@@ -1,8 +1,9 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-27: design. Nothing is built.** The build order is in
-[PLAN.md](PLAN.md). Open choices are listed in PLAN.md §8, and this document
-marks each place that depends on one as *(decision Dn)*.
+**Status as of 2026-10-27: design; only the phase 0 skeleton is built.** The
+build order is in [PLAN.md](PLAN.md). The decisions in PLAN.md §8 were
+adopted on 2026-10-27; this document marks each place that rests on one as
+*(decision Dn)*.
 
 ## 1. What Cairn is
 

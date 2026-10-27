@@ -1,0 +1,27 @@
+# Build output: make build writes bin/, release builds write dist/.
+/bin/
+/dist/
+# A plain `go build ./cmd/cairn` in the module root.
+/cairn
+
+# SQLite databases and their WAL files. A database is machine-specific and
+# may hold private data; none belongs in the repository.
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Test and profiling output.
+*.test
+coverage.out
+*.prof
+
+# Local secrets.
+.env
+
+# Editor and OS scratch.
+.DS_Store
+*.swp
+*~
