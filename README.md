@@ -83,7 +83,7 @@ project = "acme-api"
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
 | [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |
-| [docs/PLAN.md](docs/PLAN.md) | Build phases with exit checks, what is ported from bishop-memory, migration, decisions |
+| [docs/PLAN.md](docs/PLAN.md) | Build phases with exit checks, what is guided by bishop-memory, migration, decisions |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, by pull request, under Unreleased |
 | [The wiki](https://github.com/djm56/cairn-memory/wiki) | Summaries, the roadmap in plain words, and how the work is run. Published from `wiki/` |
 

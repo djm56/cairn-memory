@@ -45,9 +45,10 @@ make fmt-check   # CI fails on unformatted files
 ## Reference implementation
 
 Cairn replaces bishop-memory, checked out at `/Users/djm56/bishop-memory`.
-PLAN.md §1.1 and each phase's "Port from" line name the files to port. Read
-them there; never write to that checkout or to its database. Bishop and
-mission words do not carry over: Cairn says task, project and agent.
+PLAN.md §1.1 and each phase's "Guided by" line name the files to read for
+reference. Read them there. Write Cairn's code fresh: copy nothing from that
+checkout, and never write to it or to its database. Bishop and
+mission words are not used in Cairn: it says task, project and agent.
 
 ## Conventions
 
