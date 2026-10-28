@@ -1,7 +1,9 @@
 # Cairn Memory — Build Plan
 
-**Status as of 2026-10-27: phase 0 (skeleton) built; its exit check passes
-locally and waits on the first CI run. Decisions D1–D10 in §8 are adopted.**
+**Status as of 2026-10-27: phase 1 (contract) built, on branch
+`phase-1-contract`, and waiting for the operator's review of
+[CONTRACT.md](CONTRACT.md) §9. Phase 0's exit check passes locally; its CI
+run waits for the first push. Decisions D1–D10 in §8 are adopted.**
 What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from

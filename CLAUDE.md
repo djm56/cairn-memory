@@ -12,6 +12,9 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
 - [docs/DESIGN.md](docs/DESIGN.md) is the contract: concepts, data model
   (§3), the MCP tool list (§4), packages (§5.1) and commands (§5.2). Do not
   add tools, tables or commands it does not list without updating it first.
+- [docs/CONTRACT.md](docs/CONTRACT.md) is the call-level contract: each
+  tool's fields, errors and rules. `internal/core` is its Go form and
+  `internal/conformance` checks it; change all three together.
 - Decisions D1–D10 in PLAN.md §8 are **adopted** (2026-10-27). Do not
   reopen them without the operator.
 - [CONTRIBUTING.md](CONTRIBUTING.md) holds the engineering rules. The short
