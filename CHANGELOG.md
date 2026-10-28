@@ -29,7 +29,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 store queries: typed functions over every table of DESIGN §3, a
   `WithTx` write-transaction helper, a task id allocator, scoped search, and
   migration 0002 with the secondary indexes and the `tasks.project` guard
-  (issue #8).
+  (issue #8, [PR #47](https://github.com/djm56/cairn-memory/pull/47)).
 
 ### Changed
 
