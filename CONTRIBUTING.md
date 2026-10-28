@@ -5,7 +5,7 @@ each phase is checked: [docs/PLAN.md](docs/PLAN.md).
 
 ## Build and check
 
-Go 1.25 or later. No C toolchain: SQLite is `modernc.org/sqlite`.
+Go 1.26 or later. No C toolchain: SQLite is `modernc.org/sqlite`.
 
 ```bash
 make build       # bin/cairn, version from git describe
