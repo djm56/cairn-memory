@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -88,14 +89,19 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 	cases := []struct {
 		name, kind             string
 		insert, update, remove string
+		// wantProject and wantTaskID are checked after the insert for the
+		// kinds that carry them: a lesson, a mistake and an event.
+		wantProject, wantTaskID string
 	}{
 		{
 			name: "event",
 			kind: "event",
 			insert: `INSERT INTO events (id, task_id, project, agent, kind, text, occurred_at)
 			         VALUES (1, 'task-20261028-01', 'acme-api', 'main', 'note', '%s', 'now')`,
-			update: `UPDATE events SET text = '%s' WHERE id = 1`,
-			remove: `DELETE FROM events WHERE id = 1`,
+			update:      `UPDATE events SET text = '%s' WHERE id = 1`,
+			remove:      `DELETE FROM events WHERE id = 1`,
+			wantProject: "acme-api",
+			wantTaskID:  "task-20261028-01",
 		},
 		{
 			name: "learning",
@@ -126,16 +132,20 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 			kind: "lesson",
 			insert: `INSERT INTO task_lessons (task_id, ord, kind, text)
 			         VALUES ('task-20261028-01', 1, 'reuse', '%s')`,
-			update: `UPDATE task_lessons SET text = '%s' WHERE task_id = 'task-20261028-01' AND ord = 1`,
-			remove: `DELETE FROM task_lessons WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			update:      `UPDATE task_lessons SET text = '%s' WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			remove:      `DELETE FROM task_lessons WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			wantProject: "acme-api",
+			wantTaskID:  "task-20261028-01",
 		},
 		{
 			name: "mistake",
 			kind: "mistake",
 			insert: `INSERT INTO task_mistakes (task_id, ord, agent, mistake, impact)
 			         VALUES ('task-20261028-01', 1, 'main', '%s', 'low')`,
-			update: `UPDATE task_mistakes SET mistake = '%s' WHERE task_id = 'task-20261028-01' AND ord = 1`,
-			remove: `DELETE FROM task_mistakes WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			update:      `UPDATE task_mistakes SET mistake = '%s' WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			remove:      `DELETE FROM task_mistakes WHERE task_id = 'task-20261028-01' AND ord = 1`,
+			wantProject: "acme-api",
+			wantTaskID:  "task-20261028-01",
 		},
 	}
 	for _, c := range cases {
@@ -146,8 +156,21 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 			if _, err := s.db.Exec(fmt.Sprintf(c.insert, "alpha")); err != nil {
 				t.Fatalf("insert: %v", err)
 			}
-			if got := hits(t, s.db, "alpha"); len(got) != 1 || got[0][:len(c.kind)] != c.kind {
+			if got := hits(t, s.db, "alpha"); len(got) != 1 || !strings.HasPrefix(got[0], c.kind+":") {
 				t.Fatalf("after insert, alpha hits = %v, want one %s", got, c.kind)
+			}
+			if c.wantProject != "" {
+				var project, taskID string
+				// Only one row of this kind exists at this point (seedTask adds
+				// tasks, not these kinds), so the kind alone identifies it.
+				if err := s.db.QueryRow(`SELECT project, task_id FROM search_index
+					WHERE kind = ?`, c.kind).Scan(&project, &taskID); err != nil {
+					t.Fatalf("read %s row: %v", c.kind, err)
+				}
+				if project != c.wantProject || taskID != c.wantTaskID {
+					t.Errorf("%s row project %q task_id %q, want %q %q",
+						c.kind, project, taskID, c.wantProject, c.wantTaskID)
+				}
 			}
 
 			if _, err := s.db.Exec(fmt.Sprintf(c.update, "bravo")); err != nil {
