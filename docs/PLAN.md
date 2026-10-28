@@ -1,7 +1,8 @@
 # Cairn Memory — Build Plan
 
-**Status as of 2026-10-27: planning. Nothing is built. The decisions in §8
-are open.** What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
+**Status as of 2026-10-27: phase 0 (skeleton) built; its exit check passes
+locally and waits on the first CI run. Decisions D1–D10 in §8 are adopted.**
+What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from
 
@@ -341,7 +342,8 @@ From what went well and badly in bishop-memory:
 
 ## 8. Decisions
 
-Each has a recommendation. None is adopted yet.
+**Adopted 2026-10-27 by the operator: D1–D10, each as recommended.** D10's
+order is the one in §2.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -367,5 +369,5 @@ Each has a recommendation. None is adopted yet.
 - **D9. Local marketplace first**, public after a review of the plugin's
   hook text and install guide. *Recommended.*
 - **D10. Build from the outside in**, in the order in §2: contract, core,
-  MCP, plugin, server, UI, migration, review loop. *Recommended; confirm
-  this is the "reverse" order intended.*
+  MCP, plugin, server, UI, migration, review loop. *Recommended; confirmed
+  by the operator 2026-10-27.*

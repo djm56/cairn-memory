@@ -1,0 +1,42 @@
+name: CI
+
+# The local verification gate (CONTRIBUTING.md) on Linux. No secrets and no
+# publishing; release builds arrive in phase 10 of docs/PLAN.md.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: build, vet, fmt, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history and tags, so git describe in make build matches a
+          # local build.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Pinned to the version go.mod declares.
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: make build && bin/cairn version
+
+      - name: go vet
+        run: make vet
+
+      - name: gofmt
+        run: make fmt-check
+
+      - name: go test -race
+        run: make test

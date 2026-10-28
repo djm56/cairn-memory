@@ -8,7 +8,8 @@ every agent follows.
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
 in Cairn leaves the same kind of marker.
 
-> **Status (2026-10-27): design stage. Nothing is built yet.** Read
+> **Status (2026-10-27): phase 0 of 10. Only the build skeleton and
+> `cairn version` exist.** Read
 > [docs/DESIGN.md](docs/DESIGN.md) for what Cairn is, and
 > [docs/PLAN.md](docs/PLAN.md) for the build order. Cairn replaces
 > [bishop-memory](https://github.com/djm56/bishop-memory), which keeps
@@ -75,4 +76,8 @@ project = "acme-api"
 
 ## Licence
 
-MIT, as bishop-memory. The `LICENSE` file is added in phase 0.
+MIT, as bishop-memory. See [LICENSE](LICENSE).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
