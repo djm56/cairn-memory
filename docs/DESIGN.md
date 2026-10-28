@@ -113,7 +113,11 @@ The API key never goes in this file. It comes from the plugin's secure option,
 
 SQLite through `modernc.org/sqlite` (pure Go, no C toolchain). Every table
 carries `project`. Times are UTC, ISO 8601, set by the server. Schema changes
-are numbered migrations, run at start-up.
+are numbered migrations, run at start-up. Each migration is an embedded SQL
+file, applied in its own transaction and recorded in `schema_migrations`. The
+driver opens with `_txlock=immediate`, so the version is read under the write
+lock. Enumerated columns carry CHECK constraints, and references are declared
+foreign keys.
 
 ### 3.1 Tasks
 
@@ -139,6 +143,7 @@ task_criteria          acceptance criteria, set in the brief, judged at close
 
 task_files             key files the brief names, and deliverables at close
   task_id, ord, path, role (key | deliverable), note
+  (primary key task_id, role, ord: key and deliverable rows share the table)
 
 task_lessons           written at close
   task_id, ord, kind (wrong-assumption | reuse | similar-task), text, why, correction
@@ -233,6 +238,10 @@ search_index   FTS5 over tasks (title, goal, context, outcome), events (text),
                notes (title, body), lessons and mistakes
 ```
 
+`search_index` is one FTS5 table, with `kind`, `ref` and `project` as unindexed
+columns. Each source table has insert, update and delete triggers. Update and
+delete find a row by `ref`, which scans the index; that is accepted at v1 scale.
+
 ### 3.6 Projects and settings
 
 ```
@@ -242,6 +251,7 @@ projects
 sessions
   id PK, project, client, agent, started_at, last_seen_at
 api_keys        (server mode) name, hash, scopes, created_at, last_used_at
+  (surrogate key `id`; this table names no key of its own)
 ```
 
 The step-review rule is deferred to phase 8 (#41).

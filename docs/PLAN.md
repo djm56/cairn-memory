@@ -213,7 +213,7 @@ checked against the source. The operator reviews the result in the web UI.
 bishop-memory: categories, classification, groups, recommendations, directive
 proposals, grades, runs; the MCP review profile; the agent definitions and
 skills, rewritten without Bishop names; an engine-neutral runner
-(`cairn review run classify|process| grade`) that starts the chosen client
+(`cairn review run classify|process|grade`) that starts the chosen client
 headless. A scheduling guide for launchd and systemd.
 
 Guided by bishop-memory, for reference: the triage and grade routes in
