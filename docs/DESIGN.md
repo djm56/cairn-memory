@@ -1,10 +1,11 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
-passed with the operator's review of [CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review).
-Phase 2 (core and local store) is current.
-Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones)
-and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
+**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed
+with the operator's review of
+[CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local
+store) is current. Live progress is on the
+[milestones](https://github.com/djm56/cairn-memory/milestones) and the
+[Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
 
 The build order is in [PLAN.md](PLAN.md). The decisions in
 PLAN.md §8 were adopted on 2026-10-27; this document marks each place that
@@ -84,8 +85,8 @@ Cairn has four jobs:
 
 ### 2.1 Identity
 
-Every agent call carries a project. Every write also carries an agent. The stored
-actor is `<project>:<agent>`.
+Every agent call carries a project. Every write also carries an agent. The
+stored actor is `<project>:<agent>`.
 
 The MCP adapter finds the project in this order:
 
@@ -426,7 +427,8 @@ repository. PLAN.md lists what Cairn must provide for it.
 
 ## 7. Review loop (optional, later)
 
-Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase 8):
+Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase
+8):
 
 - **Classify**: a scheduled agent assigns a category and a confidence to each
   new finding.

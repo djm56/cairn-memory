@@ -29,9 +29,10 @@ Two plans in bishop-memory led here:
   state lives only in the service, shipped as a plugin. Once state lives in
   the service, the importer, the parsers and the reconciler are not needed.
 
-Removing those edges from bishop-memory while it stays compatible with the
-live Bishop harnesses would cost more than building the core again, cleanly,
-and writing the parts that are already good fresh, guided by bishop-memory. That is this plan.
+Removing those edges from bishop-memory while it stays compatible with the live
+Bishop harnesses would cost more than building the core again, cleanly, and
+writing the parts that are already good fresh, guided by bishop-memory. That is
+this plan.
 
 ### 1.1 What is guided by bishop-memory, and what is not
 
@@ -51,8 +52,9 @@ From bishop-memory, by size (non-test lines at `4c170b6`):
 | Triage and grading (routes, `triage-run.sh`, agents, skills) | large | **Written fresh later**, guided by bishop-memory, as the optional review loop |
 | Test suites, mutation harness (`scripts/mutate.py`, `check_mutants.py`) | large | **Guided by** bishop-memory's tests. Mutation testing: phase 2 picks an approach, the operator's choice, guided by bishop-memory's harness (`scripts/mutate.py`, `check_mutants.py`) |
 
-So roughly 6,000 lines of ingestion code and 1,200 lines of hooks go away,
-and the rest is written fresh, guided by bishop-memory, with its tests.
+So roughly 6,000 lines of ingestion code and 1,200 lines of hooks go away, and
+the rest is written fresh, guided by bishop-memory, and the tests are written
+fresh too, guided by bishop-memory's tests.
 
 ## 2. Build order
 
@@ -119,9 +121,9 @@ positions, task-id allocation in one transaction, operator-only changes.
 `internal/identity`: project resolution from `CAIRN_PROJECT` and
 `.cairn.toml` (DESIGN.md §2.1).
 
-Guided by bishop-memory, for reference: `internal/store/sqlite.go` and `migrate.go`, the FTS
-setup from `db/schema.sql`, and the allocator's daily sequence from
-`internal/api/allocate.go`.
+Guided by bishop-memory, for reference: `internal/store/sqlite.go` and
+`migrate.go`, the FTS setup from `db/schema.sql`, and the allocator's daily
+sequence from `internal/api/allocate.go`.
 
 **Exit.** The conformance suite passes against the local `Service`. Two
 processes writing the same database at once allocate distinct task ids
@@ -133,8 +135,9 @@ processes writing the same database at once allocate distinct task ids
 compact output and paging. `cairn mcp` (local backend). `cairn init`,
 `cairn status`, `cairn doctor`, `cairn hook session-start`, `cairn export`.
 
-Guided by bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go`
-(HTTP-status mapping, malformed-body guard), and the tool-description style.
+Guided by bishop-memory, for reference: the result and error helpers in
+`cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the
+tool-description style.
 
 **Exit.** A plain Claude Code project with a hand-written `.mcp.json` entry
 for `cairn mcp`, after `cairn init`, completes a small real task: Claude
@@ -167,9 +170,9 @@ brief, steps, events and close, without any other instruction file.
 `internal/client`: the `Service` over HTTP. `cairn mcp` uses it when
 `server` is set. `cairn key add/list/revoke`.
 
-Guided by bishop-memory, for reference: `internal/auth/keys.go`, `internal/middleware`,
-`internal/config`, the TLS and key handling in `cmd/memoryd`, and the network
-tests (`internal/api/network_test.go`).
+Guided by bishop-memory, for reference: `internal/auth/keys.go`,
+`internal/middleware`, `internal/config`, the TLS and key handling in
+`cmd/memoryd`, and the network tests (`internal/api/network_test.go`).
 
 **Exit.** The conformance suite passes against the HTTP client talking to a
 test server. An agent key is refused on an operator route (a test). The
@@ -206,12 +209,12 @@ checked against the source. The operator reviews the result in the web UI.
 
 ### Phase 8 — Review loop
 
-**Work.** Build triage and grading fresh (DESIGN.md §7), guided by bishop-memory: categories,
-classification, groups, recommendations, directive proposals, grades, runs;
-the MCP review profile; the agent definitions and skills, rewritten without
-Bishop names; an engine-neutral runner (`cairn review run classify|process|
-grade`) that starts the chosen client headless. A scheduling guide for
-launchd and systemd.
+**Work.** Build triage and grading fresh (DESIGN.md §7), guided by
+bishop-memory: categories, classification, groups, recommendations, directive
+proposals, grades, runs; the MCP review profile; the agent definitions and
+skills, rewritten without Bishop names; an engine-neutral runner
+(`cairn review run classify|process| grade`) that starts the chosen client
+headless. A scheduling guide for launchd and systemd.
 
 Guided by bishop-memory, for reference: the triage and grade routes in
 `internal/api/triage.go` and `grades.go`, `internal/store/triage_runs.go` and
@@ -322,7 +325,8 @@ From what went well and badly in bishop-memory:
 - **Every tool result is read by a model.** Keep it small, paged and
   readable. Test the size of `task_current` on a large task.
 - **Tests before code for each tool**, through the conformance suite.
-- **Mutation testing**: phase 2 picks an approach (the operator's choice), guided by bishop-memory's harness, on `core` and `store`.
+- **Mutation testing**: phase 2 picks an approach (the operator's choice),
+  guided by bishop-memory's harness, on `core` and `store`.
 - **No silent defaults for identity.** A missing project is an error that
   says how to fix it.
 - **Docs are dated.** Status lines carry a date, and claims carry evidence,
@@ -391,12 +395,12 @@ order is the one in §2.
 - **Status.** The status line appears in README.md, in this file, in
   docs/DESIGN.md, in docs/CONTRACT.md (whose line states the contract's own
   state, draft or approved, rather than the phase), and at the top of each
-  `wiki/*.md` content page. The
-  `cairn-phase` marker appears in README.md and in this file. All of these
-  carry the phase only: which phase is current, and whether its exit check has
-  passed. They change together, and only when a phase's exit check passes, so
-  they cannot go stale between exits. `scripts/check-docs.sh` checks only the
-  README and PLAN markers, not the status lines. They never carry pull request numbers or merge
-  state. Live progress (pull requests, issues, merges) is on the
+  `wiki/*.md` content page. The `cairn-phase` marker appears in README.md and in
+  this file. All of these carry the phase only: which phase is current, and
+  whether its exit check has passed. They change together, and only when a
+  phase's exit check passes, so they cannot go stale between exits.
+  `scripts/check-docs.sh` checks only the README and PLAN markers, not the
+  status lines. They never carry pull request numbers or merge state. Live
+  progress (pull requests, issues, merges) is on the
   [milestones](https://github.com/djm56/cairn-memory/milestones) and the
   [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
