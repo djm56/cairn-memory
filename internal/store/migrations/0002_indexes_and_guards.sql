@@ -10,10 +10,9 @@
 -- steps: the step list, in display order (ROW_NUMBER over position, id).
 CREATE INDEX idx_steps_task ON steps (task_id, position, id);
 
--- events: the journal of one task, newest first (keyset on id). The project
--- index serves the scoped journal read, which filters on project as well.
+-- events: the journal of one task, newest first (keyset on id). ListEvents
+-- filters on task_id and project; this index serves the task_id part.
 CREATE INDEX idx_events_task ON events (task_id, id);
-CREATE INDEX idx_events_project ON events (project, id);
 -- events.step_id: event_list filtered by step; also the foreign-key child for
 -- a step delete (step_plan removes pending steps).
 CREATE INDEX idx_events_step ON events (step_id);
