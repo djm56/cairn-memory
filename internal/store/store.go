@@ -1,7 +1,8 @@
 // Package store is Cairn's SQLite layer. It opens the local database, applies
-// the numbered schema migrations (docs/DESIGN.md §3), and will hold the typed
-// queries for every table (issue #8). It holds no rules: status transitions,
-// the close policy and identity live in internal/core.
+// the numbered schema migrations (docs/DESIGN.md §3), and holds the typed
+// queries for every table, the WithTx write transaction, and the scoped search
+// over search_index. It holds no rules: status transitions, the close policy
+// and identity live in internal/core.
 package store
 
 import (
