@@ -1,9 +1,10 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-phase: 1 -->
+<!-- cairn-phase: 2 -->
 
-**Status as of 2026-10-28: phase 1 (contract) is built and waits on the
-operator's review of [CONTRACT.md](CONTRACT.md) §9. Live progress is on the
+**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
+passed with the operator's review of [CONTRACT.md](CONTRACT.md) §9. Phase 2
+(core and local store) is current. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
@@ -389,7 +390,9 @@ order is the one in §2.
   set. The operator runs `--apply`.
 - **Wiki.** The GitHub wiki is published from `wiki/` in this repository.
 - **Status.** The status line appears in README.md, in this file, in
-  docs/DESIGN.md, and at the top of each `wiki/*.md` content page. The
+  docs/DESIGN.md, in docs/CONTRACT.md (whose line states the contract's own
+  state, draft or approved, rather than the phase), and at the top of each
+  `wiki/*.md` content page. The
   `cairn-phase` marker appears in README.md and in this file. All of these
   carry the phase only: which phase is current, and whether its exit check has
   passed. They change together, and only when a phase's exit check passes, so

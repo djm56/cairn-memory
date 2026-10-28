@@ -1,6 +1,6 @@
 # Getting started
 
-_Status as of 2026-10-28: phase 1 (contract) is built and waits on the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local store) is current. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 This page is for contributors. For what Cairn is, read [Home](Home) and [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md).
 
@@ -38,7 +38,7 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 | Area | Exists now | Planned |
 |---|---|---|
 | Binary | `cairn version` | `init`, `status`, `doctor`, `hook`, `export` and `mcp` in phase 3. `serve` in phase 5. `import` in phase 7. `review run` in phase 8. |
-| Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | Operator review of the contract (phase 1 exit). |
+| Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | Nothing further in phase 1. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
 | Conformance suite | `internal/conformance`, failing against the stub | Passes against the local service in phase 2. |
 | Store | Nothing yet | SQLite store, migrations and full-text search in phase 2. |
 | MCP adapter | Nothing yet | `cairn mcp` in phase 3. |

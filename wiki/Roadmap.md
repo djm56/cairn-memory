@@ -1,14 +1,14 @@
 # Roadmap
 
-_Status as of 2026-10-28: phase 1 (contract) is built and waits on the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local store) is current. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 The build runs from the outside in: the contract first, then the core, then the ways to reach it, then the operator's pages, then migration, then the review loop ([PLAN.md §2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#2-build-order)). Version 1 is phases 0 to 4 ([PLAN.md §7](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#7-risks)).
 
 | Phase | Name | Goal | Milestone | Status |
 |---|---|---|---|---|
 | 0 | [Skeleton](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton) | `cairn version` builds, and CI runs on an empty test suite | [milestone](https://github.com/djm56/cairn-memory/milestones) | Exit check passed |
-| 1 | [Contract](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-1--contract) | The tool contract, and a conformance suite that fails against a stub | [milestone](https://github.com/djm56/cairn-memory/milestones) | Built. Waits for the operator's review |
-| 2 | [Core and local store](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store) | The rules in `core` over a local SQLite store | [milestone](https://github.com/djm56/cairn-memory/milestones) | Planned |
+| 1 | [Contract](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-1--contract) | The tool contract, and a conformance suite that fails against a stub | [milestone](https://github.com/djm56/cairn-memory/milestones) | Exit check passed |
+| 2 | [Core and local store](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store) | The rules in `core` over a local SQLite store | [milestone](https://github.com/djm56/cairn-memory/milestones) | Current |
 | 3 | [MCP adapter](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter) | Every tool over MCP stdio, and the commands a project needs | [milestone](https://github.com/djm56/cairn-memory/milestones) | Planned |
 | 4 | [Claude Code plugin](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin) | A plugin, a skill and a launcher, so Claude Code records a small task | [milestone](https://github.com/djm56/cairn-memory/milestones) | Planned |
 | 5 | [Server and remote backend](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-5--server-and-remote-backend) | `cairn serve` with API keys, and a remote client | [milestone](https://github.com/djm56/cairn-memory/milestones) | Planned |

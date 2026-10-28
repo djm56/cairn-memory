@@ -1,7 +1,7 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-27: draft for operator review (PLAN.md phase 1 exit).
-Nothing implements it yet.** The Go form is `internal/core` (`Service`,
+**Status as of 2026-10-28: approved by the operator (phase 1 exit).**
+Nothing implements it yet. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite in
 `internal/conformance` checks the behaviour described here. The
 suite has 35 cases. Each one fails against the `core.Unimplemented`
@@ -12,8 +12,8 @@ operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open. Review those
-items first.
+§9 lists what this contract settles that DESIGN.md left open; the operator
+approved it on 2026-10-28.
 
 ## 1. Conventions
 
@@ -323,7 +323,8 @@ these calls do not need the caller's project.
 ## 9. Settled here, for review
 
 Each item answers a question that DESIGN.md left open. Each one is checked
-by the suite, except where noted.
+by the suite, except where noted. The operator approved items 1–11 on
+2026-10-28.
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -350,5 +351,6 @@ by the suite, except where noted.
     by design (`recall`).
 11. **Agent-scoped directives apply in every project.** DESIGN §3.4 has no
     project on an agent-scoped directive.
-12. **Not yet settled:** the "step-review rule" in project settings (DESIGN
-    §3.6) is not defined. It is left out until a client needs it.
+12. **Deferred:** the "step-review rule" in project settings is not defined
+    here. The operator deferred it to phase 8 (#41), and DESIGN §3.6 no
+    longer lists it.
