@@ -196,6 +196,36 @@ func TestMigrationsCreateEveryTableAndIndex(t *testing.T) {
 	}
 }
 
+// TestMigration0002IndexesAndGuard checks that every index migration 0002
+// creates exists under its name, and that the tasks.project guard trigger is
+// in place. The list is the migration's own, so a dropped or renamed index
+// fails here rather than as a silent slow query.
+func TestMigration0002IndexesAndGuard(t *testing.T) {
+	s := openTemp(t)
+	objects := []struct{ kind, name string }{
+		{"index", "idx_steps_task"},
+		{"index", "idx_events_task"},
+		{"index", "idx_events_step"},
+		{"index", "idx_reviews_task"},
+		{"index", "idx_reviews_step"},
+		{"index", "idx_learnings_project_status"},
+		{"index", "idx_notes_task"},
+		{"index", "idx_sessions_project"},
+		{"index", "idx_tasks_project_updated"},
+		{"trigger", "tasks_project_immutable"},
+	}
+	for _, o := range objects {
+		var n int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, o.kind, o.name).Scan(&n); err != nil {
+			t.Fatalf("query %s %s: %v", o.kind, o.name, err)
+		}
+		if n != 1 {
+			t.Errorf("%s %s missing from sqlite_master", o.kind, o.name)
+		}
+	}
+}
+
 // TestMigrationsRecordVersions checks that a fresh database ends at version 2,
 // with one row per migration, each recorded by its number and name.
 func TestMigrationsRecordVersions(t *testing.T) {
