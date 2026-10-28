@@ -82,8 +82,10 @@ func GetTask(ctx context.Context, q Querier, project, id string) (TaskRow, error
 	return t, nil
 }
 
-// GetTaskAnyProject returns task id from whatever project holds it. Only
-// recall reads across projects (CONTRACT §6); every other read uses GetTask.
+// GetTaskAnyProject returns task id from whatever project holds it. Only the
+// recall call may use it, because recall reads tasks from every project
+// (CONTRACT §6). No other caller may use it, operator calls included (§8):
+// every other read uses GetTask, which checks the project.
 //
 // Read function: call it on s, outside a transaction.
 func GetTaskAnyProject(ctx context.Context, q Querier, id string) (TaskRow, error) {
@@ -201,6 +203,8 @@ func AllocateTaskID(ctx context.Context, q Querier, day time.Time) (string, erro
 
 // ListCriteria returns the acceptance criteria of task taskID, in ord order.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction.
 func ListCriteria(ctx context.Context, q Querier, taskID string) ([]CriterionRow, error) {
 	rows, err := q.QueryContext(ctx, `SELECT task_id, ord, criterion, result, evidence
@@ -250,6 +254,8 @@ func ReplaceCriteria(ctx context.Context, q Querier, taskID string, rows []Crite
 
 // ListFiles returns the files of task taskID with the given role ("key" or
 // "deliverable"), in ord order.
+//
+// Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction.
 func ListFiles(ctx context.Context, q Querier, taskID, role string) ([]FileRow, error) {
@@ -306,6 +312,8 @@ func ReplaceFiles(ctx context.Context, q Querier, taskID, role string, rows []Fi
 
 // ListLessons returns the lessons of task taskID, in ord order.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction.
 func ListLessons(ctx context.Context, q Querier, taskID string) ([]LessonRow, error) {
 	rows, err := q.QueryContext(ctx, `SELECT task_id, ord, kind, text, why, correction
@@ -334,6 +342,8 @@ func ListLessons(ctx context.Context, q Querier, taskID string) ([]LessonRow, er
 // GetLesson returns lesson ord of task taskID. It returns ErrNotFound (wrapped)
 // when there is none. Search hits name a lesson as "task-id/ord"; see
 // ParseChildRef.
+//
+// Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction.
 func GetLesson(ctx context.Context, q Querier, taskID string, ord int) (LessonRow, error) {
@@ -374,6 +384,8 @@ func ReplaceLessons(ctx context.Context, q Querier, taskID string, rows []Lesson
 
 // ListMistakes returns the mistakes of task taskID, in ord order.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction.
 func ListMistakes(ctx context.Context, q Querier, taskID string) ([]MistakeRow, error) {
 	rows, err := q.QueryContext(ctx, `SELECT task_id, ord, agent, mistake, impact, correction, prevention
@@ -401,6 +413,8 @@ func ListMistakes(ctx context.Context, q Querier, taskID string) ([]MistakeRow, 
 
 // GetMistake returns mistake ord of task taskID. It returns ErrNotFound
 // (wrapped) when there is none.
+//
+// Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction.
 func GetMistake(ctx context.Context, q Querier, taskID string, ord int) (MistakeRow, error) {

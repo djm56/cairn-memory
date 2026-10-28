@@ -58,6 +58,8 @@ func InsertStep(ctx context.Context, q Querier, s StepRow) (int64, error) {
 // ListSteps returns every step of task taskID in display order, each with its
 // Number.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction.
 func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error) {
 	rows, err := q.QueryContext(ctx, stepRanked+` ORDER BY num`, taskID)
@@ -98,6 +100,8 @@ func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, 
 
 // GetStepByNumber returns the step shown as number in task taskID. It returns
 // ErrNotFound (wrapped) when the task has no step with that number.
+//
+// Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction.
 func GetStepByNumber(ctx context.Context, q Querier, taskID string, number int) (StepRow, error) {

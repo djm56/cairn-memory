@@ -131,6 +131,8 @@ func InsertReview(ctx context.Context, q Querier, r ReviewRow) (int64, error) {
 // ListReviews returns every review of task taskID, oldest first (id order), so
 // that a step's reviews read in the order they were made.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction.
 func ListReviews(ctx context.Context, q Querier, taskID string) ([]ReviewRow, error) {
 	rows, err := q.QueryContext(ctx, `SELECT id, task_id, step_id, reviewer, verdict,
