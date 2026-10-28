@@ -131,6 +131,7 @@ tasks
   next_action   TEXT
   blockers      TEXT
   outcome_summary TEXT         set at close
+  no_lessons_reason TEXT       why task_lessons is empty, set at close
   opened_at, started_at, closed_at, updated_at
 
 task_criteria          acceptance criteria, set in the brief, judged at close
