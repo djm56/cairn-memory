@@ -1,10 +1,11 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
-passed with the operator's review of [CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review).
-Phase 2 (core and local store) is current.
-Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones)
-and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
+**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed
+with the operator's review of
+[CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local
+store) is current. Live progress is on the
+[milestones](https://github.com/djm56/cairn-memory/milestones) and the
+[Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
 
 The build order is in [PLAN.md](PLAN.md). The decisions in
 PLAN.md §8 were adopted on 2026-10-27; this document marks each place that
@@ -84,8 +85,8 @@ Cairn has four jobs:
 
 ### 2.1 Identity
 
-Every agent call carries a project. Every write also carries an agent. The stored
-actor is `<project>:<agent>`.
+Every agent call carries a project. Every write also carries an agent. The
+stored actor is `<project>:<agent>`.
 
 The MCP adapter finds the project in this order:
 
@@ -112,7 +113,11 @@ The API key never goes in this file. It comes from the plugin's secure option,
 
 SQLite through `modernc.org/sqlite` (pure Go, no C toolchain). Every table
 carries `project`. Times are UTC, ISO 8601, set by the server. Schema changes
-are numbered migrations, run at start-up.
+are numbered migrations, run at start-up. Each migration is an embedded SQL
+file, applied in its own transaction and recorded in `schema_migrations`. The
+driver opens with `_txlock=immediate`, so the version is read under the write
+lock. Enumerated columns carry CHECK constraints, and references are declared
+foreign keys.
 
 ### 3.1 Tasks
 
@@ -130,6 +135,7 @@ tasks
   next_action   TEXT
   blockers      TEXT
   outcome_summary TEXT         set at close
+  no_lessons_reason TEXT       why task_lessons is empty, set at close
   opened_at, started_at, closed_at, updated_at
 
 task_criteria          acceptance criteria, set in the brief, judged at close
@@ -137,6 +143,7 @@ task_criteria          acceptance criteria, set in the brief, judged at close
 
 task_files             key files the brief names, and deliverables at close
   task_id, ord, path, role (key | deliverable), note
+  (primary key task_id, role, ord: key and deliverable rows share the table)
 
 task_lessons           written at close
   task_id, ord, kind (wrong-assumption | reuse | similar-task), text, why, correction
@@ -231,6 +238,10 @@ search_index   FTS5 over tasks (title, goal, context, outcome), events (text),
                notes (title, body), lessons and mistakes
 ```
 
+`search_index` is one FTS5 table, with `kind`, `ref` and `project` as unindexed
+columns. Each source table has insert, update and delete triggers. Update and
+delete find a row by `ref`, which scans the index; that is accepted at v1 scale.
+
 ### 3.6 Projects and settings
 
 ```
@@ -240,6 +251,7 @@ projects
 sessions
   id PK, project, client, agent, started_at, last_seen_at
 api_keys        (server mode) name, hash, scopes, created_at, last_used_at
+  (surrogate key `id`; this table names no key of its own)
 ```
 
 The step-review rule is deferred to phase 8 (#41).
@@ -426,7 +438,8 @@ repository. PLAN.md lists what Cairn must provide for it.
 
 ## 7. Review loop (optional, later)
 
-Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase 8):
+Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase
+8):
 
 - **Classify**: a scheduled agent assigns a category and a confidence to each
   new finding.

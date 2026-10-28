@@ -6,7 +6,7 @@ This page is for contributors. For what Cairn is, read [Home](Home) and [DESIGN.
 
 ## What you need
 
-- Go 1.25 or later. [go.mod](https://github.com/djm56/cairn-memory/blob/main/go.mod) declares `go 1.25.0`, and CI reads its Go version from that file.
+- Go 1.26 or later. [go.mod](https://github.com/djm56/cairn-memory/blob/main/go.mod) declares `go 1.26.0`, and CI reads its Go version from that file.
 - Git.
 - No C toolchain. SQLite comes from `modernc.org/sqlite`, which is pure Go.
 

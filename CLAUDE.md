@@ -52,6 +52,6 @@ mission words are not used in Cairn: it says task, project and agent.
 
 ## Conventions
 
-- Module `github.com/djm56/cairn-memory`, Go 1.25 (go.mod pins it for CI).
+- Module `github.com/djm56/cairn-memory`, Go 1.26 (go.mod pins it for CI).
 - Standard library first. A new dependency needs a reason in the PR.
 - Docs are written in plain, short English and carry a dated status line.
