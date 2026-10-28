@@ -207,6 +207,27 @@ func TestSearchPlainText(t *testing.T) {
 		})
 	}
 
+	// Each word is one phrase, and the quote, bracket, star and dash are
+	// separators to the tokenizer, so a word that carries them still finds its
+	// text. The seed holds seven acme-api rows with "tests" (the acme case of
+	// TestSearchScoping). NOT is a word too, ANDed with tests, and no row holds
+	// it, so NOT tests finds none (CONTRACT §6: operators are matched as words).
+	found := []struct {
+		query string
+		want  int
+	}{
+		{`"tests`, 7}, {`tests"`, 7}, {`(tests`, 7}, {`tests*`, 7}, {`-tests`, 7},
+		{`NOT tests`, 0},
+	}
+	for _, c := range found {
+		t.Run("hits "+c.query, func(t *testing.T) {
+			rows, _, err := Search(ctx, s, SearchFilter{Query: c.query, Project: "acme-api", Limit: 50})
+			if err != nil || len(rows) != c.want {
+				t.Errorf("Search(%q) = %d rows, err %v; want %d", c.query, len(rows), err, c.want)
+			}
+		})
+	}
+
 	rows, _, err := Search(ctx, s, SearchFilter{Query: `title:tests`, Project: "acme-api", Limit: 50})
 	if err != nil || len(rows) != 0 {
 		t.Errorf("title:tests = %d rows, err %v; want none (the colon is a word, not a column filter)", len(rows), err)
