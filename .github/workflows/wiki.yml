@@ -1,0 +1,34 @@
+name: Wiki
+
+# Publishes wiki/ to the GitHub wiki after a change lands on main. The publish
+# script is also run by hand with its dry-run default (scripts/github/publish-wiki.sh).
+on:
+  push:
+    branches: [main]
+    paths: ['wiki/**']
+  workflow_dispatch:
+
+# One publish at a time, so two pushes to the wiki cannot race.
+concurrency:
+  group: wiki-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: publish wiki
+    # workflow_dispatch can run from any branch; only main publishes.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish wiki/ to the wiki repository
+        env:
+          # Lets the script push to <repo>.wiki.git over https.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: scripts/github/publish-wiki.sh --apply

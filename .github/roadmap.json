@@ -1,0 +1,322 @@
+{
+  "milestones": [
+    {
+      "phase": 0,
+      "title": "Phase 0 — Skeleton",
+      "description": "Exit: `make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton"
+    },
+    {
+      "phase": 1,
+      "title": "Phase 1 — Contract",
+      "description": "Exit: `CONTRACT.md` covers every tool in DESIGN.md §4. The conformance suite compiles and reports every case as failing against the stub. Review of the contract by the operator before phase 2 starts.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-1--contract"
+    },
+    {
+      "phase": 2,
+      "title": "Phase 2 — Core and local store",
+      "description": "Exit: The conformance suite passes against the local `Service`. Two processes writing the same database at once allocate distinct task ids (a test). `go test -race` is clean.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store"
+    },
+    {
+      "phase": 3,
+      "title": "Phase 3 — MCP adapter",
+      "description": "Exit: A plain Claude Code project with a hand-written `.mcp.json` entry for `cairn mcp`, after `cairn init`, completes a small real task: Claude starts it, plans it, steps through it, records a learning and closes it. `cairn export` prints the task as Markdown. An MCP-level test drives the same flow through stdio.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter"
+    },
+    {
+      "phase": 4,
+      "title": "Phase 4 — Claude Code plugin",
+      "description": "Exit: On a machine with no bishop-memory: install `cairn`, add the marketplace, install the plugin, run `/cairn:init` in an empty project, and ask Claude to do a small task \"using Cairn\". The task is recorded with its brief, steps, events and close, without any other instruction file.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin"
+    },
+    {
+      "phase": 5,
+      "title": "Phase 5 — Server and remote backend",
+      "description": "Exit: The conformance suite passes against the HTTP client talking to a test server. An agent key is refused on an operator route (a test). The phase 4 flow works with `server` set in `.cairn.toml`.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-5--server-and-remote-backend"
+    },
+    {
+      "phase": 6,
+      "title": "Phase 6 — Web UI",
+      "description": "Exit: The operator can run the whole learning loop from the browser: see a proposed finding, accept it, ratify it as a directive, and see it returned by `directive_list` and `task_current` in the next session.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-6--web-ui"
+    },
+    {
+      "phase": 7,
+      "title": "Phase 7 — Migration from bishop-memory",
+      "description": "Exit: A dry run against a copy of the live bishop-memory database maps every mission, step, event, finding, directive, criterion, lesson, mistake, deliverable and grade, or names each one it skipped and why. Counts are checked against the source. The operator reviews the result in the web UI.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-7--migration-from-bishop-memory"
+    },
+    {
+      "phase": 8,
+      "title": "Phase 8 — Review loop",
+      "description": "Exit: A scheduled run classifies new findings and grades closed tasks, and the operator accepts the recommendations on the review page. Then the bishop-memory nightly runs are switched off (§5.3).\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-8--review-loop"
+    },
+    {
+      "phase": 9,
+      "title": "Phase 9 — Other clients",
+      "description": "Exit: Each client completes the phase 3 flow in a live session.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-9--other-clients"
+    },
+    {
+      "phase": 10,
+      "title": "Phase 10 — Releases",
+      "description": "Exit: A clean machine installs `cairn` from a release, installs the plugin, and completes the phase 4 flow.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-10--releases"
+    }
+  ],
+  "issues": [
+    {
+      "key": "p0-epic",
+      "phase": 0,
+      "area": "area:core",
+      "title": "Phase 0 — Skeleton",
+      "milestone": "Phase 0 — Skeleton",
+      "labels": ["type:epic", "phase:0", "area:core"],
+      "body": "**Status.** Delivered through PR #1.\n\n**Work.** Go module `github.com/djm56/cairn-memory`, Go 1.25. `cmd/cairn` with the sub-command frame and `cairn version`. Makefile (`build`, `test`, `vet`, `fmt`, `run`). CI on pull requests: `go vet`, `go test -race`, `gofmt` check. MIT licence (as bishop-memory). `CONTRIBUTING.md` with the rules in §6. `.gitignore` for `bin/`, `dist/`, `*.db`.\n\n**Exit check.** `make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton)\n\n<!-- cairn-roadmap: p0-epic -->"
+    },
+    {
+      "key": "p1-epic",
+      "phase": 1,
+      "area": "area:core",
+      "title": "Phase 1 — Contract",
+      "milestone": "Phase 1 — Contract",
+      "labels": ["type:epic", "phase:1", "area:core", "needs-operator"],
+      "body": "**Status.** Built through PR #2; the exit check is open until the operator's review of CONTRACT.md §9.\n\n**Work.** `internal/core`: the `Service` interface, the request and result types for every tool in DESIGN.md §4, and the error kinds (not found, refused by policy, invalid, operator only). `docs/CONTRACT.md`: each tool's inputs, outputs, errors and an example. `internal/conformance`: a test suite that takes any `Service` and checks the behaviour, including: a whole task (start with a brief and plan, step through it, log events, record a review, add a learning, be refused at close with the missing items listed, close); inserting a step between two others without renumbering; refusing every write without a project; refusing every operator-only change through the agent interface; events are append-only and timestamps are the server's; `task_current` returns the one active task, and nothing when none is. The suite cannot pass yet; it runs against a stub that fails every call.\n\n**Exit check.** `CONTRACT.md` covers every tool in DESIGN.md §4. The conformance suite compiles and reports every case as failing against the stub. Review of the contract by the operator before phase 2 starts.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-1--contract)\n\n<!-- cairn-roadmap: p1-epic -->"
+    },
+    {
+      "key": "p2-epic",
+      "phase": 2,
+      "area": "area:store",
+      "title": "Phase 2 — Core and local store",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:epic", "phase:2", "area:store"],
+      "body": "**Work.** `internal/store`: schema v1 (DESIGN.md §3) as numbered migrations, WAL mode, busy timeout, FTS5 index and its triggers. Typed query functions for every table. `internal/core`: the `Service` implementation over the store, holding every rule: status transitions, the close policy, step positions, task-id allocation in one transaction, operator-only changes. `internal/identity`: project resolution from `CAIRN_PROJECT` and `.cairn.toml` (DESIGN.md §2.1).\n\n**Exit check.** The conformance suite passes against the local `Service`. Two processes writing the same database at once allocate distinct task ids (a test). `go test -race` is clean.\n\n**Port from.** Port from bishop-memory: `internal/store/sqlite.go` and `migrate.go`, the FTS setup from `db/schema.sql`, and the allocator's daily sequence from `internal/api/allocate.go`.\n\n## Child issues\n\n<!-- children-start -->\n- [ ] p2-store-schema\n- [ ] p2-typed-queries\n- [ ] p2-core-service\n- [ ] p2-identity\n- [ ] p2-concurrent-allocation-test\n- [ ] p2-mutation-harness\n<!-- children-end -->\n\n<!-- children: p2-store-schema,p2-typed-queries,p2-core-service,p2-identity,p2-concurrent-allocation-test,p2-mutation-harness -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-epic -->"
+    },
+    {
+      "key": "p2-store-schema",
+      "phase": 2,
+      "area": "area:store",
+      "title": "Phase 2: store schema, migrations, WAL and FTS",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:store"],
+      "body": "**Work.** `internal/store`: schema v1 (DESIGN.md §3) as numbered migrations, WAL mode, busy timeout, FTS5 index and its triggers.\n\n**Port from.** `internal/store/sqlite.go`, `migrate.go`, and the FTS setup from `db/schema.sql`.\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-store-schema -->"
+    },
+    {
+      "key": "p2-typed-queries",
+      "phase": 2,
+      "area": "area:store",
+      "title": "Phase 2: typed query functions for every table",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:store"],
+      "body": "**Work.** Typed query functions for every table.\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-typed-queries -->"
+    },
+    {
+      "key": "p2-core-service",
+      "phase": 2,
+      "area": "area:core",
+      "title": "Phase 2: core Service implementation over the store",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:core"],
+      "body": "**Work.** `internal/core`: the `Service` implementation over the store, holding every rule: status transitions, the close policy, step positions, task-id allocation in one transaction, operator-only changes.\n\n**Exit.** The conformance suite passes against the local `Service`. Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-core-service -->"
+    },
+    {
+      "key": "p2-identity",
+      "phase": 2,
+      "area": "area:core",
+      "title": "Phase 2: project identity resolution",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:core"],
+      "body": "**Work.** `internal/identity`: project resolution from `CAIRN_PROJECT` and `.cairn.toml` (DESIGN.md §2.1).\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-identity -->"
+    },
+    {
+      "key": "p2-concurrent-allocation-test",
+      "phase": 2,
+      "area": "area:store",
+      "title": "Phase 2: concurrent task-id allocation test",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:store"],
+      "body": "**Work.** Test that task ids stay distinct under concurrent writes. Port source: the allocator's daily sequence in `internal/api/allocate.go` (PLAN §3, phase 2).\n\n**Exit.** Two processes writing the same database at once allocate distinct task ids (a test). Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-concurrent-allocation-test -->"
+    },
+    {
+      "key": "p2-mutation-harness",
+      "phase": 2,
+      "area": "area:core",
+      "title": "Phase 2: mutation testing on core and store",
+      "milestone": "Phase 2 — Core and local store",
+      "labels": ["type:task", "phase:2", "area:core"],
+      "body": "**Work.** Mutation testing with the harness ported from bishop-memory, on `core` and `store`, from phase 2 (`scripts/mutate.py`, `check_mutants.py`; PLAN §1.1 and §6).\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §1.1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#11-what-carries-over-and-what-does-not) and [§6](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#6-engineering-rules).\n\n<!-- cairn-roadmap: p2-mutation-harness -->"
+    },
+    {
+      "key": "p3-epic",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3 — MCP adapter",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:epic", "phase:3", "area:mcp"],
+      "body": "**Work.** `internal/mcp`: every tool in DESIGN.md §4 over `Service`, with compact output and paging. `cairn mcp` (local backend). `cairn init`, `cairn status`, `cairn doctor`, `cairn hook session-start`, `cairn export`.\n\n**Exit check.** A plain Claude Code project with a hand-written `.mcp.json` entry for `cairn mcp`, after `cairn init`, completes a small real task: Claude starts it, plans it, steps through it, records a learning and closes it. `cairn export` prints the task as Markdown. An MCP-level test drives the same flow through stdio.\n\n**Port from.** Port from bishop-memory: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n- [ ] p3-mcp-tools\n- [ ] p3-mcp-local-command\n- [ ] p3-cli-commands\n- [ ] p3-mcpd-helpers-port\n- [ ] p3-stdio-flow-test\n- [ ] p3-live-flow-check\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,p3-live-flow-check -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-epic -->"
+    },
+    {
+      "key": "p3-mcp-tools",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3: MCP tools over Service",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:mcp"],
+      "body": "**Work.** `internal/mcp`: every tool in DESIGN.md §4 over `Service`, with compact output and paging.\n\n**Exit.** Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-mcp-tools -->"
+    },
+    {
+      "key": "p3-mcp-local-command",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3: cairn mcp with the local backend",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:mcp"],
+      "body": "**Work.** `cairn mcp` (local backend).\n\n**Exit.** Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-mcp-local-command -->"
+    },
+    {
+      "key": "p3-cli-commands",
+      "phase": 3,
+      "area": "area:core",
+      "title": "Phase 3: init, status, doctor, hook session-start and export commands",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:core"],
+      "body": "**Work.** `cairn init`, `cairn status`, `cairn doctor`, `cairn hook session-start`, `cairn export`.\n\n**Exit.** `cairn export` prints the task as Markdown. Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-cli-commands -->"
+    },
+    {
+      "key": "p3-mcpd-helpers-port",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3: port result and error helpers from mcpd",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:mcp"],
+      "body": "**Work.** Port from bishop-memory: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n**Exit.** Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-mcpd-helpers-port -->"
+    },
+    {
+      "key": "p3-stdio-flow-test",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3: MCP-level test of the task flow over stdio",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:mcp"],
+      "body": "**Exit.** An MCP-level test drives the same flow through stdio. Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-stdio-flow-test -->"
+    },
+    {
+      "key": "p3-live-flow-check",
+      "phase": 3,
+      "area": "area:mcp",
+      "title": "Phase 3: live Claude Code run of a small task",
+      "milestone": "Phase 3 — MCP adapter",
+      "labels": ["type:task", "phase:3", "area:mcp"],
+      "body": "**Exit.** A plain Claude Code project with a hand-written `.mcp.json` entry for `cairn mcp`, after `cairn init`, completes a small real task: Claude starts it, plans it, steps through it, records a learning and closes it. Part of the phase 3 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-3--mcp-adapter)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
+    },
+    {
+      "key": "p4-epic",
+      "phase": 4,
+      "area": "area:plugin",
+      "title": "Phase 4 — Claude Code plugin",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:epic", "phase:4", "area:plugin"],
+      "body": "**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/marketplace.json` at the repository root (local marketplace first). The `cairn` skill: the task loop, when to log, what makes a good finding, how to answer a close refusal. `cairn-launch`: finds `cairn` on PATH, in `~/.local/bin`, or in `CAIRN_HOME/bin`; otherwise prints the install command. `claude plugin validate` in CI. An install guide. Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairn_cairn__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairn mcp`, and the SessionStart output.\n\n**Exit check.** On a machine with no bishop-memory: install `cairn`, add the marketplace, install the plugin, run `/cairn:init` in an empty project, and ask Claude to do a small task \"using Cairn\". The task is recorded with its brief, steps, events and close, without any other instruction file.\n\n## Child issues\n\n<!-- children-start -->\n- [ ] p4-plugin-layout\n- [ ] p4-cairn-skill\n- [ ] p4-cairn-launch\n- [ ] p4-plugin-validate-ci\n- [ ] p4-install-guide\n- [ ] p4-live-confirmation\n<!-- children-end -->\n\n<!-- children: p4-plugin-layout,p4-cairn-skill,p4-cairn-launch,p4-plugin-validate-ci,p4-install-guide,p4-live-confirmation -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-epic -->"
+    },
+    {
+      "key": "p4-plugin-layout",
+      "phase": 4,
+      "area": "area:plugin",
+      "title": "Phase 4: plugins/claude-code layout and local marketplace",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:plugin"],
+      "body": "**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/marketplace.json` at the repository root (local marketplace first).\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-plugin-layout -->"
+    },
+    {
+      "key": "p4-cairn-skill",
+      "phase": 4,
+      "area": "area:plugin",
+      "title": "Phase 4: cairn skill",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:plugin"],
+      "body": "**Work.** The `cairn` skill: the task loop, when to log, what makes a good finding, how to answer a close refusal.\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-cairn-skill -->"
+    },
+    {
+      "key": "p4-cairn-launch",
+      "phase": 4,
+      "area": "area:plugin",
+      "title": "Phase 4: cairn-launch binary finder",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:plugin"],
+      "body": "**Work.** `cairn-launch`: finds `cairn` on PATH, in `~/.local/bin`, or in `CAIRN_HOME/bin`; otherwise prints the install command.\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-cairn-launch -->"
+    },
+    {
+      "key": "p4-plugin-validate-ci",
+      "phase": 4,
+      "area": "area:github",
+      "title": "Phase 4: claude plugin validate in CI",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:github"],
+      "body": "**Work.** `claude plugin validate` in CI.\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-plugin-validate-ci -->"
+    },
+    {
+      "key": "p4-install-guide",
+      "phase": 4,
+      "area": "area:docs",
+      "title": "Phase 4: plugin install guide",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:docs"],
+      "body": "**Work.** An install guide.\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-install-guide -->"
+    },
+    {
+      "key": "p4-live-confirmation",
+      "phase": 4,
+      "area": "area:plugin",
+      "title": "Phase 4: confirm tool names and hook behaviour in a live session",
+      "milestone": "Phase 4 — Claude Code plugin",
+      "labels": ["type:task", "phase:4", "area:plugin"],
+      "body": "**Work.** Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairn_cairn__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairn mcp`, and the SessionStart output.\n\n**Exit.** Part of the phase 4 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-4--claude-code-plugin)\n\n<!-- cairn-roadmap: p4-live-confirmation -->"
+    },
+    {
+      "key": "p5-epic",
+      "phase": 5,
+      "area": "area:server",
+      "title": "Phase 5 — Server and remote backend",
+      "milestone": "Phase 5 — Server and remote backend",
+      "labels": ["type:epic", "phase:5", "area:server"],
+      "body": "**Work.** `cairn serve`: the HTTP API over `core`, API keys with scopes (DESIGN.md §8), TLS, loopback by default, body caps, `/healthz`. `internal/client`: the `Service` over HTTP. `cairn mcp` uses it when `server` is set. `cairn key add/list/revoke`.\n\n**Exit check.** The conformance suite passes against the HTTP client talking to a test server. An agent key is refused on an operator route (a test). The phase 4 flow works with `server` set in `.cairn.toml`.\n\n**Port from.** Port from bishop-memory: `internal/auth/keys.go`, `internal/middleware`, `internal/config`, the TLS and key handling in `cmd/memoryd`, and the network tests (`internal/api/network_test.go`).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-5--server-and-remote-backend)\n\n<!-- cairn-roadmap: p5-epic -->"
+    },
+    {
+      "key": "p6-epic",
+      "phase": 6,
+      "area": "area:ui",
+      "title": "Phase 6 — Web UI",
+      "milestone": "Phase 6 — Web UI",
+      "labels": ["type:epic", "phase:6", "area:ui"],
+      "body": "**Work.** Pages embedded in the binary, served by `cairn serve`: **Tasks**: a list across projects; one task's page with its brief, steps, journal, reviews and close record. Ported from bishop-memory's mission HUD. **Learnings**: proposed findings with accept, reject and supersede, each with a note. Ported from the triage review page. **Directives**: ratify a directive from an accepted finding, edit scope, retire. **Projects**: settings, including the close policy.\n\n**Exit check.** The operator can run the whole learning loop from the browser: see a proposed finding, accept it, ratify it as a directive, and see it returned by `directive_list` and `task_current` in the next session.\n\n**Port from.** Port from bishop-memory: the mission HUD (Tasks page) and the triage review page (Learnings page).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-6--web-ui)\n\n<!-- cairn-roadmap: p6-epic -->"
+    },
+    {
+      "key": "p7-epic",
+      "phase": 7,
+      "area": "area:migration",
+      "title": "Phase 7 — Migration from bishop-memory",
+      "milestone": "Phase 7 — Migration from bishop-memory",
+      "labels": ["type:epic", "phase:7", "area:migration"],
+      "body": "**Work.** `cairn import bishop-memory --db <path> [--dry-run]`. Reads the bishop-memory SQLite file directly; never reads harness Markdown. The mapping is in §5. Idempotent: running it twice changes nothing the second time. Reports counts for each table, read and written, and every row it could not map.\n\n**Exit check.** A dry run against a copy of the live bishop-memory database maps every mission, step, event, finding, directive, criterion, lesson, mistake, deliverable and grade, or names each one it skipped and why. Counts are checked against the source. The operator reviews the result in the web UI.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-7--migration-from-bishop-memory)\n\n<!-- cairn-roadmap: p7-epic -->"
+    },
+    {
+      "key": "p8-epic",
+      "phase": 8,
+      "area": "area:review",
+      "title": "Phase 8 — Review loop",
+      "milestone": "Phase 8 — Review loop",
+      "labels": ["type:epic", "phase:8", "area:review"],
+      "body": "**Work.** Port triage and grading (DESIGN.md §7): categories, classification, groups, recommendations, directive proposals, grades, runs; the MCP review profile; the agent definitions and skills, rewritten without Bishop names; an engine-neutral runner (`cairn review run classify|process|grade`) that starts the chosen client headless. A scheduling guide for launchd and systemd.\n\n**Exit check.** A scheduled run classifies new findings and grades closed tasks, and the operator accepts the recommendations on the review page. Then the bishop-memory nightly runs are switched off (§5.3).\n\n**Port from.** Port from bishop-memory: the triage and grade routes in `internal/api/triage.go` and `grades.go`, `internal/store/triage_runs.go` and `mission_grades.go`, `scripts/triage-run.sh`, the three agents and two skills under `.claude/`, and their tests.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-8--review-loop)\n\n<!-- cairn-roadmap: p8-epic -->"
+    },
+    {
+      "key": "p9-epic",
+      "phase": 9,
+      "area": "area:clients",
+      "title": "Phase 9 — Other clients",
+      "milestone": "Phase 9 — Other clients",
+      "labels": ["type:epic", "phase:9", "area:clients"],
+      "body": "**Work.** OpenCode: a generated `opencode.json` entry and instruction file; check the timeout and the tool prefix live. pi: `.pi/mcp.json` with `\"exposure\": \"direct\"`; check that the tools are visible to the model. A short page per client.\n\n**Exit check.** Each client completes the phase 3 flow in a live session.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-9--other-clients)\n\n<!-- cairn-roadmap: p9-epic -->"
+    },
+    {
+      "key": "p10-epic",
+      "phase": 10,
+      "area": "area:release",
+      "title": "Phase 10 — Releases",
+      "milestone": "Phase 10 — Releases",
+      "labels": ["type:epic", "phase:10", "area:release"],
+      "body": "**Work.** Release archives for linux and darwin, amd64 and arm64, built by CI on a tag (`CGO_ENABLED=0`, as bishop-memory's `make dist`). A Homebrew tap. A plugin release tagged `cairn--v<version>`, which is the tag form plugin dependencies resolve against. A public marketplace only after a review of the plugin's hook text *(decision D9)*.\n\n**Exit check.** A clean machine installs `cairn` from a release, installs the plugin, and completes the phase 4 flow.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-10--releases)\n\n<!-- cairn-roadmap: p10-epic -->"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+name: Documentation
+description: Something in the docs or the wiki is wrong, missing or unclear.
+title: "[docs] "
+labels: ["documentation", "area:docs"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The file or wiki page, with the section if there is one.
+      placeholder: "docs/DESIGN.md §4"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change
