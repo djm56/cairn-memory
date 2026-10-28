@@ -1,7 +1,13 @@
 # Cairn Memory — Build Plan
 
-**Status as of 2026-10-27: phase 0 (skeleton) built; its exit check passes
-locally and waits on the first CI run. Decisions D1–D10 in §8 are adopted.**
+<!-- cairn-phase: 1 -->
+
+**Status as of 2026-10-28: phase 1 (contract) is built and waits on the
+operator's review of [CONTRACT.md](CONTRACT.md) §9. Live progress is on the
+[milestones](https://github.com/djm56/cairn-memory/milestones) and the
+[Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
+The rule for this line is in §9.**
+
 What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from
@@ -371,3 +377,24 @@ order is the one in §2.
 - **D10. Build from the outside in**, in the order in §2: contract, core,
   MCP, plugin, server, UI, migration, review loop. *Recommended; confirmed
   by the operator 2026-10-27.*
+
+## 9. Project management
+
+- **Milestones** mirror the phases in §3, one milestone per phase.
+- **`.github/roadmap.json`** holds copies of each phase's exit check and work
+  items from §3. Change §3 and roadmap.json together.
+- **Board, labels and bootstrap.** The labels, the Projects board and the
+  roadmap issues are set up by `scripts/github/bootstrap.sh`. It is a dry run
+  by default. `--apply` fills what is missing and never changes what a person
+  set. The operator runs `--apply`.
+- **Wiki.** The GitHub wiki is published from `wiki/` in this repository.
+- **Status.** The status line appears in README.md, in this file, in
+  docs/DESIGN.md, and at the top of each `wiki/*.md` content page. The
+  `cairn-phase` marker appears in README.md and in this file. All of these
+  carry the phase only: which phase is current, and whether its exit check has
+  passed. They change together, and only when a phase's exit check passes, so
+  they cannot go stale between exits. `scripts/check-docs.sh` checks only the
+  README and PLAN markers, not the status lines. They never carry pull request numbers or merge
+  state. Live progress (pull requests, issues, merges) is on the
+  [milestones](https://github.com/djm56/cairn-memory/milestones) and the
+  [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).

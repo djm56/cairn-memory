@@ -1,0 +1,49 @@
+name: Decision
+description: A design question for the operator. Decisions D1–D10 in docs/PLAN.md §8 are adopted.
+title: "[decision] "
+labels: ["type:decision", "needs-operator"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Decisions D1–D10 in docs/PLAN.md §8 are adopted (2026-10-27). Reopening one
+        needs the operator, so say which one and why in the question below.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: The decision to make, in one or two sentences.
+    validations:
+      required: true
+  - type: dropdown
+    id: touches
+    attributes:
+      label: Which PLAN §8 decision does this touch?
+      options:
+        - "None: a new decision"
+        - "D1. Vocabulary: task"
+        - "D2. Local mode with no daemon"
+        - "D3. One learnings table"
+        - "D4. Task ids task-YYYYMMDD-NN"
+        - "D5. Step positions, not step numbers"
+        - "D6. One binary cairn"
+        - "D7. The project file is .cairn.toml"
+        - "D8. The review loop waits for phase 8"
+        - "D9. Local marketplace first"
+        - "D10. Build from the outside in"
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: The choices on the table, each with its cost.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+      description: The option you would pick, and the reason.
+    validations:
+      required: true

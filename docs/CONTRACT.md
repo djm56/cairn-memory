@@ -1,0 +1,354 @@
+# Cairn Memory — Contract
+
+**Status as of 2026-10-27: draft for operator review (PLAN.md phase 1 exit).
+Nothing implements it yet.** The Go form is `internal/core` (`Service`,
+request and result types, errors). The conformance suite in
+`internal/conformance` checks the behaviour described here. The
+suite has 35 cases. Each one fails against the `core.Unimplemented`
+stub, as phase 1 expects.
+
+This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
+operator calls behind the web UI and the CLI. Field names are the JSON names
+an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
+one request type, and each result back, without adding rules.
+
+§9 lists what this contract settles that DESIGN.md left open. Review those
+items first.
+
+## 1. Conventions
+
+### 1.1 Caller
+
+Every call runs as a **caller**: project, agent, optional session and
+client, and a role. The adapter sets it; request types do not carry it.
+
+- **Project.** Required for every agent call, reads included. Absent →
+  `invalid`, with a message that names `cairn init`. A name is lowercase
+  letters and digits in hyphen-separated groups, at most 64 characters
+  (`acme-api`). A project row is created on its first call.
+- **Agent.** Required for every write (each tool marked *write* below). It is
+  stored on the rows the call creates: `agent`, `reviewer`, `created_by`.
+- **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
+  server derives the role from the API key's scope, never from the request.
+  Operator calls (§8) refuse any other role.
+
+### 1.2 Errors
+
+A failure the caller can act on has a kind and a message:
+
+| Kind | Meaning |
+|---|---|
+| `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
+| `not_found` | The task, step, learning, directive or note does not exist **in the caller's project**. Another project's rows are not found, not forbidden. |
+| `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
+| `operator_only` | An operator call made without the operator role. |
+
+Checks run in this order, so a request with several faults gets the first
+one: caller → request shape (`invalid`) → existence (`not_found`) → rules
+(`refused`). Any other error is an internal failure.
+
+### 1.3 Time, ids, lists
+
+- Every time is UTC, set by the server. No request carries a timestamp.
+- Task ids are `task-YYYYMMDD-NN`. The sequence is daily and global across
+  projects (D4), and allocation is atomic.
+- Directive codes are `D-0001`, global and sequential.
+- **Paged calls** take `limit` (0 means the call's default; the maximum is
+  100, and more is `invalid`) and `cursor` (empty for the first page, then
+  the previous result's `next`). An empty `next` means it is the last page.
+  A cursor is opaque.
+- In results, empty optional fields are left out.
+
+### 1.4 Steps
+
+A step is named by a **step ref**: `{"number": 3}` is the step shown as 3
+now, and `{"id": 412}` is the step whose id is 412. Give exactly one, or the
+call is `invalid`. Numbers are computed from the order each time and change
+when steps are inserted. Ids never change.
+
+### 1.5 Task status
+
+```
+          task_start            task_update
+   open ───────────────► active ◄────────► blocked
+    │   (queue: false)     │                  │
+    │                      │ task_close       │ task_close
+    │                      ▼                  ▼
+    │                 done | failed      done | failed
+    └──────── task_update(abandoned) from open, active, blocked
+```
+
+- `task_update` may set `open`, `active`, `blocked` or `abandoned`.
+  `done` and `failed` come only from `task_close`.
+- `blocked` and `abandoned` need a `reason`, which is written to the journal.
+- `done`, `failed` and `abandoned` are terminal. After them, every write to
+  the task is `refused`: update, steps, events, reviews and close.
+- **One active task per project**, unless the project's settings allow
+  parallel tasks. Making a second task active (`task_start` or `task_update`)
+  is `refused`. `blocked` does not count as active.
+
+## 2. Task tools
+
+### `task_current` — read
+
+The first call of a session.
+
+**In:** nothing.
+**Out:** `task` (null when no task is active), `criteria`, `steps`,
+`recent_events` (newest first, at most 5), `directives` (those that apply
+to the project, as `directive_list` with no agent), and `other_active`
+(when parallel tasks are on and more than one is active, `task` is the one
+started last).
+
+```json
+{"task": {"id": "task-20261027-03", "project": "acme-api", "title": "Add rate limit",
+  "goal": "Requests over 100/min get 429.", "status": "active", "priority": "normal",
+  "next_action": "write the test", "opened_at": "…", "updated_at": "…"},
+ "criteria": [{"ord": 1, "criterion": "429 after 100 requests"}],
+ "steps": [{"id": 41, "number": 1, "title": "Write test", "status": "active", "attempts": 1}],
+ "recent_events": [{"id": 9, "kind": "started", "text": "Step 1 started", "agent": "main", "occurred_at": "…"}],
+ "directives": [{"code": "D-0004", "scope": "global", "title": "Test first", "rule": "…"}]}
+```
+
+### `task_start` — write
+
+**In:** `title`, `goal` (required); `context`, `constraints`; `priority`
+(`low|normal|high|urgent`, default `normal`); `criteria` (list of strings,
+numbered 1…n); `key_files` (`[{path, note}]`); `steps` (`[{title, agent}]`);
+`queue` (true → the task is created `open` instead of `active`).
+**Out:** `id`, `status`, `steps`.
+**Errors:** `invalid` for a missing title or goal or an unknown priority;
+`refused` when another task is active and parallel tasks are off.
+
+```json
+{"title": "Add rate limit", "goal": "Requests over 100/min get 429.",
+ "criteria": ["429 after 100 requests", "Limit configurable"],
+ "steps": [{"title": "Write test"}, {"title": "Implement"}]}
+→ {"id": "task-20261027-03", "status": "active", "steps": [{"id": 41, "number": 1, …}, …]}
+```
+
+### `task_get` — read
+
+**In:** `id`; `section`: `brief`, `steps`, `events` or `close`. Empty
+returns all of them.
+**Out:** `task`, always. `brief` adds `criteria` and `key_files`. `steps`
+adds `steps` and `reviews`. `events` adds the last 20 `events`. `close`
+adds `criteria` with results, `lessons`, `no_lessons_reason`, `mistakes` and
+`deliverables`.
+**Errors:** `not_found`.
+
+### `task_list` — read, paged
+
+**In:** `status` (a list; empty means all), `limit` (default 20), `cursor`.
+**Out:** `tasks` (`[{id, project, title, status, priority, updated_at}]`,
+most recently updated first), `next`. Only the caller's project.
+
+### `task_update` — write
+
+**In:** `id`; any of `status`, `reason`, `priority`, `owner`, `next_action`,
+`blockers`; the brief fields `title`, `goal`, `context`, `constraints`,
+`criteria`, `key_files`. Only the fields given change. A list given replaces
+the whole list.
+**Out:** the task.
+**Errors:** `invalid` for `done` or `failed`, an unknown value, or `blocked`
+or `abandoned` without a reason. `not_found`. `refused` for a terminal
+task, a transition not in §1.5, a second active task, or a brief edit after
+any step has started.
+
+### `task_close` — write
+
+**In:** `id`; `outcome` (`done|failed`); `summary`; `criteria`
+(`[{ord, result: met|partial|unmet|unclear, evidence}]`); `lessons`
+(`[{kind: wrong-assumption|reuse|similar-task, text, why, correction}]`);
+`no_lessons_reason`; `mistakes` (`[{agent, mistake, impact: low|med|high,
+correction, prevention}]`); `deliverables` (`[{path, note}]`).
+
+**Absent is not empty.** `"mistakes": []` says "no mistakes". Leaving
+`mistakes` out says nothing, and the policy refuses it. The same holds for
+`lessons`, which may be `[]` only with a `no_lessons_reason`.
+
+**Out:** the closed task (`status` is the outcome, and `closed_at` is set).
+A `close` event is written.
+
+**Errors:** `invalid` for an outcome other than `done`/`failed`, an unknown
+enum value, or a result for a criterion number the task does not have.
+`not_found`. `refused` when the task is terminal, or when the project's
+close policy is not met. The refusal lists every unmet item in `missing`,
+using these keys:
+
+| Key | Unmet when (default policy: all on) |
+|---|---|
+| `outcome` | no outcome (always required) |
+| `summary` | no summary |
+| `criteria` | a criterion has no result |
+| `lessons` | `lessons` absent, or empty with no `no_lessons_reason` |
+| `mistakes` | `mistakes` absent |
+| `active_steps` | a step is still `active` |
+
+```json
+{"kind": "refused", "message": "close policy not met: summary, lessons, mistakes",
+ "missing": ["summary", "lessons", "mistakes"]}
+```
+
+A refused close changes nothing. Supply the missing items and call again.
+
+## 3. Step tools
+
+All three are writes, and are `refused` on a terminal task.
+
+### `step_plan`
+
+**In:** `task_id`, `steps` (`[{title, agent}]`).
+**Out:** `steps`, the whole list.
+Every `pending` step is removed. Steps in any other status are kept in
+their order, and the new steps follow the last kept step.
+
+### `step_add`
+
+**In:** `task_id`, `title`, `agent`; `after`, a step ref. Left out, the step
+goes at the end. `{"number": 0}` puts it before the first step.
+**Out:** the step, with its number.
+No other step's id changes. Display numbers after it move up by one.
+
+### `step_update`
+
+**In:** `task_id`, `step` (a ref), `action`, `summary`, `agent`
+(reassigns the step).
+
+| Action | From | To | Also |
+|---|---|---|---|
+| `start` | `pending`, `failed` | `active` | `attempts` +1; `started_at`; a `started` event. The task must be `active`. |
+| `finish` | `active` | `done` | `summary` required; `ended_at`; a `finished` event |
+| `fail` | `active` | `failed` | `summary` required; `ended_at`; a `note` event |
+| `skip` | `pending`, `failed` | `skipped` | `summary` required (the reason); a `note` event |
+
+**Errors:** `invalid` for a bad ref, an unknown action, or a missing
+summary. `not_found`. `refused` for any other transition, or `start` when
+the task is not `active`.
+
+## 4. Journal
+
+### `event_log` — write
+
+**In:** `task_id`; `step` (a ref, optional); `kind`; `text` (required);
+`data` (a JSON object, optional).
+An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision` and
+`custom`. `started`, `finished`, `review` and `close` are written by the
+calls they record, and are `invalid` here.
+**Out:** the event, with `occurred_at` set by the server.
+There is no call that edits or deletes an event.
+
+### `event_list` — read, paged
+
+**In:** `task_id`; `step` (a ref, to filter); `limit` (default 20);
+`cursor`.
+**Out:** `events`, newest first, and `next`.
+
+### `review_record` — write
+
+**In:** `task_id`, `step` (a ref), `verdict` (`approved|not-approved`),
+`critical`, `warnings` (counts, ≥ 0), `summary`.
+**Out:** the review. `reviewer` is the calling agent. A `review` event is
+written.
+
+## 5. Learnings and directives
+
+### `learning_add` — write
+
+**In:** `kind` (`finding|pattern|agent-note`), `title`, `body` (required);
+`task_id`, `target`, `rationale`, `example`.
+**Out:** the learning, always with status `proposed`. No agent call changes
+it.
+**Errors:** `invalid`; `not_found` for an unknown `task_id`.
+
+### `learning_list` — read, paged
+
+**In:** `status`, `kind` (lists; empty means all); `all_projects` (by
+default only the caller's project); `target`; `limit` (default 20); `cursor`.
+**Out:** `learnings`, newest first, and `next`.
+
+### `directive_list` — read
+
+**In:** `agent` (a role name, optional).
+**Out:** `directives`, ordered by code. The list holds active directives
+only: every `global` one, the `project` ones for the caller's project, and
+`agent` ones. With `agent` set, the `agent` ones are limited to that role.
+With `agent` empty, all of them are included.
+
+## 6. Recall and search
+
+### `recall` — read
+
+**In:** `goal` (required); `agent` (narrows directives, as in
+`directive_list`); `limit` per list (default 5).
+**Out:** `directives` (those that apply to the caller's project), plus
+`lessons`, `mistakes` and `tasks` from **every project**, best match to the
+goal first. Each lesson and mistake carries its `task_id` and `project`.
+
+### `search` — read, paged
+
+**In:** `query` (required; plain text, never query syntax: quotes,
+operators and brackets are matched as words, and never cause an error);
+`kinds` (`task|event|learning|directive|note|lesson|mistake`; empty means
+all); `all_projects`; `limit` (default 10); `cursor`.
+**Out:** `hits` (`[{kind, id, project, task_id, title, snippet}]`, best
+match first), and `next`. Global directives are found from every project.
+
+## 7. Notes
+
+### `note_put` — write
+
+**In:** `title`, `body` (Markdown); `task_id` (only when creating); `id`
+(to replace an existing note's title and body).
+**Out:** the note.
+
+### `note_get` — read
+
+**In:** `id`. **Out:** the note. **Errors:** `not_found`.
+
+## 8. Operator calls
+
+These are not MCP tools, and never will be. The web UI (phase 6) and the
+CLI reach them. Each one refuses a caller without the operator role
+(`operator_only`) before any other check. Operators act across projects, so
+these calls do not need the caller's project.
+
+| Call | In | Does |
+|---|---|---|
+| `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. |
+| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning` | Creates an active directive with the next code. With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
+| `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. Retired directives are no longer listed. |
+| `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings. The close policy has one switch per row of the table in §2 (`task_close`). `outcome` is always required. |
+
+## 9. Settled here, for review
+
+Each item answers a question that DESIGN.md left open. Each one is checked
+by the suite, except where noted.
+
+1. **Operator calls are part of `Service`** (§8), refused unless the role is
+   operator. Without them, the suite could not test the rule "agents cannot
+   decide". The MCP adapter does not expose them.
+2. **The project is needed for reads too.** DESIGN §2.1 says writes. With
+   reads included, there is one rule and no hidden default.
+3. **`task_start` makes the task active by default.** `queue: true` creates
+   it `open`. A second active task is refused, not queued silently.
+4. **`blocked` and `abandoned` need a reason.** `abandoned` is set through
+   `task_update`, and `task_close` covers only `done` and `failed`.
+5. **The brief is frozen once any step starts.** DESIGN says "before work
+   starts". This is the precise form.
+6. **Agents cannot log `started`, `finished`, `review` or `close` events.**
+   The calls they record write them, so the journal cannot claim work that
+   the step table does not show.
+7. **Step refs are an object.** `{"number": n}` or `{"id": n}`, never a
+   bare integer, which could mean either.
+8. **`fail` and `skip` need a summary.** A failed attempt with no reason
+   teaches nothing.
+9. **`missing` uses fixed keys** (§2, `task_close`), so a client can act on
+   them without parsing the message.
+10. **Rows in another project are `not_found`.** `learning_list`, `search`
+    and `recall` read across projects only on request (`all_projects`), or
+    by design (`recall`).
+11. **Agent-scoped directives apply in every project.** DESIGN §3.4 has no
+    project on an agent-scoped directive.
+12. **Not yet settled:** the "step-review rule" in project settings (DESIGN
+    §3.6) is not defined. It is left out until a client needs it.

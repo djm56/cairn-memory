@@ -8,12 +8,19 @@ every agent follows.
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
 in Cairn leaves the same kind of marker.
 
-> **Status (2026-10-27): phase 0 of 10. Only the build skeleton and
-> `cairn version` exist.** Read
-> [docs/DESIGN.md](docs/DESIGN.md) for what Cairn is, and
+<!-- cairn-phase: 1 -->
+
+> **Status as of 2026-10-28:** phase 1 (contract) is built and waits on the
+> operator's review of [CONTRACT.md §9](docs/CONTRACT.md#9-settled-here-for-review).
+> Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones)
+> and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
+>
+> Read [docs/DESIGN.md](docs/DESIGN.md) for what Cairn is, and
 > [docs/PLAN.md](docs/PLAN.md) for the build order. Cairn replaces
 > [bishop-memory](https://github.com/djm56/bishop-memory), which keeps
 > running until the move is done.
+
+[![CI](https://github.com/djm56/cairn-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/djm56/cairn-memory/actions/workflows/ci.yml)
 
 ## What it does
 
@@ -46,10 +53,12 @@ in Cairn leaves the same kind of marker.
 
 ## How it will be used
 
-Once phase 4 of the plan is done:
+Until release archives exist (phase 10 of the plan), build the binary from
+source with `make build`; see [CONTRIBUTING.md](CONTRIBUTING.md). The plugin
+flow arrives at phase 4. Once phase 4 is done, the intended steps are:
 
 ```bash
-# Install the binary (release archive or Homebrew), then in Claude Code:
+# With cairn on PATH, in Claude Code:
 /plugin marketplace add djm56/cairn-memory
 /plugin install cairn@cairn-memory
 
@@ -72,7 +81,18 @@ project = "acme-api"
 | Document | What it covers |
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
+| [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |
 | [docs/PLAN.md](docs/PLAN.md) | Build phases with exit checks, what is ported from bishop-memory, migration, decisions |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, by pull request, under Unreleased |
+| [The wiki](https://github.com/djm56/cairn-memory/wiki) | Summaries, the roadmap in plain words, and how the work is run. Published from `wiki/` |
+
+## Project management
+
+- [Wiki](https://github.com/djm56/cairn-memory/wiki): summaries and how the work is run.
+- [Milestones](https://github.com/djm56/cairn-memory/milestones): one per phase.
+- [Issues](https://github.com/djm56/cairn-memory/issues): the work, from forms.
+- [Projects](https://github.com/djm56/cairn-memory/projects): the board that tracks each issue.
+- [CHANGELOG.md](CHANGELOG.md): what each pull request changed.
 
 ## Licence
 

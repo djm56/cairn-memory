@@ -1,0 +1,1 @@
+This wiki is generated from [`wiki/`](https://github.com/djm56/cairn-memory/tree/main/wiki) in the repository. Edit it there by pull request, because edits made on this wiki are overwritten on the next publish.
