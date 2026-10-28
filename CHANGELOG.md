@@ -26,4 +26,5 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on
   2026-10-28, item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)),
   and `DESIGN.md` is aligned with the contract
-  ([#39](https://github.com/djm56/cairn-memory/issues/39)).
+  ([#39](https://github.com/djm56/cairn-memory/issues/39))
+  ([PR #42](https://github.com/djm56/cairn-memory/pull/42)).
