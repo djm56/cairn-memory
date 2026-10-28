@@ -52,8 +52,8 @@ From what went well and badly in bishop-memory (PLAN.md §6):
 - **Every tool result is read by a model.** Keep it small, paged and
   readable. Test the size of `task_current` on a large task.
 - **Tests before code for each tool**, through the conformance suite.
-- **Mutation testing** on `core` and `store` from phase 2, with the harness
-  ported from bishop-memory.
+- **Mutation testing** on `core` and `store` from phase 2. Phase 2 picks the
+  approach (the operator's choice), guided by bishop-memory's harness.
 - **No silent defaults for identity.** A missing project is an error that
   says how to fix it (`cairn init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.

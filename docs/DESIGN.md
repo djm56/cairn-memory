@@ -426,7 +426,7 @@ repository. PLAN.md lists what Cairn must provide for it.
 
 ## 7. Review loop (optional, later)
 
-Ported from bishop-memory after the core is in use (PLAN.md phase 8):
+Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase 8):
 
 - **Classify**: a scheduled agent assigns a category and a confidence to each
   new finding.
