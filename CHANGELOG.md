@@ -28,4 +28,4 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   and `DESIGN.md` is aligned with the contract
   ([#39](https://github.com/djm56/cairn-memory/issues/39))
   ([PR #42](https://github.com/djm56/cairn-memory/pull/42)).
-- Plans now say Cairn is written fresh, guided by bishop-memory, rather than porting its code.
+- Plans now say Cairn is written fresh, guided by bishop-memory, rather than porting its code ([PR #44](https://github.com/djm56/cairn-memory/pull/44)).
