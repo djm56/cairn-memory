@@ -49,9 +49,12 @@ func (s *Store) QueryRowContext(ctx context.Context, query string, args ...any) 
 //
 // The driver is opened with _txlock=immediate, so BeginTx takes the write lock
 // at once. Every transaction therefore serialises with every other writer, and
-// a read inside fn sees a consistent state. Use WithTx for writes only. Reads
-// run outside it, on the Store itself: a read in a transaction still waits for
-// the write lock, which serialises it against every writer for no gain.
+// a read inside fn sees a consistent state. Calling WithTx again on the same
+// Store from inside fn waits for the write lock the outer call holds, and fails
+// at the 5 s busy timeout; it does not wait forever. Use WithTx for writes
+// only. Reads run outside it, on the Store itself: a read in a transaction
+// still waits for the write lock, which serialises it against every writer
+// for no gain.
 //
 // Allocation (AllocateTaskID) reads a counter and then inserts, so it must run
 // inside WithTx: the lock is what makes two allocations get different numbers.
