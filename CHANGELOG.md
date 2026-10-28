@@ -25,6 +25,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   mode, a busy timeout and foreign keys on every connection; the `search_index`
   FTS5 table with its triggers; and `store.Open` on `modernc.org/sqlite` v1.61.0.
   The module moves to Go 1.26, which that driver's dependency graph requires.
+  ([PR #45](https://github.com/djm56/cairn-memory/pull/45)).
 
 ### Changed
 
