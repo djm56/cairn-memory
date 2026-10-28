@@ -84,7 +84,7 @@ Cairn has four jobs:
 
 ### 2.1 Identity
 
-Every call carries a project. Every write also carries an agent. The stored
+Every agent call carries a project. Every write also carries an agent. The stored
 actor is `<project>:<agent>`.
 
 The MCP adapter finds the project in this order:

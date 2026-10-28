@@ -12,8 +12,8 @@ operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open. Review those
-items first.
+§9 lists what this contract settles that DESIGN.md left open; the operator
+approved it on 2026-10-28.
 
 ## 1. Conventions
 

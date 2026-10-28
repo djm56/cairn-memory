@@ -390,7 +390,9 @@ order is the one in §2.
   set. The operator runs `--apply`.
 - **Wiki.** The GitHub wiki is published from `wiki/` in this repository.
 - **Status.** The status line appears in README.md, in this file, in
-  docs/DESIGN.md, and at the top of each `wiki/*.md` content page. The
+  docs/DESIGN.md, in docs/CONTRACT.md (whose line states the contract's own
+  state, draft or approved, rather than the phase), and at the top of each
+  `wiki/*.md` content page. The
   `cairn-phase` marker appears in README.md and in this file. All of these
   carry the phase only: which phase is current, and whether its exit check has
   passed. They change together, and only when a phase's exit check passes, so
