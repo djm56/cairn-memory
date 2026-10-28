@@ -254,6 +254,7 @@ not the shape of a Markdown table.
 
 ## 4. Tool surface (MCP)
 
+Each tool's fields, errors and rules are in [CONTRACT.md](CONTRACT.md).
 Tool names are short and unprefixed; the client adds the server prefix
 (Claude Code: `mcp__plugin_cairn_cairn__task_start`). Each write tool takes
 `agent`. Output is compact JSON or short text, designed to be read by a model.

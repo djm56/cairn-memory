@@ -72,6 +72,7 @@ project = "acme-api"
 | Document | What it covers |
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
+| [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |
 | [docs/PLAN.md](docs/PLAN.md) | Build phases with exit checks, what is ported from bishop-memory, migration, decisions |
 
 ## Licence
