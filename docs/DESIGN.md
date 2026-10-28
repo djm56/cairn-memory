@@ -1,7 +1,8 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-28: phase 1 (contract) is built and waits on the
-operator's review of [CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review).
+**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
+passed with the operator's review of [CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review).
+Phase 2 (core and local store) is current.
 Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones)
 and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
 
@@ -83,8 +84,8 @@ Cairn has four jobs:
 
 ### 2.1 Identity
 
-Every write carries a project and an agent. The stored actor is
-`<project>:<agent>`.
+Every call carries a project. Every write also carries an agent. The stored
+actor is `<project>:<agent>`.
 
 The MCP adapter finds the project in this order:
 
@@ -92,7 +93,7 @@ The MCP adapter finds the project in this order:
 2. `project = "<name>"` in `.cairn.toml`, found by walking up from
    `CLAUDE_PROJECT_DIR` (set by Claude Code for MCP servers) or from the
    working directory.
-3. Otherwise every write is refused with an error that names `cairn init`.
+3. Otherwise every call is refused with an error that names `cairn init`.
    There is no default project. A silent default writes under the wrong
    name, which is the trap bishop-memory's `claude-code` default fell into.
 
@@ -235,11 +236,13 @@ search_index   FTS5 over tasks (title, goal, context, outcome), events (text),
 ```
 projects
   name PK, display_name, created_at, last_seen_at,
-  settings TEXT    JSON: close policy, parallel tasks, step-review rule
+  settings TEXT    JSON: close policy, parallel tasks
 sessions
   id PK, project, client, agent, started_at, last_seen_at
 api_keys        (server mode) name, hash, scopes, created_at, last_used_at
 ```
+
+The step-review rule is deferred to phase 8 (#41).
 
 ### 3.7 The close policy
 
@@ -332,6 +335,7 @@ When no task is active it says so in one line. It writes nothing.
 | `internal/identity` | Project, agent and session resolution (§2.1). |
 | `internal/auth` | API keys and scopes (server mode). |
 | `internal/ui` | The web pages, embedded in the binary. |
+| `internal/conformance` | The conformance suite that checks any `Service`. |
 | `cmd/cairn` | One binary with sub-commands. |
 
 The `Service` interface is the contract. One test suite, the **conformance

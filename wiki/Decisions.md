@@ -1,6 +1,6 @@
 # Decisions
 
-_Status as of 2026-10-28: phase 1 (contract) is built and waits on the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local store) is current. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 D1 to D10 were adopted on 2026-10-27. The wording of each decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions). The lines below only name each one. Reopening a decision needs the operator.
 
@@ -19,9 +19,9 @@ D1 to D10 were adopted on 2026-10-27. The wording of each decision is in [PLAN.m
 
 To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/issues/new?template=decision.yml). The form asks which decision it touches, the options with their costs, and a recommendation.
 
-## Settled in the contract, awaiting operator review
+## Settled in the contract
 
-[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 are settled in the contract and await the operator's review. Item 12 is not settled yet. Only the titles are listed here.
+[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 were approved by the operator on 2026-10-28. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)). Only the titles are listed here.
 
 1. Operator calls are part of `Service`
 2. The project is needed for reads too
@@ -34,4 +34,4 @@ To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/iss
 9. `missing` uses fixed keys
 10. Rows in another project are `not_found`
 11. Agent-scoped directives apply in every project
-12. Not settled: the step-review rule in project settings
+12. Deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)): the step-review rule in project settings

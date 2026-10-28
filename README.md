@@ -8,11 +8,12 @@ every agent follows.
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
 in Cairn leaves the same kind of marker.
 
-<!-- cairn-phase: 1 -->
+<!-- cairn-phase: 2 -->
 
-> **Status as of 2026-10-28:** phase 1 (contract) is built and waits on the
-> operator's review of [CONTRACT.md §9](docs/CONTRACT.md#9-settled-here-for-review).
-> Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones)
+> **Status as of 2026-10-28:** phase 1 (contract) is done, and its exit check
+> passed with the operator's review of [CONTRACT.md §9](docs/CONTRACT.md#9-settled-here-for-review).
+> Phase 2 (core and local store) is current. Live progress is on the
+> [milestones](https://github.com/djm56/cairn-memory/milestones)
 > and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 >
 > Read [docs/DESIGN.md](docs/DESIGN.md) for what Cairn is, and

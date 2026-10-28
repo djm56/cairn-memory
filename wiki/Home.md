@@ -1,6 +1,6 @@
 # Cairn
 
-_Status as of 2026-10-28: phase 1 (contract) is built and waits on the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-28: phase 1 (contract) is done, and its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local store) is current. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 Cairn is a memory for coding agents. An agent records the task it is on, the steps it takes, what happened and what it learned. The next agent reads that back before it starts. An operator turns the best lessons into rules that every agent follows.
 
@@ -18,8 +18,9 @@ Cairn is one binary, `cairn`. It uses SQLite with full-text search. On one machi
 ## Status
 
 - **Phase 0, Skeleton:** exit check passed.
-- **Phase 1, Contract:** built. It waits for the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review).
-- **Phases 2 to 10:** planned. See the [Roadmap](Roadmap) and the [milestones](https://github.com/djm56/cairn-memory/milestones) for live progress.
+- **Phase 1, Contract:** done. Its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review).
+- **Phase 2, Core and local store:** current.
+- **Phases 3 to 10:** planned. See the [Roadmap](Roadmap) and the [milestones](https://github.com/djm56/cairn-memory/milestones) for live progress.
 - **Version 1** is phases 0 to 4: a local memory that a plain Claude Code project can use.
 
 ## Where things live
@@ -35,6 +36,6 @@ Cairn is one binary, `cairn`. It uses SQLite with full-text search. On one machi
 - [Getting started](Getting-Started): clone, build and check the code.
 - [Architecture](Architecture): the shape of the design, with links into DESIGN.md.
 - [Roadmap](Roadmap): the eleven phases, their goals and their status.
-- [Decisions](Decisions): the adopted decisions D1 to D10, and the contract items awaiting review.
+- [Decisions](Decisions): the adopted decisions D1 to D10, and the contract items the operator approved (item 12 is deferred).
 - [How we work](How-We-Work): issues, branches, pull requests, CI, labels and the board.
 - [Glossary](Glossary): the terms Cairn uses.

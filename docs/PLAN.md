@@ -1,9 +1,10 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-phase: 1 -->
+<!-- cairn-phase: 2 -->
 
-**Status as of 2026-10-28: phase 1 (contract) is built and waits on the
-operator's review of [CONTRACT.md](CONTRACT.md) §9. Live progress is on the
+**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
+passed with the operator's review of [CONTRACT.md](CONTRACT.md) §9. Phase 2
+(core and local store) is current. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**

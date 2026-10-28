@@ -20,3 +20,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   bootstrap script, issue and pull request templates, the docs check, the
   wiki and its publish workflow, and branch protection on `main`
   ([PR #3](https://github.com/djm56/cairn-memory/pull/3)).
+
+### Changed
+
+- Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on
+  2026-10-28, item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)),
+  and `DESIGN.md` is aligned with the contract
+  ([#39](https://github.com/djm56/cairn-memory/issues/39)).
