@@ -1,0 +1,40 @@
+name: Docs
+
+# Phase markers and the changelog rule (scripts/check-docs.sh), and shellcheck
+# over every script. Reads only; no secrets, no publishing.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: phase markers and changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history, so the base commit is present for the changed-file diff.
+          fetch-depth: 0
+
+      - name: Check docs
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Comma-separated, which is what check-docs.sh reads.
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: scripts/check-docs.sh
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # shellcheck is preinstalled on ubuntu-latest. Only warnings and errors
+      # are reported, so style and info notes cannot fail the PR.
+      - name: shellcheck scripts
+        run: find scripts -name '*.sh' -exec shellcheck --severity=warning {} +

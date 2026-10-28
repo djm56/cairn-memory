@@ -1,0 +1,52 @@
+name: Bug
+description: Something Cairn does wrong.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. cairn init
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: cairn version
+      description: The output of `cairn version`.
+      placeholder: "v0.x.y-dirty"
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      description: How the call reached Cairn.
+      options:
+        - Claude Code
+        - OpenCode
+        - pi
+        - Other or CLI only
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, and whether you use a server (cairn serve) or the local database.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: Relevant output. Remove anything private; Cairn databases stay out of issues.
+      render: text

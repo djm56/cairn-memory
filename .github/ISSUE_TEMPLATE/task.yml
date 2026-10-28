@@ -1,0 +1,71 @@
+name: Roadmap task
+description: A unit of work from a phase in docs/PLAN.md §3.
+title: "[task] "
+labels: ["type:task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One task is one piece of a phase. Quote the work line from PLAN §3 where you can.
+        The phase and area you pick here are for the reader. Issues opened from this
+        form are not touched by the bootstrap script (scripts/github/bootstrap.sh).
+        The maintainer sets this issue's labels, milestone and project board fields
+        (Phase, Area) by hand.
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      description: The phase in docs/PLAN.md §3 this work belongs to.
+      options: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "area:core"
+        - "area:store"
+        - "area:mcp"
+        - "area:plugin"
+        - "area:server"
+        - "area:ui"
+        - "area:migration"
+        - "area:review"
+        - "area:clients"
+        - "area:release"
+        - "area:docs"
+        - "area:github"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: What to build or change. Name the files and packages where you know them.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What this unblocks, or which PLAN section needs it.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance
+      description: Write it as an exit check a reviewer can run, in the style of PLAN §3 (for example, "`make test` passes" or "a test proves X").
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: The PLAN and DESIGN sections this touches.
+      placeholder: |
+        - docs/PLAN.md §3, phase N
+        - docs/DESIGN.md §X
