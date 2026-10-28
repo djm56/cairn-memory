@@ -16,6 +16,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   in `internal/core`, the call-level contract in `docs/CONTRACT.md`, and a
   conformance suite that fails against a stub
   ([PR #2](https://github.com/djm56/cairn-memory/pull/2)).
-- GitHub project management, on this branch: labels, the roadmap, the
+- GitHub project management: labels, the roadmap, the
   bootstrap script, issue and pull request templates, the docs check, the
-  wiki and its publish workflow, and branch protection on `main`.
+  wiki and its publish workflow, and branch protection on `main`
+  ([PR #3](https://github.com/djm56/cairn-memory/pull/3)).
