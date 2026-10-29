@@ -12,6 +12,7 @@ package conformance
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -40,26 +41,47 @@ func Run(t *testing.T, newService func(t *testing.T) core.Service) {
 
 // RunWith is Run for a backend that does not yet implement the whole suite.
 // Each case named in deferred is reported as skipped, with the reason its
-// backend gave, so it counts as neither a pass nor a fail. A name that is not
-// in the suite fails the run, so a renamed case cannot be skipped by accident.
+// backend gave, so it counts as neither a pass nor a fail. Two things fail the
+// run. A name that is not in the suite fails it, so a renamed case cannot be
+// skipped by accident. A deferred case that passes against the backend fails
+// it too, so a stale entry cannot hide a case that is now live. A log line
+// would not do: a green run does not read its log, and the entry would stay.
 func RunWith(t *testing.T, newService func(t *testing.T) core.Service, deferred map[string]string) {
-	known := map[string]bool{}
-	for _, c := range Cases() {
-		known[c.Name] = true
+	cases := Cases()
+	for _, name := range unknownDeferred(cases, deferred) {
+		t.Errorf("deferred case %q is not in the suite", name)
 	}
-	for name := range deferred {
-		if !known[name] {
-			t.Errorf("deferred case %q is not in the suite", name)
-		}
-	}
-	for _, c := range Cases() {
+	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			if reason, ok := deferred[c.Name]; ok {
-				t.Skip("deferred: " + reason)
+			reason, ok := deferred[c.Name]
+			if !ok {
+				c.Run(t, newService(t))
+				return
 			}
-			c.Run(t, newService(t))
+			// The case runs on a fresh service and its outcome is only read.
+			if passes, _ := probe(c, newService(t)); passes {
+				t.Errorf("deferred case %q now passes: remove it from the deferred map", c.Name)
+			}
+			t.Skip("deferred: " + reason)
 		})
 	}
+}
+
+// unknownDeferred returns the names in deferred that no case of cases has, in
+// sorted order. RunWith fails for each of them.
+func unknownDeferred(cases []Case, deferred map[string]string) []string {
+	known := map[string]bool{}
+	for _, c := range cases {
+		known[c.Name] = true
+	}
+	var unknown []string
+	for name := range deferred {
+		if !known[name] {
+			unknown = append(unknown, name)
+		}
+	}
+	slices.Sort(unknown)
+	return unknown
 }
 
 // Cases returns the whole suite, in a fixed order.
