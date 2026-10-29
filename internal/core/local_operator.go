@@ -118,8 +118,8 @@ func (l *Local) LearningDecide(ctx context.Context, req LearningDecideRequest) (
 // with the learning named as the replacement as from, and the learning being
 // decided as to. If the replacement already leads back to the decided learning,
 // linking the decided learning to it would close a cycle. The walk stops at a
-// learning with no link, and it keeps a set of the learnings it has seen, so a
-// cycle already in the data cannot loop it.
+// learning with no link or at an id with no row, and it keeps a set of the
+// learnings it has seen, so a cycle already in the data cannot loop it.
 //
 // Read function: call it inside the transaction that writes the link.
 func supersedeReaches(ctx context.Context, q store.Querier, from, to int64) (bool, error) {
@@ -128,6 +128,10 @@ func supersedeReaches(ctx context.Context, q store.Querier, from, to int64) (boo
 	for !seen[cur] {
 		seen[cur] = true
 		row, err := store.GetLearningAnyProject(ctx, q, cur)
+		if errors.Is(err, store.ErrNotFound) {
+			// A chain that ends at no row cannot lead back to to.
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}

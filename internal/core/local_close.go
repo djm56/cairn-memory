@@ -213,6 +213,7 @@ func (l *Local) TaskClose(ctx context.Context, req TaskCloseRequest) (*Task, err
 		if err != nil {
 			return err
 		}
+		// The transaction makes write order unobservable: a refusal rolls back all writes.
 		if missing := closeMissing(settings.ClosePolicy, req, crit, steps); len(missing) > 0 {
 			return &Error{
 				Kind:    KindRefused,
