@@ -218,7 +218,7 @@ var closeCases = []Case{
 	}},
 	{"close/policy_is_project_settings", func(t T, s core.Service) {
 		lax := core.ProjectSettings{} // every requirement off
-		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: ptr(lax)}))(t)
 		res := startTask(t, s, mainCtx(), "t", "one")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
 		closed := must(s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}))(t)
@@ -229,5 +229,22 @@ var closeCases = []Case{
 		other := startTask(t, s, as(projB, "main"), "t")
 		_, err := s.TaskClose(as(projB, "main"), core.TaskCloseRequest{ID: other.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close under the default policy")
+	}},
+	{"close/settings_must_be_given", func(t T, s core.Service) {
+		// CONTRACT §8: the call replaces the whole settings object, so a call
+		// that gives none is invalid. Read as a zero value, it would switch every
+		// close requirement off and parallel tasks off as well.
+		parallel := core.DefaultSettings()
+		parallel.ParallelTasks = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: &parallel}))(t)
+		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA})
+		wantKind(t, err, core.KindInvalid, "project_settings_set without settings")
+
+		// The settings stand: two tasks may be active at once, and the default
+		// close policy still applies.
+		one := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "one", Goal: "g"}))(t)
+		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
+		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
+		wantKind(t, err, core.KindRefused, "bare close under the default policy after a refused settings call")
 	}},
 }

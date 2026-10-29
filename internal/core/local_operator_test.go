@@ -32,7 +32,7 @@ func TestOperatorCallNeedsName(t *testing.T) {
 	wantKindLocal(t, err, core.KindInvalid, "DirectiveRatify without a name")
 	_, err = s.DirectiveRetire(nameless, core.DirectiveRetireRequest{Code: "D-0001"})
 	wantKindLocal(t, err, core.KindInvalid, "DirectiveRetire without a name")
-	_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings()})
+	_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: settingsPtr(core.DefaultSettings())})
 	wantKindLocal(t, err, core.KindInvalid, "ProjectSettingsSet without a name")
 
 	// Nothing was written: the learning is still proposed.
@@ -148,15 +148,19 @@ func TestDirectiveRetireRules(t *testing.T) {
 func TestProjectSettingsSetRules(t *testing.T) {
 	s, st := openLocal(t)
 	for _, name := range []string{"", "Acme"} {
-		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: name, Settings: core.DefaultSettings()})
+		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: name, Settings: settingsPtr(core.DefaultSettings())})
 		wantKindLocal(t, err, core.KindInvalid, "project name "+name)
 	}
 
+	// Settings are replaced whole, so an omitted object is refused.
+	_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA})
+	wantKindLocal(t, err, core.KindInvalid, "project_settings_set with no settings")
+
 	named := "Acme API"
-	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, DisplayName: &named, Settings: core.DefaultSettings()}))(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, DisplayName: &named, Settings: settingsPtr(core.DefaultSettings())}))(t)
 	settings := core.DefaultSettings()
 	settings.ParallelTasks = true
-	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: settings}))(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: &settings}))(t)
 
 	row, err := store.GetProject(context.Background(), st, projA)
 	if err != nil {
@@ -168,6 +172,11 @@ func TestProjectSettingsSetRules(t *testing.T) {
 	if !strings.Contains(row.Settings, `"parallel_tasks":true`) {
 		t.Errorf("settings = %s, want parallel_tasks true", row.Settings)
 	}
+}
+
+// settingsPtr returns a pointer to s, for a request's Settings field.
+func settingsPtr(s core.ProjectSettings) *core.ProjectSettings {
+	return &s
 }
 
 // wantKindLocal fails the test unless err is a core.Error of kind want.

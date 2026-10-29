@@ -279,7 +279,8 @@ func (l *Local) DirectiveRetire(ctx context.Context, req DirectiveRetireRequest)
 
 // ProjectSettingsSet replaces a project's settings: parallel tasks and the
 // close policy (CONTRACT §8). The project is created if it has no row yet. A nil
-// display name leaves the stored one as it is.
+// display name leaves the stored one as it is. Settings must be given: an omitted
+// object is invalid, since the call replaces the whole of it.
 func (l *Local) ProjectSettingsSet(ctx context.Context, req ProjectSettingsRequest) (*Project, error) {
 	if _, err := operatorFor(ctx); err != nil {
 		return nil, err
@@ -287,7 +288,10 @@ func (l *Local) ProjectSettingsSet(ctx context.Context, req ProjectSettingsReque
 	if !ValidProjectName(req.Project) {
 		return nil, Invalid("a project needs a valid name: %q is not one", req.Project)
 	}
-	raw, err := json.Marshal(req.Settings)
+	if req.Settings == nil {
+		return nil, Invalid("project_settings_set needs settings: the call replaces the whole object, so give all of it")
+	}
+	raw, err := json.Marshal(*req.Settings)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +314,7 @@ func (l *Local) ProjectSettingsSet(ctx context.Context, req ProjectSettingsReque
 			return err
 		}
 		out = Project{
-			Name: row.Name, DisplayName: row.DisplayName, Settings: req.Settings,
+			Name: row.Name, DisplayName: row.DisplayName, Settings: *req.Settings,
 			CreatedAt: row.CreatedAt, LastSeenAt: row.LastSeenAt,
 		}
 		return nil

@@ -385,8 +385,12 @@ type DirectiveRetireRequest struct {
 	Code string `json:"code"`
 }
 
+// ProjectSettingsRequest replaces a project's settings. Settings is a pointer so
+// that an omitted object (nil) can be told from a zero one: the call replaces the
+// whole object, and a nil Settings is invalid rather than a policy of every
+// switch off (CONTRACT §8).
 type ProjectSettingsRequest struct {
-	Project     string          `json:"project"`
-	DisplayName *string         `json:"display_name,omitempty"`
-	Settings    ProjectSettings `json:"settings"`
+	Project     string           `json:"project"`
+	DisplayName *string          `json:"display_name,omitempty"`
+	Settings    *ProjectSettings `json:"settings,omitempty"`
 }

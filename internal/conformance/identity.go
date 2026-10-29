@@ -91,7 +91,7 @@ var operatorCalls = []call{
 		return ignore(s.DirectiveRetire(ctx, core.DirectiveRetireRequest{Code: "D-0001"}))
 	}},
 	{"ProjectSettingsSet", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings()}))
+		return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: projA, Settings: ptr(core.DefaultSettings())}))
 	}},
 }
 
@@ -153,7 +153,7 @@ var identityCases = []Case{
 		wantKind(t, err, core.KindInvalid, "DirectiveRatify without a name")
 		_, err = s.DirectiveRetire(nameless, core.DirectiveRetireRequest{Code: d.Code})
 		wantKind(t, err, core.KindInvalid, "DirectiveRetire without a name")
-		_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings()})
+		_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: ptr(core.DefaultSettings())})
 		wantKind(t, err, core.KindInvalid, "ProjectSettingsSet without a name")
 
 		after := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
