@@ -7,11 +7,21 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	// Pure-Go SQLite driver, named in docs/DESIGN.md §3. It needs no C toolchain.
 	_ "modernc.org/sqlite"
 )
+
+// sqliteBusy is the primary result code SQLITE_BUSY: the database is locked by
+// another connection.
+const sqliteBusy = 5
+
+// connectRetries is how many times connect tries the first connection when it
+// reports SQLITE_BUSY. The waits grow by 10 ms each time.
+const connectRetries = 10
 
 // dsnOptions are applied to every connection in the pool, not only the first.
 //
@@ -38,9 +48,11 @@ type Store struct {
 // this build is refused rather than opened.
 //
 // path is a filesystem path. It must not contain '?', which starts the driver's
-// query string. Open returns an error when the file cannot be opened, when a
-// migration fails (the database is then left at the last version that applied),
-// or when the schema is newer than this build. Open writes to the file.
+// query string. Open first connects with a retry on SQLITE_BUSY, so several
+// processes opening one new file at once all succeed. Open returns an error when
+// the file cannot be opened, when a migration fails (the database is then left at
+// the last version that applied), or when the schema is newer than this build.
+// Open writes to the file.
 func Open(path string) (*Store, error) {
 	migrations, err := loadMigrations(migrationFiles)
 	if err != nil {
@@ -50,11 +62,40 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
 	}
+	if err := connect(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: open %s: %w", path, err)
+	}
 	if err := migrate(db, migrations); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: migrate %s: %w", path, err)
 	}
 	return &Store{db: db}, nil
+}
+
+// connect makes the first connection to db and returns once it is set up. Its
+// setup switches a new file to WAL mode, which SQLite can refuse with
+// SQLITE_BUSY even with the busy timeout set when another process is doing the
+// same switch. A refused connection is discarded and nothing is left behind, so
+// connect tries again. Any other error, or a BUSY that persists past the retries,
+// is returned.
+func connect(db *sql.DB) error {
+	var err error
+	for i := 0; i < connectRetries; i++ {
+		if err = db.Ping(); err == nil || !isBusy(err) {
+			return err
+		}
+		time.Sleep(time.Duration(i+1) * 10 * time.Millisecond)
+	}
+	return err
+}
+
+// isBusy reports whether err carries SQLITE_BUSY. The driver's error exposes its
+// result code. The primary code is the low byte, so extended codes such as
+// SQLITE_BUSY_SNAPSHOT also count.
+func isBusy(err error) bool {
+	var coded interface{ Code() int }
+	return errors.As(err, &coded) && coded.Code()&0xff == sqliteBusy
 }
 
 // Close releases the database and its connections. It writes nothing to the
