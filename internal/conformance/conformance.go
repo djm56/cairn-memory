@@ -35,8 +35,28 @@ type Case struct {
 
 // Run runs every case as a subtest against a fresh Service from newService.
 func Run(t *testing.T, newService func(t *testing.T) core.Service) {
+	RunWith(t, newService, nil)
+}
+
+// RunWith is Run for a backend that does not yet implement the whole suite.
+// Each case named in deferred is reported as skipped, with the reason its
+// backend gave, so it counts as neither a pass nor a fail. A name that is not
+// in the suite fails the run, so a renamed case cannot be skipped by accident.
+func RunWith(t *testing.T, newService func(t *testing.T) core.Service, deferred map[string]string) {
+	known := map[string]bool{}
+	for _, c := range Cases() {
+		known[c.Name] = true
+	}
+	for name := range deferred {
+		if !known[name] {
+			t.Errorf("deferred case %q is not in the suite", name)
+		}
+	}
 	for _, c := range Cases() {
 		t.Run(c.Name, func(t *testing.T) {
+			if reason, ok := deferred[c.Name]; ok {
+				t.Skip("deferred: " + reason)
+			}
 			c.Run(t, newService(t))
 		})
 	}

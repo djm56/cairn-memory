@@ -209,3 +209,20 @@ func DeletePendingSteps(ctx context.Context, q Querier, taskID string) (int64, e
 	}
 	return n, nil
 }
+
+// StepHasRecords reports whether an event or a review refers to step id. Such
+// a step cannot be deleted: DeletePendingSteps would fail on the foreign key,
+// and the journal is append-only (CONTRACT §4). Core asks before it plans.
+//
+// Core checks the task's project first, with GetTask.
+//
+// Read function: call it on s, or inside the transaction that will delete.
+func StepHasRecords(ctx context.Context, q Querier, id int64) (bool, error) {
+	var found bool
+	err := q.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM events WHERE step_id = ?)
+		OR EXISTS (SELECT 1 FROM reviews WHERE step_id = ?)`, id, id).Scan(&found)
+	if err != nil {
+		return false, fmt.Errorf("store: step %d records: %w", id, err)
+	}
+	return found, nil
+}

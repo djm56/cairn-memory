@@ -10,7 +10,7 @@ import (
 // ErrNotFound is returned, wrapped, by every single-row read or update whose
 // row does not exist in the scope asked for: another project's rows count as
 // absent. Core maps it to a not_found error with errors.Is.
-var ErrNotFound = errors.New("store: not found")
+var ErrNotFound = errors.New("not found")
 
 // Querier is the part of *sql.DB and *sql.Tx that the store uses. Every query
 // function takes one, so core can run several of them inside one transaction
