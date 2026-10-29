@@ -58,8 +58,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   a review is refused, and the way out is to skip the step; `search` does not hit
   retired directives. Recall keeps short upper-case and digit words of a goal
   (`JWT`, `CSS`, `v2`), and `StepHasRecords` is removed. The conformance suite has
-  38 cases: 24 pass and 14 are deferred to part 3. Pull request link added in a
-  follow-up commit.
+  38 cases: 24 pass and 14 are deferred to part 3
+  ([PR #54](https://github.com/djm56/cairn-memory/pull/54)).
 
 ### Changed
 
