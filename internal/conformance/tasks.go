@@ -154,6 +154,20 @@ var taskCases = []Case{
 			t.Errorf("TaskCurrent after abandon = %s", cur.Task.ID)
 		}
 	}},
+	{"task/update_never_sets_open", func(t T, s core.Service) {
+		// CONTRACT §1.5 (ruling 1a): task_update does not move a task into open.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskOpen)})
+		wantKind(t, err, core.KindRefused, "task_update to open on an active task")
+		got := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionBrief}))(t)
+		if got.Task.Status != core.TaskActive {
+			t.Errorf("status after the refused move = %q, want active", got.Task.Status)
+		}
+		queued := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true}))(t)
+		if queued.Status != core.TaskOpen {
+			t.Errorf("queued task status = %q, want open", queued.Status)
+		}
+	}},
 	{"task/list_filters_and_pages", func(t T, s core.Service) {
 		active := startTask(t, s, mainCtx(), "active")
 		for i := 0; i < 3; i++ {

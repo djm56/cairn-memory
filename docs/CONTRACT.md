@@ -4,7 +4,7 @@
 Nothing implements it yet. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite in
 `internal/conformance` checks the behaviour described here. The
-suite has 35 cases. Each one fails against the `core.Unimplemented`
+suite has 36 cases. Each one fails against the `core.Unimplemented`
 stub, as phase 1 expects.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
@@ -78,8 +78,9 @@ when steps are inserted. Ids never change.
     └──────── task_update(abandoned) from open, active, blocked
 ```
 
-- `task_update` may set `open`, `active`, `blocked` or `abandoned`.
-  `done` and `failed` come only from `task_close`.
+- `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
+  `open` except `task_start` with `queue`. `done` and `failed` come only from
+  `task_close`.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
