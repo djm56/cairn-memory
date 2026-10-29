@@ -50,7 +50,7 @@ func agentCallsNoClose() []agentWrite {
 			return err
 		}},
 		{"StepUpdate", func(ctx context.Context, s *core.Local) error {
-			_, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: id, Step: core.StepRef{Number: 1}, Action: core.StepStart})
+			_, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(1), Action: core.StepStart})
 			return err
 		}},
 		{"EventLog", func(ctx context.Context, s *core.Local) error {
@@ -62,7 +62,7 @@ func agentCallsNoClose() []agentWrite {
 			return err
 		}},
 		{"ReviewRecord", func(ctx context.Context, s *core.Local) error {
-			_, err := s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: id, Step: core.StepRef{Number: 1}, Verdict: core.VerdictApproved})
+			_, err := s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: id, Step: core.NumberRef(1), Verdict: core.VerdictApproved})
 			return err
 		}},
 		{"LearningAdd", func(ctx context.Context, s *core.Local) error {
@@ -141,7 +141,7 @@ func TestTerminalTaskRefusesEveryWrite(t *testing.T) {
 	abandoned := core.TaskAbandoned
 	must(s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &abandoned, Reason: "superseded"}))(t)
 
-	one := core.StepRef{Number: 1}
+	one := core.NumberRef(1)
 	active := core.TaskActive
 	attempts := map[string]func() error{
 		"TaskUpdate status": func() error {

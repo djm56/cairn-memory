@@ -89,14 +89,14 @@ var eventCases = []Case{
 	{"event/review_record_writes_event", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "build", "review")
 		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{
-			TaskID: res.ID, Step: core.StepRef{Number: 1}, Verdict: core.VerdictNotApproved, Critical: 1, Warnings: 2, Summary: "missing test",
+			TaskID: res.ID, Step: core.NumberRef(1), Verdict: core.VerdictNotApproved, Critical: 1, Warnings: 2, Summary: "missing test",
 		}))(t)
 		if rv.Reviewer != "reviewer" || rv.StepID != res.Steps[0].ID || rv.Critical != 1 {
 			t.Errorf("review = %+v", rv)
 		}
-		_, err := s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Verdict: "meh"})
+		_, err := s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(1), Verdict: "meh"})
 		wantKind(t, err, core.KindInvalid, "unknown verdict")
-		_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Verdict: core.VerdictApproved, Critical: -1})
+		_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(1), Verdict: core.VerdictApproved, Critical: -1})
 		wantKind(t, err, core.KindInvalid, "negative count")
 		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
 		if len(d.Reviews) != 1 {
@@ -121,13 +121,13 @@ var closeCases = []Case{
 			Steps:    []core.StepInput{{Title: "Write failing test"}, {Title: "Fix"}, {Title: "Review", Agent: "reviewer"}},
 		}))(t)
 		for n := 1; n <= 2; n++ {
-			ref := core.StepRef{Number: n}
+			ref := core.NumberRef(n)
 			must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: ref, Action: core.StepStart}))(t)
 			must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: ref, Action: core.StepFinish, Summary: "ok"}))(t)
 		}
 		must(s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventDecision, Text: "Allow only same-origin paths."}))(t)
-		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 3}, Action: core.StepStart}))(t)
-		must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: core.StepRef{Number: 2}, Verdict: core.VerdictApproved}))(t)
+		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(3), Action: core.StepStart}))(t)
+		must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(2), Verdict: core.VerdictApproved}))(t)
 		l := must(s.LearningAdd(ctx, core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "Check redirects", Body: "Every redirect needs an origin check.", Target: "reviewer"}))(t)
 		if l.Status != core.LearningProposed || l.TaskID != res.ID {
 			t.Errorf("learning = %+v", l)
@@ -147,7 +147,7 @@ var closeCases = []Case{
 			t.Errorf("status after refused close = %q", d.Task.Status)
 		}
 
-		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 3}, Action: core.StepFinish, Summary: "approved"}))(t)
+		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(3), Action: core.StepFinish, Summary: "approved"}))(t)
 		req := fullClose(res.ID, 2)
 		req.Criteria[1].Result = core.CriterionPartial
 		req.Mistakes = []core.Mistake{{Agent: "main", Mistake: "Edited before testing", Impact: core.ImpactLow, Prevention: "Test first"}}
@@ -220,7 +220,7 @@ var closeCases = []Case{
 		lax := core.ProjectSettings{} // every requirement off
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax}))(t)
 		res := startTask(t, s, mainCtx(), "t", "one")
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
 		closed := must(s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}))(t)
 		if closed.Status != core.TaskDone {
 			t.Errorf("status under a lax policy = %q", closed.Status)

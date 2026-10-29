@@ -12,12 +12,21 @@ import "encoding/json"
 const MaxLimit = 100
 
 // StepRef names a step by its ID or by its displayed Number. Exactly one is
-// set. Number 0 is allowed only as StepAddRequest.After, meaning "before
-// the first step".
+// set. The fields are pointers so that "not given" (nil) and a given zero
+// differ: {} is invalid everywhere, while {"number": 0} is allowed only as
+// StepAddRequest.After, meaning "before the first step" (CONTRACT §1.4, §3).
+// Build a ref with IDRef or NumberRef.
 type StepRef struct {
-	ID     int64 `json:"id,omitempty"`
-	Number int   `json:"number,omitempty"`
+	ID     *int64 `json:"id,omitempty"`
+	Number *int   `json:"number,omitempty"`
 }
+
+// IDRef returns a ref to the step with the given id.
+func IDRef(id int64) StepRef { return StepRef{ID: &id} }
+
+// NumberRef returns a ref to the step shown as n. NumberRef(0) is only valid
+// as StepAddRequest.After.
+func NumberRef(n int) StepRef { return StepRef{Number: &n} }
 
 // StepInput is one step of a plan.
 type StepInput struct {

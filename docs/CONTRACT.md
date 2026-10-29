@@ -1,11 +1,10 @@
 # Cairn Memory — Contract
 
 **Status as of 2026-10-28: approved by the operator (phase 1 exit).**
-Nothing implements it yet. The Go form is `internal/core` (`Service`,
-request and result types, errors). The conformance suite in
-`internal/conformance` checks the behaviour described here. The
-suite has 38 cases. Each one fails against the `core.Unimplemented`
-stub, as phase 1 expects.
+`core.Local` passes 25 of the 39 cases in `internal/conformance` (counts as of
+2026-10-29); the other 14 wait on part 3 of issue #9. The Go form is
+`internal/core` (`Service`, request and result types, errors). The conformance
+suite checks the behaviour described here.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
@@ -63,19 +62,22 @@ one: caller → request shape (`invalid`) → existence (`not_found`) → rules
 
 A step is named by a **step ref**: `{"number": 3}` is the step shown as 3
 now, and `{"id": 412}` is the step whose id is 412. Give exactly one, or the
-call is `invalid`. Numbers are computed from the order each time and change
+call is `invalid`. So is `{}`, in every call that takes a ref. Number 0 names
+no step: it is valid only as `after` in `step_add`, where it means before the
+first step (§3). Numbers are computed from the order each time and change
 when steps are inserted. Ids never change.
 
 ### 1.5 Task status
 
 ```
-          task_start            task_update
-   open ───────────────► active ◄────────► blocked
-    │   (queue: false)     │                  │
-    │                      │ task_close       │ task_close
-    │                      ▼                  ▼
-    │                 done | failed      done | failed
-    └──────── task_update(abandoned) from open, active, blocked
+task_start (queue)                  task_start
+        │                                │
+        ▼                                ▼
+        open ──── task_update ─────────► active ◄──── task_update ────► blocked
+        │                                │ task_close                   │ task_close
+        │                                ▼                              ▼
+        │                                done | failed                  done | failed
+        └──────── task_update(abandoned) from open, active, blocked
 ```
 
 - `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
@@ -205,7 +207,7 @@ Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
 A `pending` step that an event or a review refers to cannot be removed, so
-the call is `refused` and changes nothing (ruling 3a). The way out: skip that
+the call is `refused` and changes nothing. The way out: skip that
 step with `step_update` (`skip`, with a summary), then plan again. A skipped
 step is kept.
 
@@ -299,7 +301,7 @@ operators and brackets are matched as words, and never cause an error);
 all); `all_projects`; `limit` (default 10); `cursor`.
 **Out:** `hits` (`[{kind, id, project, task_id, title, snippet}]`, best
 match first), and `next`. Global directives are found from every project.
-A retired directive is not a hit (ruling 4a): it is not listed by
+A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
 either.
 
