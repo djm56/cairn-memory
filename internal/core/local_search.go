@@ -142,17 +142,19 @@ func goalWords(goal string) []string {
 }
 
 // isCapitals reports whether goal is written all in upper case: it has a
-// letter, and no lower-case letter. In such a goal every word is upper case,
-// so the case of a word says nothing about whether it is a name.
+// upper-case letter, and no lower-case letter. In such a goal every word is upper
+// case, so the case of a word says nothing about whether it is a name. A goal in
+// an uncased script (CJK, for one) has no upper-case letter, so it is not
+// capitals, and its short words are kept as they are.
 func isCapitals(goal string) bool {
-	hasLetter := false
+	hasUpper := false
 	for _, r := range goal {
 		if unicode.IsLower(r) {
 			return false
 		}
-		hasLetter = hasLetter || unicode.IsLetter(r)
+		hasUpper = hasUpper || unicode.IsUpper(r)
 	}
-	return hasLetter
+	return hasUpper
 }
 
 // keepGoalWord reports whether a word of a goal can name its subject. Four or
