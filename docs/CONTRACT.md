@@ -324,7 +324,11 @@ either.
 These are not MCP tools, and never will be. The web UI (phase 6) and the
 CLI reach them. Each one refuses a caller without the operator role
 (`operator_only`) before any other check. Operators act across projects, so
-these calls do not need the caller's project.
+these calls do not need the caller's project. Every call needs the operator's
+name, which the caller carries as its agent; a call without one is `invalid`.
+`LearningDecide` and `DirectiveRatify` record the name (`decided_by`,
+`ratified_by`). `DirectiveRetire` and `ProjectSettingsSet` store no name, and
+refuse a nameless call all the same.
 
 | Call | In | Does |
 |---|---|---|

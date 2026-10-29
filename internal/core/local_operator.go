@@ -12,16 +12,18 @@ import (
 // operatorFor returns the caller of an operator call (CONTRACT §8). The role is
 // checked first, before anything else in the call: a caller without the
 // operator role is operator_only, whatever else is wrong with the request. The
-// operator's name is then required, because every operator call records it on
-// the decision (decided_by, ratified_by), and CONTRACT §1.1 requires an agent
-// name on every write. Operator calls need no project: they act across projects.
+// operator's name is then required on every operator call (CONTRACT §8). Two
+// calls record the name on the row they change, decided_by and ratified_by. The
+// other two, DirectiveRetire and ProjectSettingsSet, store no name, so for them
+// the rule is uniform rather than recorded. Operator calls need no project: they
+// act across projects.
 func operatorFor(ctx context.Context) (Caller, error) {
 	c, ok := CallerFrom(ctx)
 	if !ok || c.Role != RoleOperator {
 		return c, OperatorOnly("this call is an operator decision, and only an operator may make it")
 	}
 	if blank(c.Agent) {
-		return c, Invalid("an operator call needs the operator's name, which the decision records")
+		return c, Invalid("an operator call needs the operator's name")
 	}
 	return c, nil
 }

@@ -140,6 +140,31 @@ var identityCases = []Case{
 			t.Errorf("directives changed by refused calls: %+v", ds.Directives)
 		}
 	}},
+	{"identity/operator_call_needs_name", func(t T, s core.Service) {
+		// CONTRACT §8: every operator call needs the operator's name. Each
+		// call below is valid but for the name, and the learning and the
+		// directive exist, so a call that got past the name would change them.
+		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "r"}))(t)
+		nameless := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator})
+		_, err := s.LearningDecide(nameless, core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted})
+		wantKind(t, err, core.KindInvalid, "LearningDecide without a name")
+		_, err = s.DirectiveRatify(nameless, core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t2", Rule: "r"})
+		wantKind(t, err, core.KindInvalid, "DirectiveRatify without a name")
+		_, err = s.DirectiveRetire(nameless, core.DirectiveRetireRequest{Code: d.Code})
+		wantKind(t, err, core.KindInvalid, "DirectiveRetire without a name")
+		_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings()})
+		wantKind(t, err, core.KindInvalid, "ProjectSettingsSet without a name")
+
+		after := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
+		if len(after.Learnings) != 1 || after.Learnings[0].Status != core.LearningProposed {
+			t.Errorf("learning changed by nameless calls: %+v", after.Learnings)
+		}
+		ds := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+		if len(ds.Directives) != 1 || ds.Directives[0].Status != core.DirectiveActive {
+			t.Errorf("directives changed by nameless calls: %+v", ds.Directives)
+		}
+	}},
 }
 
 // casesCoverInterface fails when a Service method has no entry in

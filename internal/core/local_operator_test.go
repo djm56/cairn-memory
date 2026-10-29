@@ -16,10 +16,11 @@ func opCtx() context.Context {
 }
 
 // TestOperatorCallNeedsName checks that an operator call with no name is
-// invalid. The name goes on the decision (decided_by, ratified_by), so an
-// empty one would be a silent default. Each call here is otherwise valid, and
-// the name check runs before any row is read, so a missing check would let the
-// call through to the store.
+// invalid, for all four calls. Two of them record the name on the row they
+// change (decided_by, ratified_by). The other two store none, and are refused
+// too, so the rule is the same for every operator call (CONTRACT §8). Each call
+// here is otherwise valid, and the name check runs before any row is read, so a
+// missing check would let the call through to the store.
 func TestOperatorCallNeedsName(t *testing.T) {
 	s, _ := openLocal(t)
 	l := mustLearning(mainCtx(), t, s, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"})
