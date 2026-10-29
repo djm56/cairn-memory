@@ -69,10 +69,10 @@ func TestStepStartAndFinishWriteEvents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepStart}); err != nil {
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepFinish, Summary: "ok"}); err != nil {
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepFinish, Summary: "ok"}); err != nil {
 		t.Fatal(err)
 	}
 	list, err := s.EventList(ctx, core.EventListRequest{TaskID: res.ID, Limit: 10})
@@ -99,11 +99,11 @@ func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	two := core.StepRef{Number: 2}
+	two := core.NumberRef(2)
 	if _, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Step: &two, Kind: core.EventNote, Text: "about two"}); err != nil {
 		t.Fatal(err)
 	}
-	three := core.StepRef{Number: 3}
+	three := core.NumberRef(3)
 	if _, err := s.ReviewRecord(agent("acme-api", "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: three, Verdict: core.VerdictApproved}); err != nil {
 		t.Fatal(err)
 	}

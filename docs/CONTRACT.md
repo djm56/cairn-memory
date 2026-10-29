@@ -63,7 +63,9 @@ one: caller → request shape (`invalid`) → existence (`not_found`) → rules
 
 A step is named by a **step ref**: `{"number": 3}` is the step shown as 3
 now, and `{"id": 412}` is the step whose id is 412. Give exactly one, or the
-call is `invalid`. Numbers are computed from the order each time and change
+call is `invalid`. So is `{}`, in every call that takes a ref. Number 0 names
+no step: it is valid only as `after` in `step_add`, where it means before the
+first step (§3). Numbers are computed from the order each time and change
 when steps are inserted. Ids never change.
 
 ### 1.5 Task status

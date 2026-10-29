@@ -130,7 +130,7 @@ var taskCases = []Case{
 	{"task/brief_frozen_once_work_starts", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one")
 		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Goal: ptr("A sharper goal."), Criteria: ptr([]string{"c1"})}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
 		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Goal: ptr("Moving the goalposts.")})
 		wantKind(t, err, core.KindRefused, "brief edit after a step started")
 		// Status and next action stay editable.
@@ -199,11 +199,11 @@ var stepCases = []Case{
 	{"step/insert_without_renumbering", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
 		ids := []int64{res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
-		added := must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: &core.StepRef{Number: 1}, Title: "one-and-a-half"}))(t)
+		added := must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(core.NumberRef(1)), Title: "one-and-a-half"}))(t)
 		if added.Number != 2 {
 			t.Errorf("inserted step number = %d, want 2", added.Number)
 		}
-		first := must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: &core.StepRef{Number: 0}, Title: "zero"}))(t)
+		first := must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(core.NumberRef(0)), Title: "zero"}))(t)
 		last := must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, Title: "four"}))(t)
 		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
 		want := []string{"zero", "one", "one-and-a-half", "two", "three", "four"}
@@ -217,7 +217,7 @@ var stepCases = []Case{
 		}
 		// Many inserts at the same place keep their order.
 		for i := 0; i < 30; i++ {
-			must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: &core.StepRef{ID: first.ID}, Title: "squeezed"}))(t)
+			must(s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(core.IDRef(first.ID)), Title: "squeezed"}))(t)
 		}
 		d = must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
 		titles := stepTitles(t, d.Steps)
@@ -227,24 +227,37 @@ var stepCases = []Case{
 	}},
 	{"step/ref_by_id_or_number", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two")
-		byNum := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 2}, Action: core.StepStart}))(t)
+		byNum := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(2), Action: core.StepStart}))(t)
 		if byNum.ID != res.Steps[1].ID {
 			t.Errorf("step 2 by number = id %d, want %d", byNum.ID, res.Steps[1].ID)
 		}
-		byID := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{ID: res.Steps[1].ID}, Action: core.StepFinish, Summary: "done"}))(t)
+		byID := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.IDRef(res.Steps[1].ID), Action: core.StepFinish, Summary: "done"}))(t)
 		if byID.Status != core.StepDone {
 			t.Errorf("step by id status = %q", byID.Status)
 		}
-		_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{ID: res.Steps[0].ID, Number: 1}, Action: core.StepStart})
+		_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{ID: ptr(res.Steps[0].ID), Number: ptr(1)}, Action: core.StepStart})
 		wantKind(t, err, core.KindInvalid, "step ref with both id and number")
 		_, err = s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{}, Action: core.StepStart})
 		wantKind(t, err, core.KindInvalid, "empty step ref")
-		_, err = s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 9}, Action: core.StepStart})
+		_, err = s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(9), Action: core.StepStart})
 		wantKind(t, err, core.KindNotFound, "step 9 of 2")
+	}},
+	{"step/empty_ref_is_invalid", func(t T, s core.Service) {
+		// CONTRACT §1.4 (ruling 2a): {} names no step, so it is invalid. Only
+		// {"number": 0} means before the first step, and only as step_add's after.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		_, err := s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(core.StepRef{}), Title: "empty"})
+		wantKind(t, err, core.KindInvalid, "step_add after an empty ref")
+		_, err = s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(0), Action: core.StepStart})
+		wantKind(t, err, core.KindInvalid, "step_update on number 0")
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one"}) {
+			t.Errorf("steps after the refused adds = %v, want [one]", titles)
+		}
 	}},
 	{"step/transitions_and_attempts", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two")
-		one := core.StepRef{Number: 1}
+		one := core.NumberRef(1)
 		upd := func(a core.StepAction, summary string) (*core.Step, error) {
 			return s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: a, Summary: summary})
 		}
@@ -267,7 +280,7 @@ var stepCases = []Case{
 		}
 		_, err = upd(core.StepStart, "")
 		wantKind(t, err, core.KindRefused, "restart a done step")
-		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 2}, Action: core.StepSkip, Summary: "not needed", Agent: ptr("hicks")}))(t)
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(2), Action: core.StepSkip, Summary: "not needed", Agent: ptr("hicks")}))(t)
 		if skipped.Status != core.StepSkipped || skipped.Agent != "hicks" {
 			t.Errorf("skipped step = %+v", skipped)
 		}
@@ -283,14 +296,14 @@ var stepCases = []Case{
 	}},
 	{"step/start_needs_active_task", func(t T, s core.Service) {
 		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "t", Goal: "g", Queue: true, Steps: []core.StepInput{{Title: "one"}}}))(t)
-		_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepStart})
+		_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart})
 		wantKind(t, err, core.KindRefused, "start a step of an open task")
 	}},
 	{"step/plan_keeps_started_steps", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepStart}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepFinish, Summary: "ok"}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 2}, Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepFinish, Summary: "ok"}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(2), Action: core.StepStart}))(t)
 		got := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new-a"}, {Title: "new-b"}}}))(t)
 		want := []string{"one", "two", "new-a", "new-b"}
 		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, want) {
@@ -304,7 +317,7 @@ var stepCases = []Case{
 		// CONTRACT §3 (ruling 3a): a pending step with an event or a review
 		// cannot be removed, so step_plan is refused. The way out is to skip it.
 		res := startTask(t, s, mainCtx(), "t", "one", "two")
-		two := core.StepRef{Number: 2}
+		two := core.NumberRef(2)
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &two, Kind: core.EventNote, Text: "about two"}))(t)
 		_, err := s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
 		wantKind(t, err, core.KindRefused, "step_plan over a pending step with an event")

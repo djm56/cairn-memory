@@ -45,7 +45,7 @@ var agentCalls = []call{
 		return ignore(s.StepAdd(ctx, core.StepAddRequest{TaskID: "task-20260101-01", Title: "a"}))
 	}},
 	{"StepUpdate", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: "task-20260101-01", Step: core.StepRef{Number: 1}, Action: core.StepStart}))
+		return ignore(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: "task-20260101-01", Step: core.NumberRef(1), Action: core.StepStart}))
 	}},
 	{"EventLog", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.EventLog(ctx, core.EventLogRequest{TaskID: "task-20260101-01", Kind: core.EventNote, Text: "x"}))
@@ -54,7 +54,7 @@ var agentCalls = []call{
 		return ignore(s.EventList(ctx, core.EventListRequest{TaskID: "task-20260101-01"}))
 	}},
 	{"ReviewRecord", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: "task-20260101-01", Step: core.StepRef{Number: 1}, Verdict: core.VerdictApproved}))
+		return ignore(s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: "task-20260101-01", Step: core.NumberRef(1), Verdict: core.VerdictApproved}))
 	}},
 	{"LearningAdd", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))

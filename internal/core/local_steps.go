@@ -8,42 +8,48 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// checkRef checks the shape of a step ref: exactly one of id and number, and
-// neither negative (CONTRACT §1.4). A number of 0 with no id is not a ref here.
-// StepAdd gives it its one meaning, before the first step.
+// checkRef checks the shape of a step ref: exactly one of id and number, each
+// positive (CONTRACT §1.4). {} is refused here, as is number 0. StepAdd is the
+// one caller that gives number 0 its meaning, before the first step, and it
+// checks that case itself before it calls checkRef.
 func checkRef(ref StepRef) error {
 	switch {
-	case ref.ID != 0 && ref.Number != 0:
+	case ref.ID != nil && ref.Number != nil:
 		return Invalid("a step ref names a step by id or by number, not both")
-	case ref.ID == 0 && ref.Number == 0:
+	case ref.ID == nil && ref.Number == nil:
 		return Invalid("a step ref needs an id or a number")
-	case ref.ID < 0 || ref.Number < 0:
+	case ref.ID != nil && *ref.ID < 1:
+		return Invalid("a step id is a positive number")
+	case ref.Number != nil && *ref.Number == 0:
+		return Invalid("step numbers start at 1; number 0 is valid only as step_add's after")
+	case ref.Number != nil && *ref.Number < 0:
 		return Invalid("a step ref cannot be negative")
 	}
 	return nil
 }
 
-// refText names a ref for an error message.
+// refText names a ref for an error message. Call it on a ref that checkRef
+// has passed, so one of the two fields is set.
 func refText(ref StepRef) string {
-	if ref.ID != 0 {
-		return fmt.Sprintf("id %d", ref.ID)
+	if ref.ID != nil {
+		return fmt.Sprintf("id %d", *ref.ID)
 	}
-	return fmt.Sprintf("number %d", ref.Number)
+	return fmt.Sprintf("number %d", *ref.Number)
 }
 
 // resolveStep returns the step a ref names in task taskID. A step of another
 // task, or a number the task does not reach, is not_found. Call it after the
-// task has been loaded with loadTask.
+// ref has passed checkRef and after the task has been loaded with loadTask.
 //
 // Read function: call it inside the transaction that uses the step, or on the
 // store for a read that needs no write.
 func resolveStep(ctx context.Context, q store.Querier, taskID string, ref StepRef) (store.StepRow, error) {
 	var st store.StepRow
 	var err error
-	if ref.ID != 0 {
-		st, err = store.GetStep(ctx, q, taskID, ref.ID)
+	if ref.ID != nil {
+		st, err = store.GetStep(ctx, q, taskID, *ref.ID)
 	} else {
-		st, err = store.GetStepByNumber(ctx, q, taskID, ref.Number)
+		st, err = store.GetStepByNumber(ctx, q, taskID, *ref.Number)
 	}
 	if errors.Is(err, store.ErrNotFound) {
 		return st, NotFound("step %s not found in task %s", refText(ref), taskID)
@@ -154,9 +160,7 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 // StepAdd inserts one step. With no after it goes at the end; {"number": 0}
 // puts it before the first step. No other step's id changes (CONTRACT §3).
 //
-// Go cannot tell {} from {"number": 0} in StepRef, so an After with neither id
-// nor number is read as before the first step. The MCP adapter must refuse {}
-// when it decodes the call. See the report on issue #9, part 1.
+// An After of {} is invalid: only {"number": 0} means before the first step.
 func (l *Local) StepAdd(ctx context.Context, req StepAddRequest) (*Step, error) {
 	c, err := callerFor(ctx, true)
 	if err != nil {
@@ -168,7 +172,7 @@ func (l *Local) StepAdd(ctx context.Context, req StepAddRequest) (*Step, error) 
 	if blank(req.Title) {
 		return nil, Invalid("a step needs a title")
 	}
-	before := req.After != nil && req.After.ID == 0 && req.After.Number == 0
+	before := req.After != nil && req.After.ID == nil && req.After.Number != nil && *req.After.Number == 0
 	if req.After != nil && !before {
 		if err := checkRef(*req.After); err != nil {
 			return nil, err
