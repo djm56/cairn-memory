@@ -165,6 +165,34 @@ var identityCases = []Case{
 			t.Errorf("directives changed by nameless calls: %+v", ds.Directives)
 		}
 	}},
+	{"identity/operator_role_before_shape", func(t T, s core.Service) {
+		// CONTRACT §8: each operator call refuses a caller without the operator
+		// role before any other check. Each request below is invalid as well,
+		// so an agent that gets invalid instead has had the shape checked first.
+		calls := []struct {
+			name string
+			do   func(ctx context.Context) error
+		}{
+			{"LearningDecide back to proposed", func(ctx context.Context) error {
+				return ignore(s.LearningDecide(ctx, core.LearningDecideRequest{ID: 1, Status: core.LearningProposed}))
+			}},
+			{"LearningDecide with an unknown status", func(ctx context.Context) error {
+				return ignore(s.LearningDecide(ctx, core.LearningDecideRequest{ID: 1, Status: "gossip"}))
+			}},
+			{"DirectiveRatify with an unknown scope and no title", func(ctx context.Context) error {
+				return ignore(s.DirectiveRatify(ctx, core.DirectiveRatifyRequest{Scope: "galaxy"}))
+			}},
+			{"DirectiveRetire with a blank code", func(ctx context.Context) error {
+				return ignore(s.DirectiveRetire(ctx, core.DirectiveRetireRequest{Code: " "}))
+			}},
+			{"ProjectSettingsSet with a bad name and no settings", func(ctx context.Context) error {
+				return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: "Acme"}))
+			}},
+		}
+		for _, c := range calls {
+			wantKind(t, c.do(mainCtx()), core.KindOperatorOnly, c.name+" by an agent")
+		}
+	}},
 }
 
 // casesCoverInterface fails when a Service method has no entry in
