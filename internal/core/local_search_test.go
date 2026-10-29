@@ -48,8 +48,8 @@ func mustRecall(ctx context.Context, t *testing.T, s *core.Local, req core.Recal
 	return must(s.Recall(ctx, req))(t)
 }
 
-// seedLesson writes a lesson of a task through the store. Task close is part 3,
-// so the rows that close writes are made here.
+// seedLesson writes a lesson of a task through the store. The rows are made
+// here, so the search and recall tests do not depend on task_close.
 func seedLesson(t *testing.T, st *store.Store, taskID, text string) {
 	t.Helper()
 	ctx := context.Background()
@@ -80,8 +80,8 @@ func seedMistake(t *testing.T, st *store.Store, taskID, text string) {
 
 // TestSearchFindsEachKind checks search over every kind. Each row holds one
 // word that no other row holds, so the first hit for that word is a row of its
-// kind. The directive, lesson and mistake are written through the store, since
-// their operator and close calls are part 3.
+// kind. The directive, lesson and mistake are written through the store, so the
+// test does not depend on the operator and close calls.
 func TestSearchFindsEachKind(t *testing.T) {
 	s, st := openLocal(t)
 	ctx := mainCtx()

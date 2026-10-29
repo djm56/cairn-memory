@@ -12,15 +12,13 @@ import (
 )
 
 // Local is the Service over the local SQLite store (DESIGN.md §5.3). It holds
-// the rules: caller and project checks, status transitions, the one-active
-// rule, step positions and the journal entries that the calls write.
+// the rules: caller and project checks, operator-only decisions, status
+// transitions, the one-active rule, the close policy, step positions and the
+// journal entries that the calls write.
 //
-// Parts 1 and 2 of issue #9 implement the task, step, journal, learning,
-// directive, note, search and recall calls. The operator calls and task_close
-// are part 3: until it lands they are inherited from Unimplemented, and the
-// conformance cases that need them are deferred in local_test.go.
+// Every method of Service is implemented here, so Local embeds nothing. The
+// compile-time check below covers the whole interface.
 type Local struct {
-	Unimplemented
 	st *store.Store
 }
 

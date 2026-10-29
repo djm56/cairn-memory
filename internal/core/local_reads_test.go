@@ -23,8 +23,8 @@ func seedProject(t *testing.T, st *store.Store, name string) {
 }
 
 // insertDirective writes a directive row, with the next code, through the
-// store. The operator call that ratifies a directive is part 3, so this stands
-// in for it. A retired directive gets a retired_at time.
+// store, so the read and search tests do not depend on directive_ratify. A
+// retired directive gets a retired_at time.
 func insertDirective(t *testing.T, st *store.Store, scope, project, agent, title, status string) {
 	t.Helper()
 	ctx := context.Background()
@@ -110,8 +110,8 @@ func TestDirectiveReadsByScope(t *testing.T) {
 }
 
 // TestLearningListFilters checks learning_list's filters and paging. A status
-// other than proposed is set through the store here, because LearningDecide is
-// part 3.
+// other than proposed is set through the store here, so the test does not
+// depend on learning_decide.
 func TestLearningListFilters(t *testing.T) {
 	s, st := openLocal(t)
 	seedProject(t, st, "acme-web")
