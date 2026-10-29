@@ -58,9 +58,10 @@ type Project struct {
 }
 
 // projectFile is the part of .cairn.toml this package reads. Other keys, such
-// as the optional server, are ignored here.
+// as the optional server, are ignored here. Project is decoded as any so that a
+// value of the wrong type can be reported as such, not as a TOML syntax fault.
 type projectFile struct {
-	Project string `toml:"project"`
+	Project any `toml:"project"`
 }
 
 // Resolve returns the project for a call made from workDir. It reads
@@ -128,20 +129,28 @@ func findFile(dir string) (string, bool, error) {
 }
 
 // readFile decodes the project key of the .cairn.toml at path and checks it.
-// A file that does not parse, or has no project key, is a KindInvalid error
-// that names the file.
+// A file that does not parse is a KindInvalid error that names the file. So is
+// a project key of the wrong type, or one that is missing or empty, and a name
+// that breaks the rule.
 func readFile(path string) (Project, error) {
 	var pf projectFile
 	if _, err := toml.DecodeFile(path, &pf); err != nil {
 		return Project{}, core.Invalid("%s is not valid TOML: %v", path, err)
 	}
-	if pf.Project == "" {
+	if pf.Project == nil {
 		return Project{}, core.Invalid("%s has no project key: set project = \"<name>\", or run `cairn init`", path)
 	}
-	if !core.ValidProjectName(pf.Project) {
-		return Project{}, invalidName(path+" project", pf.Project)
+	name, ok := pf.Project.(string)
+	if !ok {
+		return Project{}, core.Invalid("%s has the wrong type for project: the value must be a quoted string, project = \"<name>\"", path)
 	}
-	return Project{Name: pf.Project, Source: SourceFile, Path: path}, nil
+	if name == "" {
+		return Project{}, core.Invalid("%s has no project key: set project = \"<name>\", or run `cairn init`", path)
+	}
+	if !core.ValidProjectName(name) {
+		return Project{}, invalidName(path+" project", name)
+	}
+	return Project{Name: name, Source: SourceFile, Path: path}, nil
 }
 
 // invalidName is the KindInvalid error for a project name that breaks the

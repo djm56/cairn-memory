@@ -361,3 +361,37 @@ func TestResolveDirectoryNamedFile(t *testing.T) {
 		t.Errorf("error %q wrongly reports a TOML fault", err)
 	}
 }
+
+// TestResolveProjectWrongType checks that a project key of the wrong type is
+// reported as a type fault. The file parses, so "not valid TOML" would mislead.
+func TestResolveProjectWrongType(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"integer", "project = 5\n"},
+		{"boolean", "project = true\n"},
+		{"array", "project = [\"acme-api\"]\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := newTree(t, "app", []file{{"app/.cairn.toml", tc.body}})
+			setEnv(t, EnvProject, "", true)
+			setEnv(t, EnvProjectDir, "", true)
+
+			got, err := Resolve(filepath.Join(tr.root, "app"))
+			if err == nil {
+				t.Fatalf("Resolve: got %+v, want an error", got)
+			}
+			if kind := core.KindOf(err); kind != core.KindInvalid {
+				t.Errorf("Resolve error kind = %q (%v), want invalid", kind, err)
+			}
+			if !strings.Contains(err.Error(), "wrong type for project") {
+				t.Errorf("error %q does not say the key has the wrong type", err)
+			}
+			if strings.Contains(err.Error(), "not valid TOML") {
+				t.Errorf("error %q wrongly reports a TOML fault", err)
+			}
+		})
+	}
+}
