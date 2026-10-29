@@ -41,6 +41,9 @@ func ftsQuery(text string) string {
 // follow. A query with no words returns no hits and no error. Each hit's
 // Snippet is an excerpt around the matched words, with them in square brackets.
 //
+// Without AllProjects, an empty Project is refused rather than read as "the
+// global directives only", so a caller that forgot the project fails loudly.
+//
 // Read function: call it on s, outside a transaction.
 func Search(ctx context.Context, q Querier, f SearchFilter) ([]SearchRow, bool, error) {
 	if f.Limit < 1 {
@@ -48,6 +51,9 @@ func Search(ctx context.Context, q Querier, f SearchFilter) ([]SearchRow, bool, 
 	}
 	if f.Offset < 0 {
 		return nil, false, fmt.Errorf("store: search: offset %d is negative", f.Offset)
+	}
+	if !f.AllProjects && f.Project == "" {
+		return nil, false, fmt.Errorf("store: search: project is empty; name a project or set AllProjects")
 	}
 	match := ftsQuery(f.Query)
 	if match == "" {

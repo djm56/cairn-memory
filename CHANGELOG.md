@@ -31,6 +31,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   migration 0002 with the secondary indexes and the `tasks.project` guard
   (issue #8, [PR #47](https://github.com/djm56/cairn-memory/pull/47)).
   Several processes opening one new database at once no longer fail with `SQLITE_BUSY`.
+- Phase 2 identity: `internal/identity` resolves the project from
+  `CAIRN_PROJECT`, then the nearest `.cairn.toml` walking up from
+  `CLAUDE_PROJECT_DIR` or the working directory, and refuses a call with no
+  project. An invalid name is refused, not skipped. The file is read with
+  `github.com/BurntSushi/toml` v1.6.0 ([PR #49](https://github.com/djm56/cairn-memory/pull/49)).
 
 ### Changed
 

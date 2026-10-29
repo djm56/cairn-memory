@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -90,8 +91,8 @@ func GetLearning(ctx context.Context, q Querier, project string, id int64) (Lear
 	row := q.QueryRowContext(ctx, `SELECT `+learningColumns+` FROM learnings
 		WHERE id = ? AND project = ?`, id, project)
 	l, err := scanLearning(row)
-	if err == sql.ErrNoRows {
-		return l, fmt.Errorf("learning %d: %w", id, ErrNotFound)
+	if errors.Is(err, sql.ErrNoRows) {
+		return l, fmt.Errorf("store: learning %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return l, fmt.Errorf("store: get learning %d: %w", id, err)
@@ -107,8 +108,8 @@ func GetLearning(ctx context.Context, q Querier, project string, id int64) (Lear
 func GetLearningAnyProject(ctx context.Context, q Querier, id int64) (LearningRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT `+learningColumns+` FROM learnings WHERE id = ?`, id)
 	l, err := scanLearning(row)
-	if err == sql.ErrNoRows {
-		return l, fmt.Errorf("learning %d: %w", id, ErrNotFound)
+	if errors.Is(err, sql.ErrNoRows) {
+		return l, fmt.Errorf("store: learning %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return l, fmt.Errorf("store: get learning %d: %w", id, err)

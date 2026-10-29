@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -36,8 +37,8 @@ func GetProject(ctx context.Context, q Querier, name string) (ProjectRow, error)
 	err := q.QueryRowContext(ctx, `SELECT name, display_name, created_at, last_seen_at, settings
 		FROM projects WHERE name = ?`, name).
 		Scan(&p.Name, &display, &created, &seen, &p.Settings)
-	if err == sql.ErrNoRows {
-		return p, fmt.Errorf("project %s: %w", name, ErrNotFound)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, fmt.Errorf("store: project %s: %w", name, ErrNotFound)
 	}
 	if err != nil {
 		return p, fmt.Errorf("store: get project %s: %w", name, err)
@@ -95,8 +96,8 @@ func GetSession(ctx context.Context, q Querier, id string) (SessionRow, error) {
 	err := q.QueryRowContext(ctx, `SELECT id, project, client, agent, started_at, last_seen_at
 		FROM sessions WHERE id = ?`, id).
 		Scan(&s.ID, &s.Project, &client, &agent, &started, &seen)
-	if err == sql.ErrNoRows {
-		return s, fmt.Errorf("session %s: %w", id, ErrNotFound)
+	if errors.Is(err, sql.ErrNoRows) {
+		return s, fmt.Errorf("store: session %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return s, fmt.Errorf("store: get session %s: %w", id, err)
@@ -120,7 +121,7 @@ func requireOneRow(res sql.Result, what string) error {
 		return fmt.Errorf("store: rows affected: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("%s: %w", what, ErrNotFound)
+		return fmt.Errorf("store: %s: %w", what, ErrNotFound)
 	}
 	return nil
 }
