@@ -1,11 +1,10 @@
 # Cairn Memory — Contract
 
 **Status as of 2026-10-28: approved by the operator (phase 1 exit).**
-Nothing implements it yet. The Go form is `internal/core` (`Service`,
-request and result types, errors). The conformance suite in
-`internal/conformance` checks the behaviour described here. The
-suite has 38 cases. Each one fails against the `core.Unimplemented`
-stub, as phase 1 expects.
+`core.Local` passes 25 of the 39 cases in `internal/conformance` (counts as of
+2026-10-29); the other 14 wait on part 3 of issue #9. The Go form is
+`internal/core` (`Service`, request and result types, errors). The conformance
+suite checks the behaviour described here.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
