@@ -345,8 +345,8 @@ refuse a nameless call all the same.
 ## 9. Settled here, for review
 
 Each item answers a question that DESIGN.md left open. Items 1–11 were approved
-by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, each
-item says what checks it: a conformance case by default, or `(core test only)`
+by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, an
+item is checked by a conformance case unless it is marked `(core test only)`,
 where only a core test checks it. An item with no check at all is marked
 `(not tested)`; none is.
 

@@ -101,5 +101,5 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   switch, or the call is refused; a goal in an uncased script keeps its short
   words; a name of only spaces counts as no name (CONTRACT §9 item 34); and
   number 0 is valid only as `step_add`'s `after` (§9 item 19). The conformance
-  suite has 63 cases, all passing, and CONTRACT §9 names the check for each of
-  its items 13 to 34 ([PR #58](https://github.com/djm56/cairn-memory/pull/58)).
+  suite has 63 cases, all passing, and each of CONTRACT §9's items 13 to 34 is
+  checked by a conformance case, or is marked `(core test only)` ([PR #58](https://github.com/djm56/cairn-memory/pull/58)).
