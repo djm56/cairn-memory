@@ -137,6 +137,8 @@ func UpdateStep(ctx context.Context, q Querier, s StepRow) error {
 // StepPositionLast returns a position after every step of task taskID, for a
 // step added at the end. A task with no steps gets 1.
 //
+// Core checks the task's project first, with GetTask.
+//
 // Read function: call it on s, outside a transaction. Its result is used to
 // insert, so the insert belongs in the same WithTx; otherwise two inserts can
 // take the same position.
@@ -158,6 +160,8 @@ func StepPositionLast(ctx context.Context, q Querier, taskID string) (float64, e
 // other step is renumbered in the database (DESIGN §3.2). A step inserted after
 // the last one gets after+1; the first step, with nothing before it, gets half
 // of the first position.
+//
+// Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction. As with StepPositionLast,
 // the insert that uses the result belongs in the same WithTx.
