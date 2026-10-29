@@ -91,11 +91,25 @@ var operatorCalls = []call{
 		return ignore(s.DirectiveRetire(ctx, core.DirectiveRetireRequest{Code: "D-0001"}))
 	}},
 	{"ProjectSettingsSet", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings()}))
+		return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()}))
 	}},
 }
 
 var identityCases = []Case{
+	{"identity/operator_blank_name_refused", func(t T, s core.Service) {
+		// CONTRACT §1.1, §9 item 34: a name of only spaces is no name, on an
+		// operator call as on an agent write.
+		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		spaces := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator, Agent: "   "})
+		_, err := s.LearningDecide(spaces, core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted})
+		wantKind(t, err, core.KindInvalid, "LearningDecide with a name of spaces")
+		_, err = s.ProjectSettingsSet(spaces, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()})
+		wantKind(t, err, core.KindInvalid, "ProjectSettingsSet with a name of spaces")
+		got := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
+		if len(got.Learnings) != 1 || got.Learnings[0].Status != core.LearningProposed {
+			t.Errorf("learnings after refused calls = %+v, want the one still proposed", got.Learnings)
+		}
+	}},
 	{"identity/calls_cover_interface", casesCoverInterface},
 	{"identity/no_project_refused", func(t T, s core.Service) {
 		noProject := core.WithCaller(context.Background(), core.Caller{Agent: "main", Role: core.RoleAgent})
@@ -138,6 +152,69 @@ var identityCases = []Case{
 		ds := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
 		if len(ds.Directives) != 1 || ds.Directives[0].Status != core.DirectiveActive {
 			t.Errorf("directives changed by refused calls: %+v", ds.Directives)
+		}
+	}},
+	{"identity/operator_call_needs_name", func(t T, s core.Service) {
+		// CONTRACT §8: every operator call needs the operator's name. Each
+		// call below is valid but for the name, and the learning and the
+		// directive exist, so a call that got past the name would change them.
+		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "r"}))(t)
+		nameless := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator})
+		_, err := s.LearningDecide(nameless, core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted})
+		wantKind(t, err, core.KindInvalid, "LearningDecide without a name")
+		_, err = s.DirectiveRatify(nameless, core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t2", Rule: "r"})
+		wantKind(t, err, core.KindInvalid, "DirectiveRatify without a name")
+		_, err = s.DirectiveRetire(nameless, core.DirectiveRetireRequest{Code: d.Code})
+		wantKind(t, err, core.KindInvalid, "DirectiveRetire without a name")
+		_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()})
+		wantKind(t, err, core.KindInvalid, "ProjectSettingsSet without a name")
+
+		after := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
+		if len(after.Learnings) != 1 || after.Learnings[0].Status != core.LearningProposed {
+			t.Errorf("learning changed by nameless calls: %+v", after.Learnings)
+		}
+		ds := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+		if len(ds.Directives) != 1 || ds.Directives[0].Status != core.DirectiveActive {
+			t.Errorf("directives changed by nameless calls: %+v", ds.Directives)
+		}
+	}},
+	{"identity/operator_role_before_shape", func(t T, s core.Service) {
+		// CONTRACT §8: each operator call refuses a caller without the operator
+		// role before any other check. Each request below is invalid as well,
+		// so an agent that gets invalid instead has had the shape checked first.
+		calls := []struct {
+			name string
+			do   func(ctx context.Context) error
+		}{
+			{"LearningDecide back to proposed", func(ctx context.Context) error {
+				return ignore(s.LearningDecide(ctx, core.LearningDecideRequest{ID: 1, Status: core.LearningProposed}))
+			}},
+			{"LearningDecide with an unknown status", func(ctx context.Context) error {
+				return ignore(s.LearningDecide(ctx, core.LearningDecideRequest{ID: 1, Status: "gossip"}))
+			}},
+			{"DirectiveRatify with an unknown scope and no title", func(ctx context.Context) error {
+				return ignore(s.DirectiveRatify(ctx, core.DirectiveRatifyRequest{Scope: "galaxy"}))
+			}},
+			{"DirectiveRetire with a blank code", func(ctx context.Context) error {
+				return ignore(s.DirectiveRetire(ctx, core.DirectiveRetireRequest{Code: " "}))
+			}},
+			{"ProjectSettingsSet with a bad name and no settings", func(ctx context.Context) error {
+				return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: "Acme"}))
+			}},
+		}
+		for _, c := range calls {
+			wantKind(t, c.do(mainCtx()), core.KindOperatorOnly, c.name+" by an agent")
+		}
+	}},
+	{"identity/blank_agent_refused", func(t T, s core.Service) {
+		// CONTRACT §1.1: a write needs an agent name. A name made of spaces is no
+		// name, and it is refused for every write the same way.
+		spaces := as(projA, "   ")
+		for _, c := range agentCalls {
+			if c.write {
+				wantKind(t, c.do(spaces, s), core.KindInvalid, c.name+" with a blank agent")
+			}
 		}
 	}},
 }

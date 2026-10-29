@@ -1,18 +1,21 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-28: approved by the operator (phase 1 exit).**
-`core.Local` passes 25 of the 39 cases in `internal/conformance` (counts as of
-2026-10-29); the other 14 wait on part 3 of issue #9. The Go form is
-`internal/core` (`Service`, request and result types, errors). The conformance
-suite checks the behaviour described here.
+**Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
+2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
+approval. Items 13 and later await the operator's approval.
+`core.Local` passes all 66 cases in `internal/conformance` (count as of
+2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
+request and result types, errors). The conformance suite checks the behaviour
+described here.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open; the operator
-approved it on 2026-10-28.
+§9 lists what this contract settles that DESIGN.md left open. Items 1–11 were
+approved by the operator on 2026-10-28, item 12 is deferred, and items 13 and
+later await approval.
 
 ## 1. Conventions
 
@@ -26,7 +29,8 @@ client, and a role. The adapter sets it; request types do not carry it.
   letters and digits in hyphen-separated groups, at most 64 characters
   (`acme-api`). A project row is created on its first call.
 - **Agent.** Required for every write (each tool marked *write* below). It is
-  stored on the rows the call creates: `agent`, `reviewer`, `created_by`.
+  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
+  of only spaces counts as no name, and is `invalid`.
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.
@@ -38,7 +42,7 @@ A failure the caller can act on has a kind and a message:
 | Kind | Meaning |
 |---|---|
 | `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
-| `not_found` | The task, step, learning, directive or note does not exist **in the caller's project**. Another project's rows are not found, not forbidden. |
+| `not_found` | The task, step, learning, directive or note does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role. |
 
@@ -61,8 +65,9 @@ one: caller → request shape (`invalid`) → existence (`not_found`) → rules
 ### 1.4 Steps
 
 A step is named by a **step ref**: `{"number": 3}` is the step shown as 3
-now, and `{"id": 412}` is the step whose id is 412. Give exactly one, or the
-call is `invalid`. So is `{}`, in every call that takes a ref. Number 0 names
+now, and `{"id": 412}` is the step whose id is 412. Ids and numbers start at
+1; give exactly one, or the call is `invalid`. So is `{}`, in every call that
+takes a ref. Number 0 names
 no step: it is valid only as `after` in `step_add`, where it means before the
 first step (§3). Numbers are computed from the order each time and change
 when steps are inserted. Ids never change.
@@ -82,7 +87,8 @@ task_start (queue)                  task_start
 
 - `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
   `open` except `task_start` with `queue`. `done` and `failed` come only from
-  `task_close`.
+  `task_close`. Asking for the status a task already has is `refused`, and the
+  call changes nothing.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
@@ -175,8 +181,9 @@ A `close` event is written.
 
 **Errors:** `invalid` for an outcome other than `done`/`failed`, an unknown
 enum value, or a result for a criterion number the task does not have.
-`not_found`. `refused` when the task is terminal, or when the project's
-close policy is not met. The refusal lists every unmet item in `missing`,
+`not_found`. `refused` when the task is terminal, when it is `open` (start it
+first), or when the project's close policy is not met. The refusal lists every
+unmet item in `missing`,
 using these keys:
 
 | Key | Unmet when (default policy: all on) |
@@ -322,20 +329,26 @@ either.
 These are not MCP tools, and never will be. The web UI (phase 6) and the
 CLI reach them. Each one refuses a caller without the operator role
 (`operator_only`) before any other check. Operators act across projects, so
-these calls do not need the caller's project.
+these calls do not need the caller's project. Every call needs the operator's
+name, which the caller carries as its agent; a call without one is `invalid`.
+`LearningDecide` and `DirectiveRatify` record the name (`decided_by`,
+`ratified_by`). `DirectiveRetire` and `ProjectSettingsSet` store no name, and
+refuse a nameless call all the same.
 
 | Call | In | Does |
 |---|---|---|
-| `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. |
+| `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
 | `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning` | Creates an active directive with the next code. With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
-| `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. Retired directives are no longer listed. |
-| `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings. The close policy has one switch per row of the table in §2 (`task_close`). `outcome` is always required. |
+| `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
+| `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
 
 ## 9. Settled here, for review
 
-Each item answers a question that DESIGN.md left open. Each one is checked
-by the suite, except where noted. The operator approved items 1–11 on
-2026-10-28.
+Each item answers a question that DESIGN.md left open. Items 1–11 were approved
+by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, an
+item is checked by a conformance case unless it is marked `(core test only)`,
+where only a core test checks it. An item with no check at all is marked
+`(not tested)`; none is.
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -365,3 +378,98 @@ by the suite, except where noted. The operator approved items 1–11 on
 12. **Deferred:** the "step-review rule" in project settings is not defined
     here. The operator deferred it to phase 8 (#41), and DESIGN §3.6 no
     longer lists it.
+13. **`task_update` never opens a task (2026-10-29).** No
+    `task_update` moves a task into `open`. Only `task_start` with `queue`
+    creates one (§1.5). *Bishop default, pending operator approval.*
+14. **A step ref is one positive value (2026-10-29).** A ref names
+    a step by an id or a number, never both. `{}` is `invalid` in every call
+    that takes a ref. `{"number": 0}` is valid only as `step_add`'s `after`,
+    where it means before the first step (§1.4, §3). *Bishop default, pending
+    operator approval.*
+15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
+    pending step with an event or a review is not removed. The call is
+    `refused` and changes nothing. The refusal names the first such step in
+    display order, and the way out is to skip it and plan again (§3). *Bishop
+    default, pending operator approval.*
+16. **`search` hides retired directives (2026-10-29).** A retired
+    directive is not a `search` hit, as it is not listed by `directive_list`,
+    `recall` or `task_current` (§6). *Bishop default, pending operator
+    approval.*
+17. **Same-status `task_update` is refused (2026-10-29).** Asking
+    for the status a task already has is `refused`, and the call changes
+    nothing, so a reason sent with it is not dropped without a word (§1.5).
+    *Bishop default, pending operator approval.*
+18. **Recall's word rule (2026-10-29).** `recall` keeps the words of
+    a goal that can name its subject, and drops the stop words. In a goal that
+    mixes cases, it keeps upper-case short words (`JWT`, `SQL`, `TLS`, `CLI`)
+    and words with a digit (`v2`). In a goal written wholly in capitals, it
+    keeps only words of four or more letters and words with a digit, so
+    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. Elsewhere, a word
+    under four letters is kept if it has a digit or is unchanged by
+    upper-casing, so `JWT` is kept and `fix` is dropped. A word in an uncased
+    script (CJK, for one) is unchanged by upper-casing, so it is kept.
+    *Bishop default, pending operator approval.*
+    (core test only)
+19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
+    1}` is `invalid`, and so is any id or number below 1, except number 0 as
+    `step_add`'s `after`, where it means before the first step (§1.4, §3). Give
+    exactly one (§1.4).
+    *Bishop default, pending operator approval.*
+20. **Every operator call needs a name (2026-10-29).** A call with
+    no operator name is `invalid`. `LearningDecide` and `DirectiveRatify`
+    record the name (`decided_by`, `ratified_by`). `DirectiveRetire` and
+    `ProjectSettingsSet` store none, and refuse a nameless call all the same
+    (§8). *Bishop default, pending operator approval.*
+21. **A directive retires once (2026-10-29).** A second
+    `directive_retire` of the same code is `refused`, and the first retirement
+    time stands `(core test only)` (§8). *Bishop default, pending operator
+    approval.*
+22. **Learning moves and supersede cycles (2026-10-29).**
+    `learning_decide` may set any status except `proposed`, from any current
+    status. A `superseded_by` that leads back to the learning being decided,
+    directly or through a chain of superseded learnings, is `refused`, since
+    the links would form a cycle (§8). *Bishop default, pending operator
+    approval.*
+23. **Settings are required, whole (2026-10-29).** `project_settings_set`
+    with no `settings`, or with `settings` missing any one switch, is `invalid`.
+    The call replaces the whole object, and an omitted switch would otherwise
+    read as off (§8). *Bishop default,
+    pending operator approval.*
+24. **Close from `open` (2026-10-29).** `task_close` of an open
+    task is `refused`: the task must be started first (§1.5, §2). *Bishop
+    default, pending operator approval.* (core test only)
+25. **Operator lookups match by id (2026-10-29).** An operator
+    call finds its learning or directive by id or code in any project. Only
+    agent calls are limited to the caller's project (§1.2, §8). *Bishop
+    default, pending operator approval.*
+26. **Lessons with a no-lessons reason (2026-10-29).** A close
+    that has lessons and a `no_lessons_reason` stores the reason as given. It
+    is neither refused nor dropped (§2). *Bishop default, pending operator
+    approval.*
+27. **Close-policy switches (2026-10-29).** The close policy has
+    one switch per row of the §2 table, except `outcome`, which is always
+    required (§8). *Bishop default, pending operator approval.*
+28. **Abandon and block journal kinds (2026-10-29).** `task_update` to
+    `abandoned` writes a `decision` event, and to `blocked` a `blocked` event,
+    each with the reason given (§1.5). *Bishop default, pending operator
+    approval.* (core test only)
+29. **Skip sets `ended_at` (2026-10-29).** A `skip` step update sets the step's
+    `ended_at` (§3). *Bishop default, pending operator approval.*
+30. **Learnings and notes on a terminal task (2026-10-29).** `learning_add` and
+    `note_put` are allowed on a `done`, `failed` or `abandoned` task. §1.5
+    refuses the task's own writes (update, steps, events, reviews and close),
+    and these are not among them. *Bishop default, pending operator approval.*
+31. **`note_put` shape (2026-10-29).** Giving `id` with `task_id` is `invalid`,
+    and so is a blank title or body (§7). *Bishop default, pending operator
+    approval.* (core test only)
+32. **`review_record` on any step (2026-10-29).** `review_record` accepts a step
+    in any status. The contract names none (§4). *Bishop default, pending
+    operator approval.*
+33. **Event on a pending step (2026-10-29).** `event_log` may name a pending
+    step (§4). *Bishop default, pending operator approval.*
+34. **A name of only spaces is no name (2026-10-29).** An agent write whose
+    agent name is only spaces is `invalid`, as one with no name is (§1.1). So is
+    an operator call whose name is only spaces (§8). The agent case is
+    `identity/blank_agent_refused`; the operator case is
+    `identity/operator_blank_name_refused`. *Bishop default, pending operator
+    approval.*

@@ -9,6 +9,17 @@ import (
 )
 
 var eventCases = []Case{
+	{"event/pending_step_takes_review_and_event", func(t T, s core.Service) {
+		// CONTRACT §9 items 32 and 33: review_record and event_log each accept a
+		// step in any status, and the step here is still pending.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventNote, Text: "Before the work starts."}))(t)
+		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		if rv.StepID != res.Steps[0].ID {
+			t.Errorf("review of a pending step names step %d, want %d", rv.StepID, res.Steps[0].ID)
+		}
+	}},
 	{"event/append_only_with_server_time", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one")
 		before := time.Now().UTC().Add(-time.Second)
@@ -86,6 +97,41 @@ var eventCases = []Case{
 			t.Errorf("default page = %d events, want 20", len(def.Events))
 		}
 	}},
+	{"event/step_refs_must_name_a_step", func(t T, s core.Service) {
+		// CONTRACT §1.4: a step ref names one step. {} names none, number 0
+		// names none (it is valid only as step_add's after), and an id of 0 with
+		// a number is two faults at once. Each of the three journal calls that
+		// take a ref refuses all three, and writes nothing.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		refs := []struct {
+			what string
+			ref  core.StepRef
+		}{
+			{"{}", core.StepRef{}},
+			{"number 0", core.NumberRef(0)},
+			{"number -1", core.NumberRef(-1)},
+			{"id -1", core.StepRef{ID: ptr(int64(-1))}},
+			{"id 0 with number 1", core.StepRef{ID: ptr(int64(0)), Number: ptr(1)}},
+		}
+		for _, r := range refs {
+			ref := r.ref
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &ref, Kind: core.EventNote, Text: "refused"})
+			wantKind(t, err, core.KindInvalid, "event_log with step "+r.what)
+			_, err = s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID, Step: &ref})
+			wantKind(t, err, core.KindInvalid, "event_list with step "+r.what)
+			_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: ref, Verdict: core.VerdictApproved})
+			wantKind(t, err, core.KindInvalid, "review_record with step "+r.what)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		if len(d.Reviews) != 0 {
+			t.Errorf("reviews after refused calls = %+v", d.Reviews)
+		}
+		for _, e := range d.Events {
+			if e.Text == "refused" {
+				t.Errorf("a refused event_log was written: %+v", e)
+			}
+		}
+	}},
 	{"event/review_record_writes_event", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "build", "review")
 		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{
@@ -110,9 +156,95 @@ var eventCases = []Case{
 			t.Errorf("no review event in %+v", d.Events)
 		}
 	}},
+	{"event/review_record_on_active_and_done_step", func(t T, s core.Service) {
+		// CONTRACT §9 item 32: review_record accepts a step in any status. The
+		// same step is reviewed while active, then again once it is done.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepStart}))(t)
+		active := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepFinish, Summary: "Built it."}))(t)
+		done := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		if active.StepID != res.Steps[0].ID || done.StepID != res.Steps[0].ID {
+			t.Errorf("reviews name steps %d and %d, want %d", active.StepID, done.StepID, res.Steps[0].ID)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		if len(d.Reviews) != 2 {
+			t.Errorf("task reviews = %d, want 2", len(d.Reviews))
+		}
+	}},
+}
+
+// policySwitchCase is the case for one close-policy switch (CONTRACT §9 item 27).
+// Only that switch is on. A task with a criterion and one active step is closed
+// with nothing given: the close is refused with exactly the item the switch
+// guards in missing, and it passes once give supplies that item. sw picks the
+// switch from a ClosePolicy, and give fills the close request.
+func policySwitchCase(name, key string, sw func(p *core.ClosePolicy) *bool, give func(t T, s core.Service, id string, req *core.TaskCloseRequest)) Case {
+	return Case{Name: name, Run: func(t T, s core.Service) {
+		var p core.ProjectSettings
+		*sw(&p.ClosePolicy) = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: p.AsInput()}))(t)
+		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{
+			Title: "t", Goal: "g", Criteria: []string{"c"}, Steps: []core.StepInput{{Title: "one"}},
+		}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
+
+		req := core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}
+		_, err := s.TaskClose(mainCtx(), req)
+		wantKind(t, err, core.KindRefused, "close with only "+key+" on, given nothing")
+		if m := core.MissingOf(err); !slices.Equal(m, []string{key}) {
+			t.Errorf("missing = %v, want [%s]", m, key)
+		}
+		give(t, s, res.ID, &req)
+		closed := must(s.TaskClose(mainCtx(), req))(t)
+		if closed.Status != core.TaskDone {
+			t.Errorf("status = %q, want done once %s is given", closed.Status, key)
+		}
+	}}
 }
 
 var closeCases = []Case{
+	{"close/lessons_kept_with_no_lessons_reason", func(t T, s core.Service) {
+		// CONTRACT §2, §9 item 26: a close with lessons and a no_lessons_reason
+		// stores the reason as given. It is neither refused nor dropped.
+		res := startTask(t, s, mainCtx(), "t")
+		req := fullClose(res.ID, 0)
+		req.NoLessonsReason = "The lesson above covers it."
+		closed := must(s.TaskClose(mainCtx(), req))(t)
+		if closed.Status != core.TaskDone {
+			t.Errorf("status = %q, want done", closed.Status)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionClose}))(t)
+		if d.NoLessonsReason != req.NoLessonsReason || len(d.Lessons) != 1 {
+			t.Errorf("no_lessons_reason %q with %d lessons, want the reason as given and the one lesson", d.NoLessonsReason, len(d.Lessons))
+		}
+	}},
+	policySwitchCase("close/policy_switch_summary", core.MissingSummary,
+		func(p *core.ClosePolicy) *bool { return &p.RequireSummary },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Summary = "Done."
+		}),
+	policySwitchCase("close/policy_switch_criteria", core.MissingCriteria,
+		func(p *core.ClosePolicy) *bool { return &p.RequireCriteriaResults },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Criteria = []core.CriterionOutcome{{Ord: 1, Result: core.CriterionMet, Evidence: "ok"}}
+		}),
+	policySwitchCase("close/policy_switch_lessons", core.MissingLessons,
+		func(p *core.ClosePolicy) *bool { return &p.RequireLessons },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Lessons = []core.Lesson{{Kind: core.LessonReuse, Text: "Reuse the parser.", Why: "It works."}}
+		}),
+	policySwitchCase("close/policy_switch_mistakes", core.MissingMistakes,
+		func(p *core.ClosePolicy) *bool { return &p.RequireMistakes },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Mistakes = []core.Mistake{}
+		}),
+	policySwitchCase("close/policy_switch_active_steps", core.MissingActiveSteps,
+		func(p *core.ClosePolicy) *bool { return &p.RequireNoActiveSteps },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(1), Action: core.StepFinish, Summary: "ok"}))(t)
+		}),
 	{"close/whole_task", func(t T, s core.Service) {
 		ctx := mainCtx()
 		res := must(s.TaskStart(ctx, core.TaskStartRequest{
@@ -218,7 +350,7 @@ var closeCases = []Case{
 	}},
 	{"close/policy_is_project_settings", func(t T, s core.Service) {
 		lax := core.ProjectSettings{} // every requirement off
-		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax.AsInput()}))(t)
 		res := startTask(t, s, mainCtx(), "t", "one")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
 		closed := must(s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}))(t)
@@ -229,5 +361,94 @@ var closeCases = []Case{
 		other := startTask(t, s, as(projB, "main"), "t")
 		_, err := s.TaskClose(as(projB, "main"), core.TaskCloseRequest{ID: other.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close under the default policy")
+	}},
+	{"close/refused_close_keeps_record", func(t T, s core.Service) {
+		// CONTRACT §2: a refused close changes nothing. This close carries every
+		// part of a close (criteria results, lessons, mistakes, deliverables) and
+		// is refused for want of a summary. Read back, none of them is written.
+		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "t", Goal: "g", Criteria: []string{"a", "b"}}))(t)
+		req := fullClose(res.ID, 2)
+		req.Summary = ""
+		req.Mistakes = []core.Mistake{{Agent: "main", Mistake: "Edited before testing", Impact: core.ImpactLow}}
+		req.Deliverables = []core.TaskFile{{Path: "internal/auth/redirect.go"}}
+		_, err := s.TaskClose(mainCtx(), req)
+		wantKind(t, err, core.KindRefused, "close without a summary")
+		if m := core.MissingOf(err); !slices.Equal(m, []string{core.MissingSummary}) {
+			t.Errorf("missing = %v, want [summary]", m)
+		}
+
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionClose}))(t)
+		for _, c := range d.Criteria {
+			if c.Result != "" {
+				t.Errorf("criterion %d has result %q after a refused close", c.Ord, c.Result)
+			}
+		}
+		if len(d.Lessons) != 0 || len(d.Mistakes) != 0 || len(d.Deliverables) != 0 {
+			t.Errorf("record after a refused close: lessons %+v mistakes %+v deliverables %+v", d.Lessons, d.Mistakes, d.Deliverables)
+		}
+		if d.NoLessonsReason != "" || d.Task.Status != core.TaskActive || d.Task.ClosedAt != nil {
+			t.Errorf("after a refused close: no_lessons_reason %q status %q closed_at %v", d.NoLessonsReason, d.Task.Status, d.Task.ClosedAt)
+		}
+	}},
+	{"close/writes_one_close_event", func(t T, s core.Service) {
+		// CONTRACT §2: an accepted close writes a close event. It is written
+		// once, by the caller, and its text carries the outcome.
+		res := startTask(t, s, mainCtx(), "t")
+		must(s.TaskClose(as(projA, "closer"), fullClose(res.ID, 0)))(t)
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		var closes []core.Event
+		for _, e := range d.Events {
+			if e.Kind == core.EventClose {
+				closes = append(closes, e)
+			}
+		}
+		if len(closes) != 1 {
+			t.Fatalf("close events = %+v, want exactly one", closes)
+		}
+		if closes[0].Agent != "closer" || closes[0].Text != "Closed as done" {
+			t.Errorf("close event agent %q text %q, want closer and \"Closed as done\"", closes[0].Agent, closes[0].Text)
+		}
+	}},
+	{"close/settings_must_be_given", func(t T, s core.Service) {
+		// CONTRACT §8: the call replaces the whole settings object, so a call
+		// that gives none is invalid. Read as a zero value, it would switch every
+		// close requirement off and parallel tasks off as well.
+		parallel := core.DefaultSettings()
+		parallel.ParallelTasks = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: parallel.AsInput()}))(t)
+		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA})
+		wantKind(t, err, core.KindInvalid, "project_settings_set without settings")
+
+		// The settings stand: two tasks may be active at once, and the default
+		// close policy still applies.
+		one := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "one", Goal: "g"}))(t)
+		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
+		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
+		wantKind(t, err, core.KindRefused, "bare close under the default policy after a refused settings call")
+	}},
+	{"close/settings_must_be_whole", func(t T, s core.Service) {
+		// CONTRACT §8, §9 item 23: an object missing any one switch is invalid,
+		// as a missing object is. Read as off, a missing close switch would
+		// quietly lift one requirement, so each partial object is refused.
+		whole := core.DefaultSettings()
+		whole.ParallelTasks = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: whole.AsInput()}))(t)
+
+		noParallel := whole.AsInput()
+		noParallel.ParallelTasks = nil
+		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: noParallel})
+		wantKind(t, err, core.KindInvalid, "settings without parallel_tasks")
+
+		noMistakes := whole.AsInput()
+		noMistakes.ClosePolicy.RequireMistakes = nil
+		_, err = s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: noMistakes})
+		wantKind(t, err, core.KindInvalid, "settings without close_policy.require_mistakes")
+
+		// The stored settings stand: two tasks may be active, and the mistakes
+		// requirement still applies to a close that gives none.
+		one := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "one", Goal: "g"}))(t)
+		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
+		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
+		wantKind(t, err, core.KindRefused, "bare close after refused partial settings")
 	}},
 }

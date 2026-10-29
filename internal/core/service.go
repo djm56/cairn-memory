@@ -54,8 +54,9 @@ type Operator interface {
 // ErrNotImplemented is returned by every Unimplemented call.
 var ErrNotImplemented = errors.New("not implemented")
 
-// Unimplemented is a Service that fails every call with ErrNotImplemented.
-// The conformance suite runs against it to show that every case can fail.
+// Unimplemented is a Service that fails every call with ErrNotImplemented. It is
+// for the conformance harness only: the suite runs against it to show that every
+// case can fail. No production path returns ErrNotImplemented.
 type Unimplemented struct{}
 
 var _ Service = Unimplemented{}

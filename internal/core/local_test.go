@@ -11,30 +11,10 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// part3 names the part of issue #9 that brings in the calls the deferred cases
-// still need: the operator calls and task_close with its close policy. Parts 1
-// and 2 are live; a case deferred now waits only on part 3.
-const part3 = "issue #9 part 3 (operator calls, task_close and close policy)"
-
-// deferred lists the cases that part 2 does not yet pass. Each is reported as
-// skipped with its reason, and is neither a pass nor a fail. RunWith fails if
-// a name here is not in the suite, and if a name here passes.
-var deferred = map[string]string{
-	"identity/no_project_refused":           "needs task_close, which is " + part3,
-	"identity/write_without_agent_refused":  "needs task_close, which is " + part3,
-	"identity/operator_calls_refuse_agents": "needs the operator calls, which are " + part3,
-	"task/parallel_when_project_allows":     "needs project_settings_set, which is " + part3,
-	"close/whole_task":                      "needs task_close, which is " + part3,
-	"close/empty_lists_versus_absent":       "needs task_close, which is " + part3,
-	"close/failed_outcome_and_validation":   "needs task_close, which is " + part3,
-	"close/policy_is_project_settings":      "needs task_close and project_settings_set, which are " + part3,
-	"learning/operator_decides":             "needs learning_decide, which is " + part3,
-	"directive/scopes_apply":                "needs directive_ratify and directive_retire, which are " + part3,
-	"directive/from_learning":               "needs directive_ratify from a learning, which is " + part3,
-	"recall/across_projects":                "needs task_close and directive_ratify, which are " + part3,
-	"search/finds_each_kind":                "needs directive_ratify, which is " + part3,
-	"search/hides_retired_directives":       "needs directive_ratify and directive_retire, which are " + part3,
-}
+// deferred lists the conformance cases that core.Local does not yet pass. It is
+// empty: every case is live. RunWith still fails a name here that is not in the
+// suite, or that passes, so an entry added later cannot hide a case.
+var deferred = map[string]string{}
 
 // openLocal returns a Service over a new database in a temporary directory,
 // and the store under it, for tests that check the rows directly.
@@ -153,5 +133,93 @@ func TestBlockAndAbandonWriteReasonToJournal(t *testing.T) {
 	}
 	if events[1].Kind != string(core.EventBlocked) || events[1].Text != "waiting on review" {
 		t.Errorf("block row = %s %q", events[1].Kind, events[1].Text)
+	}
+}
+
+// TestStepSkipFromFailed checks that a failed step can be skipped, as
+// CONTRACT §3 allows. Mutation testing showed that no test reached this edge
+// of the skip rule.
+func TestStepSkipFromFailed(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := core.NumberRef(1)
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepStart}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepFail, Summary: "broke"}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"})
+	if err != nil {
+		t.Fatalf("skip of a failed step: %v", err)
+	}
+	if st.Status != core.StepSkipped {
+		t.Errorf("status after skip = %q, want skipped", st.Status)
+	}
+}
+
+// TestTaskStartActiveSetsStartedAt checks that a task started active has its
+// start time set at once, as task_start sets it.
+func TestTaskStartActiveSetsStartedAt(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Task.StartedAt == nil {
+		t.Errorf("active task has no started_at")
+	}
+}
+
+// TestTaskUpdateCriteriaAndKeyFiles checks that one task_update writes both the
+// criteria and the key files it is given. Each is replaced only when given, and
+// writing one must not skip the other.
+func TestTaskUpdateCriteriaAndKeyFiles(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	criteria := []string{"tests pass"}
+	files := []core.TaskFile{{Path: "internal/core/caller.go", Note: "the rule"}}
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Criteria: &criteria, KeyFiles: &files}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Criteria) != 1 || d.Criteria[0].Criterion != "tests pass" {
+		t.Errorf("criteria after update = %+v, want the one given", d.Criteria)
+	}
+	if len(d.KeyFiles) != 1 || d.KeyFiles[0].Path != "internal/core/caller.go" {
+		t.Errorf("key files after update = %+v, want the one given", d.KeyFiles)
+	}
+}
+
+// TestRatifiedDirectiveHasRatifiedAt checks that a directive read back after
+// ratification carries its ratification time. The time is set on the row when
+// it is ratified, and the read must show it.
+func TestRatifiedDirectiveHasRatifiedAt(t *testing.T) {
+	s, _ := openLocal(t)
+	if _, err := s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Check origins", Rule: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	ds, err := s.DirectiveList(agent("acme-api", "main"), core.DirectiveListRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds.Directives) != 1 || ds.Directives[0].RatifiedAt.IsZero() {
+		t.Errorf("listed directives = %+v, want one with ratified_at set", ds.Directives)
 	}
 }

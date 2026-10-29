@@ -101,7 +101,7 @@ var taskCases = []Case{
 	{"task/parallel_when_project_allows", func(t T, s core.Service) {
 		settings := core.DefaultSettings()
 		settings.ParallelTasks = true
-		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: settings}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: settings.AsInput()}))(t)
 		startTask(t, s, mainCtx(), "first")
 		second := startTask(t, s, mainCtx(), "second")
 		cur := must(s.TaskCurrent(mainCtx()))(t)
@@ -172,6 +172,34 @@ var taskCases = []Case{
 			t.Errorf("queued task status = %q, want open", queued.Status)
 		}
 	}},
+	{"task/same_status_is_refused", func(t T, s core.Service) {
+		// CONTRACT §1.5: asking for the status a task already has is refused,
+		// and the call changes nothing. The second blocked call carries a
+		// reason; refusing it means that reason is not dropped silently.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskActive)})
+		wantKind(t, err, core.KindRefused, "task_update to active on an active task")
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
+		_, err = s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on design"})
+		wantKind(t, err, core.KindRefused, "task_update to blocked on a blocked task")
+		queued := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true}))(t)
+		_, err = s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: queued.ID, Status: ptr(core.TaskOpen)})
+		wantKind(t, err, core.KindRefused, "task_update to open on an open task")
+
+		got := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		if got.Task.Status != core.TaskBlocked {
+			t.Errorf("status after the refused calls = %q, want blocked", got.Task.Status)
+		}
+		var reasons []string
+		for _, e := range got.Events {
+			if e.Kind == core.EventBlocked {
+				reasons = append(reasons, e.Text)
+			}
+		}
+		if !slices.Equal(reasons, []string{"waiting on review"}) {
+			t.Errorf("blocked events = %v, want only the first reason", reasons)
+		}
+	}},
 	{"task/list_filters_and_pages", func(t T, s core.Service) {
 		active := startTask(t, s, mainCtx(), "active")
 		for i := 0; i < 3; i++ {
@@ -200,6 +228,14 @@ var taskCases = []Case{
 }
 
 var stepCases = []Case{
+	{"step/skip_sets_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 29: a skip sets the step's ended_at.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
+		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil {
+			t.Errorf("skipped step = %+v, want ended_at set", skipped)
+		}
+	}},
 	{"step/insert_without_renumbering", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
 		ids := []int64{res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
@@ -257,6 +293,31 @@ var stepCases = []Case{
 		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
 		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one"}) {
 			t.Errorf("steps after the refused adds = %v, want [one]", titles)
+		}
+	}},
+	{"step/ref_gives_exactly_one", func(t T, s core.Service) {
+		// CONTRACT §1.4: ids and numbers start at 1, and a ref gives exactly
+		// one of them. {"id": 0, "number": 1} is invalid: it is not read as
+		// either the id or the number.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		id := res.Steps[0].ID
+		refs := []core.StepRef{
+			{ID: ptr(id), Number: ptr(1)},
+			{ID: ptr(int64(0)), Number: ptr(1)},
+			{ID: ptr(int64(0))},
+		}
+		for _, ref := range refs {
+			_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: ref, Action: core.StepStart})
+			wantKind(t, err, core.KindInvalid, "step_update with a ref of id and number, or id 0")
+			_, err = s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(ref), Title: "x"})
+			wantKind(t, err, core.KindInvalid, "step_add after a ref of id and number, or id 0")
+		}
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one"}) {
+			t.Errorf("steps after the refused calls = %v, want [one]", titles)
+		}
+		if kept.Steps[0].Status != core.StepPending {
+			t.Errorf("status after the refused starts = %q, want pending", kept.Steps[0].Status)
 		}
 	}},
 	{"step/transitions_and_attempts", func(t T, s core.Service) {
