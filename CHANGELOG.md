@@ -60,6 +60,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   (`JWT`, `CSS`, `v2`), and `StepHasRecords` is removed. The conformance suite has
   38 cases: 24 pass and 14 are deferred to part 3
   ([PR #54](https://github.com/djm56/cairn-memory/pull/54)).
+- Phase 2 core, part 3b of issue #9: CONTRACT ruling 2a. `core.StepRef` fields are
+  pointers, so `{}` is `invalid` in every call that takes a step ref, and
+  `{"number": 0}` is valid only as `step_add`'s `after`. `IDRef` and `NumberRef`
+  build refs. Recall's stop list drops the short function words that a goal in
+  capitals passed as names. The step-14 review fixes follow: the §1.5 diagram,
+  the CONTRACT header counts (25 of 39 cases pass), the retired-directive and
+  review-branch conformance coverage, and DESIGN §4's `step_plan` row
+  ([PR #55](https://github.com/djm56/cairn-memory/pull/55)).
 
 ### Changed
 
