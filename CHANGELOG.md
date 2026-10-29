@@ -26,6 +26,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   FTS5 table with its triggers; and `store.Open` on `modernc.org/sqlite` v1.61.0.
   The module moves to Go 1.26, which that driver's dependency graph requires.
   ([PR #45](https://github.com/djm56/cairn-memory/pull/45)).
+- Phase 2 identity: `internal/identity` resolves the project from
+  `CAIRN_PROJECT`, then the nearest `.cairn.toml` walking up from
+  `CLAUDE_PROJECT_DIR` or the working directory, and refuses a call with no
+  project. An invalid name is refused, not skipped. The file is read with
+  `github.com/BurntSushi/toml` v1.6.0 ([PR #49](https://github.com/djm56/cairn-memory/pull/49)).
 
 ### Changed
 
