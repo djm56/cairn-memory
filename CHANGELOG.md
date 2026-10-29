@@ -43,7 +43,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   blocked or abandoned task follow the contract. The conformance suite runs
   against it: 14 cases pass, and the 21 cases for events, learnings, search,
   operator calls and the close policy are skipped with their part named.
-  `conformance.RunWith` is the skip list.
+  `conformance.RunWith` is the skip list
+  ([PR #51](https://github.com/djm56/cairn-memory/pull/51)).
 
 ### Changed
 
