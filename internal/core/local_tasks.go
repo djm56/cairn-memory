@@ -392,9 +392,10 @@ func (l *Local) TaskList(ctx context.Context, req TaskListRequest) (*TaskList, e
 
 // TaskUpdate changes the fields given and leaves the rest. The brief (title,
 // goal, context, constraints, criteria, key files) is frozen once any step has
-// started. A status change follows taskMoves, and a move to active follows the
+// started. A status change follows taskMayMove, and a move to active follows the
 // one-active rule. A move to blocked or abandoned writes its reason to the
-// journal.
+// journal. A status the task already has is not a move, so it is refused like
+// any other transition that taskMayMove does not allow (CONTRACT §1.5).
 func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, error) {
 	c, err := callerFor(ctx, true)
 	if err != nil {
@@ -467,7 +468,9 @@ func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, e
 		}
 
 		next := cur
-		changing := req.Status != nil && *req.Status != cur
+		// taskMayMove has no pair from a status to itself, so a same-status
+		// request is refused below, and the reason it may carry is not dropped.
+		changing := req.Status != nil
 		if changing {
 			next = *req.Status
 			if !taskMayMove(cur, next) {

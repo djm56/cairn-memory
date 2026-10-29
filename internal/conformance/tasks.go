@@ -172,6 +172,34 @@ var taskCases = []Case{
 			t.Errorf("queued task status = %q, want open", queued.Status)
 		}
 	}},
+	{"task/same_status_is_refused", func(t T, s core.Service) {
+		// CONTRACT §1.5: asking for the status a task already has is refused,
+		// and the call changes nothing. The second blocked call carries a
+		// reason; refusing it means that reason is not dropped silently.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskActive)})
+		wantKind(t, err, core.KindRefused, "task_update to active on an active task")
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
+		_, err = s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on design"})
+		wantKind(t, err, core.KindRefused, "task_update to blocked on a blocked task")
+		queued := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true}))(t)
+		_, err = s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: queued.ID, Status: ptr(core.TaskOpen)})
+		wantKind(t, err, core.KindRefused, "task_update to open on an open task")
+
+		got := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		if got.Task.Status != core.TaskBlocked {
+			t.Errorf("status after the refused calls = %q, want blocked", got.Task.Status)
+		}
+		var reasons []string
+		for _, e := range got.Events {
+			if e.Kind == core.EventBlocked {
+				reasons = append(reasons, e.Text)
+			}
+		}
+		if !slices.Equal(reasons, []string{"waiting on review"}) {
+			t.Errorf("blocked events = %v, want only the first reason", reasons)
+		}
+	}},
 	{"task/list_filters_and_pages", func(t T, s core.Service) {
 		active := startTask(t, s, mainCtx(), "active")
 		for i := 0; i < 3; i++ {

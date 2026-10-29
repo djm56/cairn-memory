@@ -82,7 +82,8 @@ task_start (queue)                  task_start
 
 - `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
   `open` except `task_start` with `queue`. `done` and `failed` come only from
-  `task_close`.
+  `task_close`. Asking for the status a task already has is `refused`, and the
+  call changes nothing.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
