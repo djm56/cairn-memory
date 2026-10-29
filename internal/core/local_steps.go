@@ -104,16 +104,17 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 		if err != nil {
 			return err
 		}
-		for _, s := range steps {
-			if s.Status != string(StepPending) {
-				continue
-			}
-			recorded, err := store.StepHasRecords(ctx, q, s.ID)
-			if err != nil {
-				return err
-			}
-			if recorded {
-				return Refused("step %d has events or reviews, so step_plan cannot remove it", s.Number)
+		// One query finds the pending steps with records. The first of them, in
+		// display order, names the refusal.
+		recorded, err := store.PendingStepsWithRecords(ctx, q, task.ID)
+		if err != nil {
+			return err
+		}
+		if len(recorded) > 0 {
+			for _, s := range steps {
+				if s.ID == recorded[0] {
+					return Refused("step %d has events or reviews, so step_plan cannot remove it", s.Number)
+				}
 			}
 		}
 		if _, err := store.DeletePendingSteps(ctx, q, task.ID); err != nil {
