@@ -22,12 +22,35 @@ var learningCases = []Case{
 	{"learning/decided_again_from_any_status", func(t T, s core.Service) {
 		// CONTRACT §9 items 22 and 25: learning_decide may move a decided learning
 		// to another status, and an operator finds a learning of another project
-		// by its id.
+		// by its id. Two moves are made: accepted to rejected, then rejected back
+		// to accepted.
 		l := must(s.LearningAdd(as(projB, "main"), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
 		must(s.LearningDecide(op(), core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted}))(t)
 		got := must(s.LearningDecide(op(), core.LearningDecideRequest{ID: l.ID, Status: core.LearningRejected, Note: "changed my mind"}))(t)
 		if got.Status != core.LearningRejected || got.DecisionNote != "changed my mind" {
 			t.Errorf("re-decided learning = %+v", got)
+		}
+		back := must(s.LearningDecide(op(), core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted}))(t)
+		if back.Status != core.LearningAccepted {
+			t.Errorf("learning moved back from rejected = %+v", back)
+		}
+	}},
+	{"learning/add_and_note_on_done_and_failed_task", func(t T, s core.Service) {
+		// CONTRACT §9 item 30: learning_add and note_put are allowed on a done
+		// or failed task, as on an abandoned one (see the case above).
+		for _, outcome := range []core.TaskStatus{core.TaskDone, core.TaskFailed} {
+			res := startTask(t, s, mainCtx(), "t-"+string(outcome))
+			req := fullClose(res.ID, 0)
+			req.Outcome = outcome
+			must(s.TaskClose(mainCtx(), req))(t)
+			l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+			if l.TaskID != res.ID {
+				t.Errorf("%s task: learning task = %q, want %s", outcome, l.TaskID, res.ID)
+			}
+			n := must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Post-mortem", Body: "b"}))(t)
+			if n.TaskID != res.ID {
+				t.Errorf("%s task: note task = %q, want %s", outcome, n.TaskID, res.ID)
+			}
 		}
 	}},
 	{"learning/add_and_note_on_terminal_task", func(t T, s core.Service) {
@@ -175,6 +198,15 @@ var learningCases = []Case{
 		cur := must(s.TaskCurrent(mainCtx()))(t)
 		if got := directiveTitles(cur.Directives); !slices.Contains(got, "global") || slices.Contains(got, "project-b") || slices.Contains(got, "retired") {
 			t.Errorf("TaskCurrent directives = %v", got)
+		}
+	}},
+	{"directive/operator_retires_other_project", func(t T, s core.Service) {
+		// CONTRACT §9 item 25: an operator finds a project-scoped directive of
+		// another project by its code. Agent calls in projA could not see it.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projB, Title: "project-b only", Rule: "r"}))(t)
+		got := must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
+		if got.Status != core.DirectiveRetired || got.RetiredAt == nil {
+			t.Errorf("retired directive of %s = %+v", projB, got)
 		}
 	}},
 	{"directive/retire_once", func(t T, s core.Service) {

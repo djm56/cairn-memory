@@ -3,7 +3,7 @@
 **Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
 2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
 approval. Items 13 and later await the operator's approval.
-`core.Local` passes all 63 cases in `internal/conformance` (count as of
+`core.Local` passes all 66 cases in `internal/conformance` (count as of
 2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
