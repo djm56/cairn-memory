@@ -46,6 +46,11 @@ func refText(ref StepRef) string {
 func resolveStep(ctx context.Context, q store.Querier, taskID string, ref StepRef) (store.StepRow, error) {
 	var st store.StepRow
 	var err error
+	// A ref with neither field has nothing to resolve. checkRef refuses it first,
+	// but this guard keeps a caller that forgets from dereferencing nil.
+	if ref.ID == nil && ref.Number == nil {
+		return st, Invalid("a step ref needs an id or a number")
+	}
 	if ref.ID != nil {
 		st, err = store.GetStep(ctx, q, taskID, *ref.ID)
 	} else {

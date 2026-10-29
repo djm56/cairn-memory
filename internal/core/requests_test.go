@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -39,5 +40,15 @@ func TestStepRefDecoding(t *testing.T) {
 		if got := checkRef(ref) != nil; got != c.invalid {
 			t.Errorf("%s: checkRef invalid = %v (%v), want %v", c.json, got, checkRef(ref), c.invalid)
 		}
+	}
+}
+
+// TestResolveStepNeedsRef checks the guard at the top of resolveStep. A ref with
+// neither field is invalid, and the guard answers before the store is touched:
+// the querier is nil here, so a guard that was removed would dereference nil.
+func TestResolveStepNeedsRef(t *testing.T) {
+	_, err := resolveStep(context.Background(), nil, "task-20260101-01", StepRef{})
+	if KindOf(err) != KindInvalid {
+		t.Errorf("resolveStep of an empty ref: error %v, want kind invalid", err)
 	}
 }
