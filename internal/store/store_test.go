@@ -224,6 +224,17 @@ func TestMigration0002IndexesAndGuard(t *testing.T) {
 			t.Errorf("%s %s missing from sqlite_master", o.kind, o.name)
 		}
 	}
+	// idx_events_project is not in migration 0002: idx_events_task serves the
+	// task_id part of ListEvents. Its absence is asserted so it cannot return
+	// silently.
+	var dropped int
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_events_project'`).Scan(&dropped); err != nil {
+		t.Fatalf("query idx_events_project: %v", err)
+	}
+	if dropped != 0 {
+		t.Errorf("index idx_events_project present; migration 0002 does not create it")
+	}
 }
 
 // TestMigrationsRecordVersions checks that a fresh database ends at version 2,
