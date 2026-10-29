@@ -116,6 +116,21 @@ var learningCases = []Case{
 			t.Errorf("TaskCurrent directives = %v", got)
 		}
 	}},
+	{"directive/retire_once", func(t T, s core.Service) {
+		// CONTRACT §8: a directive retires once. A second directive_retire of
+		// the same code is refused, and the directive stays retired.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Retire me", Rule: "r"}))(t)
+		first := must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
+		if first.Status != core.DirectiveRetired || first.RetiredAt == nil {
+			t.Errorf("first retirement = %+v", first)
+		}
+		_, err := s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code})
+		wantKind(t, err, core.KindRefused, "second directive_retire of the same code")
+		ds := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+		if titles := directiveTitles(ds.Directives); slices.Contains(titles, "Retire me") {
+			t.Errorf("retired directive is still listed: %v", titles)
+		}
+	}},
 	{"directive/from_learning", func(t T, s core.Service) {
 		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "Check redirects", Body: "b"}))(t)
 		req := core.DirectiveRatifyRequest{FromLearning: &l.ID, Scope: core.ScopeGlobal, Title: "Check redirects", Rule: "Every redirect has an origin check."}
