@@ -9,10 +9,9 @@ import (
 )
 
 // taskMoves lists the status changes task_update may make (CONTRACT §1.5).
-// done and failed are not listed: task_close sets them. CONTRACT §1.5 says
-// task_update may set open, but its diagram has no move into open, so no
-// move here leads to open. A queued task is created open by task_start. This
-// is a reading of the contract, reported for review.
+// done and failed are not listed: task_close sets them. No move leads to open:
+// a queued task is created open by task_start with queue, and nothing moves a
+// task back to it.
 var taskMoves = map[TaskStatus][]TaskStatus{
 	TaskOpen:    {TaskActive, TaskAbandoned},
 	TaskActive:  {TaskBlocked, TaskAbandoned},

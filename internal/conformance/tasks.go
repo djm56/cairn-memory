@@ -154,6 +154,20 @@ var taskCases = []Case{
 			t.Errorf("TaskCurrent after abandon = %s", cur.Task.ID)
 		}
 	}},
+	{"task/update_never_sets_open", func(t T, s core.Service) {
+		// CONTRACT §1.5 (ruling 1a): task_update does not move a task into open.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskOpen)})
+		wantKind(t, err, core.KindRefused, "task_update to open on an active task")
+		got := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionBrief}))(t)
+		if got.Task.Status != core.TaskActive {
+			t.Errorf("status after the refused move = %q, want active", got.Task.Status)
+		}
+		queued := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true}))(t)
+		if queued.Status != core.TaskOpen {
+			t.Errorf("queued task status = %q, want open", queued.Status)
+		}
+	}},
 	{"task/list_filters_and_pages", func(t T, s core.Service) {
 		active := startTask(t, s, mainCtx(), "active")
 		for i := 0; i < 3; i++ {
@@ -284,6 +298,25 @@ var stepCases = []Case{
 		}
 		if got.Steps[0].ID != res.Steps[0].ID || got.Steps[1].Status != core.StepActive {
 			t.Errorf("started steps not kept: %+v", got.Steps[:2])
+		}
+	}},
+	{"step/plan_refuses_recorded_pending_step", func(t T, s core.Service) {
+		// CONTRACT §3 (ruling 3a): a pending step with an event or a review
+		// cannot be removed, so step_plan is refused. The way out is to skip it.
+		res := startTask(t, s, mainCtx(), "t", "one", "two")
+		two := core.StepRef{Number: 2}
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &two, Kind: core.EventNote, Text: "about two"}))(t)
+		_, err := s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
+		wantKind(t, err, core.KindRefused, "step_plan over a pending step with an event")
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one", "two"}) {
+			t.Errorf("steps after the refused plan = %v, want unchanged", titles)
+		}
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: two, Action: core.StepSkip, Summary: "not needed"}))(t)
+		got := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
+		// The pending step "one" is removed; the skipped step "two" is kept.
+		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, []string{"two", "new"}) {
+			t.Errorf("steps after skip and replan = %v, want [two new]", titles)
 		}
 	}},
 }

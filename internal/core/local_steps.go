@@ -114,7 +114,7 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 		if len(recorded) > 0 {
 			for _, s := range steps {
 				if s.ID == recorded[0] {
-					return Refused("step %d has events or reviews, so step_plan cannot remove it", s.Number)
+					return Refused("step %d has events or reviews, so step_plan cannot remove it: skip the step, then plan again", s.Number)
 				}
 			}
 		}

@@ -85,6 +85,10 @@ func Search(ctx context.Context, q Querier, f SearchFilter) ([]SearchRow, bool, 
 			args = append(args, k)
 		}
 	}
+	// A retired directive is history, not a rule. It is not a hit, as it is not
+	// listed by directive_list, recall or task_current (CONTRACT §6, §8). The
+	// index keeps every directive row; the query drops the retired ones.
+	query += ` AND NOT (kind = 'directive' AND ref IN (SELECT CAST(id AS TEXT) FROM directives WHERE status = 'retired'))`
 	if !f.AllProjects {
 		// project IS NULL is the global and agent-scoped directives, which every
 		// project sees (CONTRACT §9, items 10 and 11).

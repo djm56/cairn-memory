@@ -647,11 +647,10 @@ func TestStepDeleteBlockedByEvent(t *testing.T) {
 	}
 }
 
-// TestStepHasRecords covers both branches of the test: a step an event refers
-// to, a step a review refers to, and a step with neither. It also checks the
-// batched form, which must agree with the single-step form and return only
-// pending steps.
-func TestStepHasRecords(t *testing.T) {
+// TestPendingStepsWithRecords covers the query step_plan uses: a pending step an
+// event refers to and a pending step a review refers to are listed, in display
+// order. A bare pending step is not, and neither is a done step with an event.
+func TestPendingStepsWithRecords(t *testing.T) {
 	s := openTemp(t)
 	ctx := context.Background()
 	seedProjects(t, s, "acme-api")
@@ -659,7 +658,7 @@ func TestStepHasRecords(t *testing.T) {
 	insertTask(t, s, newTask(id, "acme-api", t0))
 	byEvent := insertStepAt(t, s, id, "event step", "pending")
 	byReview := insertStepAt(t, s, id, "review step", "pending")
-	bare := insertStepAt(t, s, id, "bare step", "pending")
+	insertStepAt(t, s, id, "bare step", "pending")
 	done := insertStepAt(t, s, id, "done step", "done")
 	if err := s.WithTx(ctx, func(q Querier) error {
 		if _, err := InsertEvent(ctx, q, EventRow{TaskID: id, Project: "acme-api", StepID: &byEvent,
@@ -677,19 +676,6 @@ func TestStepHasRecords(t *testing.T) {
 		t.Fatalf("write records: %v", err)
 	}
 
-	want := map[int64]bool{byEvent: true, byReview: true, bare: false, done: true}
-	for stepID, wantHas := range want {
-		got, err := StepHasRecords(ctx, s, stepID)
-		if err != nil {
-			t.Fatalf("StepHasRecords(%d): %v", stepID, err)
-		}
-		if got != wantHas {
-			t.Errorf("StepHasRecords(%d) = %v, want %v", stepID, got, wantHas)
-		}
-	}
-
-	// The batched form lists pending steps only: the done step with an event is
-	// left out, and so is the bare step.
 	ids, err := PendingStepsWithRecords(ctx, s, id)
 	if err != nil {
 		t.Fatalf("PendingStepsWithRecords: %v", err)

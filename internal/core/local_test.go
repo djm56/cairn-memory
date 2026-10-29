@@ -33,6 +33,7 @@ var deferred = map[string]string{
 	"directive/from_learning":               "needs directive_ratify from a learning, which is " + part3,
 	"recall/across_projects":                "needs task_close and directive_ratify, which are " + part3,
 	"search/finds_each_kind":                "needs directive_ratify, which is " + part3,
+	"search/hides_retired_directives":       "needs directive_ratify and directive_retire, which are " + part3,
 }
 
 // openLocal returns a Service over a new database in a temporary directory,
@@ -60,9 +61,9 @@ func TestConformance(t *testing.T) {
 }
 
 // TestStepStartAndFinishWriteEvents checks the journal rows that step_update
-// writes. event_list reads them in part 2, so this reads the store directly.
+// writes, read back through event_list.
 func TestStepStartAndFinishWriteEvents(t *testing.T) {
-	s, st := openLocal(t)
+	s, _ := openLocal(t)
 	ctx := agent("acme-api", "main")
 	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}}})
 	if err != nil {
@@ -74,16 +75,17 @@ func TestStepStartAndFinishWriteEvents(t *testing.T) {
 	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.StepRef{Number: 1}, Action: core.StepFinish, Summary: "ok"}); err != nil {
 		t.Fatal(err)
 	}
-	events, _, err := store.ListEvents(context.Background(), st, store.EventFilter{TaskID: res.ID, Project: "acme-api", Limit: 10})
+	list, err := s.EventList(ctx, core.EventListRequest{TaskID: res.ID, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// event_list is newest first.
 	var kinds []string
-	for i := len(events) - 1; i >= 0; i-- {
-		kinds = append(kinds, events[i].Kind)
+	for _, e := range list.Events {
+		kinds = append(kinds, string(e.Kind))
 	}
-	if len(kinds) != 2 || kinds[0] != string(core.EventStarted) || kinds[1] != string(core.EventFinished) {
-		t.Errorf("journal kinds = %v, want [started finished]", kinds)
+	if len(kinds) != 2 || kinds[0] != string(core.EventFinished) || kinds[1] != string(core.EventStarted) {
+		t.Errorf("journal kinds = %v, want [finished started] newest first", kinds)
 	}
 }
 

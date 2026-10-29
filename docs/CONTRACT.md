@@ -4,7 +4,7 @@
 Nothing implements it yet. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite in
 `internal/conformance` checks the behaviour described here. The
-suite has 35 cases. Each one fails against the `core.Unimplemented`
+suite has 38 cases. Each one fails against the `core.Unimplemented`
 stub, as phase 1 expects.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
@@ -78,8 +78,9 @@ when steps are inserted. Ids never change.
     └──────── task_update(abandoned) from open, active, blocked
 ```
 
-- `task_update` may set `open`, `active`, `blocked` or `abandoned`.
-  `done` and `failed` come only from `task_close`.
+- `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
+  `open` except `task_start` with `queue`. `done` and `failed` come only from
+  `task_close`.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
@@ -203,6 +204,11 @@ All three are writes, and are `refused` on a terminal task.
 Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
+A `pending` step that an event or a review refers to cannot be removed, so
+the call is `refused` and changes nothing (ruling 3a). The way out: skip that
+step with `step_update` (`skip`, with a summary), then plan again. A skipped
+step is kept.
+
 ### `step_add`
 
 **In:** `task_id`, `title`, `agent`; `after`, a step ref. Left out, the step
@@ -293,6 +299,9 @@ operators and brackets are matched as words, and never cause an error);
 all); `all_projects`; `limit` (default 10); `cursor`.
 **Out:** `hits` (`[{kind, id, project, task_id, title, snippet}]`, best
 match first), and `next`. Global directives are found from every project.
+A retired directive is not a hit (ruling 4a): it is not listed by
+`directive_list`, `recall` or `task_current`, and search does not list it
+either.
 
 ## 7. Notes
 
