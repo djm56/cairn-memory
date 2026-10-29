@@ -105,8 +105,8 @@ func directiveCodeOf(ctx context.Context, q store.Querier, ref string) (string, 
 
 // recallStopWords are common words that do not say what a goal is about. recall
 // leaves them out of its match, so "the" or "with" cannot pull in every row.
-// The short function words are here too. A goal in capitals passes keepGoalWord's
-// upper-case test for them, so the list is what keeps "THE" out of the match.
+// The short function words are here too. In a goal that mixes cases, "THE" passes
+// keepGoalWord's upper-case test, so the list is what keeps it out of the match.
 var recallStopWords = map[string]bool{
 	"about": true, "after": true, "again": true, "against": true, "and": true,
 	"are": true, "but": true, "can": true, "could": true, "for": true,
@@ -126,12 +126,13 @@ var recallStopWords = map[string]bool{
 func goalWords(goal string) []string {
 	seen := map[string]bool{}
 	var out []string
+	capitals := isCapitals(goal)
 	tokens := strings.FieldsFunc(goal, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
 	for _, tok := range tokens {
 		w := strings.ToLower(tok)
-		if !keepGoalWord(tok) || recallStopWords[w] || seen[w] {
+		if !keepGoalWord(tok, capitals) || recallStopWords[w] || seen[w] {
 			continue
 		}
 		seen[w] = true
@@ -140,12 +141,30 @@ func goalWords(goal string) []string {
 	return out
 }
 
+// isCapitals reports whether goal is written all in upper case: it has a
+// letter, and no lower-case letter. In such a goal every word is upper case,
+// so the case of a word says nothing about whether it is a name.
+func isCapitals(goal string) bool {
+	hasLetter := false
+	for _, r := range goal {
+		if unicode.IsLower(r) {
+			return false
+		}
+		hasLetter = hasLetter || unicode.IsLetter(r)
+	}
+	return hasLetter
+}
+
 // keepGoalWord reports whether a word of a goal can name its subject. Four or
 // more characters always can. A shorter word can only when it reads as a name
 // in the goal as written: all upper case (JWT, SQL, CSS, TLS, CLI) or holding a
 // digit (v2). So "Fix" is dropped and "JWT" is kept. A single character is
 // never kept.
-func keepGoalWord(tok string) bool {
+//
+// In a goal written all in capitals (capitals is true) the case test says
+// nothing, so a short word is kept only for its digit: "ADD RATE LIMIT TO API"
+// keeps RATE and LIMIT, and "ADD V2 API" keeps V2.
+func keepGoalWord(tok string, capitals bool) bool {
 	n := utf8.RuneCountInString(tok)
 	switch {
 	case n >= 4:
@@ -156,7 +175,7 @@ func keepGoalWord(tok string) bool {
 	if strings.IndexFunc(tok, unicode.IsDigit) >= 0 {
 		return true
 	}
-	return tok == strings.ToUpper(tok)
+	return !capitals && tok == strings.ToUpper(tok)
 }
 
 // Recall answers what a caller should know before a goal. Directives are those

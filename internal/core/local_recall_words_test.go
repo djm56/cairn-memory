@@ -73,3 +73,45 @@ func TestRecallKeepsShortNameWords(t *testing.T) {
 		t.Errorf("recall of \"fix bug\" lessons = %+v, want none", none.Lessons)
 	}
 }
+
+// TestRecallCapitalGoalDropsShortWords checks a goal written all in capitals.
+// Its case says nothing about a name, so TO and API are dropped with ADD, and
+// only RATE and LIMIT match. The lesson that holds only "to" and "API" must not
+// be found, and the rate-limit lesson must. Under the case rule for mixed goals
+// both short words would match, so the test fails if that rule is kept.
+func TestRecallCapitalGoalDropsShortWords(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Limits", Goal: "Limit work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Rate limit every endpoint.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Gateway", Goal: "Gateway work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Move the header to the API gateway.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "ADD RATE LIMIT TO API"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Rate limit every endpoint." {
+		t.Errorf("recall of \"ADD RATE LIMIT TO API\" lessons = %+v, want only the rate-limit lesson", got.Lessons)
+	}
+}
+
+// TestRecallMixedCaseKeepsNames checks that a goal with lower-case words keeps
+// its upper-case short names and its digit words: JWT, SQL, TLS, CLI and v2 each
+// find their lesson. The lower-case "use" is dropped, and no lesson holds it.
+func TestRecallMixedCaseKeepsNames(t *testing.T) {
+	s, st := openLocal(t)
+	seeds := []string{"Rotate the JWT key.", "Parameterise every SQL query.", "Pin TLS 1.3.", "Flags on the CLI.", "Keep the v2 endpoints."}
+	for _, text := range seeds {
+		// One task per lesson: seedLesson replaces a task's lessons.
+		task := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Lesson work", Goal: "Work.", Queue: true}))(t)
+		seedLesson(t, st, task.ID, text)
+	}
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Check JWT, SQL, TLS, CLI and v2 use", Limit: 10})
+	found := map[string]bool{}
+	for _, l := range got.Lessons {
+		found[l.Text] = true
+	}
+	for _, text := range seeds {
+		if !found[text] {
+			t.Errorf("recall of a mixed-case goal did not find %q; lessons = %+v", text, got.Lessons)
+		}
+	}
+}
