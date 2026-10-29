@@ -117,7 +117,8 @@ are numbered migrations, run at start-up. Each migration is an embedded SQL
 file, applied in its own transaction and recorded in `schema_migrations`. The
 driver opens with `_txlock=immediate`, so the version is read under the write
 lock. Enumerated columns carry CHECK constraints, and references are declared
-foreign keys.
+foreign keys. `tasks.project` is immutable: a trigger in migration 0002 refuses a
+change. The store reads outside transactions and writes inside `WithTx`.
 
 ### 3.1 Tasks
 
@@ -238,7 +239,7 @@ search_index   FTS5 over tasks (title, goal, context, outcome), events (text),
                notes (title, body), lessons and mistakes
 ```
 
-`search_index` is one FTS5 table, with `kind`, `ref` and `project` as unindexed
+`search_index` is one FTS5 table, with `kind`, `ref`, `project` and `task_id` as unindexed
 columns. Each source table has insert, update and delete triggers. Update and
 delete find a row by `ref`, which scans the index; that is accepted at v1 scale.
 

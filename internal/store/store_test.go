@@ -168,9 +168,10 @@ func TestMigrationsCreateEveryTableAndIndex(t *testing.T) {
 		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger'`).Scan(&triggers); err != nil {
 		t.Fatalf("count triggers: %v", err)
 	}
-	// Seven source tables, each with insert, update and delete triggers.
-	if triggers != 21 {
-		t.Errorf("trigger count = %d, want 21", triggers)
+	// Seven source tables, each with insert, update and delete triggers (21),
+	// and the tasks project guard from migration 0002.
+	if triggers != 22 {
+		t.Errorf("trigger count = %d, want 22", triggers)
 	}
 
 	// PRAGMA index_list returns seq, name, unique, origin and partial.
@@ -195,16 +196,60 @@ func TestMigrationsCreateEveryTableAndIndex(t *testing.T) {
 	}
 }
 
-// TestMigrationsRecordVersion checks that the schema is at version 1 after
-// Open, and that the one migration is recorded by name.
-func TestMigrationsRecordVersion(t *testing.T) {
+// TestMigration0002IndexesAndGuard checks that every index migration 0002
+// creates exists under its name, and that the tasks.project guard trigger is
+// in place. The list is the migration's own, so a dropped or renamed index
+// fails here rather than as a silent slow query.
+func TestMigration0002IndexesAndGuard(t *testing.T) {
+	s := openTemp(t)
+	objects := []struct{ kind, name string }{
+		{"index", "idx_steps_task"},
+		{"index", "idx_events_task"},
+		{"index", "idx_events_step"},
+		{"index", "idx_reviews_task"},
+		{"index", "idx_reviews_step"},
+		{"index", "idx_learnings_project_status"},
+		{"index", "idx_notes_task"},
+		{"index", "idx_sessions_project"},
+		{"index", "idx_tasks_project_updated"},
+		{"trigger", "tasks_project_immutable"},
+	}
+	for _, o := range objects {
+		var n int
+		if err := s.db.QueryRow(
+			`SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?`, o.kind, o.name).Scan(&n); err != nil {
+			t.Fatalf("query %s %s: %v", o.kind, o.name, err)
+		}
+		if n != 1 {
+			t.Errorf("%s %s missing from sqlite_master", o.kind, o.name)
+		}
+	}
+	// idx_events_project is not in migration 0002: idx_events_task serves the
+	// task_id part of ListEvents. Its absence is asserted so it cannot return
+	// silently.
+	var dropped int
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_events_project'`).Scan(&dropped); err != nil {
+		t.Fatalf("query idx_events_project: %v", err)
+	}
+	if dropped != 0 {
+		t.Errorf("index idx_events_project present; migration 0002 does not create it")
+	}
+}
+
+// TestMigrationsRecordVersions checks that a fresh database ends at version 2,
+// with one row per migration, each recorded by its number and name.
+func TestMigrationsRecordVersions(t *testing.T) {
 	s := openTemp(t)
 	rows := migrationRows(t, s.db)
-	if len(rows) != 1 {
-		t.Fatalf("migration rows = %v, want exactly one", rows)
+	want := []string{"1|schema_v1|", "2|indexes_and_guards|"}
+	if len(rows) != len(want) {
+		t.Fatalf("migration rows = %v, want %d", rows, len(want))
 	}
-	if !strings.HasPrefix(rows[0], "1|schema_v1|") {
-		t.Errorf("migration row = %q, want version 1 named schema_v1", rows[0])
+	for i, prefix := range want {
+		if !strings.HasPrefix(rows[i], prefix) {
+			t.Errorf("migration row %d = %q, want prefix %q", i, rows[i], prefix)
+		}
 	}
 }
 
@@ -274,15 +319,24 @@ func TestLoadMigrationsRejectsGap(t *testing.T) {
 	}
 }
 
-// TestLoadMigrationsEmbedsSchemaV1 checks that the embedded set is exactly
-// the one schema migration, at version 1.
-func TestLoadMigrationsEmbedsSchemaV1(t *testing.T) {
+// TestLoadMigrationsEmbedsAll checks that the embedded set is exactly the two
+// schema migrations, in order.
+func TestLoadMigrationsEmbedsAll(t *testing.T) {
 	list, err := loadMigrations(migrationFiles)
 	if err != nil {
 		t.Fatalf("loadMigrations: %v", err)
 	}
-	if len(list) != 1 || list[0].version != 1 || list[0].name != "schema_v1" {
-		t.Errorf("embedded migrations = %+v, want one schema_v1 at version 1", list)
+	want := []struct {
+		version int
+		name    string
+	}{{1, "schema_v1"}, {2, "indexes_and_guards"}}
+	if len(list) != len(want) {
+		t.Fatalf("embedded migrations = %d, want %d", len(list), len(want))
+	}
+	for i, w := range want {
+		if list[i].version != w.version || list[i].name != w.name {
+			t.Errorf("migration %d = %d_%s, want %d_%s", i, list[i].version, list[i].name, w.version, w.name)
+		}
 	}
 }
 

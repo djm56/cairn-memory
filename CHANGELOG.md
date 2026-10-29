@@ -26,6 +26,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   FTS5 table with its triggers; and `store.Open` on `modernc.org/sqlite` v1.61.0.
   The module moves to Go 1.26, which that driver's dependency graph requires.
   ([PR #45](https://github.com/djm56/cairn-memory/pull/45)).
+- Phase 2 store queries: typed functions over every table of DESIGN §3, a
+  `WithTx` write-transaction helper, a task id allocator, scoped search, and
+  migration 0002 with the secondary indexes and the `tasks.project` guard
+  (issue #8, [PR #47](https://github.com/djm56/cairn-memory/pull/47)).
+  Several processes opening one new database at once no longer fail with `SQLITE_BUSY`.
 - Phase 2 identity: `internal/identity` resolves the project from
   `CAIRN_PROJECT`, then the nearest `.cairn.toml` walking up from
   `CLAUDE_PROJECT_DIR` or the working directory, and refuses a call with no
