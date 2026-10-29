@@ -48,8 +48,9 @@ type Store struct {
 // this build is refused rather than opened.
 //
 // path is a filesystem path. It must not contain '?', which starts the driver's
-// query string. Open first connects with a retry on SQLITE_BUSY, so several
-// processes opening one new file at once all succeed. Open returns an error when
+// query string. Open first connects with a retry on SQLITE_BUSY (see connect), so
+// several processes opening one new file at once should succeed within that
+// retry budget. Open returns an error when
 // the file cannot be opened, when a migration fails (the database is then left at
 // the last version that applied), or when the schema is newer than this build.
 // Open writes to the file.
@@ -79,6 +80,12 @@ func Open(path string) (*Store, error) {
 // same switch. A refused connection is discarded and nothing is left behind, so
 // connect tries again. Any other error, or a BUSY that persists past the retries,
 // is returned.
+//
+// The retry budget is about 450 ms in all (nine waits of 10 to 90 ms), which is
+// deliberately short next to the 5 s busy timeout. The switch is brief, so a
+// refusal that outlasts the budget means something else holds the file. Open
+// then returns the error rather than block for seconds on a switch that the
+// busy handler does not cover anyway.
 func connect(db *sql.DB) error {
 	var err error
 	for i := 0; i < connectRetries; i++ {
