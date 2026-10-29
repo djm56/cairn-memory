@@ -230,6 +230,34 @@ var closeCases = []Case{
 		_, err := s.TaskClose(as(projB, "main"), core.TaskCloseRequest{ID: other.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close under the default policy")
 	}},
+	{"close/refused_close_keeps_record", func(t T, s core.Service) {
+		// CONTRACT §2: a refused close changes nothing. This close carries every
+		// part of a close (criteria results, lessons, mistakes, deliverables) and
+		// is refused for want of a summary. Read back, none of them is written.
+		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "t", Goal: "g", Criteria: []string{"a", "b"}}))(t)
+		req := fullClose(res.ID, 2)
+		req.Summary = ""
+		req.Mistakes = []core.Mistake{{Agent: "main", Mistake: "Edited before testing", Impact: core.ImpactLow}}
+		req.Deliverables = []core.TaskFile{{Path: "internal/auth/redirect.go"}}
+		_, err := s.TaskClose(mainCtx(), req)
+		wantKind(t, err, core.KindRefused, "close without a summary")
+		if m := core.MissingOf(err); !slices.Equal(m, []string{core.MissingSummary}) {
+			t.Errorf("missing = %v, want [summary]", m)
+		}
+
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionClose}))(t)
+		for _, c := range d.Criteria {
+			if c.Result != "" {
+				t.Errorf("criterion %d has result %q after a refused close", c.Ord, c.Result)
+			}
+		}
+		if len(d.Lessons) != 0 || len(d.Mistakes) != 0 || len(d.Deliverables) != 0 {
+			t.Errorf("record after a refused close: lessons %+v mistakes %+v deliverables %+v", d.Lessons, d.Mistakes, d.Deliverables)
+		}
+		if d.NoLessonsReason != "" || d.Task.Status != core.TaskActive || d.Task.ClosedAt != nil {
+			t.Errorf("after a refused close: no_lessons_reason %q status %q closed_at %v", d.NoLessonsReason, d.Task.Status, d.Task.ClosedAt)
+		}
+	}},
 	{"close/writes_one_close_event", func(t T, s core.Service) {
 		// CONTRACT §2: an accepted close writes a close event. It is written
 		// once, by the caller, and its text carries the outcome.
