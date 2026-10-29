@@ -109,6 +109,23 @@ func TestRecallCJKGoalKeepsShortWords(t *testing.T) {
 	}
 }
 
+// TestRecallUnspacedCJKGoalKeepsWord checks an unspaced two-character goal in an
+// uncased script. Without spaces the goal is one token of two characters. It is
+// not in capitals, so the token is kept and finds the rate lesson. Read as
+// capitals, a two-character token would be dropped and find nothing.
+func TestRecallUnspacedCJKGoalKeepsWord(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Rate", Goal: "Rate work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "设置 限流 配置 每分钟上限")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Logs", Goal: "Log work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Unrelated lesson about logging.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "限流"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "设置 限流 配置 每分钟上限" {
+		t.Errorf("recall of \"限流\" lessons = %+v, want only the rate lesson", got.Lessons)
+	}
+}
+
 // TestRecallMixedCaseKeepsNames checks that a goal with lower-case words keeps
 // its upper-case short names and its digit words: JWT, SQL, TLS, CLI and v2 each
 // find their lesson. The lower-case "use" is dropped, and no lesson holds it.

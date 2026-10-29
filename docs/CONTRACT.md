@@ -404,8 +404,10 @@ where only a core test checks it. An item with no check at all is marked
     mixes cases, it keeps upper-case short words (`JWT`, `SQL`, `TLS`, `CLI`)
     and words with a digit (`v2`). In a goal written wholly in capitals, it
     keeps only words of four or more letters and words with a digit, so
-    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. *Bishop default,
-    pending operator approval.* (core test only)
+    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. A goal with no
+    upper-case letter, such as one in an uncased script, is not in capitals,
+    so its short words are kept. *Bishop default, pending operator approval.*
+    (core test only)
 19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
     1}` is `invalid`, and so is any id or number below 1, except number 0 as
     `step_add`'s `after`, where it means before the first step (§1.4, §3). Give
