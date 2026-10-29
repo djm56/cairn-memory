@@ -71,24 +71,36 @@ func loadMigrations(fsys fs.FS) ([]migration, error) {
 }
 
 // migrate brings the database to the newest version in list. It creates the
-// schema_migrations table if needed, then applies each migration above the
-// current version in its own transaction. The version is read inside that
-// transaction, under the write lock (the driver opens every transaction
-// immediately), so two processes opening one file cannot apply a migration
-// twice. A migration that fails rolls back alone: the database is left at the
-// version before it. It returns an error when the database is at a version
-// newer than list. Migrations applied earlier are not undone.
+// schema_migrations table if needed, in its own transaction, then applies each
+// migration above the current version in its own transaction. The DSN sets
+// _txlock=immediate, so every transaction takes the write lock when it begins
+// and the busy timeout applies. A bare autocommit CREATE TABLE does not: it
+// reads first, then upgrades to a write, and in WAL mode SQLite returns
+// SQLITE_BUSY at once when another process committed in between. The version is
+// read inside each migration transaction, under the write lock, so two processes
+// opening one file cannot apply a migration twice. A migration that fails rolls
+// back alone: the database is left at the version before it. It returns an error
+// when the database is at a version newer than list. Migrations applied earlier
+// are not undone.
 func migrate(db *sql.DB, list []migration) error {
 	if len(list) == 0 {
 		return fmt.Errorf("no migrations to apply")
 	}
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin schema_migrations: %w", err)
+	}
+	defer tx.Rollback() // a no-op once Commit has succeeded
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version     INTEGER PRIMARY KEY,
 		name        TEXT NOT NULL,
 		applied_at  TEXT NOT NULL
 	)`); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit schema_migrations: %w", err)
 	}
 	for _, m := range list {
 		if err := applyOne(ctx, db, m); err != nil {
