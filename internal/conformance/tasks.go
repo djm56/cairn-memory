@@ -155,7 +155,7 @@ var taskCases = []Case{
 		}
 	}},
 	{"task/update_never_sets_open", func(t T, s core.Service) {
-		// CONTRACT §1.5 (ruling 1a): task_update does not move a task into open.
+		// CONTRACT §1.5: task_update does not move a task into open.
 		res := startTask(t, s, mainCtx(), "t")
 		_, err := s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskOpen)})
 		wantKind(t, err, core.KindRefused, "task_update to open on an active task")
@@ -247,7 +247,7 @@ var stepCases = []Case{
 		wantKind(t, err, core.KindNotFound, "step 9 of 2")
 	}},
 	{"step/empty_ref_is_invalid", func(t T, s core.Service) {
-		// CONTRACT §1.4 (ruling 2a): {} names no step, so it is invalid. Only
+		// CONTRACT §1.4: {} names no step, so it is invalid. Only
 		// {"number": 0} means before the first step, and only as step_add's after.
 		res := startTask(t, s, mainCtx(), "t", "one")
 		_, err := s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(core.StepRef{}), Title: "empty"})
@@ -318,7 +318,7 @@ var stepCases = []Case{
 		}
 	}},
 	{"step/plan_refuses_recorded_pending_step", func(t T, s core.Service) {
-		// CONTRACT §3 (ruling 3a): a pending step with an event or a review
+		// CONTRACT §3: a pending step with an event or a review
 		// cannot be removed, so step_plan is refused. The way out is to skip it.
 		res := startTask(t, s, mainCtx(), "t", "one", "two")
 		two := core.NumberRef(2)

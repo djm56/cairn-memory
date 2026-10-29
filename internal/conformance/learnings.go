@@ -171,7 +171,7 @@ var searchCases = []Case{
 		wantKind(t, err, core.KindInvalid, "recall without a goal")
 	}},
 	{"search/hides_retired_directives", func(t T, s core.Service) {
-		// CONTRACT §6 (ruling 4a): a retired directive is not a hit, as it is
+		// CONTRACT §6: a retired directive is not a hit, as it is
 		// not listed anywhere else.
 		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Limit requests", Rule: "Rate limit every endpoint."}))(t)
 		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)

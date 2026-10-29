@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestSearchHidesRetiredDirectives checks CONTRACT §6 (ruling 4a): a retired
+// TestSearchHidesRetiredDirectives checks CONTRACT §6: a retired
 // directive is not a search hit, as it is not listed by directive_list. Both
 // directives hold the word "limit"; only the active one is found.
 func TestSearchHidesRetiredDirectives(t *testing.T) {

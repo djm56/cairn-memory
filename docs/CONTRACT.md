@@ -207,7 +207,7 @@ Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
 A `pending` step that an event or a review refers to cannot be removed, so
-the call is `refused` and changes nothing (ruling 3a). The way out: skip that
+the call is `refused` and changes nothing. The way out: skip that
 step with `step_update` (`skip`, with a summary), then plan again. A skipped
 step is kept.
 
@@ -301,7 +301,7 @@ operators and brackets are matched as words, and never cause an error);
 all); `all_projects`; `limit` (default 10); `cursor`.
 **Out:** `hits` (`[{kind, id, project, task_id, title, snippet}]`, best
 match first), and `next`. Global directives are found from every project.
-A retired directive is not a hit (ruling 4a): it is not listed by
+A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
 either.
 
