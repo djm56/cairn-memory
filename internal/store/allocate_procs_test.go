@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -32,7 +33,8 @@ const allocProject = "acme-api"
 // processes are copies of this test binary, started with
 // TestHelperProcessAllocate. Each one opens the file, reports ready on its
 // stdout, and waits on its stdin. Once both are ready the parent sends go to
-// each, so the allocations overlap by construction, not by timing. The test
+// each, so the allocations overlap in practice: both helpers are blocked at the
+// same point when the go lines are written. Nothing enforces the overlap. The test
 // fails unless both processes succeed and all the ids are distinct.
 func TestAllocateTaskIDAcrossProcesses(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cairn.db")
@@ -65,7 +67,9 @@ func TestAllocateTaskIDAcrossProcesses(t *testing.T) {
 	}
 	for i, c := range children {
 		if _, err := io.WriteString(c.stdin, "go\n"); err != nil {
-			t.Fatalf("helper %d: send go: %v", i, err)
+			// The helper died before it read go. Its output says why.
+			_, rerr := c.collect()
+			t.Fatalf("helper %d: send go: %v; helper: %v", i, err, rerr)
 		}
 	}
 
@@ -137,13 +141,21 @@ type allocChild struct {
 	stdout *bufio.Reader
 	stderr *bytes.Buffer
 	timer  *time.Timer
+
+	// reaped runs cmd.Wait exactly once. waitErr is its result.
+	reaped  sync.Once
+	waitErr error
 }
 
 // startAllocChild starts a copy of the test binary that runs only
 // TestHelperProcessAllocate against path. A watchdog kills it after a minute, so
 // a hang fails the test rather than stalling the run.
 func startAllocChild(path string) (*allocChild, error) {
-	cmd := exec.Command(os.Args[0], "-test.run=^TestHelperProcessAllocate$")
+	self, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(self, "-test.run=^TestHelperProcessAllocate$")
 	cmd.Env = append(os.Environ(), helperDBEnv+"="+path)
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr
@@ -163,10 +175,12 @@ func startAllocChild(path string) (*allocChild, error) {
 	return c, nil
 }
 
-// readLine reads one line from the child and fails unless it is want.
+// readLine reads one line from the child and fails unless it is want. On a read
+// error it kills and reaps the child first, so the stderr it reports is complete.
 func (c *allocChild) readLine(want string) error {
 	line, err := c.stdout.ReadString('\n')
 	if err != nil {
+		c.kill()
 		return fmt.Errorf("read %q: %v (stderr: %s)", want, err, strings.TrimSpace(c.stderr.String()))
 	}
 	if got := strings.TrimSpace(line); got != want {
@@ -178,12 +192,13 @@ func (c *allocChild) readLine(want string) error {
 // collect reads the child's ids up to its done line, then waits for it to exit.
 // It fails if the child exits with an error, or ends without done. The lines
 // that are not ids are the test's own failure messages, so they go in the error.
+// On a read error it kills and reaps the child before it reads stderr.
 func (c *allocChild) collect() ([]string, error) {
 	var ids, other []string
 	for {
 		line, err := c.stdout.ReadString('\n')
 		if err != nil {
-			c.timer.Stop()
+			c.kill()
 			return nil, fmt.Errorf("after %d ids: %v; child said %q (stderr: %s)",
 				len(ids), err, other, strings.TrimSpace(c.stderr.String()))
 		}
@@ -197,17 +212,31 @@ func (c *allocChild) collect() ([]string, error) {
 			other = append(other, line)
 		}
 	}
-	c.timer.Stop()
-	if err := c.cmd.Wait(); err != nil {
+	// The child said done and should exit on its own, so this only waits. A
+	// kill here could turn a clean exit into a false failure.
+	if err := c.wait(); err != nil {
 		return nil, fmt.Errorf("exit: %v; child said %q (stderr: %s)",
 			err, other, strings.TrimSpace(c.stderr.String()))
 	}
 	return ids, nil
 }
 
-// kill stops the child if it is still running. It is safe to call twice.
+// kill stops the child if it is still running, then reaps it. It is safe to
+// call more than once, and after collect.
 func (c *allocChild) kill() {
 	if c.cmd.Process != nil {
 		c.cmd.Process.Kill()
 	}
+	c.wait()
+}
+
+// wait stops the watchdog and runs cmd.Wait, once. Wait also waits for exec to
+// finish copying stderr, so stderr is complete once wait has returned. Later
+// calls return the first result.
+func (c *allocChild) wait() error {
+	c.reaped.Do(func() {
+		c.timer.Stop()
+		c.waitErr = c.cmd.Wait()
+	})
+	return c.waitErr
 }

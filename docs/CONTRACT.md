@@ -3,7 +3,7 @@
 **Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
 2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
 approval. Items 13 and later await the operator's approval.
-`core.Local` passes all 63 cases in `internal/conformance` (count as of
+`core.Local` passes all 66 cases in `internal/conformance` (count as of
 2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
@@ -345,8 +345,8 @@ refuse a nameless call all the same.
 ## 9. Settled here, for review
 
 Each item answers a question that DESIGN.md left open. Items 1–11 were approved
-by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, each
-item says what checks it: a conformance case by default, or `(core test only)`
+by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, an
+item is checked by a conformance case unless it is marked `(core test only)`,
 where only a core test checks it. An item with no check at all is marked
 `(not tested)`; none is.
 
@@ -404,8 +404,12 @@ where only a core test checks it. An item with no check at all is marked
     mixes cases, it keeps upper-case short words (`JWT`, `SQL`, `TLS`, `CLI`)
     and words with a digit (`v2`). In a goal written wholly in capitals, it
     keeps only words of four or more letters and words with a digit, so
-    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. *Bishop default,
-    pending operator approval.* (core test only)
+    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. Elsewhere, a word
+    under four letters is kept if it has a digit or is unchanged by
+    upper-casing, so `JWT` is kept and `fix` is dropped. A word in an uncased
+    script (CJK, for one) is unchanged by upper-casing, so it is kept.
+    *Bishop default, pending operator approval.*
+    (core test only)
 19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
     1}` is `invalid`, and so is any id or number below 1, except number 0 as
     `step_add`'s `after`, where it means before the first step (§1.4, §3). Give
@@ -418,7 +422,8 @@ where only a core test checks it. An item with no check at all is marked
     (§8). *Bishop default, pending operator approval.*
 21. **A directive retires once (2026-10-29).** A second
     `directive_retire` of the same code is `refused`, and the first retirement
-    time stands (§8). *Bishop default, pending operator approval.*
+    time stands `(core test only)` (§8). *Bishop default, pending operator
+    approval.*
 22. **Learning moves and supersede cycles (2026-10-29).**
     `learning_decide` may set any status except `proposed`, from any current
     status. A `superseded_by` that leads back to the learning being decided,

@@ -18,6 +18,16 @@ make fmt-check   # fails if any file is not gofmt-formatted
 CI runs build, `vet`, `fmt-check` and `test` on every pull request. Run the
 same four before you push.
 
+### Mutation testing
+
+`make mutation` runs [Gremlins](https://github.com/go-gremlins/gremlins) on
+`internal/core` and `internal/store`, one package per run. Gremlins is pinned
+in the Makefile (`GREMLINS`, v0.5.1), so `go.mod` does not change. Each run
+prints its efficacy (killed mutants over killed and lived) and its mutator
+coverage. The run is slow, so it is not part of CI and no threshold gates it.
+A surviving mutant is either killed by a new test or recorded in the pull
+request as equivalent or accepted, with a reason.
+
 ## Workflow
 
 1. **Issue.** Open one from a form: bug, documentation, decision or roadmap
@@ -54,8 +64,9 @@ From what went well and badly in bishop-memory (PLAN.md §6):
 - **Every tool result is read by a model.** Keep it small, paged and
   readable. Test the size of `task_current` on a large task.
 - **Tests before code for each tool**, through the conformance suite.
-- **Mutation testing** on `core` and `store` from phase 2. Phase 2 picks the
-  approach (the operator's choice), guided by bishop-memory's harness.
+- **Mutation testing** on `core` and `store` from phase 2. Phase 2 uses
+  Gremlins (`make mutation`), a Bishop default awaiting the operator's
+  ratification.
 - **No silent defaults for identity.** A missing project is an error that
   says how to fix it (`cairn init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.
