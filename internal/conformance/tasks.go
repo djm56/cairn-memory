@@ -287,6 +287,31 @@ var stepCases = []Case{
 			t.Errorf("steps after the refused adds = %v, want [one]", titles)
 		}
 	}},
+	{"step/ref_gives_exactly_one", func(t T, s core.Service) {
+		// CONTRACT §1.4: ids and numbers start at 1, and a ref gives exactly
+		// one of them. {"id": 0, "number": 1} is invalid: it is not read as
+		// either the id or the number.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		id := res.Steps[0].ID
+		refs := []core.StepRef{
+			{ID: ptr(id), Number: ptr(1)},
+			{ID: ptr(int64(0)), Number: ptr(1)},
+			{ID: ptr(int64(0))},
+		}
+		for _, ref := range refs {
+			_, err := s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: ref, Action: core.StepStart})
+			wantKind(t, err, core.KindInvalid, "step_update with a ref of id and number, or id 0")
+			_, err = s.StepAdd(mainCtx(), core.StepAddRequest{TaskID: res.ID, After: ptr(ref), Title: "x"})
+			wantKind(t, err, core.KindInvalid, "step_add after a ref of id and number, or id 0")
+		}
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one"}) {
+			t.Errorf("steps after the refused calls = %v, want [one]", titles)
+		}
+		if kept.Steps[0].Status != core.StepPending {
+			t.Errorf("status after the refused starts = %q, want pending", kept.Steps[0].Status)
+		}
+	}},
 	{"step/transitions_and_attempts", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two")
 		one := core.NumberRef(1)
