@@ -56,6 +56,14 @@ func setEnv(t *testing.T, key, value string, unset bool) {
 	}
 }
 
+// TestResolve covers the resolution order. Two cases ("CLAUDE_PROJECT_DIR with
+// no file ignores the working directory" and "neither env nor file") expect
+// no file to be found, so the walk climbs from t.TempDir() to the filesystem
+// root. That is a trade-off, recorded here: the walk only reads, but a stray
+// .cairn.toml in an ancestor of the temp directory (/tmp, /var/folders, or
+// $HOME on a developer machine or CI runner) would change those two results.
+// Making the walk hermetic would need a seam used only by tests; none is added
+// without a clearer need.
 func TestResolve(t *testing.T) {
 	const good = "project = \"acme-api\"\n"
 	cases := []struct {
