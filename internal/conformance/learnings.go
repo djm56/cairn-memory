@@ -229,6 +229,23 @@ var searchCases = []Case{
 			t.Errorf("search of a retired directive found %d hits, want none", len(res.Hits))
 		}
 	}},
+	{"search/finds_lessons_and_mistakes", func(t T, s core.Service) {
+		// CONTRACT §6: lesson and mistake are kinds of search. The rows come from
+		// task_close, not from a learning, so they are found only once a close
+		// has written them.
+		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "Tune the pool", Goal: "Pool sizing."}))(t)
+		req := fullClose(res.ID, 0)
+		req.Lessons = []core.Lesson{{Kind: core.LessonReuse, Text: "The walrus pool needs a warm start.", Why: "Cold starts time out."}}
+		req.Mistakes = []core.Mistake{{Agent: "main", Mistake: "Sized the walrus pool by hand", Impact: core.ImpactMed, Prevention: "Measure first"}}
+		must(s.TaskClose(mainCtx(), req))(t)
+
+		for kind, want := range map[core.HitKind]string{core.HitLesson: "lesson", core.HitMistake: "mistake"} {
+			got := must(s.Search(mainCtx(), core.SearchRequest{Query: "walrus", Kinds: []core.HitKind{kind}}))(t)
+			if len(got.Hits) != 1 || got.Hits[0].Kind != kind || got.Hits[0].TaskID != res.ID {
+				t.Errorf("search of %s kind = %+v, want one hit on %s", want, got.Hits, res.ID)
+			}
+		}
+	}},
 	{"search/finds_each_kind", func(t T, s core.Service) {
 		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "Tune the zeppelin cache", Goal: "Cache hit rate over 90%."}))(t)
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "The quokka endpoint is slow."}))(t)
