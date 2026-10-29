@@ -238,6 +238,31 @@ func TestSearchPlainText(t *testing.T) {
 	}
 }
 
+// TestSearchPlainTextMirror backs the zero-hit checks in TestSearchPlainText. It
+// adds one acme-api row that holds the words of `NOT tests` and the phrase
+// `title:tests`, and each query must find that row. Each word of a query is a
+// phrase, and `title:tests` is one phrase, so "title" and "tests" must sit next
+// to each other in the row, in that order. Without the row, zero hits could mean
+// the search is broken rather than that no row matches.
+func TestSearchPlainTextMirror(t *testing.T) {
+	s := openTemp(t)
+	seedSearch(t, s)
+	ctx := context.Background()
+	if err := s.WithTx(ctx, func(q Querier) error {
+		_, err := InsertEvent(ctx, q, EventRow{TaskID: "task-20261028-01", Project: "acme-api",
+			Agent: "main", Kind: "note", Text: "title tests not", OccurredAt: t0})
+		return err
+	}); err != nil {
+		t.Fatalf("insert mirror event: %v", err)
+	}
+	for _, query := range []string{`NOT tests`, `title:tests`} {
+		rows, _, err := Search(ctx, s, SearchFilter{Query: query, Project: "acme-api", Limit: 50})
+		if err != nil || len(rows) != 1 {
+			t.Errorf("Search(%q) = %d rows, err %v; want the one mirror row", query, len(rows), err)
+		}
+	}
+}
+
 // TestSearchArguments checks the two argument errors: a limit below 1 and a
 // negative offset.
 func TestSearchArguments(t *testing.T) {
