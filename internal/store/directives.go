@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -94,7 +95,7 @@ func InsertDirective(ctx context.Context, q Querier, d DirectiveRow) (int64, err
 func GetDirectiveByCode(ctx context.Context, q Querier, code string) (DirectiveRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT `+directiveColumns+` FROM directives WHERE code = ?`, code)
 	d, err := scanDirective(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return d, fmt.Errorf("directive %s: %w", code, ErrNotFound)
 	}
 	if err != nil {

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -36,7 +37,7 @@ func GetProject(ctx context.Context, q Querier, name string) (ProjectRow, error)
 	err := q.QueryRowContext(ctx, `SELECT name, display_name, created_at, last_seen_at, settings
 		FROM projects WHERE name = ?`, name).
 		Scan(&p.Name, &display, &created, &seen, &p.Settings)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return p, fmt.Errorf("project %s: %w", name, ErrNotFound)
 	}
 	if err != nil {
@@ -95,7 +96,7 @@ func GetSession(ctx context.Context, q Querier, id string) (SessionRow, error) {
 	err := q.QueryRowContext(ctx, `SELECT id, project, client, agent, started_at, last_seen_at
 		FROM sessions WHERE id = ?`, id).
 		Scan(&s.ID, &s.Project, &client, &agent, &started, &seen)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return s, fmt.Errorf("session %s: %w", id, ErrNotFound)
 	}
 	if err != nil {

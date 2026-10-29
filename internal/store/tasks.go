@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -73,7 +74,7 @@ func GetTask(ctx context.Context, q Querier, project, id string) (TaskRow, error
 	row := q.QueryRowContext(ctx, `SELECT `+taskColumns+` FROM tasks
 		WHERE id = ? AND project = ?`, id, project)
 	t, err := scanTask(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return t, fmt.Errorf("task %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
@@ -91,7 +92,7 @@ func GetTask(ctx context.Context, q Querier, project, id string) (TaskRow, error
 func GetTaskAnyProject(ctx context.Context, q Querier, id string) (TaskRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT `+taskColumns+` FROM tasks WHERE id = ?`, id)
 	t, err := scanTask(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return t, fmt.Errorf("task %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
@@ -352,7 +353,7 @@ func GetLesson(ctx context.Context, q Querier, taskID string, ord int) (LessonRo
 	err := q.QueryRowContext(ctx, `SELECT task_id, ord, kind, text, why, correction
 		FROM task_lessons WHERE task_id = ? AND ord = ?`, taskID, ord).
 		Scan(&l.TaskID, &l.Ord, &l.Kind, &l.Text, &why, &correction)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return l, fmt.Errorf("lesson %s/%d: %w", taskID, ord, ErrNotFound)
 	}
 	if err != nil {
@@ -423,7 +424,7 @@ func GetMistake(ctx context.Context, q Querier, taskID string, ord int) (Mistake
 	err := q.QueryRowContext(ctx, `SELECT task_id, ord, agent, mistake, impact, correction, prevention
 		FROM task_mistakes WHERE task_id = ? AND ord = ?`, taskID, ord).
 		Scan(&m.TaskID, &m.Ord, &m.Agent, &m.Mistake, &m.Impact, &correction, &prevention)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return m, fmt.Errorf("mistake %s/%d: %w", taskID, ord, ErrNotFound)
 	}
 	if err != nil {

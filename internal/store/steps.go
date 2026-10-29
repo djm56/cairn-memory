@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -89,7 +90,7 @@ func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error)
 func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE id = ?`, taskID, id)
 	s, err := scanStep(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return s, fmt.Errorf("step %d of %s: %w", id, taskID, ErrNotFound)
 	}
 	if err != nil {
@@ -107,7 +108,7 @@ func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, 
 func GetStepByNumber(ctx context.Context, q Querier, taskID string, number int) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE num = ?`, taskID, number)
 	s, err := scanStep(row)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return s, fmt.Errorf("step %d of %s: %w", number, taskID, ErrNotFound)
 	}
 	if err != nil {
