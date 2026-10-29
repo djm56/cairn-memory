@@ -55,12 +55,17 @@ func TestRecallIgnoresFunctionWordsInCapitals(t *testing.T) {
 // keep CSS, so a lesson about CSS is found; "Fix" is a common word and is not.
 func TestRecallKeepsShortNameWords(t *testing.T) {
 	s, st := openLocal(t)
+	// One task per lesson: seedLesson replaces a task's lessons.
 	res := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Style work", Goal: "Tidy the stylesheet."}))(t)
 	seedLesson(t, st, res.ID, "Scope every CSS rule to its component.")
+	// This lesson holds "Fix" and no CSS or bug. If "fix" were kept in a goal, it
+	// would match, so the two halves of the test below can fail.
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Build work", Goal: "Repair the build.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Fix the build before merge.")
 
 	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Fix CSS bug"})
-	if len(got.Lessons) != 1 {
-		t.Errorf("recall of \"Fix CSS bug\" lessons = %+v, want the CSS lesson", got.Lessons)
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Scope every CSS rule to its component." {
+		t.Errorf("recall of \"Fix CSS bug\" lessons = %+v, want only the CSS lesson", got.Lessons)
 	}
 	// A lower-case short word is not a name, so a goal of such words matches nothing.
 	none := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "fix bug"})
