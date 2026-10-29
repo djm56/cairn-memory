@@ -38,7 +38,7 @@ func GetNote(ctx context.Context, q Querier, project string, id int64) (NoteRow,
 		FROM notes WHERE id = ? AND project = ?`, id, project).
 		Scan(&n.ID, &taskID, &n.Project, &n.Title, &n.Body, &n.CreatedBy, &updated)
 	if errors.Is(err, sql.ErrNoRows) {
-		return n, fmt.Errorf("note %d: %w", id, ErrNotFound)
+		return n, fmt.Errorf("store: note %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return n, fmt.Errorf("store: get note %d: %w", id, err)

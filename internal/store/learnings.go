@@ -92,7 +92,7 @@ func GetLearning(ctx context.Context, q Querier, project string, id int64) (Lear
 		WHERE id = ? AND project = ?`, id, project)
 	l, err := scanLearning(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return l, fmt.Errorf("learning %d: %w", id, ErrNotFound)
+		return l, fmt.Errorf("store: learning %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return l, fmt.Errorf("store: get learning %d: %w", id, err)
@@ -109,7 +109,7 @@ func GetLearningAnyProject(ctx context.Context, q Querier, id int64) (LearningRo
 	row := q.QueryRowContext(ctx, `SELECT `+learningColumns+` FROM learnings WHERE id = ?`, id)
 	l, err := scanLearning(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return l, fmt.Errorf("learning %d: %w", id, ErrNotFound)
+		return l, fmt.Errorf("store: learning %d: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return l, fmt.Errorf("store: get learning %d: %w", id, err)

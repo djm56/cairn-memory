@@ -75,7 +75,7 @@ func GetTask(ctx context.Context, q Querier, project, id string) (TaskRow, error
 		WHERE id = ? AND project = ?`, id, project)
 	t, err := scanTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return t, fmt.Errorf("task %s: %w", id, ErrNotFound)
+		return t, fmt.Errorf("store: task %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return t, fmt.Errorf("store: get task %s: %w", id, err)
@@ -93,7 +93,7 @@ func GetTaskAnyProject(ctx context.Context, q Querier, id string) (TaskRow, erro
 	row := q.QueryRowContext(ctx, `SELECT `+taskColumns+` FROM tasks WHERE id = ?`, id)
 	t, err := scanTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return t, fmt.Errorf("task %s: %w", id, ErrNotFound)
+		return t, fmt.Errorf("store: task %s: %w", id, ErrNotFound)
 	}
 	if err != nil {
 		return t, fmt.Errorf("store: get task %s: %w", id, err)
@@ -354,7 +354,7 @@ func GetLesson(ctx context.Context, q Querier, taskID string, ord int) (LessonRo
 		FROM task_lessons WHERE task_id = ? AND ord = ?`, taskID, ord).
 		Scan(&l.TaskID, &l.Ord, &l.Kind, &l.Text, &why, &correction)
 	if errors.Is(err, sql.ErrNoRows) {
-		return l, fmt.Errorf("lesson %s/%d: %w", taskID, ord, ErrNotFound)
+		return l, fmt.Errorf("store: lesson %s/%d: %w", taskID, ord, ErrNotFound)
 	}
 	if err != nil {
 		return l, fmt.Errorf("store: get lesson %s/%d: %w", taskID, ord, err)
@@ -425,7 +425,7 @@ func GetMistake(ctx context.Context, q Querier, taskID string, ord int) (Mistake
 		FROM task_mistakes WHERE task_id = ? AND ord = ?`, taskID, ord).
 		Scan(&m.TaskID, &m.Ord, &m.Agent, &m.Mistake, &m.Impact, &correction, &prevention)
 	if errors.Is(err, sql.ErrNoRows) {
-		return m, fmt.Errorf("mistake %s/%d: %w", taskID, ord, ErrNotFound)
+		return m, fmt.Errorf("store: mistake %s/%d: %w", taskID, ord, ErrNotFound)
 	}
 	if err != nil {
 		return m, fmt.Errorf("store: get mistake %s/%d: %w", taskID, ord, err)

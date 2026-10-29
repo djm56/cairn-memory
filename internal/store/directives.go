@@ -96,7 +96,7 @@ func GetDirectiveByCode(ctx context.Context, q Querier, code string) (DirectiveR
 	row := q.QueryRowContext(ctx, `SELECT `+directiveColumns+` FROM directives WHERE code = ?`, code)
 	d, err := scanDirective(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return d, fmt.Errorf("directive %s: %w", code, ErrNotFound)
+		return d, fmt.Errorf("store: directive %s: %w", code, ErrNotFound)
 	}
 	if err != nil {
 		return d, fmt.Errorf("store: get directive %s: %w", code, err)

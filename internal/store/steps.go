@@ -91,7 +91,7 @@ func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, 
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE id = ?`, taskID, id)
 	s, err := scanStep(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s, fmt.Errorf("step %d of %s: %w", id, taskID, ErrNotFound)
+		return s, fmt.Errorf("store: step %d of %s: %w", id, taskID, ErrNotFound)
 	}
 	if err != nil {
 		return s, fmt.Errorf("store: get step %d: %w", id, err)
@@ -109,7 +109,7 @@ func GetStepByNumber(ctx context.Context, q Querier, taskID string, number int) 
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE num = ?`, taskID, number)
 	s, err := scanStep(row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return s, fmt.Errorf("step %d of %s: %w", number, taskID, ErrNotFound)
+		return s, fmt.Errorf("store: step %d of %s: %w", number, taskID, ErrNotFound)
 	}
 	if err != nil {
 		return s, fmt.Errorf("store: get step number %d of %s: %w", number, taskID, err)
