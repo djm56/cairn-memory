@@ -230,6 +230,25 @@ var closeCases = []Case{
 		_, err := s.TaskClose(as(projB, "main"), core.TaskCloseRequest{ID: other.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close under the default policy")
 	}},
+	{"close/writes_one_close_event", func(t T, s core.Service) {
+		// CONTRACT §2: an accepted close writes a close event. It is written
+		// once, by the caller, and its text carries the outcome.
+		res := startTask(t, s, mainCtx(), "t")
+		must(s.TaskClose(as(projA, "closer"), fullClose(res.ID, 0)))(t)
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		var closes []core.Event
+		for _, e := range d.Events {
+			if e.Kind == core.EventClose {
+				closes = append(closes, e)
+			}
+		}
+		if len(closes) != 1 {
+			t.Fatalf("close events = %+v, want exactly one", closes)
+		}
+		if closes[0].Agent != "closer" || closes[0].Text != "Closed as done" {
+			t.Errorf("close event agent %q text %q, want closer and \"Closed as done\"", closes[0].Agent, closes[0].Text)
+		}
+	}},
 	{"close/settings_must_be_given", func(t T, s core.Service) {
 		// CONTRACT §8: the call replaces the whole settings object, so a call
 		// that gives none is invalid. Read as a zero value, it would switch every
