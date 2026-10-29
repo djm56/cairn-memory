@@ -103,3 +103,12 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   number 0 is valid only as `step_add`'s `after` (§9 item 19). The conformance
   suite has 63 cases, all passing, and each of CONTRACT §9's items 13 to 34 is
   checked by a conformance case, or is marked `(core test only)` ([PR #58](https://github.com/djm56/cairn-memory/pull/58)).
+- Phase 2 exit: the conformance suite passes against the local service (66
+  cases, all passing), two processes allocate distinct task ids, and
+  `go test -race` is clean. Mutation testing is added with `make mutation`,
+  which runs Gremlins v0.5.1 on `internal/core` and `internal/store`; it is
+  not part of CI. Core is at 96.9% efficacy after new tests, and store at
+  92.6%. Conformance rows now pin the status moves, operator directive
+  retirement, learning writes on done and failed tasks, and reviews of active
+  and done steps. The phase markers and status lines move to phase 3
+  ([PR #59](https://github.com/djm56/cairn-memory/pull/59)).
