@@ -18,6 +18,16 @@ make fmt-check   # fails if any file is not gofmt-formatted
 CI runs build, `vet`, `fmt-check` and `test` on every pull request. Run the
 same four before you push.
 
+### Mutation testing
+
+`make mutation` runs [Gremlins](https://github.com/go-gremlins/gremlins) on
+`internal/core` and `internal/store`, one package per run. Gremlins is pinned
+in the Makefile (`GREMLINS`, v0.5.1), so `go.mod` does not change. Each run
+prints its efficacy (killed mutants over killed and lived) and its mutator
+coverage. The run is slow, so it is not part of CI and no threshold gates it.
+A surviving mutant is either killed by a new test or recorded in the pull
+request as equivalent or accepted, with a reason.
+
 ## Workflow
 
 1. **Issue.** Open one from a form: bug, documentation, decision or roadmap
