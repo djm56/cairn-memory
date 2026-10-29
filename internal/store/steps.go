@@ -61,7 +61,9 @@ func InsertStep(ctx context.Context, q Querier, s StepRow) (int64, error) {
 //
 // Core checks the task's project first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error) {
 	rows, err := q.QueryContext(ctx, stepRanked+` ORDER BY num`, taskID)
 	if err != nil {
@@ -86,7 +88,9 @@ func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error)
 // another task returns ErrNotFound (wrapped). Core checks the task's project
 // first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE id = ?`, taskID, id)
 	s, err := scanStep(row)
@@ -104,7 +108,9 @@ func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, 
 //
 // Core checks the task's project first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func GetStepByNumber(ctx context.Context, q Querier, taskID string, number int) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE num = ?`, taskID, number)
 	s, err := scanStep(row)

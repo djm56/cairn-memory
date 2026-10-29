@@ -88,9 +88,9 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 			return nil, Invalid("every step needs a title")
 		}
 	}
-	now := l.now()
 	var out StepList
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}
@@ -174,9 +174,9 @@ func (l *Local) StepAdd(ctx context.Context, req StepAddRequest) (*Step, error) 
 			return nil, err
 		}
 	}
-	now := l.now()
 	var out Step
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}
@@ -236,9 +236,9 @@ func (l *Local) StepUpdate(ctx context.Context, req StepUpdateRequest) (*Step, e
 	if req.Action != StepStart && blank(req.Summary) {
 		return nil, Invalid("%s needs a summary", req.Action)
 	}
-	now := l.now()
 	var out Step
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}
