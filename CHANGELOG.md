@@ -84,3 +84,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   ([#39](https://github.com/djm56/cairn-memory/issues/39))
   ([PR #42](https://github.com/djm56/cairn-memory/pull/42)).
 - Plans now say Cairn is written fresh, guided by bishop-memory, rather than porting its code ([PR #44](https://github.com/djm56/cairn-memory/pull/44)).
+- Phase 2 core, part 3 of issue #9: review fixes and the rules the contract
+  still needed. `task_update` refuses a status the task already has, instead of
+  ignoring it. Recall keeps the words of a goal that can name its subject, and
+  in a goal written all in capitals it keeps only words of four or more letters
+  and words with a digit. A step ref names exactly one positive id or number. An
+  operator call needs the operator's name, a directive can be retired once, a
+  learning cannot be superseded in a cycle, and project settings must be given
+  whole. A name made of spaces counts as no name. The rules are listed in
+  CONTRACT §9 as items 13 to 33, and they await the operator's approval. The
+  conformance suite has 51 cases, all passing
+  ([PR #57](https://github.com/djm56/cairn-memory/pull/57)).
