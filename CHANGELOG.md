@@ -53,6 +53,13 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   (operator calls, `task_close` and the close policy). `RunWith` fails a
   deferred case that passes, so a stale entry is caught
   ([PR #53](https://github.com/djm56/cairn-memory/pull/53)).
+- Phase 2 core, part 3a of issue #9: CONTRACT rulings 1a, 3a and 4a. `task_update`
+  never moves a task into `open`; `step_plan` over a pending step with an event or
+  a review is refused, and the way out is to skip the step; `search` does not hit
+  retired directives. Recall keeps short upper-case and digit words of a goal
+  (`JWT`, `CSS`, `v2`), and `StepHasRecords` is removed. The conformance suite has
+  38 cases: 24 pass and 14 are deferred to part 3. Pull request link added in a
+  follow-up commit.
 
 ### Changed
 
