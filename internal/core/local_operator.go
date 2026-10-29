@@ -49,7 +49,9 @@ func ensureOperatorProject(ctx context.Context, q store.Querier, project string,
 
 // LearningDecide records the operator's decision on a learning: its status,
 // who decided and when, and the note (CONTRACT §8). A superseded learning names
-// the learning that replaces it, and only that status takes one.
+// the learning that replaces it, and only that status takes one. The links may
+// not close a cycle: a learning cannot be superseded, directly or through a
+// chain, by a learning that is superseded by it (refused).
 func (l *Local) LearningDecide(ctx context.Context, req LearningDecideRequest) (*Learning, error) {
 	c, err := operatorFor(ctx)
 	if err != nil {
@@ -83,6 +85,14 @@ func (l *Local) LearningDecide(ctx context.Context, req LearningDecideRequest) (
 			} else if err != nil {
 				return err
 			}
+			cycle, err := supersedeReaches(ctx, q, *req.SupersededBy, req.ID)
+			if err != nil {
+				return err
+			}
+			if cycle {
+				return Refused("learning %d cannot be superseded by %d: %d is superseded by %d, directly or through a chain, so the links would form a cycle",
+					req.ID, *req.SupersededBy, *req.SupersededBy, req.ID)
+			}
 		}
 		now := l.now()
 		row.Status = string(req.Status)
@@ -100,6 +110,35 @@ func (l *Local) LearningDecide(ctx context.Context, req LearningDecideRequest) (
 		return nil, err
 	}
 	return &out, nil
+}
+
+// supersedeReaches reports whether learning from is superseded by learning to,
+// directly or through a chain of superseded_by links. LearningDecide calls it
+// with the learning named as the replacement as from, and the learning being
+// decided as to. If the replacement already leads back to the decided learning,
+// linking the decided learning to it would close a cycle. The walk stops at a
+// learning with no link, and it keeps a set of the learnings it has seen, so a
+// cycle already in the data cannot loop it.
+//
+// Read function: call it inside the transaction that writes the link.
+func supersedeReaches(ctx context.Context, q store.Querier, from, to int64) (bool, error) {
+	seen := map[int64]bool{}
+	cur := from
+	for !seen[cur] {
+		seen[cur] = true
+		row, err := store.GetLearningAnyProject(ctx, q, cur)
+		if err != nil {
+			return false, err
+		}
+		if row.SupersededBy == nil {
+			return false, nil
+		}
+		if *row.SupersededBy == to {
+			return true, nil
+		}
+		cur = *row.SupersededBy
+	}
+	return false, nil
 }
 
 // DirectiveRatify creates an active directive with the next code (CONTRACT §8).

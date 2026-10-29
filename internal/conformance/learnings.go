@@ -70,6 +70,40 @@ var learningCases = []Case{
 			t.Errorf("patterns = %+v", patterns.Learnings)
 		}
 	}},
+	{"learning/supersede_cycle_refused", func(t T, s core.Service) {
+		// CONTRACT §8: a learning cannot be superseded, directly or through a
+		// chain, by a learning that is superseded by it. Such a call is refused
+		// and changes nothing; a link that closes no cycle is still accepted.
+		a := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "a", Body: "b"}))(t)
+		b := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "b", Body: "b"}))(t)
+		c := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "c", Body: "b"}))(t)
+		d := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "d", Body: "b"}))(t)
+		must(s.LearningDecide(op(), core.LearningDecideRequest{ID: b.ID, Status: core.LearningSuperseded, SupersededBy: &a.ID}))(t)
+		must(s.LearningDecide(op(), core.LearningDecideRequest{ID: c.ID, Status: core.LearningSuperseded, SupersededBy: &b.ID}))(t)
+
+		// b is superseded by a, so a cannot be superseded by b: a direct cycle.
+		_, err := s.LearningDecide(op(), core.LearningDecideRequest{ID: a.ID, Status: core.LearningSuperseded, SupersededBy: &b.ID})
+		wantKind(t, err, core.KindRefused, "a superseded by b, which is superseded by a")
+		// c leads to b and b to a, so a cannot be superseded by c either.
+		_, err = s.LearningDecide(op(), core.LearningDecideRequest{ID: a.ID, Status: core.LearningSuperseded, SupersededBy: &c.ID})
+		wantKind(t, err, core.KindRefused, "a superseded by c, through the chain c, b, a")
+		// d leads to c, which leads to b and a: no cycle, so this one stands.
+		must(s.LearningDecide(op(), core.LearningDecideRequest{ID: d.ID, Status: core.LearningSuperseded, SupersededBy: &c.ID}))(t)
+
+		all := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
+		for _, l := range all.Learnings {
+			switch l.ID {
+			case a.ID:
+				if l.Status != core.LearningProposed || l.SupersededBy != nil {
+					t.Errorf("a after the refused calls = %+v, want proposed and not superseded", l)
+				}
+			case d.ID:
+				if l.Status != core.LearningSuperseded {
+					t.Errorf("d = %+v, want superseded", l)
+				}
+			}
+		}
+	}},
 	{"directive/scopes_apply", func(t T, s core.Service) {
 		ratify := func(req core.DirectiveRatifyRequest) *core.Directive {
 			t.Helper()
