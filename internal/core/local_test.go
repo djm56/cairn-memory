@@ -33,7 +33,6 @@ var deferred = map[string]string{
 	"learning/operator_decides":             part2,
 	"directive/scopes_apply":                part2,
 	"directive/from_learning":               part2 + " (ratify from a learning is part 3)",
-	"note/put_and_get":                      part2,
 	"recall/across_projects":                part2,
 	"search/finds_each_kind":                part2,
 }
