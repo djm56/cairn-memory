@@ -95,3 +95,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   CONTRACT §9 as items 13 to 33, and they await the operator's approval. The
   conformance suite has 51 cases, all passing
   ([PR #57](https://github.com/djm56/cairn-memory/pull/57)).
+- Phase 2 store, issue #11: a test starts two processes against one database
+  file, and each allocates task ids while the other does. Every id is distinct.
+  The fold-ins from the review of PR #57: a project's settings must give every
+  switch, or the call is refused; a goal in an uncased script keeps its short
+  words; a name of only spaces counts as no name (CONTRACT §9 item 34); and
+  number 0 is valid only as `step_add`'s `after` (§9 item 19). The conformance
+  suite has 63 cases, all passing, and CONTRACT §9 names the check for each of
+  its items 13 to 34 ([PR #58](https://github.com/djm56/cairn-memory/pull/58)).
