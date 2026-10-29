@@ -71,13 +71,14 @@ when steps are inserted. Ids never change.
 ### 1.5 Task status
 
 ```
-          task_start            task_update
-   open ───────────────► active ◄────────► blocked
-    │   (queue: false)     │                  │
-    │                      │ task_close       │ task_close
-    │                      ▼                  ▼
-    │                 done | failed      done | failed
-    └──────── task_update(abandoned) from open, active, blocked
+task_start (queue)                  task_start
+        │                                │
+        ▼                                ▼
+        open ──── task_update ─────────► active ◄──── task_update ────► blocked
+        │                                │ task_close                   │ task_close
+        │                                ▼                              ▼
+        │                                done | failed                  done | failed
+        └──────── task_update(abandoned) from open, active, blocked
 ```
 
 - `task_update` may set `active`, `blocked` or `abandoned`. No move goes into
