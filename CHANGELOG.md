@@ -36,7 +36,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   `CLAUDE_PROJECT_DIR` or the working directory, and refuses a call with no
   project. An invalid name is refused, not skipped. The file is read with
   `github.com/BurntSushi/toml` v1.6.0 ([PR #49](https://github.com/djm56/cairn-memory/pull/49)).
-- Phase 2 core, part 1 of issue #9: `core.Local`, the local `Service`, implements
+- Phase 2 core, issue #9: `core.Local`, the local `Service`, implements
   the task and step calls of CONTRACT.md §2 and §3 over the store. Each write
   runs in one transaction, and the one-active rule, the brief freeze, the
   status moves, the step positions and the journal rows of `step_update` and a
@@ -45,26 +45,26 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   operator calls and the close policy are skipped with their part named.
   `conformance.RunWith` is the skip list
   ([PR #51](https://github.com/djm56/cairn-memory/pull/51)).
-- Phase 2 core, part 2 of issue #9: `core.Local` implements the journal
+- Phase 2 core, issue #9: `core.Local` implements the journal
   (`event_log`, `event_list`, `review_record`), learnings (`learning_add`,
   `learning_list`), `directive_list` and the directives of `task_current`,
   notes (`note_put`, `note_get`), and `search` and `recall` over every kind of
-  row. The conformance suite has 22 cases passing and 13 deferred to part 3
-  (operator calls, `task_close` and the close policy). `RunWith` fails a
+  row. The conformance suite has 22 cases passing and 13 deferred (operator
+  calls, `task_close` and the close policy). `RunWith` fails a
   deferred case that passes, so a stale entry is caught
   ([PR #53](https://github.com/djm56/cairn-memory/pull/53)).
-- Phase 2 core, part 3a of issue #9: CONTRACT rulings 1a, 3a and 4a. `task_update`
+- Phase 2 core, issue #9: `task_update`
   never moves a task into `open`; `step_plan` over a pending step with an event or
   a review is refused, and the way out is to skip the step; `search` does not hit
   retired directives. Recall keeps short upper-case and digit words of a goal
   (`JWT`, `CSS`, `v2`), and `StepHasRecords` is removed. The conformance suite has
-  38 cases: 24 pass and 14 are deferred to part 3
+  38 cases: 24 pass and 14 are deferred
   ([PR #54](https://github.com/djm56/cairn-memory/pull/54)).
-- Phase 2 core, part 3b of issue #9: CONTRACT ruling 2a. `core.StepRef` fields are
+- Phase 2 core, issue #9: `core.StepRef` fields are
   pointers, so `{}` is `invalid` in every call that takes a step ref, and
   `{"number": 0}` is valid only as `step_add`'s `after`. `IDRef` and `NumberRef`
   build refs. Recall's stop list drops the short function words that a goal in
-  capitals passed as names. The step-14 review fixes follow: the §1.5 diagram,
+  capitals passed as names. Review fixes follow: the §1.5 diagram,
   the CONTRACT header counts (25 of 39 cases pass), the retired-directive and
   review-branch conformance coverage, and DESIGN §4's `step_plan` row
   ([PR #55](https://github.com/djm56/cairn-memory/pull/55)).
@@ -84,7 +84,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   ([#39](https://github.com/djm56/cairn-memory/issues/39))
   ([PR #42](https://github.com/djm56/cairn-memory/pull/42)).
 - Plans now say Cairn is written fresh, guided by bishop-memory, rather than porting its code ([PR #44](https://github.com/djm56/cairn-memory/pull/44)).
-- Phase 2 core, part 3 of issue #9: review fixes and the rules the contract
+- Phase 2 core, issue #9: review fixes and the rules the contract
   still needed. `task_update` refuses a status the task already has, instead of
   ignoring it. Recall keeps the words of a goal that can name its subject, and
   in a goal written all in capitals it keeps only words of four or more letters
