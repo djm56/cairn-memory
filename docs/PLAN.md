@@ -1,10 +1,11 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-phase: 2 -->
+<!-- cairn-phase: 3 -->
 
-**Status as of 2026-10-28: phase 1 (contract) is done, and its exit check
+**Status as of 2026-10-29: phase 1 (contract) is done, and its exit check
 passed with the operator's review of [CONTRACT.md](CONTRACT.md) §9. Phase 2
-(core and local store) is current. Live progress is on the
+(core and local store) is done, and its exit check passed. Phase 3
+(MCP adapter) is current. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
