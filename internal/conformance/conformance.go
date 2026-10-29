@@ -12,6 +12,7 @@ package conformance
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -59,12 +60,24 @@ func RunWith(t *testing.T, newService func(t *testing.T) core.Service, deferred 
 				return
 			}
 			// The case runs on a fresh service and its outcome is only read.
-			if passes, _ := probe(c, newService(t)); passes {
-				t.Errorf("deferred case %q now passes: remove it from the deferred map", c.Name)
+			passes, _ := probe(c, newService(t))
+			if msg := deferredFailure(c.Name, passes); msg != "" {
+				t.Error(msg)
 			}
 			t.Skip("deferred: " + reason)
 		})
 	}
+}
+
+// deferredFailure is the failure RunWith reports for a deferred case, given
+// whether the case passed against the backend. A case that passes is stale: the
+// deferred map must drop it, so the message names it. A case that still fails
+// stays deferred, and the result is "".
+func deferredFailure(name string, passes bool) string {
+	if !passes {
+		return ""
+	}
+	return fmt.Sprintf("deferred case %q now passes: remove it from the deferred map", name)
 }
 
 // unknownDeferred returns the names in deferred that no case of cases has, in

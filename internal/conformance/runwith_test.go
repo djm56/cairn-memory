@@ -44,6 +44,24 @@ func TestProbeReportsWhetherCasePasses(t *testing.T) {
 	}
 }
 
+// TestDeferredFailureOutcomes checks the decision RunWith makes for a deferred
+// case, on both outcomes. A case that passes is stale and fails the run, with
+// its name in the message. A case that fails stays deferred and fails nothing.
+// The outcome comes from probe, so the test runs real cases on both sides.
+func TestDeferredFailureOutcomes(t *testing.T) {
+	passing := Case{Name: "stale/passes", Run: func(T, core.Service) {}}
+	passes, _ := probe(passing, core.Unimplemented{})
+	if msg := deferredFailure(passing.Name, passes); msg != `deferred case "stale/passes" now passes: remove it from the deferred map` {
+		t.Errorf("a passing deferred case gave message %q", msg)
+	}
+
+	failing := Case{Name: "live/fails", Run: func(t T, _ core.Service) { t.Errorf("not yet") }}
+	passes, _ = probe(failing, core.Unimplemented{})
+	if msg := deferredFailure(failing.Name, passes); msg != "" {
+		t.Errorf("a failing deferred case gave message %q, want none", msg)
+	}
+}
+
 // TestProbeCountsPanicAsFailure checks that a deferred case that panics is
 // read as failing, so it stays deferred rather than failing the run.
 func TestProbeCountsPanicAsFailure(t *testing.T) {
