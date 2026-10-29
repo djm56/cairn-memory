@@ -407,7 +407,9 @@ where only a core test checks it. An item with no check at all is marked
     `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. *Bishop default,
     pending operator approval.* (core test only)
 19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
-    1}` is `invalid`, and so is any id or number below 1. Give exactly one (§1.4).
+    1}` is `invalid`, and so is any id or number below 1, except number 0 as
+    `step_add`'s `after`, where it means before the first step (§1.4, §3). Give
+    exactly one (§1.4).
     *Bishop default, pending operator approval.*
 20. **Every operator call needs a name (2026-10-29).** A call with
     no operator name is `invalid`. `LearningDecide` and `DirectiveRatify`
