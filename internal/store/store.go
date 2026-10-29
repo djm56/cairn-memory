@@ -92,9 +92,10 @@ func connect(db *sql.DB) error {
 	return err
 }
 
-// isBusy reports whether err carries SQLITE_BUSY. The driver's error exposes its
-// result code. The primary code is the low byte, so extended codes such as
-// SQLITE_BUSY_SNAPSHOT also count.
+// isBusy reports whether err carries SQLITE_BUSY. The driver's error, a
+// *sqlite.Error from modernc.org/sqlite, exposes its result code through Code.
+// The primary code is the low byte, so extended codes such as SQLITE_BUSY_SNAPSHOT
+// also count.
 func isBusy(err error) bool {
 	var coded interface{ Code() int }
 	return errors.As(err, &coded) && coded.Code()&0xff == sqliteBusy
