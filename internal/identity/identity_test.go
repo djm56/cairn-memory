@@ -334,3 +334,30 @@ func checkNameRule(t *testing.T, valid bool, name string, got Project, err error
 		t.Errorf("name %q: error %q does not state the rule", name, err)
 	}
 }
+
+// TestResolveDirectoryNamedFile checks that an entry named .cairn.toml which is
+// a directory is refused as a KindInvalid error that says so, and is not
+// reported as a file that fails to parse.
+func TestResolveDirectoryNamedFile(t *testing.T) {
+	tr := newTree(t, "app", nil)
+	dir := filepath.Join(tr.root, "app", FileName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	setEnv(t, EnvProject, "", true)
+	setEnv(t, EnvProjectDir, "", true)
+
+	got, err := Resolve(filepath.Join(tr.root, "app"))
+	if err == nil {
+		t.Fatalf("Resolve: got %+v, want an error", got)
+	}
+	if kind := core.KindOf(err); kind != core.KindInvalid {
+		t.Errorf("Resolve error kind = %q (%v), want invalid", kind, err)
+	}
+	if !strings.Contains(err.Error(), "is a directory, not a project file") {
+		t.Errorf("error %q does not say the entry is a directory", err)
+	}
+	if strings.Contains(err.Error(), "not valid TOML") {
+		t.Errorf("error %q wrongly reports a TOML fault", err)
+	}
+}

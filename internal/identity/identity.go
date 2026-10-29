@@ -104,12 +104,16 @@ func Resolve(workDir string) (Project, error) {
 
 // findFile walks up from dir and returns the first .cairn.toml it meets. It
 // reports found false when the walk reaches the filesystem root without one.
-// Only a missing file is passed over; any other stat error stops the walk.
+// Only a missing file is passed over. Any other stat error stops the walk, and
+// so does an entry named .cairn.toml that is a directory: that is a KindInvalid
+// error, because the nearest entry is authoritative and it is not a file.
 func findFile(dir string) (string, bool, error) {
 	for {
 		path := filepath.Join(dir, FileName)
-		_, err := os.Stat(path)
+		info, err := os.Stat(path)
 		switch {
+		case err == nil && info.IsDir():
+			return "", false, core.Invalid("%s is a directory, not a project file", path)
 		case err == nil:
 			return path, true, nil
 		case !errors.Is(err, fs.ErrNotExist):
