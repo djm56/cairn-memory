@@ -36,6 +36,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   `CLAUDE_PROJECT_DIR` or the working directory, and refuses a call with no
   project. An invalid name is refused, not skipped. The file is read with
   `github.com/BurntSushi/toml` v1.6.0 ([PR #49](https://github.com/djm56/cairn-memory/pull/49)).
+- Phase 2 core, part 1 of issue #9: `core.Local`, the local `Service`, implements
+  the task and step calls of CONTRACT.md §2 and §3 over the store. Each write
+  runs in one transaction, and the one-active rule, the brief freeze, the
+  status moves, the step positions and the journal rows of `step_update` and a
+  blocked or abandoned task follow the contract. The conformance suite runs
+  against it: 14 cases pass, and the 21 cases for events, learnings, search,
+  operator calls and the close policy are skipped with their part named.
+  `conformance.RunWith` is the skip list.
 
 ### Changed
 
