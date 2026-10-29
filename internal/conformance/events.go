@@ -251,7 +251,7 @@ var closeCases = []Case{
 	}},
 	{"close/policy_is_project_settings", func(t T, s core.Service) {
 		lax := core.ProjectSettings{} // every requirement off
-		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: ptr(lax)}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax.AsInput()}))(t)
 		res := startTask(t, s, mainCtx(), "t", "one")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
 		closed := must(s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}))(t)
@@ -316,7 +316,7 @@ var closeCases = []Case{
 		// close requirement off and parallel tasks off as well.
 		parallel := core.DefaultSettings()
 		parallel.ParallelTasks = true
-		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: &parallel}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: parallel.AsInput()}))(t)
 		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA})
 		wantKind(t, err, core.KindInvalid, "project_settings_set without settings")
 
@@ -326,5 +326,30 @@ var closeCases = []Case{
 		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
 		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close under the default policy after a refused settings call")
+	}},
+	{"close/settings_must_be_whole", func(t T, s core.Service) {
+		// CONTRACT §8, §9 item 23: an object missing any one switch is invalid,
+		// as a missing object is. Read as off, a missing close switch would
+		// quietly lift one requirement, so each partial object is refused.
+		whole := core.DefaultSettings()
+		whole.ParallelTasks = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: whole.AsInput()}))(t)
+
+		noParallel := whole.AsInput()
+		noParallel.ParallelTasks = nil
+		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: noParallel})
+		wantKind(t, err, core.KindInvalid, "settings without parallel_tasks")
+
+		noMistakes := whole.AsInput()
+		noMistakes.ClosePolicy.RequireMistakes = nil
+		_, err = s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: noMistakes})
+		wantKind(t, err, core.KindInvalid, "settings without close_policy.require_mistakes")
+
+		// The stored settings stand: two tasks may be active, and the mistakes
+		// requirement still applies to a close that gives none.
+		one := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "one", Goal: "g"}))(t)
+		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
+		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
+		wantKind(t, err, core.KindRefused, "bare close after refused partial settings")
 	}},
 }

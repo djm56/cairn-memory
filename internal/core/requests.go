@@ -385,12 +385,83 @@ type DirectiveRetireRequest struct {
 	Code string `json:"code"`
 }
 
-// ProjectSettingsRequest replaces a project's settings. Settings is a pointer so
-// that an omitted object (nil) can be told from a zero one: the call replaces the
-// whole object, and a nil Settings is invalid rather than a policy of every
-// switch off (CONTRACT §8).
+// ProjectSettingsRequest replaces a project's settings. The call replaces the
+// whole object, so Settings must give every switch: a nil Settings, or one with
+// any switch left nil, is invalid rather than read as off (CONTRACT §8, §9 item 23).
 type ProjectSettingsRequest struct {
-	Project     string           `json:"project"`
-	DisplayName *string          `json:"display_name,omitempty"`
-	Settings    *ProjectSettings `json:"settings,omitempty"`
+	Project     string         `json:"project"`
+	DisplayName *string        `json:"display_name,omitempty"`
+	Settings    *SettingsInput `json:"settings,omitempty"`
+}
+
+// SettingsInput is a project's settings as a call gives them. It mirrors
+// ProjectSettings with a pointer on every switch, so a switch the call leaves
+// out is nil and can be told from one set to false.
+type SettingsInput struct {
+	ParallelTasks *bool             `json:"parallel_tasks"`
+	ClosePolicy   *ClosePolicyInput `json:"close_policy"`
+}
+
+// ClosePolicyInput mirrors ClosePolicy with a pointer on every switch.
+type ClosePolicyInput struct {
+	RequireSummary         *bool `json:"require_summary"`
+	RequireCriteriaResults *bool `json:"require_criteria_results"`
+	RequireLessons         *bool `json:"require_lessons"`
+	RequireMistakes        *bool `json:"require_mistakes"`
+	RequireNoActiveSteps   *bool `json:"require_no_active_steps"`
+}
+
+// AsInput gives s as a complete SettingsInput, with every switch set. Callers
+// use it to send a whole object, such as DefaultSettings with one switch changed.
+func (s ProjectSettings) AsInput() *SettingsInput {
+	cp := s.ClosePolicy
+	return &SettingsInput{
+		ParallelTasks: &s.ParallelTasks,
+		ClosePolicy: &ClosePolicyInput{
+			RequireSummary:         &cp.RequireSummary,
+			RequireCriteriaResults: &cp.RequireCriteriaResults,
+			RequireLessons:         &cp.RequireLessons,
+			RequireMistakes:        &cp.RequireMistakes,
+			RequireNoActiveSteps:   &cp.RequireNoActiveSteps,
+		},
+	}
+}
+
+// complete returns in as ProjectSettings when every switch is given. Otherwise
+// it returns the JSON names of the switches that are missing, and the settings
+// returned must not be used. A nil in has every switch missing.
+func (in *SettingsInput) complete() (ProjectSettings, []string) {
+	var s ProjectSettings
+	if in == nil {
+		return s, []string{"parallel_tasks", "close_policy"}
+	}
+	var missing []string
+	if in.ParallelTasks == nil {
+		missing = append(missing, "parallel_tasks")
+	} else {
+		s.ParallelTasks = *in.ParallelTasks
+	}
+	if in.ClosePolicy == nil {
+		return s, append(missing, "close_policy")
+	}
+	cp := in.ClosePolicy
+	switches := []struct {
+		name string
+		in   *bool
+		out  *bool
+	}{
+		{"close_policy.require_summary", cp.RequireSummary, &s.ClosePolicy.RequireSummary},
+		{"close_policy.require_criteria_results", cp.RequireCriteriaResults, &s.ClosePolicy.RequireCriteriaResults},
+		{"close_policy.require_lessons", cp.RequireLessons, &s.ClosePolicy.RequireLessons},
+		{"close_policy.require_mistakes", cp.RequireMistakes, &s.ClosePolicy.RequireMistakes},
+		{"close_policy.require_no_active_steps", cp.RequireNoActiveSteps, &s.ClosePolicy.RequireNoActiveSteps},
+	}
+	for _, sw := range switches {
+		if sw.in == nil {
+			missing = append(missing, sw.name)
+			continue
+		}
+		*sw.out = *sw.in
+	}
+	return s, missing
 }

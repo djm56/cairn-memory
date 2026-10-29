@@ -32,7 +32,7 @@ func TestOperatorCallNeedsName(t *testing.T) {
 	wantKindLocal(t, err, core.KindInvalid, "DirectiveRatify without a name")
 	_, err = s.DirectiveRetire(nameless, core.DirectiveRetireRequest{Code: "D-0001"})
 	wantKindLocal(t, err, core.KindInvalid, "DirectiveRetire without a name")
-	_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: settingsPtr(core.DefaultSettings())})
+	_, err = s.ProjectSettingsSet(nameless, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()})
 	wantKindLocal(t, err, core.KindInvalid, "ProjectSettingsSet without a name")
 
 	// Nothing was written: the learning is still proposed.
@@ -148,7 +148,7 @@ func TestDirectiveRetireRules(t *testing.T) {
 func TestProjectSettingsSetRules(t *testing.T) {
 	s, st := openLocal(t)
 	for _, name := range []string{"", "Acme"} {
-		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: name, Settings: settingsPtr(core.DefaultSettings())})
+		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: name, Settings: core.DefaultSettings().AsInput()})
 		wantKindLocal(t, err, core.KindInvalid, "project name "+name)
 	}
 
@@ -157,10 +157,10 @@ func TestProjectSettingsSetRules(t *testing.T) {
 	wantKindLocal(t, err, core.KindInvalid, "project_settings_set with no settings")
 
 	named := "Acme API"
-	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, DisplayName: &named, Settings: settingsPtr(core.DefaultSettings())}))(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, DisplayName: &named, Settings: core.DefaultSettings().AsInput()}))(t)
 	settings := core.DefaultSettings()
 	settings.ParallelTasks = true
-	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: &settings}))(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: settings.AsInput()}))(t)
 
 	row, err := store.GetProject(context.Background(), st, projA)
 	if err != nil {
@@ -174,9 +174,46 @@ func TestProjectSettingsSetRules(t *testing.T) {
 	}
 }
 
-// settingsPtr returns a pointer to s, for a request's Settings field.
-func settingsPtr(s core.ProjectSettings) *core.ProjectSettings {
-	return &s
+// TestProjectSettingsSetNeedsEverySwitch checks that a settings object missing
+// any one switch is invalid, and that the stored settings stand after the
+// refusal. Each case leaves out one switch and names it in the message.
+func TestProjectSettingsSetNeedsEverySwitch(t *testing.T) {
+	s, st := openLocal(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()}))(t)
+	before, err := store.GetProject(context.Background(), st, projA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		drop func(in *core.SettingsInput)
+	}{
+		{"parallel_tasks", func(in *core.SettingsInput) { in.ParallelTasks = nil }},
+		{"close_policy", func(in *core.SettingsInput) { in.ClosePolicy = nil }},
+		{"close_policy.require_summary", func(in *core.SettingsInput) { in.ClosePolicy.RequireSummary = nil }},
+		{"close_policy.require_criteria_results", func(in *core.SettingsInput) { in.ClosePolicy.RequireCriteriaResults = nil }},
+		{"close_policy.require_lessons", func(in *core.SettingsInput) { in.ClosePolicy.RequireLessons = nil }},
+		{"close_policy.require_mistakes", func(in *core.SettingsInput) { in.ClosePolicy.RequireMistakes = nil }},
+		{"close_policy.require_no_active_steps", func(in *core.SettingsInput) { in.ClosePolicy.RequireNoActiveSteps = nil }},
+	}
+	for _, c := range cases {
+		in := core.DefaultSettings().AsInput()
+		c.drop(in)
+		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: in})
+		wantKindLocal(t, err, core.KindInvalid, "settings without "+c.name)
+		if err != nil && !strings.Contains(err.Error(), c.name) {
+			t.Errorf("settings without %s: message %q does not name it", c.name, err.Error())
+		}
+	}
+
+	after, err := store.GetProject(context.Background(), st, projA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Settings != before.Settings {
+		t.Errorf("settings after refused calls = %s, want %s unchanged", after.Settings, before.Settings)
+	}
 }
 
 // wantKindLocal fails the test unless err is a core.Error of kind want.
