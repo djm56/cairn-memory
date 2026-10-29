@@ -1,7 +1,8 @@
 # Cairn Memory — Contract
 
 **Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
-2026-10-28 (phase 1 exit). Items 12 and later await the operator's approval.
+2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
+approval. Items 13 and later await the operator's approval.
 `core.Local` passes all 52 cases in `internal/conformance` (count as of
 2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
@@ -12,8 +13,9 @@ operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open; the operator
-approved it on 2026-10-28.
+§9 lists what this contract settles that DESIGN.md left open. Items 1–11 were
+approved by the operator on 2026-10-28, item 12 is deferred, and items 13 and
+later await approval.
 
 ## 1. Conventions
 
