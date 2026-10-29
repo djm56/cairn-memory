@@ -51,7 +51,7 @@ From bishop-memory, by size (non-test lines at `4c170b6`):
 | `internal/auth`, `middleware`, `config` | 588 | **Written fresh**, guided by bishop-memory (for reference: `internal/auth/keys.go`) |
 | `internal/ui` (HUD, triage, crew, performance pages) | 92 + HTML | **Written fresh** after the core, guided by bishop-memory, with Bishop words removed |
 | Triage and grading (routes, `triage-run.sh`, agents, skills) | large | **Written fresh later**, guided by bishop-memory, as the optional review loop |
-| Test suites, mutation harness (`scripts/mutate.py`, `check_mutants.py`) | large | **Guided by** bishop-memory's tests. Mutation testing: phase 2 picks an approach, the operator's choice, guided by bishop-memory's harness (`scripts/mutate.py`, `check_mutants.py`) |
+| Test suites, mutation harness (`scripts/mutate.py`, `check_mutants.py`) | large | **Guided by** bishop-memory's tests. Mutation testing: phase 2 uses Gremlins (`make mutation`), a Bishop default awaiting the operator's ratification. bishop-memory's harness (`scripts/mutate.py`, `check_mutants.py`) is the reference only |
 
 So roughly 6,000 lines of ingestion code and 1,200 lines of hooks go away, and
 the rest is written fresh, guided by bishop-memory, and the tests are written
@@ -326,8 +326,9 @@ From what went well and badly in bishop-memory:
 - **Every tool result is read by a model.** Keep it small, paged and
   readable. Test the size of `task_current` on a large task.
 - **Tests before code for each tool**, through the conformance suite.
-- **Mutation testing**: phase 2 picks an approach (the operator's choice),
-  guided by bishop-memory's harness, on `core` and `store`.
+- **Mutation testing**: phase 2 uses Gremlins (`make mutation`) on `core` and
+  `store`. A Bishop default, awaiting the operator's ratification; bishop-memory's
+  harness was the reference only.
 - **No silent defaults for identity.** A missing project is an error that
   says how to fix it.
 - **Docs are dated.** Status lines carry a date, and claims carry evidence,
