@@ -30,6 +30,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   `WithTx` write-transaction helper, a task id allocator, scoped search, and
   migration 0002 with the secondary indexes and the `tasks.project` guard
   (issue #8, [PR #47](https://github.com/djm56/cairn-memory/pull/47)).
+  Several processes opening one new database at once no longer fail with `SQLITE_BUSY`.
 
 ### Changed
 
