@@ -104,6 +104,23 @@ func GetDirectiveByCode(ctx context.Context, q Querier, code string) (DirectiveR
 	return d, nil
 }
 
+// GetDirectiveByID returns the directive with row id id, whatever its status. A
+// search hit names a directive by its row id, and the hit reports its code. It
+// returns ErrNotFound (wrapped) when there is none.
+//
+// Read function: call it on s, outside a transaction.
+func GetDirectiveByID(ctx context.Context, q Querier, id int64) (DirectiveRow, error) {
+	row := q.QueryRowContext(ctx, `SELECT `+directiveColumns+` FROM directives WHERE id = ?`, id)
+	d, err := scanDirective(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return d, fmt.Errorf("store: directive row %d: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return d, fmt.Errorf("store: get directive row %d: %w", id, err)
+	}
+	return d, nil
+}
+
 // ListActiveDirectives returns the active directives that apply to a caller,
 // ordered by code (CONTRACT §5). It takes:
 //   - every global directive;

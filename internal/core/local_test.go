@@ -22,9 +22,9 @@ const (
 // skipped with its reason, and is neither a pass nor a fail. RunWith fails if
 // a name here is not in the suite.
 var deferred = map[string]string{
-	"identity/no_project_refused":           "needs every agent call; " + part2 + " and " + part3,
-	"identity/write_without_agent_refused":  "needs every write call; " + part2 + " and " + part3,
-	"identity/operator_calls_refuse_agents": "needs learning_add and the operator calls; " + part2 + " and " + part3,
+	"identity/no_project_refused":           "needs task_close, which is " + part3,
+	"identity/write_without_agent_refused":  "needs task_close, which is " + part3,
+	"identity/operator_calls_refuse_agents": "needs the operator calls; " + part3,
 	"task/parallel_when_project_allows":     "needs project_settings_set; " + part3,
 	"close/whole_task":                      part3,
 	"close/empty_lists_versus_absent":       part3,

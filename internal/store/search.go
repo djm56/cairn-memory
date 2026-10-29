@@ -14,12 +14,15 @@ import (
 // directive, note, lesson, mistake). Project scopes the hits to one project
 // unless AllProjects is set. A directive with no project (global, or
 // agent-scoped) is a hit from every project. Offset and Limit page the result;
-// Limit must be at least 1.
+// Limit must be at least 1. Any matches a row that holds at least one of the
+// words, where by default it must hold all of them: recall uses it, because a
+// goal's words need not all appear in the row that answers it.
 type SearchFilter struct {
 	Query       string
 	Kinds       []string
 	Project     string
 	AllProjects bool
+	Any         bool
 	Offset      int
 	Limit       int
 }
@@ -29,12 +32,22 @@ type SearchFilter struct {
 // words are ANDed, and no word can be read as an operator, a column filter or a
 // prefix. A text with no words returns "".
 func ftsQuery(text string) string {
+	return ftsJoin(text, " ")
+}
+
+// ftsQueryAny is ftsQuery with the words ORed. The quoting is the same.
+func ftsQueryAny(text string) string {
+	return ftsJoin(text, " OR ")
+}
+
+// ftsJoin quotes each word of text and joins the quoted words with sep.
+func ftsJoin(text, sep string) string {
 	words := strings.Fields(text)
 	quoted := make([]string, 0, len(words))
 	for _, w := range words {
 		quoted = append(quoted, `"`+strings.ReplaceAll(w, `"`, `""`)+`"`)
 	}
-	return strings.Join(quoted, " ")
+	return strings.Join(quoted, sep)
 }
 
 // Search returns up to f.Limit hits, best match first, and reports whether more
@@ -56,6 +69,9 @@ func Search(ctx context.Context, q Querier, f SearchFilter) ([]SearchRow, bool, 
 		return nil, false, fmt.Errorf("store: search: project is empty; name a project or set AllProjects")
 	}
 	match := ftsQuery(f.Query)
+	if f.Any {
+		match = ftsQueryAny(f.Query)
+	}
 	if match == "" {
 		return nil, false, nil
 	}
