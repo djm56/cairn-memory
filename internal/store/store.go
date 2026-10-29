@@ -85,7 +85,9 @@ func connect(db *sql.DB) error {
 		if err = db.Ping(); err == nil || !isBusy(err) {
 			return err
 		}
-		time.Sleep(time.Duration(i+1) * 10 * time.Millisecond)
+		if i < connectRetries-1 {
+			time.Sleep(time.Duration(i+1) * 10 * time.Millisecond)
+		}
 	}
 	return err
 }
