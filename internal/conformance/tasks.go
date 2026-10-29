@@ -331,5 +331,16 @@ var stepCases = []Case{
 		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, []string{"two", "new"}) {
 			t.Errorf("steps after skip and replan = %v, want [two new]", titles)
 		}
+		// A review counts as a record too: a pending step with only a review is refused.
+		// Queued, so it does not clash with the active task above.
+		other := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true, Steps: []core.StepInput{{Title: "alpha"}, {Title: "beta"}}}))(t)
+		must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: other.ID, Step: core.NumberRef(1), Verdict: core.VerdictApproved}))(t)
+		_, err = s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}})
+		wantKind(t, err, core.KindRefused, "step_plan over a pending step with a review")
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: other.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
+		replanned := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
+		if titles := stepTitles(t, replanned.Steps); !slices.Equal(titles, []string{"alpha", "new"}) {
+			t.Errorf("reviewed task after skip and replan = %v, want [alpha new]", titles)
+		}
 	}},
 }
