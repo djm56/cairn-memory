@@ -420,7 +420,8 @@ where only a core test checks it. An item with no check at all is marked
     (§8). *Bishop default, pending operator approval.*
 21. **A directive retires once (2026-10-29).** A second
     `directive_retire` of the same code is `refused`, and the first retirement
-    time stands (§8). *Bishop default, pending operator approval.*
+    time stands `(core test only)` (§8). *Bishop default, pending operator
+    approval.*
 22. **Learning moves and supersede cycles (2026-10-29).**
     `learning_decide` may set any status except `proposed`, from any current
     status. A `superseded_by` that leads back to the learning being decided,
