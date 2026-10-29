@@ -41,4 +41,19 @@ func TestSearchHidesRetiredDirectives(t *testing.T) {
 	if len(hits) != 1 || hits[0].Title != "Limit requests" {
 		t.Errorf("directive hits = %+v, want only the active directive", hits)
 	}
+	// The filter sits in the query, so it holds across projects and with no kind filter.
+	all, _, err := Search(ctx, s, SearchFilter{Query: "limit", AllProjects: true, Limit: 10})
+	if err != nil {
+		t.Fatalf("Search all projects: %v", err)
+	}
+	if len(all) != 1 || all[0].Title != "Limit requests" {
+		t.Errorf("all-projects hits = %+v, want only the active directive", all)
+	}
+	anyKind, _, err := Search(ctx, s, SearchFilter{Query: "limit", Project: "acme-api", Limit: 10})
+	if err != nil {
+		t.Fatalf("Search no kinds: %v", err)
+	}
+	if len(anyKind) != 1 || anyKind[0].Title != "Limit requests" {
+		t.Errorf("no-kind hits = %+v, want only the active directive", anyKind)
+	}
 }
