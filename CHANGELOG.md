@@ -45,6 +45,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   operator calls and the close policy are skipped with their part named.
   `conformance.RunWith` is the skip list
   ([PR #51](https://github.com/djm56/cairn-memory/pull/51)).
+- Phase 2 core, part 2 of issue #9: `core.Local` implements the journal
+  (`event_log`, `event_list`, `review_record`), learnings (`learning_add`,
+  `learning_list`), `directive_list` and the directives of `task_current`,
+  notes (`note_put`, `note_get`), and `search` and `recall` over every kind of
+  row. The conformance suite has 22 cases passing and 13 deferred to part 3
+  (operator calls, `task_close` and the close policy). `RunWith` fails a
+  deferred case that passes, so a stale entry is caught
+  ([PR #53](https://github.com/djm56/cairn-memory/pull/53)).
 
 ### Changed
 

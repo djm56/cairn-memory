@@ -61,7 +61,9 @@ func InsertStep(ctx context.Context, q Querier, s StepRow) (int64, error) {
 //
 // Core checks the task's project first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error) {
 	rows, err := q.QueryContext(ctx, stepRanked+` ORDER BY num`, taskID)
 	if err != nil {
@@ -86,7 +88,9 @@ func ListSteps(ctx context.Context, q Querier, taskID string) ([]StepRow, error)
 // another task returns ErrNotFound (wrapped). Core checks the task's project
 // first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE id = ?`, taskID, id)
 	s, err := scanStep(row)
@@ -104,7 +108,9 @@ func GetStep(ctx context.Context, q Querier, taskID string, id int64) (StepRow, 
 //
 // Core checks the task's project first, with GetTask.
 //
-// Read function: call it on s, outside a transaction.
+// Read function: call it on s for a plain read. Core calls it inside the write
+// transaction for a check-then-write, where the write lock makes the read and
+// the write one step.
 func GetStepByNumber(ctx context.Context, q Querier, taskID string, number int) (StepRow, error) {
 	row := q.QueryRowContext(ctx, `SELECT * FROM (`+stepRanked+`) WHERE num = ?`, taskID, number)
 	s, err := scanStep(row)
@@ -208,6 +214,38 @@ func DeletePendingSteps(ctx context.Context, q Querier, taskID string) (int64, e
 		return 0, fmt.Errorf("store: delete pending steps of %s: rows affected: %w", taskID, err)
 	}
 	return n, nil
+}
+
+// PendingStepsWithRecords returns the ids of the pending steps of task taskID
+// that an event or a review refers to, in display order. It is StepHasRecords
+// for every pending step of a task in one query, so step_plan does not ask
+// once per step.
+//
+// Core checks the task's project first, with GetTask.
+//
+// Read function: call it on s, or inside the transaction that will delete.
+func PendingStepsWithRecords(ctx context.Context, q Querier, taskID string) ([]int64, error) {
+	rows, err := q.QueryContext(ctx, `SELECT s.id FROM steps s
+		WHERE s.task_id = ? AND s.status = 'pending' AND (
+			EXISTS (SELECT 1 FROM events e WHERE e.step_id = s.id)
+			OR EXISTS (SELECT 1 FROM reviews r WHERE r.step_id = s.id))
+		ORDER BY s.position, s.id`, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("store: pending steps with records of %s: %w", taskID, err)
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("store: pending steps with records of %s: %w", taskID, err)
+		}
+		out = append(out, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: pending steps with records of %s: %w", taskID, err)
+	}
+	return out, nil
 }
 
 // StepHasRecords reports whether an event or a review refers to step id. Such

@@ -35,7 +35,8 @@ func refText(ref StepRef) string {
 // task, or a number the task does not reach, is not_found. Call it after the
 // task has been loaded with loadTask.
 //
-// Read function: call it inside the write transaction that uses the step.
+// Read function: call it inside the transaction that uses the step, or on the
+// store for a read that needs no write.
 func resolveStep(ctx context.Context, q store.Querier, taskID string, ref StepRef) (store.StepRow, error) {
 	var st store.StepRow
 	var err error
@@ -87,9 +88,9 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 			return nil, Invalid("every step needs a title")
 		}
 	}
-	now := l.now()
 	var out StepList
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}
@@ -104,16 +105,17 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 		if err != nil {
 			return err
 		}
-		for _, s := range steps {
-			if s.Status != string(StepPending) {
-				continue
-			}
-			recorded, err := store.StepHasRecords(ctx, q, s.ID)
-			if err != nil {
-				return err
-			}
-			if recorded {
-				return Refused("step %d has events or reviews, so step_plan cannot remove it", s.Number)
+		// One query finds the pending steps with records. The first of them, in
+		// display order, names the refusal.
+		recorded, err := store.PendingStepsWithRecords(ctx, q, task.ID)
+		if err != nil {
+			return err
+		}
+		if len(recorded) > 0 {
+			for _, s := range steps {
+				if s.ID == recorded[0] {
+					return Refused("step %d has events or reviews, so step_plan cannot remove it", s.Number)
+				}
 			}
 		}
 		if _, err := store.DeletePendingSteps(ctx, q, task.ID); err != nil {
@@ -172,9 +174,9 @@ func (l *Local) StepAdd(ctx context.Context, req StepAddRequest) (*Step, error) 
 			return nil, err
 		}
 	}
-	now := l.now()
 	var out Step
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}
@@ -234,9 +236,9 @@ func (l *Local) StepUpdate(ctx context.Context, req StepUpdateRequest) (*Step, e
 	if req.Action != StepStart && blank(req.Summary) {
 		return nil, Invalid("%s needs a summary", req.Action)
 	}
-	now := l.now()
 	var out Step
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		if _, err := ensureProject(ctx, q, c.Project, now); err != nil {
 			return err
 		}

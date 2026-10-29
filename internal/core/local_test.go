@@ -3,46 +3,36 @@ package core_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/djm56/cairn-memory/internal/conformance"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// part2 and part3 name the parts of issue #9 that bring in the calls a deferred
-// case needs. Part 1 is tasks and steps.
-const (
-	part2 = "issue #9 part 2 (events, learnings, search)"
-	part3 = "issue #9 part 3 (operator calls and close policy)"
-)
+// part3 names the part of issue #9 that brings in the calls the deferred cases
+// still need: the operator calls and task_close with its close policy. Parts 1
+// and 2 are live; a case deferred now waits only on part 3.
+const part3 = "issue #9 part 3 (operator calls, task_close and close policy)"
 
-// deferred lists the cases part 1 does not yet pass. Each is reported as
+// deferred lists the cases that part 2 does not yet pass. Each is reported as
 // skipped with its reason, and is neither a pass nor a fail. RunWith fails if
-// a name here is not in the suite.
+// a name here is not in the suite, and if a name here passes.
 var deferred = map[string]string{
-	"identity/no_project_refused":           "needs every agent call; " + part2 + " and " + part3,
-	"identity/write_without_agent_refused":  "needs every write call; " + part2 + " and " + part3,
-	"identity/operator_calls_refuse_agents": "needs learning_add and the operator calls; " + part2 + " and " + part3,
-	"task/abandoned_is_terminal":            "needs event_log; " + part2,
-	"task/parallel_when_project_allows":     "needs project_settings_set; " + part3,
-	"step/transitions_and_attempts":         "needs event_list; " + part2,
-	"event/append_only_with_server_time":    part2,
-	"event/kinds_agents_may_log":            part2,
-	"event/list_pages":                      part2,
-	"event/review_record_writes_event":      part2,
-	"close/whole_task":                      part3,
-	"close/empty_lists_versus_absent":       part3,
-	"close/failed_outcome_and_validation":   part3,
-	"close/policy_is_project_settings":      part3,
-	"learning/add_is_proposed_only":         part2,
-	"learning/operator_decides":             part2,
-	"directive/scopes_apply":                part2,
-	"directive/from_learning":               part2 + " (ratify from a learning is part 3)",
-	"note/put_and_get":                      part2,
-	"recall/across_projects":                part2,
-	"search/finds_each_kind":                part2,
+	"identity/no_project_refused":           "needs task_close, which is " + part3,
+	"identity/write_without_agent_refused":  "needs task_close, which is " + part3,
+	"identity/operator_calls_refuse_agents": "needs the operator calls, which are " + part3,
+	"task/parallel_when_project_allows":     "needs project_settings_set, which is " + part3,
+	"close/whole_task":                      "needs task_close, which is " + part3,
+	"close/empty_lists_versus_absent":       "needs task_close, which is " + part3,
+	"close/failed_outcome_and_validation":   "needs task_close, which is " + part3,
+	"close/policy_is_project_settings":      "needs task_close and project_settings_set, which are " + part3,
+	"learning/operator_decides":             "needs learning_decide, which is " + part3,
+	"directive/scopes_apply":                "needs directive_ratify and directive_retire, which are " + part3,
+	"directive/from_learning":               "needs directive_ratify from a learning, which is " + part3,
+	"recall/across_projects":                "needs task_close and directive_ratify, which are " + part3,
+	"search/finds_each_kind":                "needs directive_ratify, which is " + part3,
 }
 
 // openLocal returns a Service over a new database in a temporary directory,
@@ -98,32 +88,36 @@ func TestStepStartAndFinishWriteEvents(t *testing.T) {
 }
 
 // TestStepPlanRefusesPendingStepWithRecords checks that step_plan does not
-// detach a journal: a pending step with an event cannot be removed.
+// detach a journal: a pending step with an event cannot be removed. The same
+// holds for a pending step with a review.
 func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
-	s, st := openLocal(t)
+	s, _ := openLocal(t)
 	ctx := agent("acme-api", "main")
-	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}, {Title: "two"}}})
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}, {Title: "two"}, {Title: "three"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	stepID := res.Steps[1].ID
-	// event_log is part 2, so the event is written through the store.
-	if _, err := store.InsertEvent(context.Background(), st, store.EventRow{
-		TaskID: res.ID, Project: "acme-api", StepID: &stepID, Agent: "main",
-		Kind: string(core.EventNote), Text: "about two", OccurredAt: time.Now().UTC(),
-	}); err != nil {
+	two := core.StepRef{Number: 2}
+	if _, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Step: &two, Kind: core.EventNote, Text: "about two"}); err != nil {
+		t.Fatal(err)
+	}
+	three := core.StepRef{Number: 3}
+	if _, err := s.ReviewRecord(agent("acme-api", "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: three, Verdict: core.VerdictApproved}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = s.StepPlan(ctx, core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
 	if core.KindOf(err) != core.KindRefused {
 		t.Fatalf("StepPlan over a recorded pending step: error %v, want refused", err)
 	}
+	if !strings.Contains(err.Error(), "step 2 has events or reviews") {
+		t.Errorf("refusal %q does not name the first recorded step, 2", err)
+	}
 	cur, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cur.Steps) != 2 {
-		t.Errorf("steps after refused plan = %d, want 2 unchanged", len(cur.Steps))
+	if len(cur.Steps) != 3 {
+		t.Errorf("steps after refused plan = %d, want 3 unchanged", len(cur.Steps))
 	}
 }
 

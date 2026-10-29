@@ -15,9 +15,10 @@ import (
 // the rules: caller and project checks, status transitions, the one-active
 // rule, step positions and the journal entries that the calls write.
 //
-// Part 1 of issue #9 implements the task and step calls. Every other method is
-// inherited from Unimplemented until its part lands; the conformance cases that
-// need those calls are deferred in local_test.go.
+// Parts 1 and 2 of issue #9 implement the task, step, journal, learning,
+// directive, note, search and recall calls. The operator calls and task_close
+// are part 3: until it lands they are inherited from Unimplemented, and the
+// conformance cases that need them are deferred in local_test.go.
 type Local struct {
 	Unimplemented
 	st *store.Store

@@ -120,8 +120,8 @@ func fileRows(id string, role FileRole, files []TaskFile) []store.FileRow {
 
 // TaskCurrent returns the caller's active task with its criteria, steps and the
 // last five events. Task is nil when no task is active. OtherActive counts the
-// rest when the project allows parallel tasks. Directives are not yet returned:
-// they arrive with the learnings part of issue #9.
+// rest when the project allows parallel tasks. Directives are those that apply
+// to the project, as directive_list gives them with no agent.
 func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
@@ -130,14 +130,23 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	if err := l.ensureReadProject(ctx, c.Project); err != nil {
 		return nil, err
 	}
+	// Directives are read whether or not a task is active: they belong to the
+	// project, and CONTRACT §2 gives them with every answer.
+	cur := &TaskCurrent{}
+	cur.Directives, err = directivesFor(ctx, l.st, c.Project, "")
+	if err != nil {
+		return nil, err
+	}
 	active, err := activeTasks(ctx, l.st, c.Project)
 	if err != nil {
 		return nil, err
 	}
-	cur := &TaskCurrent{}
 	if len(active) == 0 {
 		return cur, nil
 	}
+	// The task comes from a list scoped to the caller's project, so the child
+	// reads below go by its id without GetTask. Each read is then of a row the
+	// project owns, which is the scoping GetTask gives the other calls.
 	row := active[0]
 	t := taskFromRow(row)
 	cur.Task = &t
@@ -192,13 +201,15 @@ func (l *Local) TaskStart(ctx context.Context, req TaskStartRequest) (*TaskStart
 		}
 	}
 
-	now := l.now()
 	status := TaskActive
 	if req.Queue {
 		status = TaskOpen
 	}
 	var out TaskStartResult
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		// The time is taken inside the transaction: a writer that waited for
+		// the lock must not stamp a time earlier than a commit it followed.
+		now := l.now()
 		settings, err := ensureProject(ctx, q, c.Project, now)
 		if err != nil {
 			return err
@@ -427,9 +438,9 @@ func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, e
 	briefEdit := req.Title != nil || req.Goal != nil || req.Context != nil ||
 		req.Constraints != nil || req.Criteria != nil || req.KeyFiles != nil
 
-	now := l.now()
 	var out Task
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		now := l.now()
 		settings, err := ensureProject(ctx, q, c.Project, now)
 		if err != nil {
 			return err

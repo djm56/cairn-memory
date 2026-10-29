@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/base64"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,4 +48,29 @@ func decodeTaskCursor(cursor string) (*store.TaskKey, error) {
 		return nil, Invalid("cursor is not valid")
 	}
 	return &store.TaskKey{UpdatedAt: at, ID: id}, nil
+}
+
+// encodeCursor returns the opaque cursor that resumes a list at position v. The
+// position is a row id for a keyset list (events, learnings) or an offset for
+// search. Base64url keeps it a token the client does not read.
+func encodeCursor(v int64) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(v, 10)))
+}
+
+// decodeCursor reads a cursor from encodeCursor. An empty cursor is the first
+// page and returns nil. A cursor that does not decode, or a negative position,
+// is invalid.
+func decodeCursor(cursor string) (*int64, error) {
+	if cursor == "" {
+		return nil, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return nil, Invalid("cursor is not valid")
+	}
+	v, err := strconv.ParseInt(string(raw), 10, 64)
+	if err != nil || v < 0 {
+		return nil, Invalid("cursor is not valid")
+	}
+	return &v, nil
 }
