@@ -135,3 +135,91 @@ func TestBlockAndAbandonWriteReasonToJournal(t *testing.T) {
 		t.Errorf("block row = %s %q", events[1].Kind, events[1].Text)
 	}
 }
+
+// TestStepSkipFromFailed checks that a failed step can be skipped, as
+// CONTRACT §3 allows. Mutation testing showed that no test reached this edge
+// of the skip rule.
+func TestStepSkipFromFailed(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	one := core.NumberRef(1)
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepStart}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepFail, Summary: "broke"}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"})
+	if err != nil {
+		t.Fatalf("skip of a failed step: %v", err)
+	}
+	if st.Status != core.StepSkipped {
+		t.Errorf("status after skip = %q, want skipped", st.Status)
+	}
+}
+
+// TestTaskStartActiveSetsStartedAt checks that a task started active has its
+// start time set at once, as task_start sets it.
+func TestTaskStartActiveSetsStartedAt(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Task.StartedAt == nil {
+		t.Errorf("active task has no started_at")
+	}
+}
+
+// TestTaskUpdateCriteriaAndKeyFiles checks that one task_update writes both the
+// criteria and the key files it is given. Each is replaced only when given, and
+// writing one must not skip the other.
+func TestTaskUpdateCriteriaAndKeyFiles(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	criteria := []string{"tests pass"}
+	files := []core.TaskFile{{Path: "internal/core/caller.go", Note: "the rule"}}
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Criteria: &criteria, KeyFiles: &files}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.Criteria) != 1 || d.Criteria[0].Criterion != "tests pass" {
+		t.Errorf("criteria after update = %+v, want the one given", d.Criteria)
+	}
+	if len(d.KeyFiles) != 1 || d.KeyFiles[0].Path != "internal/core/caller.go" {
+		t.Errorf("key files after update = %+v, want the one given", d.KeyFiles)
+	}
+}
+
+// TestRatifiedDirectiveHasRatifiedAt checks that a directive read back after
+// ratification carries its ratification time. The time is set on the row when
+// it is ratified, and the read must show it.
+func TestRatifiedDirectiveHasRatifiedAt(t *testing.T) {
+	s, _ := openLocal(t)
+	if _, err := s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Check origins", Rule: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	ds, err := s.DirectiveList(agent("acme-api", "main"), core.DirectiveListRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds.Directives) != 1 || ds.Directives[0].RatifiedAt.IsZero() {
+		t.Errorf("listed directives = %+v, want one with ratified_at set", ds.Directives)
+	}
+}

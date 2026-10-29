@@ -126,6 +126,23 @@ func TestRecallUnspacedCJKGoalKeepsWord(t *testing.T) {
 	}
 }
 
+// TestRecallKeepsDigitFirstShortWord checks a two-character word that starts
+// with a digit, in a goal that is not in capitals. "3d" holds a digit, so it is
+// kept and finds the lesson. Mutation testing showed that the digit test was
+// not pinned at the start of a word.
+func TestRecallKeepsDigitFirstShortWord(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Maps", Goal: "Map work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Index the 3d map.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Logs", Goal: "Log work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Unrelated lesson about logging.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Build 3d maps"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Index the 3d map." {
+		t.Errorf("recall of \"Build 3d maps\" lessons = %+v, want only the 3d lesson", got.Lessons)
+	}
+}
+
 // TestRecallMixedCaseKeepsNames checks that a goal with lower-case words keeps
 // its upper-case short names and its digit words: JWT, SQL, TLS, CLI and v2 each
 // find their lesson. The lower-case "use" is dropped, and no lesson holds it.
