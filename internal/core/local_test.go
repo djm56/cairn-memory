@@ -33,6 +33,7 @@ var deferred = map[string]string{
 	"directive/from_learning":               "needs directive_ratify from a learning, which is " + part3,
 	"recall/across_projects":                "needs task_close and directive_ratify, which are " + part3,
 	"search/finds_each_kind":                "needs directive_ratify, which is " + part3,
+	"search/hides_retired_directives":       "needs directive_ratify and directive_retire, which are " + part3,
 }
 
 // openLocal returns a Service over a new database in a temporary directory,

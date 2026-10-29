@@ -4,7 +4,7 @@
 Nothing implements it yet. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite in
 `internal/conformance` checks the behaviour described here. The
-suite has 37 cases. Each one fails against the `core.Unimplemented`
+suite has 38 cases. Each one fails against the `core.Unimplemented`
 stub, as phase 1 expects.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
@@ -299,6 +299,9 @@ operators and brackets are matched as words, and never cause an error);
 all); `all_projects`; `limit` (default 10); `cursor`.
 **Out:** `hits` (`[{kind, id, project, task_id, title, snippet}]`, best
 match first), and `next`. Global directives are found from every project.
+A retired directive is not a hit (ruling 4a): it is not listed by
+`directive_list`, `recall` or `task_current`, and search does not list it
+either.
 
 ## 7. Notes
 

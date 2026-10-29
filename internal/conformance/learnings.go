@@ -170,6 +170,16 @@ var searchCases = []Case{
 		_, err := s.Recall(mainCtx(), core.RecallRequest{})
 		wantKind(t, err, core.KindInvalid, "recall without a goal")
 	}},
+	{"search/hides_retired_directives", func(t T, s core.Service) {
+		// CONTRACT §6 (ruling 4a): a retired directive is not a hit, as it is
+		// not listed anywhere else.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Limit requests", Rule: "Rate limit every endpoint."}))(t)
+		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
+		res := must(s.Search(mainCtx(), core.SearchRequest{Query: "limit", Kinds: []core.HitKind{core.HitDirective}}))(t)
+		if len(res.Hits) != 0 {
+			t.Errorf("search of a retired directive found %d hits, want none", len(res.Hits))
+		}
+	}},
 	{"search/finds_each_kind", func(t T, s core.Service) {
 		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "Tune the zeppelin cache", Goal: "Cache hit rate over 90%."}))(t)
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "The quokka endpoint is slow."}))(t)
