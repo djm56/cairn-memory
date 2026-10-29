@@ -193,6 +193,16 @@ var identityCases = []Case{
 			wantKind(t, c.do(mainCtx()), core.KindOperatorOnly, c.name+" by an agent")
 		}
 	}},
+	{"identity/blank_agent_refused", func(t T, s core.Service) {
+		// CONTRACT §1.1: a write needs an agent name. A name made of spaces is no
+		// name, and it is refused for every write the same way.
+		spaces := as(projA, "   ")
+		for _, c := range agentCalls {
+			if c.write {
+				wantKind(t, c.do(spaces, s), core.KindInvalid, c.name+" with a blank agent")
+			}
+		}
+	}},
 }
 
 // casesCoverInterface fails when a Service method has no entry in

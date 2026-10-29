@@ -46,7 +46,7 @@ func callerFor(ctx context.Context, write bool) (Caller, error) {
 	if !ValidProjectName(c.Project) {
 		return c, Invalid("project name %q is not valid: lowercase letters and digits in hyphen-separated groups, at most 64 characters", c.Project)
 	}
-	if write && c.Agent == "" {
+	if write && blank(c.Agent) {
 		return c, Invalid("this call writes, so the caller needs an agent name")
 	}
 	return c, nil
