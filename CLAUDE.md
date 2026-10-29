@@ -29,9 +29,12 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
 - **Every pull request** updates CHANGELOG.md unless it carries the
   `skip-changelog` label, and the wiki page when user-facing behaviour changes.
   See [CONTRIBUTING.md](CONTRIBUTING.md#keeping-docs-current).
-- **Agents never merge.** The operator merges into `main`. Agents never run
-  the bootstrap script or the wiki publish script with `--apply` unless the
-  operator asks for it (`scripts/github/`).
+- **Agents merge only when the gates pass.** A pull request may be merged by
+  an agent only when CI is green and the code review is APPROVED with no open
+  CRITICAL finding. Merge with a merge commit, then delete the branch. The
+  operator may merge at any time. Agents never run the bootstrap script or the
+  wiki publish script with `--apply` unless the operator asks for it
+  (`scripts/github/`).
 
 ## Commands
 

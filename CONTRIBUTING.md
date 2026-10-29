@@ -30,9 +30,11 @@ same four before you push.
    markers and the changelog, and shellcheck lints the scripts. Only
    `build, vet, fmt, test` is required on `main`.
 5. **Review.** See the rule below.
-6. **Merge.** The operator merges into `main`. Agents open pull requests and
-   never merge them. `main` is protected: a pull request is required, and the
-   `build, vet, fmt, test` check must pass and be up to date.
+6. **Merge.** An agent may merge a pull request once CI is green and the
+  review is APPROVED with no open CRITICAL finding (see the rule below). Use
+  a merge commit, then delete the branch. The operator may merge at any time.
+  `main` is protected: a pull request is required, and the
+  `build, vet, fmt, test` check must pass and be up to date.
 
 ### Review findings
 
