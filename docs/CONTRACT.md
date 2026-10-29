@@ -29,7 +29,8 @@ client, and a role. The adapter sets it; request types do not carry it.
   letters and digits in hyphen-separated groups, at most 64 characters
   (`acme-api`). A project row is created on its first call.
 - **Agent.** Required for every write (each tool marked *write* below). It is
-  stored on the rows the call creates: `agent`, `reviewer`, `created_by`.
+  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
+  of only spaces counts as no name, and is `invalid`.
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.
@@ -459,3 +460,9 @@ where only a core test checks it. An item with no check at all is marked
     operator approval.*
 33. **Event on a pending step (2026-10-29).** `event_log` may name a pending
     step (§4). *Bishop default, pending operator approval.*
+34. **A name of only spaces is no name (2026-10-29).** An agent write whose
+    agent name is only spaces is `invalid`, as one with no name is (§1.1). So is
+    an operator call whose name is only spaces (§8). The agent case is
+    `identity/blank_agent_refused`; the operator case is
+    `identity/operator_blank_name_refused`. *Bishop default, pending operator
+    approval.*
