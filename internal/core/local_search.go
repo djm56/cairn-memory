@@ -116,23 +116,43 @@ var recallStopWords = map[string]bool{
 }
 
 // goalWords returns the distinct words of goal that can name its subject: the
-// words of four or more letters and digits that are not stop words, lowercased,
-// in the order they appear. recall matches a row that holds any of them. The
-// words are the match's whole input, so no punctuation reaches the query.
+// words that pass keepGoalWord and are not stop words, lowercased, in the order
+// they appear. recall matches a row that holds any of them. The words are the
+// match's whole input, so no punctuation reaches the query.
 func goalWords(goal string) []string {
 	seen := map[string]bool{}
 	var out []string
-	fields := strings.FieldsFunc(strings.ToLower(goal), func(r rune) bool {
+	tokens := strings.FieldsFunc(goal, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
-	for _, w := range fields {
-		if utf8.RuneCountInString(w) < 4 || recallStopWords[w] || seen[w] {
+	for _, tok := range tokens {
+		w := strings.ToLower(tok)
+		if !keepGoalWord(tok) || recallStopWords[w] || seen[w] {
 			continue
 		}
 		seen[w] = true
 		out = append(out, w)
 	}
 	return out
+}
+
+// keepGoalWord reports whether a word of a goal can name its subject. Four or
+// more characters always can. A shorter word can only when it reads as a name
+// in the goal as written: all upper case (JWT, SQL, CSS, TLS, CLI) or holding a
+// digit (v2). So "Fix" is dropped and "JWT" is kept. A single character is
+// never kept.
+func keepGoalWord(tok string) bool {
+	n := utf8.RuneCountInString(tok)
+	switch {
+	case n >= 4:
+		return true
+	case n < 2:
+		return false
+	}
+	if strings.IndexFunc(tok, unicode.IsDigit) >= 0 {
+		return true
+	}
+	return tok == strings.ToUpper(tok)
 }
 
 // Recall answers what a caller should know before a goal. Directives are those
