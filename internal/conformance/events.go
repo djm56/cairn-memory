@@ -86,6 +86,39 @@ var eventCases = []Case{
 			t.Errorf("default page = %d events, want 20", len(def.Events))
 		}
 	}},
+	{"event/step_refs_must_name_a_step", func(t T, s core.Service) {
+		// CONTRACT §1.4: a step ref names one step. {} names none, number 0
+		// names none (it is valid only as step_add's after), and an id of 0 with
+		// a number is two faults at once. Each of the three journal calls that
+		// take a ref refuses all three, and writes nothing.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		refs := []struct {
+			what string
+			ref  core.StepRef
+		}{
+			{"{}", core.StepRef{}},
+			{"number 0", core.NumberRef(0)},
+			{"id 0 with number 1", core.StepRef{ID: ptr(int64(0)), Number: ptr(1)}},
+		}
+		for _, r := range refs {
+			ref := r.ref
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &ref, Kind: core.EventNote, Text: "refused"})
+			wantKind(t, err, core.KindInvalid, "event_log with step "+r.what)
+			_, err = s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID, Step: &ref})
+			wantKind(t, err, core.KindInvalid, "event_list with step "+r.what)
+			_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: ref, Verdict: core.VerdictApproved})
+			wantKind(t, err, core.KindInvalid, "review_record with step "+r.what)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
+		if len(d.Reviews) != 0 {
+			t.Errorf("reviews after refused calls = %+v", d.Reviews)
+		}
+		for _, e := range d.Events {
+			if e.Text == "refused" {
+				t.Errorf("a refused event_log was written: %+v", e)
+			}
+		}
+	}},
 	{"event/review_record_writes_event", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "build", "review")
 		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{
