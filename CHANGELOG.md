@@ -68,6 +68,13 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   the CONTRACT header counts (25 of 39 cases pass), the retired-directive and
   review-branch conformance coverage, and DESIGN §4's `step_plan` row
   ([PR #55](https://github.com/djm56/cairn-memory/pull/55)).
+- Phase 2 core: the close of a task and the operator's decisions. `core.Local`
+  now implements `task_close` with the project's close policy, and the four
+  operator calls: learning decisions, directive ratification and retirement, and
+  project settings. A refused close changes nothing and lists what is missing.
+  An agent that calls an operator call gets `operator_only`. All 39 conformance
+  cases pass, so issue #9 is complete once its pull request chain lands on
+  `main` ([PR #56](https://github.com/djm56/cairn-memory/pull/56)).
 
 ### Changed
 
