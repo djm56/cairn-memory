@@ -395,3 +395,62 @@ func TestResolveProjectWrongType(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveRelativeStart checks that a relative working directory and a
+// relative CLAUDE_PROJECT_DIR are made absolute against the process directory,
+// and that the file found is reported by its absolute path.
+func TestResolveRelativeStart(t *testing.T) {
+	const good = "project = \"acme-api\"\n"
+	want := func(root string) Project {
+		return Project{Name: "acme-api", Source: SourceFile, Path: filepath.Join(root, "app", FileName)}
+	}
+
+	t.Run("relative working directory", func(t *testing.T) {
+		tr := newTree(t, "app/src", []file{{"app/.cairn.toml", good}})
+		t.Chdir(tr.root)
+		setEnv(t, EnvProject, "", true)
+		setEnv(t, EnvProjectDir, "", true)
+
+		got, err := Resolve("app/src")
+		if err != nil {
+			t.Fatalf("Resolve: unexpected error %v", err)
+		}
+		if got != want(tr.root) {
+			t.Errorf("Resolve = %+v, want %+v", got, want(tr.root))
+		}
+	})
+
+	t.Run("relative CLAUDE_PROJECT_DIR", func(t *testing.T) {
+		tr := newTree(t, "elsewhere", []file{{"app/.cairn.toml", good}})
+		t.Chdir(tr.root)
+		setEnv(t, EnvProject, "", true)
+		setEnv(t, EnvProjectDir, "app", false)
+
+		got, err := Resolve(filepath.Join(tr.root, "elsewhere"))
+		if err != nil {
+			t.Fatalf("Resolve: unexpected error %v", err)
+		}
+		if got != want(tr.root) {
+			t.Errorf("Resolve = %+v, want %+v", got, want(tr.root))
+		}
+	})
+}
+
+// TestResolveMissingStartDirectory checks that a start directory which does not
+// exist is not an error in itself: the walk passes the missing levels and finds
+// the nearest existing .cairn.toml above them.
+func TestResolveMissingStartDirectory(t *testing.T) {
+	const good = "project = \"acme-api\"\n"
+	tr := newTree(t, "", []file{{".cairn.toml", good}})
+	setEnv(t, EnvProject, "", true)
+	setEnv(t, EnvProjectDir, "", true)
+
+	got, err := Resolve(filepath.Join(tr.root, "no", "such", "dir"))
+	if err != nil {
+		t.Fatalf("Resolve: unexpected error %v", err)
+	}
+	wantPath := filepath.Join(tr.root, FileName)
+	if got.Name != "acme-api" || got.Source != SourceFile || got.Path != wantPath {
+		t.Errorf("Resolve = %+v, want acme-api from %s", got, wantPath)
+	}
+}
