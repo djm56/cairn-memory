@@ -3,7 +3,7 @@
 **Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
 2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
 approval. Items 13 and later await the operator's approval.
-`core.Local` passes all 52 cases in `internal/conformance` (count as of
+`core.Local` passes all 63 cases in `internal/conformance` (count as of
 2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
@@ -343,9 +343,11 @@ refuse a nameless call all the same.
 
 ## 9. Settled here, for review
 
-Each item answers a question that DESIGN.md left open. Each one is checked
-by the suite, except where noted. The operator approved items 1–11 on
-2026-10-28.
+Each item answers a question that DESIGN.md left open. Items 1–11 were approved
+by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, each
+item says what checks it: a conformance case by default, or `(core test only)`
+where only a core test checks it. An item with no check at all is marked
+`(not tested)`; none is.
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -375,74 +377,74 @@ by the suite, except where noted. The operator approved items 1–11 on
 12. **Deferred:** the "step-review rule" in project settings is not defined
     here. The operator deferred it to phase 8 (#41), and DESIGN §3.6 no
     longer lists it.
-13. **`task_update` never opens a task (ruling 1a, 2026-10-29).** No
+13. **`task_update` never opens a task (2026-10-29).** No
     `task_update` moves a task into `open`. Only `task_start` with `queue`
     creates one (§1.5). *Bishop default, pending operator approval.*
-14. **A step ref is one positive value (ruling 2a, 2026-10-29).** A ref names
+14. **A step ref is one positive value (2026-10-29).** A ref names
     a step by an id or a number, never both. `{}` is `invalid` in every call
     that takes a ref. `{"number": 0}` is valid only as `step_add`'s `after`,
     where it means before the first step (§1.4, §3). *Bishop default, pending
     operator approval.*
-15. **A recorded pending step blocks `step_plan` (ruling 3a, 2026-10-29).** A
+15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
     pending step with an event or a review is not removed. The call is
     `refused` and changes nothing. The refusal names the first such step in
     display order, and the way out is to skip it and plan again (§3). *Bishop
     default, pending operator approval.*
-16. **`search` hides retired directives (ruling 4a, 2026-10-29).** A retired
+16. **`search` hides retired directives (2026-10-29).** A retired
     directive is not a `search` hit, as it is not listed by `directive_list`,
     `recall` or `task_current` (§6). *Bishop default, pending operator
     approval.*
-17. **Same-status `task_update` is refused (default 1, 2026-10-29).** Asking
+17. **Same-status `task_update` is refused (2026-10-29).** Asking
     for the status a task already has is `refused`, and the call changes
     nothing, so a reason sent with it is not dropped without a word (§1.5).
     *Bishop default, pending operator approval.*
-18. **Recall's word rule (default 2, 2026-10-29).** `recall` keeps the words of
+18. **Recall's word rule (2026-10-29).** `recall` keeps the words of
     a goal that can name its subject, and drops the stop words. In a goal that
     mixes cases, it keeps upper-case short words (`JWT`, `SQL`, `TLS`, `CLI`)
     and words with a digit (`v2`). In a goal written wholly in capitals, it
     keeps only words of four or more letters and words with a digit, so
     `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. *Bishop default,
-    pending operator approval.*
-19. **Ids and numbers start at 1 (default 3, 2026-10-29).** `{"id": 0, "number":
+    pending operator approval.* (core test only)
+19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
     1}` is `invalid`, and so is any id or number below 1. Give exactly one (§1.4).
     *Bishop default, pending operator approval.*
-20. **Every operator call needs a name (default 4, 2026-10-29).** A call with
+20. **Every operator call needs a name (2026-10-29).** A call with
     no operator name is `invalid`. `LearningDecide` and `DirectiveRatify`
     record the name (`decided_by`, `ratified_by`). `DirectiveRetire` and
     `ProjectSettingsSet` store none, and refuse a nameless call all the same
     (§8). *Bishop default, pending operator approval.*
-21. **A directive retires once (default 5, 2026-10-29).** A second
+21. **A directive retires once (2026-10-29).** A second
     `directive_retire` of the same code is `refused`, and the first retirement
     time stands (§8). *Bishop default, pending operator approval.*
-22. **Learning moves and supersede cycles (default 6, 2026-10-29).**
+22. **Learning moves and supersede cycles (2026-10-29).**
     `learning_decide` may set any status except `proposed`, from any current
     status. A `superseded_by` that leads back to the learning being decided,
     directly or through a chain of superseded learnings, is `refused`, since
     the links would form a cycle (§8). *Bishop default, pending operator
     approval.*
-23. **Settings are required, whole (default 7, 2026-10-29).** `project_settings_set`
+23. **Settings are required, whole (2026-10-29).** `project_settings_set`
     with no `settings`, or with `settings` missing any one switch, is `invalid`.
     The call replaces the whole object, and an omitted switch would otherwise
     read as off (§8). *Bishop default,
     pending operator approval.*
-24. **Close from `open` (reading 14e-1, 2026-10-29).** `task_close` of an open
+24. **Close from `open` (2026-10-29).** `task_close` of an open
     task is `refused`: the task must be started first (§1.5, §2). *Bishop
-    default, pending operator approval.*
-25. **Operator lookups match by id (reading 14e-2, 2026-10-29).** An operator
+    default, pending operator approval.* (core test only)
+25. **Operator lookups match by id (2026-10-29).** An operator
     call finds its learning or directive by id or code in any project. Only
     agent calls are limited to the caller's project (§1.2, §8). *Bishop
     default, pending operator approval.*
-26. **Lessons with a no-lessons reason (reading 14e-3, 2026-10-29).** A close
+26. **Lessons with a no-lessons reason (2026-10-29).** A close
     that has lessons and a `no_lessons_reason` stores the reason as given. It
     is neither refused nor dropped (§2). *Bishop default, pending operator
     approval.*
-27. **Close-policy switches (reading 14e-4, 2026-10-29).** The close policy has
+27. **Close-policy switches (2026-10-29).** The close policy has
     one switch per row of the §2 table, except `outcome`, which is always
     required (§8). *Bishop default, pending operator approval.*
 28. **Abandon and block journal kinds (2026-10-29).** `task_update` to
     `abandoned` writes a `decision` event, and to `blocked` a `blocked` event,
     each with the reason given (§1.5). *Bishop default, pending operator
-    approval.*
+    approval.* (core test only)
 29. **Skip sets `ended_at` (2026-10-29).** A `skip` step update sets the step's
     `ended_at` (§3). *Bishop default, pending operator approval.*
 30. **Learnings and notes on a terminal task (2026-10-29).** `learning_add` and
@@ -451,7 +453,7 @@ by the suite, except where noted. The operator approved items 1–11 on
     and these are not among them. *Bishop default, pending operator approval.*
 31. **`note_put` shape (2026-10-29).** Giving `id` with `task_id` is `invalid`,
     and so is a blank title or body (§7). *Bishop default, pending operator
-    approval.*
+    approval.* (core test only)
 32. **`review_record` on any step (2026-10-29).** `review_record` accepts a step
     in any status. The contract names none (§4). *Bishop default, pending
     operator approval.*
