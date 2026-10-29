@@ -35,7 +35,8 @@ func refText(ref StepRef) string {
 // task, or a number the task does not reach, is not_found. Call it after the
 // task has been loaded with loadTask.
 //
-// Read function: call it inside the write transaction that uses the step.
+// Read function: call it inside the transaction that uses the step, or on the
+// store for a read that needs no write.
 func resolveStep(ctx context.Context, q store.Querier, taskID string, ref StepRef) (store.StepRow, error) {
 	var st store.StepRow
 	var err error

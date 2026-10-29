@@ -3,8 +3,8 @@ package core_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/djm56/cairn-memory/internal/conformance"
 	"github.com/djm56/cairn-memory/internal/core"
@@ -25,13 +25,7 @@ var deferred = map[string]string{
 	"identity/no_project_refused":           "needs every agent call; " + part2 + " and " + part3,
 	"identity/write_without_agent_refused":  "needs every write call; " + part2 + " and " + part3,
 	"identity/operator_calls_refuse_agents": "needs learning_add and the operator calls; " + part2 + " and " + part3,
-	"task/abandoned_is_terminal":            "needs event_log; " + part2,
 	"task/parallel_when_project_allows":     "needs project_settings_set; " + part3,
-	"step/transitions_and_attempts":         "needs event_list; " + part2,
-	"event/append_only_with_server_time":    part2,
-	"event/kinds_agents_may_log":            part2,
-	"event/list_pages":                      part2,
-	"event/review_record_writes_event":      part2,
 	"close/whole_task":                      part3,
 	"close/empty_lists_versus_absent":       part3,
 	"close/failed_outcome_and_validation":   part3,
@@ -98,32 +92,36 @@ func TestStepStartAndFinishWriteEvents(t *testing.T) {
 }
 
 // TestStepPlanRefusesPendingStepWithRecords checks that step_plan does not
-// detach a journal: a pending step with an event cannot be removed.
+// detach a journal: a pending step with an event cannot be removed. The same
+// holds for a pending step with a review.
 func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
-	s, st := openLocal(t)
+	s, _ := openLocal(t)
 	ctx := agent("acme-api", "main")
-	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}, {Title: "two"}}})
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}, {Title: "two"}, {Title: "three"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	stepID := res.Steps[1].ID
-	// event_log is part 2, so the event is written through the store.
-	if _, err := store.InsertEvent(context.Background(), st, store.EventRow{
-		TaskID: res.ID, Project: "acme-api", StepID: &stepID, Agent: "main",
-		Kind: string(core.EventNote), Text: "about two", OccurredAt: time.Now().UTC(),
-	}); err != nil {
+	two := core.StepRef{Number: 2}
+	if _, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Step: &two, Kind: core.EventNote, Text: "about two"}); err != nil {
+		t.Fatal(err)
+	}
+	three := core.StepRef{Number: 3}
+	if _, err := s.ReviewRecord(agent("acme-api", "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: three, Verdict: core.VerdictApproved}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = s.StepPlan(ctx, core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
 	if core.KindOf(err) != core.KindRefused {
 		t.Fatalf("StepPlan over a recorded pending step: error %v, want refused", err)
 	}
+	if !strings.Contains(err.Error(), "step 2 has events or reviews") {
+		t.Errorf("refusal %q does not name the first recorded step, 2", err)
+	}
 	cur, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cur.Steps) != 2 {
-		t.Errorf("steps after refused plan = %d, want 2 unchanged", len(cur.Steps))
+	if len(cur.Steps) != 3 {
+		t.Errorf("steps after refused plan = %d, want 3 unchanged", len(cur.Steps))
 	}
 }
 
