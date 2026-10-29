@@ -87,12 +87,12 @@ func Resolve(workDir string) (Project, error) {
 	if start == "" {
 		start = workDir
 	}
-	start, err := filepath.Abs(start)
+	abs, err := filepath.Abs(start)
 	if err != nil {
 		return Project{}, fmt.Errorf("identity: resolve start directory %q: %w", start, err)
 	}
 
-	path, found, err := findFile(start)
+	path, found, err := findFile(abs)
 	if err != nil {
 		return Project{}, err
 	}
