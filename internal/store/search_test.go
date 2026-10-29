@@ -275,3 +275,17 @@ func TestSearchArguments(t *testing.T) {
 		t.Error("negative offset accepted")
 	}
 }
+
+// TestSearchEmptyProject checks that an empty Project is refused unless
+// AllProjects is set, and that AllProjects accepts it.
+func TestSearchEmptyProject(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	_, _, err := Search(ctx, s, SearchFilter{Query: "x", Limit: 5})
+	if err == nil || !strings.Contains(err.Error(), "project is empty") {
+		t.Errorf("empty project without AllProjects: err = %v, want a refusal", err)
+	}
+	if _, _, err := Search(ctx, s, SearchFilter{Query: "x", Limit: 5, AllProjects: true}); err != nil {
+		t.Errorf("empty project with AllProjects: unexpected error %v", err)
+	}
+}
