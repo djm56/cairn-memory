@@ -33,6 +33,23 @@ func TestRecallRanksBestMatchFirst(t *testing.T) {
 	}
 }
 
+// TestRecallIgnoresFunctionWordsInCapitals checks that a goal written in capitals
+// does not pull in rows by its function words. "THE" passes the upper-case test
+// for short words, so recall must drop it by its stop-list entry. The lesson
+// that holds only "the" must not be found; the lesson with "login" must.
+func TestRecallIgnoresFunctionWordsInCapitals(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Cache", Goal: "Cache work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Keep the cache warm.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Auth", Goal: "Auth work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "The login form is fine.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "FIX THE LOGIN BUG"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "The login form is fine." {
+		t.Errorf("recall of \"FIX THE LOGIN BUG\" lessons = %+v, want only the login lesson", got.Lessons)
+	}
+}
+
 // TestRecallKeepsShortNameWords checks the short words that name a subject:
 // upper-case or digit-bearing words under four letters. "Fix CSS bug" must
 // keep CSS, so a lesson about CSS is found; "Fix" is a common word and is not.

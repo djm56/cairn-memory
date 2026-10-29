@@ -105,14 +105,18 @@ func directiveCodeOf(ctx context.Context, q store.Querier, ref string) (string, 
 
 // recallStopWords are common words that do not say what a goal is about. recall
 // leaves them out of its match, so "the" or "with" cannot pull in every row.
+// The short function words are here too. A goal in capitals passes keepGoalWord's
+// upper-case test for them, so the list is what keeps "THE" out of the match.
 var recallStopWords = map[string]bool{
-	"about": true, "after": true, "again": true, "against": true, "could": true,
-	"from": true, "have": true, "into": true, "make": true, "need": true,
-	"should": true, "some": true, "than": true, "that": true, "their": true,
-	"then": true, "there": true, "these": true, "they": true, "this": true,
-	"those": true, "through": true, "want": true, "were": true, "what": true,
-	"when": true, "where": true, "which": true, "while": true, "will": true,
-	"with": true, "would": true, "your": true,
+	"about": true, "after": true, "again": true, "against": true, "and": true,
+	"are": true, "but": true, "can": true, "could": true, "for": true,
+	"from": true, "have": true, "into": true, "its": true, "make": true,
+	"need": true, "not": true, "should": true, "some": true, "than": true,
+	"that": true, "the": true, "their": true, "then": true, "there": true,
+	"these": true, "they": true, "this": true, "those": true, "through": true,
+	"want": true, "was": true, "were": true, "what": true, "when": true,
+	"where": true, "which": true, "while": true, "will": true, "with": true,
+	"would": true, "you": true, "your": true,
 }
 
 // goalWords returns the distinct words of goal that can name its subject: the
