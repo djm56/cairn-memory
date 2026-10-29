@@ -287,7 +287,7 @@ Tool names are short and unprefixed; the client adds the server prefix
 | `task_list` | Recent tasks in this project, filtered by status. |
 | `task_update` | Status, priority, owner, next action, blockers; edit the brief before work starts. |
 | `task_close` | Outcome, summary, criteria results, lessons, mistakes, deliverables. Refused with a list of what is missing when the close policy is not met. |
-| `step_plan` | Replace the task's pending steps with a list. Steps already started are kept. |
+| `step_plan` | Replace the task's pending steps with a list. Steps already started are kept. A pending step that has an event or a review is not removed: the call is refused, and the agent skips that step first (CONTRACT §3). |
 | `step_add` | Insert one step after a given step. |
 | `step_update` | Start, finish, fail or skip a step; record an attempt and a summary. Also writes the matching event. |
 | `event_log` | Append a journal event. |
