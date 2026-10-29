@@ -163,6 +163,10 @@ var taskCases = []Case{
 		if got.Task.Status != core.TaskActive {
 			t.Errorf("status after the refused move = %q, want active", got.Task.Status)
 		}
+		// blocked is not a source of open either: only task_start with queue creates one.
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
+		_, err = s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskOpen)})
+		wantKind(t, err, core.KindRefused, "task_update to open from blocked")
 		queued := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true}))(t)
 		if queued.Status != core.TaskOpen {
 			t.Errorf("queued task status = %q, want open", queued.Status)
