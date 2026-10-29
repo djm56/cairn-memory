@@ -19,6 +19,33 @@ func directiveTitles(ds []core.Directive) []string {
 }
 
 var learningCases = []Case{
+	{"learning/decided_again_from_any_status", func(t T, s core.Service) {
+		// CONTRACT §9 items 22 and 25: learning_decide may move a decided learning
+		// to another status, and an operator finds a learning of another project
+		// by its id.
+		l := must(s.LearningAdd(as(projB, "main"), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		must(s.LearningDecide(op(), core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted}))(t)
+		got := must(s.LearningDecide(op(), core.LearningDecideRequest{ID: l.ID, Status: core.LearningRejected, Note: "changed my mind"}))(t)
+		if got.Status != core.LearningRejected || got.DecisionNote != "changed my mind" {
+			t.Errorf("re-decided learning = %+v", got)
+		}
+	}},
+	{"learning/add_and_note_on_terminal_task", func(t T, s core.Service) {
+		// CONTRACT §9 item 30: learning_add and note_put are allowed on an
+		// abandoned task. The task's own writes, here an event, are refused.
+		res := startTask(t, s, mainCtx(), "t")
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskAbandoned), Reason: "stopped"}))(t)
+		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		if l.TaskID != res.ID {
+			t.Errorf("learning task = %q, want %s", l.TaskID, res.ID)
+		}
+		n := must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Post-mortem", Body: "b"}))(t)
+		if n.TaskID != res.ID {
+			t.Errorf("note task = %q, want %s", n.TaskID, res.ID)
+		}
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "late"})
+		wantKind(t, err, core.KindRefused, "event on an abandoned task")
+	}},
 	{"learning/add_is_proposed_only", func(t T, s core.Service) {
 		for _, k := range []core.LearningKind{core.LearningFinding, core.LearningPattern, core.LearningAgentNote} {
 			l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: k, Title: string(k), Body: "b"}))(t)

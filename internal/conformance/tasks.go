@@ -228,6 +228,14 @@ var taskCases = []Case{
 }
 
 var stepCases = []Case{
+	{"step/skip_sets_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 29: a skip sets the step's ended_at.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
+		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil {
+			t.Errorf("skipped step = %+v, want ended_at set", skipped)
+		}
+	}},
 	{"step/insert_without_renumbering", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
 		ids := []int64{res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}

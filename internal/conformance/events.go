@@ -9,6 +9,17 @@ import (
 )
 
 var eventCases = []Case{
+	{"event/pending_step_takes_review_and_event", func(t T, s core.Service) {
+		// CONTRACT §9 items 32 and 33: review_record and event_log each accept a
+		// step in any status, and the step here is still pending.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventNote, Text: "Before the work starts."}))(t)
+		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		if rv.StepID != res.Steps[0].ID {
+			t.Errorf("review of a pending step names step %d, want %d", rv.StepID, res.Steps[0].ID)
+		}
+	}},
 	{"event/append_only_with_server_time", func(t T, s core.Service) {
 		res := startTask(t, s, mainCtx(), "t", "one")
 		before := time.Now().UTC().Add(-time.Second)
@@ -98,6 +109,8 @@ var eventCases = []Case{
 		}{
 			{"{}", core.StepRef{}},
 			{"number 0", core.NumberRef(0)},
+			{"number -1", core.NumberRef(-1)},
+			{"id -1", core.StepRef{ID: ptr(int64(-1))}},
 			{"id 0 with number 1", core.StepRef{ID: ptr(int64(0)), Number: ptr(1)}},
 		}
 		for _, r := range refs {
@@ -145,7 +158,76 @@ var eventCases = []Case{
 	}},
 }
 
+// policySwitchCase is the case for one close-policy switch (CONTRACT §9 item 27).
+// Only that switch is on. A task with a criterion and one active step is closed
+// with nothing given: the close is refused with exactly the item the switch
+// guards in missing, and it passes once give supplies that item. sw picks the
+// switch from a ClosePolicy, and give fills the close request.
+func policySwitchCase(name, key string, sw func(p *core.ClosePolicy) *bool, give func(t T, s core.Service, id string, req *core.TaskCloseRequest)) Case {
+	return Case{Name: name, Run: func(t T, s core.Service) {
+		var p core.ProjectSettings
+		*sw(&p.ClosePolicy) = true
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: p.AsInput()}))(t)
+		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{
+			Title: "t", Goal: "g", Criteria: []string{"c"}, Steps: []core.StepInput{{Title: "one"}},
+		}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
+
+		req := core.TaskCloseRequest{ID: res.ID, Outcome: core.TaskDone}
+		_, err := s.TaskClose(mainCtx(), req)
+		wantKind(t, err, core.KindRefused, "close with only "+key+" on, given nothing")
+		if m := core.MissingOf(err); !slices.Equal(m, []string{key}) {
+			t.Errorf("missing = %v, want [%s]", m, key)
+		}
+		give(t, s, res.ID, &req)
+		closed := must(s.TaskClose(mainCtx(), req))(t)
+		if closed.Status != core.TaskDone {
+			t.Errorf("status = %q, want done once %s is given", closed.Status, key)
+		}
+	}}
+}
+
 var closeCases = []Case{
+	{"close/lessons_kept_with_no_lessons_reason", func(t T, s core.Service) {
+		// CONTRACT §2, §9 item 26: a close with lessons and a no_lessons_reason
+		// stores the reason as given. It is neither refused nor dropped.
+		res := startTask(t, s, mainCtx(), "t")
+		req := fullClose(res.ID, 0)
+		req.NoLessonsReason = "The lesson above covers it."
+		closed := must(s.TaskClose(mainCtx(), req))(t)
+		if closed.Status != core.TaskDone {
+			t.Errorf("status = %q, want done", closed.Status)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionClose}))(t)
+		if d.NoLessonsReason != req.NoLessonsReason || len(d.Lessons) != 1 {
+			t.Errorf("no_lessons_reason %q with %d lessons, want the reason as given and the one lesson", d.NoLessonsReason, len(d.Lessons))
+		}
+	}},
+	policySwitchCase("close/policy_switch_summary", core.MissingSummary,
+		func(p *core.ClosePolicy) *bool { return &p.RequireSummary },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Summary = "Done."
+		}),
+	policySwitchCase("close/policy_switch_criteria", core.MissingCriteria,
+		func(p *core.ClosePolicy) *bool { return &p.RequireCriteriaResults },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Criteria = []core.CriterionOutcome{{Ord: 1, Result: core.CriterionMet, Evidence: "ok"}}
+		}),
+	policySwitchCase("close/policy_switch_lessons", core.MissingLessons,
+		func(p *core.ClosePolicy) *bool { return &p.RequireLessons },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Lessons = []core.Lesson{{Kind: core.LessonReuse, Text: "Reuse the parser.", Why: "It works."}}
+		}),
+	policySwitchCase("close/policy_switch_mistakes", core.MissingMistakes,
+		func(p *core.ClosePolicy) *bool { return &p.RequireMistakes },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			req.Mistakes = []core.Mistake{}
+		}),
+	policySwitchCase("close/policy_switch_active_steps", core.MissingActiveSteps,
+		func(p *core.ClosePolicy) *bool { return &p.RequireNoActiveSteps },
+		func(t T, s core.Service, id string, req *core.TaskCloseRequest) {
+			must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(1), Action: core.StepFinish, Summary: "ok"}))(t)
+		}),
 	{"close/whole_task", func(t T, s core.Service) {
 		ctx := mainCtx()
 		res := must(s.TaskStart(ctx, core.TaskStartRequest{

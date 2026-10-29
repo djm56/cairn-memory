@@ -96,6 +96,20 @@ var operatorCalls = []call{
 }
 
 var identityCases = []Case{
+	{"identity/operator_blank_name_refused", func(t T, s core.Service) {
+		// CONTRACT §1.1, §9 item 34: a name of only spaces is no name, on an
+		// operator call as on an agent write.
+		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		spaces := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator, Agent: "   "})
+		_, err := s.LearningDecide(spaces, core.LearningDecideRequest{ID: l.ID, Status: core.LearningAccepted})
+		wantKind(t, err, core.KindInvalid, "LearningDecide with a name of spaces")
+		_, err = s.ProjectSettingsSet(spaces, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()})
+		wantKind(t, err, core.KindInvalid, "ProjectSettingsSet with a name of spaces")
+		got := must(s.LearningList(mainCtx(), core.LearningListRequest{}))(t)
+		if len(got.Learnings) != 1 || got.Learnings[0].Status != core.LearningProposed {
+			t.Errorf("learnings after refused calls = %+v, want the one still proposed", got.Learnings)
+		}
+	}},
 	{"identity/calls_cover_interface", casesCoverInterface},
 	{"identity/no_project_refused", func(t T, s core.Service) {
 		noProject := core.WithCaller(context.Background(), core.Caller{Agent: "main", Role: core.RoleAgent})
