@@ -30,7 +30,6 @@ var deferred = map[string]string{
 	"close/empty_lists_versus_absent":       part3,
 	"close/failed_outcome_and_validation":   part3,
 	"close/policy_is_project_settings":      part3,
-	"learning/add_is_proposed_only":         part2,
 	"learning/operator_decides":             part2,
 	"directive/scopes_apply":                part2,
 	"directive/from_learning":               part2 + " (ratify from a learning is part 3)",

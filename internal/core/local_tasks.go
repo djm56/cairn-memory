@@ -120,8 +120,8 @@ func fileRows(id string, role FileRole, files []TaskFile) []store.FileRow {
 
 // TaskCurrent returns the caller's active task with its criteria, steps and the
 // last five events. Task is nil when no task is active. OtherActive counts the
-// rest when the project allows parallel tasks. Directives are not yet returned:
-// they arrive with the learnings part of issue #9.
+// rest when the project allows parallel tasks. Directives are those that apply
+// to the project, as directive_list gives them with no agent.
 func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
@@ -130,11 +130,17 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	if err := l.ensureReadProject(ctx, c.Project); err != nil {
 		return nil, err
 	}
+	// Directives are read whether or not a task is active: they belong to the
+	// project, and CONTRACT §2 gives them with every answer.
+	cur := &TaskCurrent{}
+	cur.Directives, err = directivesFor(ctx, l.st, c.Project, "")
+	if err != nil {
+		return nil, err
+	}
 	active, err := activeTasks(ctx, l.st, c.Project)
 	if err != nil {
 		return nil, err
 	}
-	cur := &TaskCurrent{}
 	if len(active) == 0 {
 		return cur, nil
 	}
