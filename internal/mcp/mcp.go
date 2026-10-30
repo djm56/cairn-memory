@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -87,9 +88,18 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 		panic(fmt.Sprintf("mcp: the input schema of %s: %v", name, err))
 	}
 	tool := &mcp.Tool{Name: name, Description: description, InputSchema: schema}
-	s.srv.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.srv.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (res *mcp.CallToolResult, err error) {
+		// The SDK does not recover a panic in a handler (step 8 review S2; SDK
+		// v1.8.0 has no recover in its non-test code, as far as its source shows).
+		// A panic becomes an internal tool error, so one bad field does not end the
+		// session. The cause is in the message, as for other internal errors.
+		defer func() {
+			if p := recover(); p != nil {
+				res, err = failure(fmt.Errorf("the tool failed: %v", p)), nil
+			}
+		}()
 		if s.project.Err != nil {
-			return failure(s.project.Err), nil
+			return failure(withRestart(s.project.Err)), nil
 		}
 		in, err := decodeArgs[In](req.Params.Arguments)
 		if err != nil {
@@ -101,10 +111,37 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 		}
 		out, err := fn(core.WithCaller(ctx, caller), in)
 		if err != nil {
-			return failure(err), nil
+			return failure(withAgentArgument(err, write, caller.Agent)), nil
 		}
 		return answer(out), nil
 	})
+}
+
+// withRestart adds to the refusal for an unresolved project that the session must
+// be restarted after the fix (step 8 review S9). The project is read once, when
+// the session starts, so a fix made later is not seen until then. The kind and the
+// missing list are kept; the error is copied, not changed, since core's ErrNoProject
+// is shared.
+func withRestart(err error) error {
+	var ce *core.Error
+	if !errors.As(err, &ce) {
+		return err
+	}
+	return &core.Error{Kind: ce.Kind, Message: ce.Message + ", then restart this session: the project is read once, when it starts", Missing: ce.Missing}
+}
+
+// withAgentArgument names the agent argument in the refusal of a write with no
+// agent (step 8 review S6). Core refuses the call, and its message does not say
+// which argument to give; on this surface the argument is agent. Only the text
+// changes: the refusal and its kind are core's. Core checks the caller before any
+// other field, so a blank agent on a write is always the first fault, and the
+// suffix is added to the refusal the call gets, of kind invalid.
+func withAgentArgument(err error, write bool, agent string) error {
+	var ce *core.Error
+	if !write || strings.TrimSpace(agent) != "" || !errors.As(err, &ce) || ce.Kind != core.KindInvalid {
+		return err
+	}
+	return &core.Error{Kind: ce.Kind, Message: ce.Message + ": pass your name as the agent argument", Missing: ce.Missing}
 }
 
 // forOptions overrides the schema of the one type the inference cannot describe
