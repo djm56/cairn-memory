@@ -1,6 +1,7 @@
 package mcp_test
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -35,11 +36,21 @@ func TestAnswersKeepMarkupCharacters(t *testing.T) {
 // is answered as an internal tool error, with the cause, and the session goes on.
 // The SDK does not recover it, as far as its non-test source shows.
 func TestPanicInAToolIsAnInternalError(t *testing.T) {
+	var diag bytes.Buffer
+	restore := cairnmcp.SetDiagnosticsForTest(&diag)
+	defer restore()
 	cs := connect(t, panicking{}, acme)
 	text, isErr := call(t, cs, "task_current", nil)
 	got := errorOf(t, text, isErr)
 	if got.Kind != "internal" || !strings.Contains(got.Message, "nil map write") {
 		t.Errorf("panic: %+v, want kind internal with the cause", got)
+	}
+	// The stack goes to the operator's diagnostics, and not to the model (S5).
+	if !strings.Contains(diag.String(), "task_current tool panicked: nil map write") || !strings.Contains(diag.String(), "goroutine") {
+		t.Errorf("diagnostics = %q, want the panic and its stack", diag.String())
+	}
+	if strings.Contains(text, "goroutine") {
+		t.Errorf("the tool error carries a stack, which the model should not read: %q", text)
 	}
 	text, isErr = call(t, cs, "task_list", map[string]any{})
 	errorOf(t, text, isErr)

@@ -25,7 +25,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -36,6 +38,11 @@ import (
 
 // Name is the name the server gives itself to MCP clients.
 const Name = "cairn"
+
+// diagnostics receives what the adapter tells the operator and not the model: the
+// stack of a panic in a tool (step 10 review S5). It is stderr, since stdout carries
+// the protocol. A test replaces it.
+var diagnostics io.Writer = os.Stderr
 
 // Project is the project every call of the server runs in. A failure to resolve
 // it is kept, not raised: each call is then refused with that error, as DESIGN.md
@@ -95,6 +102,9 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 		// session. The cause is in the message, as for other internal errors.
 		defer func() {
 			if p := recover(); p != nil {
+				// The model gets the cause. The stack goes to diagnostics, for the
+				// operator (step 10 review S5), since the model cannot act on it.
+				fmt.Fprintf(diagnostics, "cairn mcp: the %s tool panicked: %v\n%s", name, p, debug.Stack())
 				res, err = failure(fmt.Errorf("the tool failed: %v", p)), nil
 			}
 		}()
