@@ -204,3 +204,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   case `step/plan_refusal_names_each_recorded_step` checks that the refusal
   names steps 1 and 3 and not step 2, as whole numbers, instead of core's exact
   wording.
+- Phase 2 core tests, follow-up to issue #52 (item 1, review of step 8):
+  `TestRecordedRefusal` pins the step_plan refusal for one, two and three
+  recorded steps: the singular wording, and the ", " and " and " join.
