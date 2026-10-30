@@ -274,6 +274,16 @@
       "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
     },
     {
+      "key": "m1-export-project-decision",
+      "mkey": "M1",
+      "phase": null,
+      "area": "area:core",
+      "title": "Decision: place `cairn export project` in a milestone (in v1 scope, unplaced)",
+      "milestone": "M1 Server-mode MCP",
+      "labels": ["type:decision", "needs-operator", "m1", "area:core"],
+      "body": "**Question.** `cairn export project` is in Scope of v1 (PLAN §3) but no milestone places it. Should it go in a milestone, and if so which one? It sits in M1 until the operator decides.\n\n**Source.** [docs/PLAN.md §3, Scope of v1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#scope-of-v1) and [docs/DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).\n\n<!-- cairn-roadmap: m1-export-project-decision -->"
+    },
+    {
       "key": "p4-epic",
       "phase": 4,
       "mkey": "M5",
