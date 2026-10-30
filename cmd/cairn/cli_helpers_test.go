@@ -2,10 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/djm56/cairn-memory/internal/api"
+	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/store"
 )
 
 // useDir runs the commands from dir, with no caller set in the environment: the
@@ -62,4 +69,48 @@ func assertNoDestructive(t *testing.T, texts ...string) {
 			}
 		}
 	}
+}
+
+// newServer serves a real core.Local over the api handlers on a loopback httptest
+// server, and returns the Local (to seed rows) and the server's URL. Every request
+// is recorded in seen, with its project header, so a test can see what was sent.
+func newServer(t *testing.T, seen *[]string) (*core.Local, string) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+	local := core.NewLocal(st)
+	handler := api.Handler(local, api.UnauthenticatedHeaderCaller, nil)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if seen != nil {
+			*seen = append(*seen, r.URL.Path+" project="+r.Header.Get(api.HeaderProject))
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return local, srv.URL
+}
+
+// seedTask starts an active task in project for the seeding of a server, and returns
+// its id. It has two steps, the first of which is active.
+func seedTask(t *testing.T, local *core.Local, project string) string {
+	t.Helper()
+	ctx := core.WithCaller(context.Background(), core.Caller{Project: project, Agent: "main", Role: core.RoleAgent})
+	res, err := local.TaskStart(ctx, core.TaskStartRequest{
+		Title: "Wire the export", Goal: "Print a task as Markdown.",
+		Steps: []core.StepInput{{Title: "Read the schema"}, {Title: "Write the printer"}},
+	})
+	if err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+	next := "Read the schema first"
+	if _, err := local.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, NextAction: &next}); err != nil {
+		t.Fatalf("seed next action: %v", err)
+	}
+	if _, err := local.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}); err != nil {
+		t.Fatalf("seed step start: %v", err)
+	}
+	return res.ID
 }
