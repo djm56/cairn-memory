@@ -116,6 +116,12 @@ server = "https://cairn.lan:8787"   # required from M1 (decision D11); D2's loca
 The API key never goes in this file. It comes from the plugin's secure option,
 `CAIRN_API_KEY`, or `~/.config/cairn/client.env`.
 
+The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
+key of the nearest `.cairn.toml`, found by the same walk (M1). `CAIRN_SERVER`
+is read first, and an empty value counts as unset. A call with neither is
+refused with an error that names `cairn init`, and there is no default server.
+`cairn mcp` refuses to start without one.
+
 ## 3. Data model
 
 SQLite through `modernc.org/sqlite` (pure Go, no C toolchain). Every table
@@ -316,6 +322,13 @@ removes them, and `event_list` folds into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
 is how every harness other than Claude Code reaches Cairn.
 
+In M1, `internal/mcp` registers the fifteen tools of the table below, each one
+call of the service. Each write tool takes `agent`, which is the caller's agent
+(CONTRACT §1.1). The two step tools that also name a step's assignee take it as
+`assignee` instead, because there `agent` is the caller: `step_add` and
+`step_update` (CONTRACT §3 names the field `agent` for both, and the MCP surface
+differs from it only there).
+
 | Tool | Purpose |
 |---|---|
 | `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply. The first call of a session. Planned: directives capped at 12, ranked (D16). |
@@ -393,7 +406,7 @@ against an in-process server (D19).
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
 | `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The shipped binary has no network listener (D19). The `cairn serve` listener that mounts them is M2. |
 | `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
-| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
+| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. Built in M1. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
 | `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
 | `internal/auth` | API keys and scopes (server mode). |
@@ -410,7 +423,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 | Command | Does |
 |---|---|
 | `cairn init` | Writes `.cairn.toml` in the current project and registers the project. Planned, M1. |
-| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). |
+| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is planned, M1; `pre-compact` and `stop` are planned, M4. |
 | `cairn status` | The active task and the server in use, for a terminal. Planned, M1. |

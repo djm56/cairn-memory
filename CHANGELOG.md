@@ -76,6 +76,9 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   cases pass, so issue #9 is complete once its pull request chain lands on
   `main` ([PR #56](https://github.com/djm56/cairn-memory/pull/56)).
 - M1 HTTP wire form (issues #14, #17): `internal/api` serves `core.Service` as thin handlers, one POST per call, with each error answered at a status for its kind and a body of kind, message and missing list. `internal/client` is a `Service` over that form. The whole conformance suite runs through the client over an in-process loopback server, and all 80 cases pass. The form is in DESIGN §5.4. The shipped binary has no listener (D19).
+- M1 MCP tools (issue #14): `internal/mcp` registers the fifteen tools of DESIGN §4 (the thirteen tools, plus `recall` and `search`) over a `core.Service`, through the MCP protocol of `github.com/modelcontextprotocol/go-sdk` v1.8.0. A call's result is compact JSON; a failure is a tool error whose text is the HTTP error body, with its kind, message and missing list. The step tools name the step's assignee `assignee`, since `agent` is the caller there (CONTRACT §3).
+- M1 `cairn mcp` (issue #15): the MCP server over stdio, through `internal/client` to a server. It is the only client path (D11), and it never opens a database. It needs `server` in `.cairn.toml` or `CAIRN_SERVER`, and refuses to start without one (issue #66). It listens on nothing (D19).
+- Server resolution (issue #66): `internal/identity` gives the server URL from `CAIRN_SERVER`, else from the `server` key of the nearest `.cairn.toml`.
 
 ### Changed
 

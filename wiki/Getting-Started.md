@@ -38,11 +38,11 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 
 | Area | Exists now | Planned |
 |---|---|---|
-| Binary | `cairn version` | `init`, `status`, `doctor`, `export task` and `hook session-start` in M1, and `mcp` (server only). `serve` in M2. `enable` and the other hooks in M4. `import` in M6. `review run` is Later. |
+| Binary | `cairn version` and `cairn mcp` (server only) | `init`, `status`, `doctor`, `export task` and `hook session-start` in M1. `serve` in M2. `enable` and the other hooks in M4. `import` in M6. `review run` is Later. |
 | Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | The M1 tool changes are in the code. Item 12 is deferred to Later ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
 | Conformance suite | `internal/conformance`: 82 cases, all passing against the local service and over the HTTP client | — |
 | Store | SQLite store with migrations, full-text search and task-id allocation (phase 2) | Postgres is Later. |
-| MCP adapter | Nothing yet | `cairn mcp`, server only, in M1. |
+| MCP adapter | `cairn mcp`: the 15 tools over stdio, to the server named by `server` in `.cairn.toml` or `CAIRN_SERVER`. It refuses to start without one. | The server it talks to is `cairn serve`, in M2. |
 | Claude Code plugin | Nothing yet | M5. |
 | Server | Nothing yet | `cairn serve` in M2; the web UI and dashboard in M3. |
 | CLI and hooks | Nothing yet | `internal/cli`, `pre-compact` and `stop`, in M4. |
