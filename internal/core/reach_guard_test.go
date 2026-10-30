@@ -13,85 +13,186 @@ import (
 	"testing"
 )
 
-// The reach guard (step 8 review, W1). The M1 promises that the CLI and the MCP
-// adapter never open a database and never listen (DESIGN.md §5.2, §5.3; D11, D19)
-// are checked here by reading the source, not by a grep run once. The guarded
-// packages link core and store, since the client imports core, so an import graph
-// cannot tell a call from a link. The guard reads the calls instead. It resolves
-// each package name through the file's imports, so an aliased import is still
-// seen. It is in package core_test because it reuses the parsing of errortext_test.go.
+// The reach guard (step 8 review W1, step 10 review W1). The M1 promises that the
+// CLI, the MCP adapter and the client never open a database and never listen
+// (DESIGN.md §5.2, §5.3; D11, D19). That is checked here by reading the source, not
+// by a grep run once. The guarded packages link core and store, since the client
+// imports core, so an import graph cannot tell a call from a link. The guard reads
+// the calls instead.
+//
+// The guard is a denylist, and it says so: it names the forms of a listener it knows
+// (see listenerName and the rules in reachFaults). It does not prove that no listener
+// exists. What it does prove is that a new package is guarded by default (guardedDirs
+// derives the set from the module, and a package must be exempted by name, with a
+// reason), and that each form it names is caught by a snippet that fails without it
+// (TestReachGuardCanFail).
 
-// guardedDirs are the packages that reach a server and nothing else.
-var guardedDirs = []string{"../../cmd/cairn", "../mcp", "../client"}
-
-// repoRoot is the module root, which the header-caller check walks.
-const repoRoot = "../.."
-
-// Import paths of the packages the guard names.
 const (
-	storePath   = "github.com/djm56/cairn-memory/internal/store"
-	corePath    = "github.com/djm56/cairn-memory/internal/core"
-	netPath     = "net"
-	netHTTPPath = "net/http"
+	storePath    = "github.com/djm56/cairn-memory/internal/store"
+	corePath     = "github.com/djm56/cairn-memory/internal/core"
+	netPath      = "net"
+	netHTTPPath  = "net/http"
+	tlsPath      = "crypto/tls"
+	httptestPath = "net/http/httptest"
+	// repoRoot is the module root, which the directory walks start from.
+	repoRoot = "../.."
 )
 
-// banned is one call or literal a guarded package must not contain. A path of ""
-// matches the name on any receiver, as ListenAndServe does: it is a method of
-// http.Server as well as a function. A name matches by prefix, so ListenAndServeTLS
-// is caught with ListenAndServe.
-type banned struct {
-	path    string
-	name    string
-	literal bool // a composite literal of the type, such as &http.Server{...}
-	why     string
+// serverSide are the packages the guard does not check, each with the reason. Every
+// other package in the module is guarded, so a new package is checked from its first
+// commit. A name here that is not a package of the module fails the test.
+var serverSide = map[string]string{
+	"internal/store": "owns the database; it is the one place a store is opened",
+	"internal/core":  "the in-process Service over a store; it imports internal/store",
+	"internal/api":   "HTTP handlers only; the shipped binary starts no listener (D19). M2's cairn serve is in cmd/cairn, which is guarded",
 }
 
-// bannedCalls is the list the guard enforces.
-var bannedCalls = []banned{
-	{path: storePath, name: "Open", why: "opens a database"},
-	{path: corePath, name: "NewLocal", why: "builds a local Service over a database"},
-	{path: netPath, name: "Listen", why: "listens on a socket"},
-	{path: "", name: "ListenAndServe", why: "starts an HTTP listener"},
-	{path: netHTTPPath, name: "Server", literal: true, why: "configures an HTTP listener"},
+// requiredGuarded are packages that must stay in the guard. Losing one of them to an
+// exemption, or to a rename, fails the test and names it.
+var requiredGuarded = []string{"cmd/cairn", "internal/mcp", "internal/client", "internal/identity"}
+
+// guardedDirs derives the packages the guard checks: every directory under the module
+// with a non-test Go file, except the serverSide ones. It fails when a serverSide name
+// is no longer a package, or when a required package is not guarded, and says which.
+func guardedDirs(t *testing.T) []string {
+	t.Helper()
+	pkgs := map[string]bool{}
+	err := filepath.WalkDir(repoRoot, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if p != repoRoot && (strings.HasPrefix(d.Name(), ".") || d.Name() == "testdata") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(p, ".go") && !strings.HasSuffix(p, "_test.go") {
+			rel, err := filepath.Rel(repoRoot, filepath.Dir(p))
+			if err != nil {
+				return err
+			}
+			pkgs[filepath.ToSlash(rel)] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, why := range serverSide {
+		if !pkgs[name] {
+			t.Fatalf("the reach guard exempts %s (%s), which has no non-test Go files: update serverSide", name, why)
+		}
+	}
+	var out []string
+	for name := range pkgs {
+		if _, exempt := serverSide[name]; !exempt {
+			out = append(out, name)
+		}
+	}
+	for _, name := range requiredGuarded {
+		if !contains(out, name) {
+			t.Fatalf("the reach guard does not check %s: it must, since it is client-side", name)
+		}
+	}
+	return out
 }
 
-// reachFaults returns one description for each banned call or literal in f, with
-// its position. An empty result means the file is clean.
+// contains reports whether list holds s.
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// bannedImports are packages a guarded non-test file must not import at all, with the
+// reason. Importing one is a fault on its own, since it is the way to reach the call.
+var bannedImports = map[string]string{
+	storePath:    "opens a database",
+	httptestPath: "starts an in-process HTTP listener",
+}
+
+// listenerPkgs are the standard packages whose functions and types start or configure
+// a listener. A name from one of them is checked by listenerName or by the rules below.
+var listenerPkgs = map[string]bool{netPath: true, netHTTPPath: true, tlsPath: true}
+
+// listenerName reports whether a selector qualified by a listener package (net,
+// net/http, crypto/tls) starts a listener: a name that starts with Listen, or Serve,
+// ServeTLS or FileListener. A type such as net.ListenConfig or net.Listener counts too:
+// a guarded package has no use for either, and a listener's configuration is the first
+// step to one. ServeHTTP does not count: it hands a request to a handler and opens
+// nothing, and neither does ServeFile.
+func listenerName(name string) bool {
+	return strings.HasPrefix(name, "Listen") || name == "Serve" || name == "ServeTLS" || name == "FileListener"
+}
+
+// listenerMethod reports whether a selector with any receiver is a listener's method:
+// the exact names of the functions and methods that open a socket or serve one. It is
+// exact, not a prefix, so a field or type called Listener on an unrelated value is not
+// caught. The package-qualified rule (listenerName) covers the functions by package.
+func listenerMethod(name string) bool {
+	switch name {
+	case "Listen", "ListenPacket", "ListenAndServe", "ListenAndServeTLS", "Serve", "ServeTLS", "FileListener":
+		return true
+	}
+	return false
+}
+
+// reachFaults returns one description for each banned import, call or reference in f,
+// with its position. An empty result means the file is clean. The rules are:
+//   - a banned import (bannedImports);
+//   - a dot import, in any file: a name it brings in cannot be resolved to its package
+//     by reading the call, so it is refused;
+//   - a listener function or method (listenerName for a listener package; listenerMethod
+//     for any receiver, so it covers a method value, an embedded *http.Server, and a value
+//     of any type with the method);
+//   - a reference to the net/http Server type (a literal, a var, new(http.Server), a
+//     field), since a Server is the configuration of a listener;
+//   - store.Open and core.NewLocal, which open a store or build a Service over one.
 func reachFaults(fset *token.FileSet, f *ast.File) []string {
 	names := importNames(f)
 	var out []string
 	report := func(n ast.Node, what string) {
 		out = append(out, fmt.Sprintf("%s: %s", fset.Position(n.Pos()), what))
 	}
+	for _, imp := range f.Imports {
+		p, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			continue
+		}
+		if why, banned := bannedImports[p]; banned {
+			report(imp, fmt.Sprintf("imports %s, which %s", p, why))
+		}
+		if imp.Name != nil && imp.Name.Name == "." {
+			report(imp, fmt.Sprintf("a dot import of %s hides the package of its calls: import it by name", p))
+		}
+	}
 	ast.Inspect(f, func(n ast.Node) bool {
-		switch n := n.(type) {
-		case *ast.SelectorExpr:
-			for _, b := range bannedCalls {
-				if b.literal || !strings.HasPrefix(n.Sel.Name, b.name) {
-					continue
-				}
-				if b.path == "" {
-					report(n, fmt.Sprintf("a call to %s %s", n.Sel.Name, b.why))
-					continue
-				}
-				if x, ok := n.X.(*ast.Ident); ok && names[x.Name] == b.path && n.Sel.Name == b.name {
-					report(n, fmt.Sprintf("%s.%s %s", path.Base(b.path), b.name, b.why))
-				}
-			}
-		case *ast.CompositeLit:
-			sel, ok := n.Type.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			x, ok := sel.X.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			for _, b := range bannedCalls {
-				if b.literal && names[x.Name] == b.path && sel.Sel.Name == b.name {
-					report(n, fmt.Sprintf("a %s.%s literal %s", path.Base(b.path), b.name, b.why))
-				}
-			}
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		x, isPkg := sel.X.(*ast.Ident)
+		pkg := ""
+		if isPkg {
+			pkg = names[x.Name]
+		}
+		switch {
+		case pkg == storePath && sel.Sel.Name == "Open":
+			report(sel, "store.Open opens a database")
+		case pkg == corePath && sel.Sel.Name == "NewLocal":
+			report(sel, "core.NewLocal builds a local Service over a database")
+		case pkg == netHTTPPath && sel.Sel.Name == "Server":
+			report(sel, "http.Server configures an HTTP listener")
+		case pkg == tlsPath && sel.Sel.Name == "NewListener":
+			report(sel, "tls.NewListener wraps a listener")
+		case listenerPkgs[pkg] && listenerName(sel.Sel.Name):
+			report(sel, fmt.Sprintf("%s.%s starts a listener", path.Base(pkg), sel.Sel.Name))
+		case !listenerPkgs[pkg] && listenerMethod(sel.Sel.Name):
+			report(sel, fmt.Sprintf("a call to .%s starts a listener", sel.Sel.Name))
 		}
 		return true
 	})
@@ -121,7 +222,8 @@ func headerCallerUses(fset *token.FileSet, f *ast.File) []string {
 }
 
 // importNames maps each name a file gives its imports to the import path. A
-// file's package is named by its last path element unless it is renamed.
+// file's package is named by its last path element unless it is renamed. A dot import
+// has no name and is left out: reachFaults refuses it.
 func importNames(f *ast.File) map[string]string {
 	out := map[string]string{}
 	for _, imp := range f.Imports {
@@ -133,7 +235,9 @@ func importNames(f *ast.File) map[string]string {
 		if imp.Name != nil {
 			name = imp.Name.Name
 		}
-		out[name] = p
+		if name != "." {
+			out[name] = p
+		}
 	}
 	return out
 }
@@ -154,7 +258,7 @@ func nonTestGoFiles(t *testing.T, dir string) []string {
 		}
 	}
 	if len(out) == 0 {
-		t.Fatalf("the reach guard lists %s, which has no non-test Go files: update guardedDirs", dir)
+		t.Fatalf("the reach guard lists %s, which has no non-test Go files", dir)
 	}
 	return out
 }
@@ -169,12 +273,13 @@ func parseFile(t *testing.T, fset *token.FileSet, file string) *ast.File {
 	return f
 }
 
-// TestGuardedPackagesNeverOpenStoreOrListen is W1. The CLI, the MCP adapter and
-// the client make no call that opens a store or starts a listener, in any of their
-// non-test files, including the ones added later.
+// TestGuardedPackagesNeverOpenStoreOrListen is W1. Every package the guard derives,
+// the CLI, the MCP adapter, the client and identity among them, makes no call that
+// opens a store or starts a listener, and imports no store or test server, in any of
+// its non-test files, including the ones added later.
 func TestGuardedPackagesNeverOpenStoreOrListen(t *testing.T) {
-	for _, dir := range guardedDirs {
-		for _, file := range nonTestGoFiles(t, dir) {
+	for _, dir := range guardedDirs(t) {
+		for _, file := range nonTestGoFiles(t, filepath.Join(repoRoot, dir)) {
 			fset := token.NewFileSet()
 			for _, fault := range reachFaults(fset, parseFile(t, fset, file)) {
 				t.Errorf("%s: the guarded package must not reach a store or a listener", fault)
@@ -217,27 +322,48 @@ func TestNoNonTestUseOfUnauthenticatedHeaderCaller(t *testing.T) {
 	}
 }
 
-// TestReachGuardCanFail proves the guard can fail. Each snippet holds one banned
-// call, or none, and the guard must answer with exactly the count given. A guard
-// that always answers zero would pass the test above and check nothing.
+// TestReachGuardCanFail proves the guard can fail. Each snippet holds the banned forms
+// and the count the guard must answer with. A guard that always answers zero would
+// pass the test above and check nothing. A reference to a banned type counts once and
+// its call counts once, so a snippet with both is counted twice, and says so.
 func TestReachGuardCanFail(t *testing.T) {
 	const pkg = "package p\n"
 	storeImp := `import store "` + storePath + `"` + "\n"
 	coreImp := `import "` + corePath + `"` + "\n"
+	netImp := `import "net"` + "\n"
+	httpImp := `import "net/http"` + "\n"
+	tlsImp := `import "crypto/tls"` + "\n"
 	cases := []struct {
 		name   string
 		src    string
 		faults int
 	}{
-		{"store.Open", pkg + `import "` + storePath + `"` + "\nfunc f() { store.Open(\"x\") }\n", 1},
-		{"aliased store import", pkg + storeImp + "func f() { store.Open(\"x\") }\n", 1},
+		// The import and the call are each a fault. A ListenConfig is a listener's
+		// configuration, so its literal is a second fault, as http.Server's is.
+		{"store.Open", pkg + `import "` + storePath + `"` + "\nfunc f() { store.Open(\"x\") }\n", 2},
+		{"aliased store import", pkg + storeImp + "func f() { store.Open(\"x\") }\n", 2},
 		{"core.NewLocal", pkg + coreImp + "func f() { core.NewLocal(nil) }\n", 1},
-		{"net.Listen", pkg + `import "net"` + "\nfunc f() { net.Listen(\"tcp\", \"127.0.0.1:0\") }\n", 1},
-		{"http.ListenAndServe", pkg + `import "net/http"` + "\nfunc f() { http.ListenAndServe(\":80\", nil) }\n", 1},
-		{"a server's ListenAndServe", pkg + `import "net/http"` + "\nfunc f(s *http.Server) { s.ListenAndServe() }\n", 1},
-		{"ListenAndServeTLS", pkg + `import "net/http"` + "\nfunc f(s *http.Server) { s.ListenAndServeTLS(\"c\", \"k\") }\n", 1},
-		{"http.Server literal", pkg + `import "net/http"` + "\nvar s = &http.Server{Addr: \":80\"}\n", 1},
-		{"clean calls", pkg + coreImp + `import "net/http"` + "\nfunc f() { core.ValidProjectName(\"x\"); _ = http.StatusOK }\n", 0},
+		{"net.Listen", pkg + netImp + "func f() { net.Listen(\"tcp\", \"127.0.0.1:0\") }\n", 1},
+		{"net.ListenPacket (a Listen prefix)", pkg + netImp + "func f() { net.ListenPacket(\"udp\", \":0\") }\n", 1},
+		{"a method of a net.ListenConfig", pkg + netImp + "func f() { (&net.ListenConfig{}).Listen(nil, \"tcp\", \":0\") }\n", 2},
+		{"net.FileListener", pkg + netImp + "func f() { net.FileListener(nil) }\n", 1},
+		{"http.ListenAndServe", pkg + httpImp + "func f() { http.ListenAndServe(\":80\", nil) }\n", 1},
+		{"http.Serve", pkg + httpImp + "func f() { http.Serve(nil, nil) }\n", 1},
+		// A *http.Server parameter is a reference to the type, and the call is a second fault.
+		{"a server's ListenAndServe", pkg + httpImp + "func f(s *http.Server) { s.ListenAndServe() }\n", 2},
+		{"ListenAndServeTLS", pkg + httpImp + "func f(s *http.Server) { s.ListenAndServeTLS(\"c\", \"k\") }\n", 2},
+		{"http.Server literal", pkg + httpImp + "var s = &http.Server{Addr: \":80\"}\n", 1},
+		{"a var of http.Server, then Serve", pkg + httpImp + "var s http.Server\nfunc f(l net.Listener) { s.Serve(l) }\n", 2},
+		{"new(http.Server)", pkg + httpImp + "var s = new(http.Server)\n", 1},
+		{"an embedded *http.Server, then a call", pkg + httpImp + "type h struct{ *http.Server }\nfunc f(x h) { x.ListenAndServe() }\n", 2},
+		{"a method value of ListenAndServe", pkg + "type s interface{ ListenAndServe() error }\nfunc f(x s) { g := x.ListenAndServe; _ = g }\n", 1},
+		{"tls.Listen", pkg + tlsImp + "func f() { tls.Listen(\"tcp\", \":0\", nil) }\n", 1},
+		{"tls.NewListener", pkg + tlsImp + "func f(l net.Listener) { tls.NewListener(l, nil) }\n", 1},
+		{"a dot import of net", pkg + `import . "net"` + "\nfunc f() { Listen(\"tcp\", \":0\") }\n", 1},
+		{"a dot import of a package that has a Listen", pkg + `import . "x/lib"` + "\nvar _ = 1\n", 1},
+		{"an import of httptest", pkg + `import "net/http/httptest"` + "\nvar _ = 1\n", 1},
+		{"a clean file",
+			pkg + coreImp + httpImp + "func f(h http.Handler) { core.ValidProjectName(\"x\"); _ = http.StatusOK; h.ServeHTTP(nil, nil); _ = http.ServeFile }\n", 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -272,5 +398,25 @@ func TestReachGuardCanFail(t *testing.T) {
 				t.Fatalf("headerCallerUses = %d uses %q, want %d", len(got), got, c.faults)
 			}
 		})
+	}
+}
+
+// TestGuardedDirsAreDerived checks the directory rule. The derived set holds the
+// required packages, and no exempt one; a package added to the module is in it
+// without a line of the guard being changed.
+func TestGuardedDirsAreDerived(t *testing.T) {
+	dirs := guardedDirs(t)
+	for _, name := range requiredGuarded {
+		if !contains(dirs, name) {
+			t.Errorf("%s is not guarded", name)
+		}
+	}
+	for name := range serverSide {
+		if contains(dirs, name) {
+			t.Errorf("%s is exempt, and is also guarded", name)
+		}
+	}
+	if len(dirs) < len(requiredGuarded) {
+		t.Errorf("the guard checks %d packages, want at least %d", len(dirs), len(requiredGuarded))
 	}
 }
