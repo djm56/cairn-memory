@@ -359,7 +359,7 @@ is a Bishop default, pending operator approval, and is marked so; a marked item
 is not approved until the operator says it is. From item 13 on, an item is
 checked by a conformance case unless it is marked `(core test only)`, where
 only a core test checks it. An item with no check of its own is marked
-`(not tested)`. Item 35 is the one such item today (see its entry).
+`(not tested)`. No item is marked so today.
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -489,10 +489,9 @@ only a core test checks it. An item with no check of its own is marked
     the project's directives) run in one read transaction. The answer is one
     consistent state of the project: a write that lands during the call is seen
     by all of it or by none (§2). *Bishop default, pending operator approval.*
-    (not tested)
-    The store test `TestWithReadTxIsSnapshot` pins the snapshot
-    that a read transaction gives, but no test checks that `task_current` reads
-    through one, so no check of this item exists.
+    (core test only)
+    `TestTaskCurrentReadsOneSnapshot` in `internal/core` checks it. The store
+    test `TestWithReadTxIsSnapshot` pins what a read transaction gives.
 36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
     `task_update` from `blocked` to `active` writes an `unblocked` event, in
     the same transaction as the move. A move to `blocked` writes its `blocked`

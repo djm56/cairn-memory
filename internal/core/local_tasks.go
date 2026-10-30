@@ -159,6 +159,9 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 		t := taskFromRow(row)
 		cur.Task = &t
 		cur.OtherActive = len(active) - 1
+		if l.betweenReads != nil {
+			l.betweenReads()
+		}
 		crit, err := store.ListCriteria(ctx, q, row.ID)
 		if err != nil {
 			return err
