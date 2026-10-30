@@ -78,6 +78,16 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 ### Changed
 
+- M1 surface (issues #67, #68, #62, #70): the agent surface is 13 tools plus
+  `recall` and `search`. `event_list` folds into `task_get` (`section: events`,
+  paged, with `step`), and `review_record`, `note_put` and `note_get` are
+  removed from `core.Service`. A review is an `event_log` entry of kind
+  `review`, whose data holds the verdict and counts; a missing or malformed
+  field is `invalid`, and the message names the fix. CONTRACT §9 item 39 (Bishop
+  default, pending operator veto) rules that an agent may log a review. The store
+  is unchanged. The task_current snapshot is tested (CONTRACT §9 item 35), and
+  an error-text audit fails on any error string that advises `--force`, `rm` or
+  `reset`. The conformance suite has 72 cases.
 - Plan v1: central server only, 13 tools plus recall and search, viewer scope, hooks and CLI, dashboard; milestones M1–M8 and Later replace phases 3–10 ([PR #65](https://github.com/djm56/cairn-memory/pull/65)).
 - Decision D19 (issue #71): M1 builds no network listener in the shipped binary. `internal/api` lands in M1 as handlers only, and `internal/client` is tested against an in-process server. M1's exit check is an MCP stdio test over that server. The live run against `cairn serve` moves to M2's exit check (#19) ([PR #101](https://github.com/djm56/cairn-memory/pull/101)).
 - Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on
