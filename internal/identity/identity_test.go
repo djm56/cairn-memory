@@ -364,6 +364,44 @@ func TestResolveDirectoryNamedFile(t *testing.T) {
 	if strings.Contains(err.Error(), "not valid TOML") {
 		t.Errorf("error %q wrongly reports a TOML fault", err)
 	}
+	// DESIGN §2.1: the directory refusal does not name `cairn init`.
+	if strings.Contains(err.Error(), "cairn init") {
+		t.Errorf("error %q wrongly names `cairn init`", err)
+	}
+}
+
+// TestNoProjectKeyNamesInit checks that both refusals for a .cairn.toml with no
+// usable project key name `cairn init` as the way out. They are separate
+// branches of readFile: a missing key, and an empty one.
+func TestNoProjectKeyNamesInit(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"missing key", "server = \"https://cairn.lan:8787\"\n"},
+		{"empty key", "project = \"\"\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := newTree(t, "app", []file{{"app/.cairn.toml", tc.body}})
+			setEnv(t, EnvProject, "", true)
+			setEnv(t, EnvProjectDir, "", true)
+
+			got, err := Resolve(filepath.Join(tr.root, "app"))
+			if err == nil {
+				t.Fatalf("Resolve: got %+v, want an error", got)
+			}
+			if kind := core.KindOf(err); kind != core.KindInvalid {
+				t.Errorf("Resolve error kind = %q (%v), want invalid", kind, err)
+			}
+			if !strings.Contains(err.Error(), "has no project key") {
+				t.Errorf("error %q does not say the project key is missing", err)
+			}
+			if !strings.Contains(err.Error(), "cairn init") {
+				t.Errorf("error %q does not name `cairn init`", err)
+			}
+		})
+	}
 }
 
 // TestResolveProjectWrongType checks that a project key of the wrong type is
