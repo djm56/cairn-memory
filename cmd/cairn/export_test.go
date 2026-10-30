@@ -239,3 +239,50 @@ func TestExitCheckMCPFlowThenExport(t *testing.T) {
 		}
 	}
 }
+
+// TestExportFoldsServerText is step 10 review W3 through export. A title with a carriage
+// return and a Markdown heading stays one heading line. A goal keeps its line break, as
+// a paragraph does, and loses its escape sequence. A key file's path and its note are one
+// line each, with the separator and the control character gone.
+func TestExportFoldsServerText(t *testing.T) {
+	local, url := newServer(t, nil)
+	dir := t.TempDir()
+	useDir(t, dir)
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	res, err := local.TaskStart(callerFor("acme-api"), core.TaskStartRequest{
+		Title:    "Ship\r\n# Forged\x1b[2J heading",
+		Goal:     "Line one\r\nline two\x1b[31m red",
+		KeyFiles: []core.TaskFile{{Path: "src/a\u2028.go", Role: core.FileKey, Note: "note\x1b[1m\rhere"}},
+		Steps:    []core.StepInput{{Title: "Write it"}},
+	})
+	if err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+
+	code, stdout, stderr := runCmd(t, "export", "task", res.ID)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0 (stderr %q)", code, stderr)
+	}
+	for _, want := range []string{
+		"# Ship # Forged heading\n",
+		"## Goal\n\nLine one\nline two red\n",
+		"- `src/a .go` (key): note here\n",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("export lacks %q:\n%s", want, stdout)
+		}
+	}
+	headings := 0
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.HasPrefix(line, "# ") {
+			headings++
+		}
+	}
+	if headings != 1 {
+		t.Errorf("export has %d single-# headings, want the title only:\n%s", headings, stdout)
+	}
+	if strings.ContainsAny(stdout, "\r\x1b\x07\u2028") {
+		t.Errorf("export carries a control character or a separator: %q", stdout)
+	}
+}

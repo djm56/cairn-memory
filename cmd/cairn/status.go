@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
@@ -43,18 +44,20 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 // then the active task, its next action and its current step.
 func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	fmt.Fprintf(w, "project     %s (from %s)\n", t.project.Name, projectSource(t.project))
-	fmt.Fprintf(w, "server      %s (from %s)\n", t.url, serverSource())
+	// The URL goes without its credentials, and each server-derived text is one
+	// printable line, as the hook prints it (step 10 review W3, W5).
+	fmt.Fprintf(w, "server      %s (from %s)\n", client.DisplayURL(t.url), serverSource())
 	if cur.Task == nil {
 		fmt.Fprintln(w, "task        none active")
 		return
 	}
 	task := cur.Task
-	fmt.Fprintf(w, "task        %s  %s  %s\n", task.ID, task.Status, task.Title)
-	if task.NextAction != "" {
-		fmt.Fprintf(w, "next        %s\n", task.NextAction)
+	fmt.Fprintf(w, "task        %s  %s  %s\n", plain(task.ID), plain(string(task.Status)), plain(task.Title))
+	if next := plain(task.NextAction); next != "" {
+		fmt.Fprintf(w, "next        %s\n", next)
 	}
 	if s := currentStep(cur.Steps); s != nil {
-		fmt.Fprintf(w, "step        %d of %d: %s (%s)\n", s.Number, len(cur.Steps), s.Title, s.Status)
+		fmt.Fprintf(w, "step        %d of %d: %s (%s)\n", s.Number, len(cur.Steps), plain(s.Title), plain(string(s.Status)))
 	}
 	if cur.OtherActive > 0 {
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)

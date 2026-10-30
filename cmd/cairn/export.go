@@ -104,18 +104,20 @@ func allEvents(t *target, id string) ([]core.Event, error) {
 }
 
 // renderTask writes the task as Markdown. The journal is written oldest first, as a
-// person reads a history; the server gives it newest first. Text is written as it is
-// stored, with its line breaks folded into list items, so the export is one list per
-// record. Nothing in it is a command to run.
+// person reads a history; the server gives it newest first. A single-line field is
+// folded to one line by foldLine, so a title or a note cannot start a heading or a
+// list item of its own, and no control character reaches the document (step 10
+// review W3). A section body keeps its own line breaks and Markdown, and loses its
+// control characters, as blockText does. Nothing in it is a command to run.
 func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	task := d.Task
-	fmt.Fprintf(w, "# %s\n\n", oneLine(task.Title))
-	fmt.Fprintf(w, "- **ID:** %s\n", task.ID)
-	fmt.Fprintf(w, "- **Status:** %s\n", task.Status)
-	fmt.Fprintf(w, "- **Priority:** %s\n", task.Priority)
-	fmt.Fprintf(w, "- **Project:** %s\n", task.Project)
+	fmt.Fprintf(w, "# %s\n\n", foldLine(task.Title))
+	fmt.Fprintf(w, "- **ID:** %s\n", foldLine(task.ID))
+	fmt.Fprintf(w, "- **Status:** %s\n", foldLine(string(task.Status)))
+	fmt.Fprintf(w, "- **Priority:** %s\n", foldLine(string(task.Priority)))
+	fmt.Fprintf(w, "- **Project:** %s\n", foldLine(task.Project))
 	if task.Owner != "" {
-		fmt.Fprintf(w, "- **Owner:** %s\n", oneLine(task.Owner))
+		fmt.Fprintf(w, "- **Owner:** %s\n", foldLine(task.Owner))
 	}
 	fmt.Fprintf(w, "- **Opened:** %s\n", stamp(task.OpenedAt))
 	if task.StartedAt != nil {
@@ -139,12 +141,12 @@ func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 			if c.Result == core.CriterionMet {
 				box = "x"
 			}
-			line := fmt.Sprintf("- [%s] %s", box, oneLine(c.Criterion))
+			line := fmt.Sprintf("- [%s] %s", box, foldLine(c.Criterion))
 			if c.Result != "" {
 				line += " — " + string(c.Result)
 			}
 			if c.Evidence != "" {
-				line += ": " + oneLine(c.Evidence)
+				line += ": " + foldLine(c.Evidence)
 			}
 			fmt.Fprintln(w, line)
 		}
@@ -158,12 +160,12 @@ func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	if len(d.Steps) > 0 {
 		fmt.Fprint(w, "\n## Steps\n\n")
 		for _, s := range d.Steps {
-			line := fmt.Sprintf("%d. [%s] %s", s.Number, s.Status, oneLine(s.Title))
+			line := fmt.Sprintf("%d. [%s] %s", s.Number, foldLine(string(s.Status)), foldLine(s.Title))
 			if s.Agent != "" {
-				line += " (assignee: " + oneLine(s.Agent) + ")"
+				line += " (assignee: " + foldLine(s.Agent) + ")"
 			}
 			if s.Summary != "" {
-				line += ": " + oneLine(s.Summary)
+				line += ": " + foldLine(s.Summary)
 			}
 			fmt.Fprintln(w, line)
 		}
@@ -171,28 +173,28 @@ func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	if len(d.Lessons) > 0 || d.NoLessonsReason != "" {
 		fmt.Fprint(w, "\n## Lessons\n\n")
 		for _, l := range d.Lessons {
-			line := fmt.Sprintf("- **%s:** %s", l.Kind, oneLine(l.Text))
+			line := fmt.Sprintf("- **%s:** %s", foldLine(string(l.Kind)), foldLine(l.Text))
 			if l.Why != "" {
-				line += " Why: " + oneLine(l.Why)
+				line += " Why: " + foldLine(l.Why)
 			}
 			if l.Correction != "" {
-				line += " Correction: " + oneLine(l.Correction)
+				line += " Correction: " + foldLine(l.Correction)
 			}
 			fmt.Fprintln(w, line)
 		}
 		if d.NoLessonsReason != "" {
-			fmt.Fprintf(w, "- No lessons: %s\n", oneLine(d.NoLessonsReason))
+			fmt.Fprintf(w, "- No lessons: %s\n", foldLine(d.NoLessonsReason))
 		}
 	}
 	if len(d.Mistakes) > 0 {
 		fmt.Fprint(w, "\n## Mistakes\n\n")
 		for _, m := range d.Mistakes {
-			line := fmt.Sprintf("- %s (%s): %s", oneLine(m.Agent), m.Impact, oneLine(m.Mistake))
+			line := fmt.Sprintf("- %s (%s): %s", foldLine(m.Agent), foldLine(string(m.Impact)), foldLine(m.Mistake))
 			if m.Correction != "" {
-				line += " Correction: " + oneLine(m.Correction)
+				line += " Correction: " + foldLine(m.Correction)
 			}
 			if m.Prevention != "" {
-				line += " Prevention: " + oneLine(m.Prevention)
+				line += " Prevention: " + foldLine(m.Prevention)
 			}
 			fmt.Fprintln(w, line)
 		}
@@ -207,11 +209,11 @@ func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 		fmt.Fprint(w, "\n## Journal\n\n")
 		for i := len(events) - 1; i >= 0; i-- {
 			e := events[i]
-			line := fmt.Sprintf("- %s **%s**", stamp(e.OccurredAt), e.Kind)
+			line := fmt.Sprintf("- %s **%s**", stamp(e.OccurredAt), foldLine(string(e.Kind)))
 			if e.Agent != "" {
-				line += " " + oneLine(e.Agent)
+				line += " " + foldLine(e.Agent)
 			}
-			line += ": " + oneLine(e.Text)
+			line += ": " + foldLine(e.Text)
 			fmt.Fprintln(w, line)
 			if data := compactData(e.Data); data != "" {
 				fmt.Fprintf(w, "  - data: %s\n", data)
@@ -220,22 +222,25 @@ func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	}
 }
 
-// section writes a titled block of text, when the text is not empty.
+// section writes a titled block of text, when the text is not empty. Its body keeps
+// its line breaks, since a goal or a context is a paragraph, and loses its control
+// characters (blockText).
 func section(w io.Writer, title, body string) {
 	if body == "" {
 		return
 	}
-	fmt.Fprintf(w, "\n## %s\n\n%s\n", title, strings.TrimSpace(body))
+	fmt.Fprintf(w, "\n## %s\n\n%s\n", title, strings.TrimSpace(blockText(body)))
 }
 
 // fileLine is one key file or deliverable, with its role and note when it has them.
+// The path is one line without control characters (step 10 review W3).
 func fileLine(f core.TaskFile) string {
-	line := "- `" + f.Path + "`"
+	line := "- `" + foldLine(f.Path) + "`"
 	if f.Role != "" {
-		line += " (" + string(f.Role) + ")"
+		line += " (" + foldLine(string(f.Role)) + ")"
 	}
 	if f.Note != "" {
-		line += ": " + oneLine(f.Note)
+		line += ": " + foldLine(f.Note)
 	}
 	return line
 }
@@ -245,11 +250,6 @@ func stamp(t time.Time) string {
 	return t.UTC().Format("2006-01-02 15:04 UTC")
 }
 
-// oneLine folds a text's line breaks into spaces, so it fits one list item.
-func oneLine(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
-}
-
 // compactData writes an event's data as one line of JSON, or "" when it has none.
 func compactData(data json.RawMessage) string {
 	if len(data) == 0 {
@@ -257,7 +257,9 @@ func compactData(data json.RawMessage) string {
 	}
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, data); err != nil {
-		return string(data)
+		return foldLine(string(data))
 	}
-	return buf.String()
+	// Valid JSON holds no raw control character, but a line separator may sit in a
+	// string, so the line is folded as well.
+	return foldLine(buf.String())
 }

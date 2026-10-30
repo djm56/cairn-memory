@@ -19,12 +19,35 @@ import (
 // project and server come only from the files the test writes.
 func useDir(t *testing.T, dir string) {
 	t.Helper()
+	assertNoAncestorProjectFile(t)
 	t.Setenv("CAIRN_PROJECT", "")
 	t.Setenv("CAIRN_SERVER", "")
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	prev := workDir
 	workDir = func() (string, error) { return dir, nil }
 	t.Cleanup(func() { workDir = prev })
+}
+
+// assertNoAncestorProjectFile fails the test when a .cairn.toml sits above the temporary
+// directory. A walk up from a test directory reaches the temporary directory's ancestors,
+// so such a file would be read by the test and change what it sees (step 10 review S9).
+// The test says so, rather than passing for the wrong reason.
+func assertNoAncestorProjectFile(t *testing.T) {
+	t.Helper()
+	dir, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".cairn.toml")); err == nil {
+			t.Fatalf("%s holds a .cairn.toml above the temporary directory, which the tests walk up through: move it, or set TMPDIR", dir)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return
+		}
+		dir = parent
+	}
 }
 
 // runCmd runs one command line and returns its exit code and both streams.
@@ -97,15 +120,22 @@ func newServer(t *testing.T, seen *[]string) (*core.Local, string) {
 // its id. It has two steps, the first of which is active.
 func seedTask(t *testing.T, local *core.Local, project string) string {
 	t.Helper()
+	return seedNamedTask(t, local, project, "Wire the export", "Read the schema first")
+}
+
+// seedNamedTask is seedTask with the title and the next action given, so a test can
+// put text in them that the server must carry as it is.
+func seedNamedTask(t *testing.T, local *core.Local, project, title, nextAction string) string {
+	t.Helper()
 	ctx := core.WithCaller(context.Background(), core.Caller{Project: project, Agent: "main", Role: core.RoleAgent})
 	res, err := local.TaskStart(ctx, core.TaskStartRequest{
-		Title: "Wire the export", Goal: "Print a task as Markdown.",
+		Title: title, Goal: "Print a task as Markdown.",
 		Steps: []core.StepInput{{Title: "Read the schema"}, {Title: "Write the printer"}},
 	})
 	if err != nil {
 		t.Fatalf("seed task: %v", err)
 	}
-	next := "Read the schema first"
+	next := nextAction
 	if _, err := local.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, NextAction: &next}); err != nil {
 		t.Fatalf("seed next action: %v", err)
 	}

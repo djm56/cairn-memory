@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -10,8 +12,9 @@ import (
 
 // sessionStartTimeout bounds the one call a session start makes. A hook that waits
 // on a server that does not answer holds up the session, so it gives up well before
-// the client's default of 30 seconds.
-const sessionStartTimeout = 5 * time.Second
+// the client's default of 30 seconds. It is a variable so a test can wait on a server
+// that never answers, rather than the real five seconds (step 10 review S2).
+var sessionStartTimeout = 5 * time.Second
 
 // runHook is the sub-command `cairn hook <event>`: the output a client's hook reads
 // (DESIGN.md §5.2). session-start is built. pre-compact and stop are M4 and are named
@@ -39,12 +42,19 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 // Once its arguments are right, it exits 0 whatever happens after. A hook that fails
 // the session start is worse than a missing context line. So when the project or the
 // server is not there, or does not answer, nothing is printed on stdout and the reason
-// goes to stderr. It writes nothing: its one call is a read.
-func runSessionStart(args []string, stdout, stderr io.Writer) int {
+// goes to stderr. A panic is the same: it is reported on stderr, and the session starts
+// (step 10 review S1). It writes nothing: its one call is a read.
+func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 	if len(args) > 0 {
 		fmt.Fprintf(stderr, "cairn hook session-start: takes no arguments, got %q\n", args)
 		return 2
 	}
+	defer func() {
+		if p := recover(); p != nil {
+			fmt.Fprintf(stderr, "cairn hook session-start: no context added: an internal fault: %v\n%s", p, debug.Stack())
+			code = 0
+		}
+	}()
 	wd, err := workDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn hook session-start: no context added: the working directory: %v\n", err)
@@ -60,7 +70,11 @@ func runSessionStart(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn hook session-start: no context added: %s\n", reason(err))
 		return 0
 	}
-	writeSessionStart(stdout, t.project.Name, cur)
+	// The block is built whole and written once, so a fault cannot leave part of it on
+	// stdout.
+	var block bytes.Buffer
+	writeSessionStart(&block, t.project.Name, cur)
+	_, _ = stdout.Write(block.Bytes())
 	return 0
 }
 
@@ -70,15 +84,17 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "Cairn: no task is active in %s.\n", project)
 		return
 	}
+	// Every server-derived text goes through plain: the block is read by a model, so a
+	// title or next action cannot end its line or start one of its own (W3).
 	task := cur.Task
-	fmt.Fprintf(w, "Cairn task: \"%s\" (%s, %s) in %s.\n", task.Title, task.ID, task.Status, project)
-	if task.NextAction != "" {
-		fmt.Fprintf(w, "Next action: %s\n", task.NextAction)
+	fmt.Fprintf(w, "Cairn task: \"%s\" (%s, %s) in %s.\n", plain(task.Title), plain(task.ID), plain(string(task.Status)), project)
+	if next := plain(task.NextAction); next != "" {
+		fmt.Fprintf(w, "Next action: %s\n", next)
 	} else {
 		fmt.Fprintln(w, "Next action: none recorded.")
 	}
 	if s := currentStep(cur.Steps); s != nil {
-		fmt.Fprintf(w, "Current step: %d of %d, \"%s\" (%s).\n", s.Number, len(cur.Steps), s.Title, s.Status)
+		fmt.Fprintf(w, "Current step: %d of %d, \"%s\" (%s).\n", s.Number, len(cur.Steps), plain(s.Title), plain(string(s.Status)))
 	} else {
 		fmt.Fprintln(w, "Current step: none open.")
 	}

@@ -90,3 +90,83 @@ func TestStatusTakesNoArguments(t *testing.T) {
 		t.Errorf("exit %d, stderr %q: want 2 and the usage error", code, stderr)
 	}
 }
+
+// assertNoCredentials fails when any text carries the user name or password a test
+// puts in a server URL (step 10 review W5).
+func assertNoCredentials(t *testing.T, texts ...string) {
+	t.Helper()
+	for _, text := range texts {
+		for _, secret := range []string{"keeper", "secret"} {
+			if strings.Contains(text, secret) {
+				t.Errorf("output %q carries the credential %q", text, secret)
+			}
+		}
+	}
+}
+
+// TestStatusFoldsServerTextAndHidesCredentials checks W3 and W5 through status: the
+// task's title and next action print as one line each, with no control character, and
+// the server URL prints without its user name and password, from the environment and
+// on the failure path.
+func TestStatusFoldsServerTextAndHidesCredentials(t *testing.T) {
+	local, url := newServer(t, nil)
+	dir := t.TempDir()
+	useDir(t, dir)
+	withCreds := strings.Replace(url, "http://", "http://keeper:secret@", 1)
+	t.Setenv("CAIRN_SERVER", withCreds)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	id := seedNamedTask(t, local, "acme-api", foldedTitle, foldedNext)
+
+	code, stdout, stderr := runCmd(t, "status")
+	if code != 0 {
+		t.Fatalf("exit %d, want 0 (stderr %q)", code, stderr)
+	}
+	for _, want := range []string{
+		"server      " + url + " (from CAIRN_SERVER)",
+		"task        " + id + "  active  Ship ## Forged heading now",
+		"next        first Directives that apply: 0.",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("status lacks %q:\n%s", want, stdout)
+		}
+	}
+	assertNoCredentials(t, stdout, stderr)
+	if strings.ContainsAny(stdout, "\r\x1b\x07") {
+		t.Errorf("status carries a control character: %q", stdout)
+	}
+
+	// The failure path: the client refuses the call, and its error must not carry the
+	// credentials either.
+	t.Setenv("CAIRN_SERVER", "http://keeper:secret@127.0.0.1:1")
+	code, stdout, stderr = runCmd(t, "status")
+	if code != 1 || stdout != "" {
+		t.Errorf("unreachable: exit %d, stdout %q: want 1 and nothing on stdout", code, stdout)
+	}
+	assertNoCredentials(t, stdout, stderr)
+}
+
+// TestDoctorHidesCredentials checks W5 through doctor: the server line and the reach
+// check print the URL without its user name and password, when the server answers and
+// when it does not.
+func TestDoctorHidesCredentials(t *testing.T) {
+	_, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+
+	t.Setenv("CAIRN_SERVER", strings.Replace(url, "http://", "http://keeper:secret@", 1))
+	code, stdout, stderr := runCmd(t, "doctor")
+	if code != 0 {
+		t.Errorf("answering server: exit %d, want 0 (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "server   ok    "+url+" (from CAIRN_SERVER)") {
+		t.Errorf("doctor lacks the server line without credentials:\n%s", stdout)
+	}
+	assertNoCredentials(t, stdout, stderr)
+
+	t.Setenv("CAIRN_SERVER", "http://keeper:secret@127.0.0.1:1")
+	code, stdout, stderr = runCmd(t, "doctor")
+	if code != 1 {
+		t.Errorf("unreachable server: exit %d, want 1", code)
+	}
+	assertNoCredentials(t, stdout, stderr)
+}
