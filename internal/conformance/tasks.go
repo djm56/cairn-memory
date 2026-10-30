@@ -14,6 +14,7 @@ var taskID = regexp.MustCompile(`^task-\d{8}-\d{2,}$`)
 // namesStep reports whether msg contains the step number n as a whole number.
 // The word boundaries stop 1 from matching inside 13, so the check does not
 // depend on which of the two numbers a message happens to list first.
+// It compiles its pattern on each call: it runs only a few times per test run.
 func namesStep(msg string, n int) bool {
 	return regexp.MustCompile(`\b` + strconv.Itoa(n) + `\b`).MatchString(msg)
 }
