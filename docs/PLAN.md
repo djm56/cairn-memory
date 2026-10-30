@@ -14,8 +14,8 @@ What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from
 
-Cairn replaces [bishop-memory](https://github.com/djm56/bishop-memory) (local
-checkout `/Users/djm56/bishop-memory`). bishop-memory works, and it holds the
+Cairn replaces [bishop-memory](https://github.com/djm56/bishop-memory) (a local
+bishop-memory checkout). bishop-memory works, and it holds the
 operator's history: missions, findings, directives and grades. It was built
 around one harness, Bishop, and around one idea: the harness writes Markdown
 files and the service imports them.
@@ -173,9 +173,8 @@ Tool surface after the cuts: `task_current`, `task_start`, `task_get`,
 `task_list`, `task_update`, `task_close`, `step_plan`, `step_add`,
 `step_update`, `event_log`, `learning_add`, `learning_list`, `directive_list`,
 plus `recall` and `search` as read tools. `event_list` folds into `task_get`
-with `section: events`. The plan gives this surface as 13 tools, but the list
-names 15: the 13 above, and `recall` and `search`. Whether the count is 13 or
-15 is open (§10).
+with `section: events`. That is 13 tools plus the read tools `recall` and
+`search` (15 names).
 
 ### After v1
 
@@ -340,11 +339,14 @@ v1's decisions table.
   hook text and install guide. *Recommended.*
 - **D10. Build from the outside in**, in the order in §2: contract, core,
   MCP, plugin, server, UI, migration, review loop. *Recommended; confirmed
-  by the operator 2026-10-27.*
+  by the operator 2026-10-27.* **Superseded by the M1–M8 order in §2**
+  (Plan v1, 2026-10-30); kept as the record.
 
 Plan v1 (2026-10-30) adds D11–D18. Each row names what it replaces and why.
-D2 and D8 are marked superseded above; the other rows replace something that
-is not a numbered decision here, and the table says what.
+D2, D8 and D10 are marked superseded above; the other rows replace something
+that is not a numbered decision here, and the table says what.
+
+**Adopted 2026-10-30 by the operator (Plan v1): D11–D18.**
 
 - **D11. Central server only.** `cairn mcp` and the CLI require a `server` in
   `.cairn.toml` or `CAIRN_SERVER`; no local database path for clients.
@@ -407,5 +409,6 @@ is not a numbered decision here, and the table says what.
 - [ ] Do viewers see proposed learnings, or only ratified directives?
 - [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
 - [ ] Rename to `cairn` now (one PR, before M1) or after M8?
-- [ ] Is the agent tool surface 13 tools or 15? Plan v1 gives 13 and lists 15
-  (see Scope of v1).
+- [ ] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
+  `internal/client` and a serve skeleton into M1, or does it test against an
+  in-process test server?

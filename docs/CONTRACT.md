@@ -10,15 +10,16 @@ approved.
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
-> **Plan v1 (2026-10-30): planned for M1, not yet made.** The agent tool
-> surface narrows as Plan v1 sets it out (the count is open; see
-> [DESIGN.md](DESIGN.md) §4). `note_put`, `note_get`, `review_record` and
-> `event_list` are to be removed, and `event_list` folds into `task_get` with
-> `section=events`. The directive cap (12 per call, ranked, decision D16) is to
-> be documented on `task_current` and `recall`. CLI equivalents per tool come
-> with `internal/cli` in M4. These changes land in M1 with the code, because
-> this contract, `internal/core` and `internal/conformance` change together.
-> The sections below still describe the surface as it stands.
+> **Plan v1 (2026-10-30): planned, not yet made.** The agent tool surface
+> narrows as Plan v1 sets it out: 13 tools plus the read tools `recall` and
+> `search` (15 names; see [DESIGN.md](DESIGN.md) §4). In M1, `note_put`,
+> `note_get`, `review_record` and `event_list` are removed, and `event_list`
+> folds into `task_get` with `section=events`. CLI equivalents per tool come
+> with `internal/cli` in M4. The M1 changes land with the code, because this
+> contract, `internal/core` and `internal/conformance` change together. In M2,
+> the directive cap (12 per call, ranked, decision D16) and `review_by` arrive,
+> and are then documented on `task_current` and `recall`. The sections below
+> still describe the surface as it stands.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names

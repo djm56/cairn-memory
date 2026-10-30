@@ -79,7 +79,8 @@ Ten rules from Plan v1 (2026-10-30), added to the rules above.
    before it is mentioned in docs. A migration never renames or removes its
    source before import succeeds, and always has `--dry-run`.
 2. **No destructive advice in error text.** A refusal names only a safe fix. A
-   CI test fails on `--force`, `rm`, `reset` or `init` in any error string.
+   CI test, not yet written, fails on `--force`, `rm`, `reset`, or any `init`
+   other than `cairn init`, in an error string.
 3. **One source of truth.** Exports are exports; nothing reads an export back
    except `import` on an explicit command.
 4. **Hooks remind, tools record.** Every task-loop step the skill asks for has a
@@ -91,8 +92,9 @@ Ten rules from Plan v1 (2026-10-30), added to the rules above.
    daily and the "waiting on you" count stays under 15.
 7. **No silent identity.** Missing `project` or `server` is an error that names
    `cairn init`.
-8. **Small tool surface.** 13 tools, descriptions under 200 characters, every
-   non-obvious affordance shown by example in the skill text.
+8. **Small tool surface.** 13 tools plus the read tools `recall` and `search`
+   (15 names), descriptions under 200 characters, every non-obvious affordance
+   shown by example in the skill text.
 9. **Confirm plugin facts live.** Tool names and `CLAUDE_PROJECT_DIR` behaviour
    are checked in a live session at M5 and on every Claude Code minor release.
 10. **Rules live in core.** No rule in a handler, hook or skill that the
