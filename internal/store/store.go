@@ -76,8 +76,8 @@ func Open(path string) (*Store, error) {
 		db.SetMaxOpenConns(1)
 	}
 	if err := connect(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("store: open %s: %w", path, err)
+		// The close error is joined, as on the migrate path below.
+		return nil, errors.Join(fmt.Errorf("store: open %s: %w", path, err), db.Close())
 	}
 	if err := migrate(db, migrations); err != nil {
 		// The close error is joined, not dropped. errors.Join ignores a nil one.
