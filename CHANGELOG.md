@@ -99,7 +99,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   file, and each allocates task ids while the other does. Every id is distinct.
   The fold-ins from the review of PR #57: a project's settings must give every
   switch, or the call is refused; a goal in an uncased script keeps its short
-  words; a name of only spaces counts as no name (CONTRACT §9 item 34); and
+  words (two or three characters); a name of only spaces counts as no name (CONTRACT §9 item 34); and
   number 0 is valid only as `step_add`'s `after` (§9 item 19). The conformance
   suite has 63 cases, all passing, and each of CONTRACT §9's items 13 to 34 is
   checked by a conformance case, or is marked `(core test only)` ([PR #58](https://github.com/djm56/cairn-memory/pull/58)).
@@ -108,7 +108,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   `go test -race` is clean. Mutation testing is added with `make mutation`,
   which runs Gremlins v0.5.1 on `internal/core` and `internal/store`; it is
   not part of CI. Core is at 96.9% efficacy after new tests, and store at
-  92.6%. Conformance rows now pin the status moves, operator directive
+  92.6%. Conformance rows now pin the learning status moves, operator directive
   retirement, learning writes on done and failed tasks, and reviews of active
   and done steps. The phase markers and status lines move to phase 3
   ([PR #59](https://github.com/djm56/cairn-memory/pull/59)).
@@ -136,3 +136,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 store, follow-up to issue #46 (S4): the `StepPositionBetween` docblock
   says that about 50 inserts at one spot exhaust float64 precision, and that
   step order then falls back to id.
+- Phase 2 tests, follow-up to issue #60: each store list function with a limit
+  has an exact-fit page test and a limit-one test. Core tests cover the
+  `started_at` of a queued task on activation, key files written with a block,
+  one-character, `Go` and all-digit words in recall, a review with a negative
+  warnings count, and the global directive scope. A conformance case reviews a
+  pending step as well as an active and a done one. The `:memory:` test fails
+  when the connection limit is removed.
+- Phase 2 store, follow-up to issue #60: `Open` joins the close error on the
+  connect path too. Migration 0003 drops its dead `task_id` guard. CONTRACT §9
+  items 18 and 21 say what the tests pin, and item 21 marks only its
+  core-only half.
