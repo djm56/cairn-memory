@@ -49,12 +49,13 @@ Roadmap issues are created from [roadmap.json](https://github.com/djm56/cairn-me
 
 ## The board
 
-The Projects board is named **Cairn Memory Roadmap**. It has four single-select fields:
+The Projects board is named **Cairn Memory Roadmap**. It has three single-select fields of its own:
 
 - **Status:** Todo, In progress, In review, Done.
 - **Phase:** 0 to 10, for work from before Plan v1.
-- **Milestone:** M1 to M8, and Later.
 - **Area:** the `area:` labels.
+
+The milestone is GitHub's built-in **Milestone** field, not a custom one. Group the table view by Milestone.
 
 Issues opened from the forms are not read or changed by the bootstrap script. The maintainer sets their labels, milestone and board fields by hand.
 
