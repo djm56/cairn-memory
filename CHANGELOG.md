@@ -147,3 +147,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   connect path too. Migration 0003 drops its dead `task_id` guard. CONTRACT §9
   items 18 and 21 say what the tests pin, and item 21 marks only its
   core-only half.
+- Phase 2 core, follow-up to issue #52 (item 1): `task_current` reads its task,
+  criteria, steps, events and directives in one read transaction, so the answer
+  is one consistent snapshot. The store has `WithReadTx`, a deferred read
+  transaction that takes no write lock. CONTRACT §9 item 35.

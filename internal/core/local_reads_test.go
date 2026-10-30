@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -191,6 +192,60 @@ func TestLearningListFilters(t *testing.T) {
 		if core.KindOf(err) != core.KindInvalid {
 			t.Errorf("%s: error %v, want invalid", name, err)
 		}
+	}
+}
+
+// TestTaskCurrentResultShape pins what task_current returns while a task is
+// active: the task, its criteria and steps in order, the five newest events with
+// the newest first, the project's directives, and the count of other active
+// tasks. Six notes are logged, so the answer holds notes 6 to 2 and not note 1.
+// The reads run in one snapshot (CONTRACT §9 item 35); this test checks the
+// shape of that answer, not the snapshot itself.
+func TestTaskCurrentResultShape(t *testing.T) {
+	s, st := openLocal(t)
+	seedProject(t, st, "acme-api")
+	insertDirective(t, st, "global", "", "", "global-rule", "active")
+	insertDirective(t, st, "project", "acme-api", "", "project-rule", "active")
+	ctx := agent("acme-api", "main")
+
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{
+		Title: "t", Goal: "g", Criteria: []string{"c1", "c2"},
+		Steps: []core.StepInput{{Title: "one"}, {Title: "two"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 6; i++ {
+		if _, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: fmt.Sprintf("note %d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cur, err := s.TaskCurrent(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cur.Task == nil || cur.Task.ID != res.ID {
+		t.Fatalf("TaskCurrent task = %+v, want %s", cur.Task, res.ID)
+	}
+	if cur.OtherActive != 0 {
+		t.Errorf("other_active = %d, want 0", cur.OtherActive)
+	}
+	if len(cur.Criteria) != 2 || cur.Criteria[1].Ord != 2 || cur.Criteria[1].Criterion != "c2" {
+		t.Errorf("criteria = %+v, want c1 and c2 in order", cur.Criteria)
+	}
+	if len(cur.Steps) != 2 || cur.Steps[0].Number != 1 || cur.Steps[0].Title != "one" || cur.Steps[1].Title != "two" {
+		t.Errorf("steps = %+v, want one and two in order", cur.Steps)
+	}
+	var texts []string
+	for _, e := range cur.RecentEvents {
+		texts = append(texts, e.Text)
+	}
+	if want := []string{"note 6", "note 5", "note 4", "note 3", "note 2"}; !slices.Equal(texts, want) {
+		t.Errorf("recent events = %v, want %v", texts, want)
+	}
+	if want := []string{"global-rule", "project-rule"}; !slices.Equal(directiveTitles(cur.Directives), want) {
+		t.Errorf("directives = %v, want %v", directiveTitles(cur.Directives), want)
 	}
 }
 

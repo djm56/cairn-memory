@@ -121,51 +121,64 @@ func fileRows(id string, role FileRole, files []TaskFile) []store.FileRow {
 // last five events. Task is nil when no task is active. OtherActive counts the
 // rest when the project allows parallel tasks. Directives are those that apply
 // to the project, as directive_list gives them with no agent.
+//
+// The reads run in one read transaction, so the answer is one consistent
+// snapshot of the project (CONTRACT §2, §9 item 35). The store's WithTx would
+// take the write lock, which a read does not need, so WithReadTx is used.
 func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
 		return nil, err
 	}
+	// ensureReadProject runs before the snapshot opens: it may write a new
+	// project row, which a read transaction must not do.
 	if err := l.ensureReadProject(ctx, c.Project); err != nil {
 		return nil, err
 	}
-	// Directives are read whether or not a task is active: they belong to the
-	// project, and CONTRACT §2 gives them with every answer.
 	cur := &TaskCurrent{}
-	cur.Directives, err = directivesFor(ctx, l.st, c.Project, "")
+	err = l.st.WithReadTx(ctx, func(q store.Querier) error {
+		// Directives are read whether or not a task is active: they belong to the
+		// project, and CONTRACT §2 gives them with every answer.
+		dirs, err := directivesFor(ctx, q, c.Project, "")
+		if err != nil {
+			return err
+		}
+		cur.Directives = dirs
+		active, err := activeTasks(ctx, q, c.Project)
+		if err != nil {
+			return err
+		}
+		if len(active) == 0 {
+			return nil
+		}
+		// The task comes from a list scoped to the caller's project, so the child
+		// reads below go by its id without GetTask. Each read is then of a row the
+		// project owns, which is the scoping GetTask gives the other calls.
+		row := active[0]
+		t := taskFromRow(row)
+		cur.Task = &t
+		cur.OtherActive = len(active) - 1
+		crit, err := store.ListCriteria(ctx, q, row.ID)
+		if err != nil {
+			return err
+		}
+		cur.Criteria = criteriaFromRows(crit)
+		steps, err := store.ListSteps(ctx, q, row.ID)
+		if err != nil {
+			return err
+		}
+		cur.Steps = stepsFromRows(steps)
+		events, _, err := store.ListEvents(ctx, q, store.EventFilter{TaskID: row.ID, Project: c.Project, Limit: 5})
+		if err != nil {
+			return err
+		}
+		for _, e := range events {
+			cur.RecentEvents = append(cur.RecentEvents, eventFromRow(e))
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	active, err := activeTasks(ctx, l.st, c.Project)
-	if err != nil {
-		return nil, err
-	}
-	if len(active) == 0 {
-		return cur, nil
-	}
-	// The task comes from a list scoped to the caller's project, so the child
-	// reads below go by its id without GetTask. Each read is then of a row the
-	// project owns, which is the scoping GetTask gives the other calls.
-	row := active[0]
-	t := taskFromRow(row)
-	cur.Task = &t
-	cur.OtherActive = len(active) - 1
-	crit, err := store.ListCriteria(ctx, l.st, row.ID)
-	if err != nil {
-		return nil, err
-	}
-	cur.Criteria = criteriaFromRows(crit)
-	steps, err := store.ListSteps(ctx, l.st, row.ID)
-	if err != nil {
-		return nil, err
-	}
-	cur.Steps = stepsFromRows(steps)
-	events, _, err := store.ListEvents(ctx, l.st, store.EventFilter{TaskID: row.ID, Project: c.Project, Limit: 5})
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range events {
-		cur.RecentEvents = append(cur.RecentEvents, eventFromRow(e))
 	}
 	return cur, nil
 }

@@ -99,6 +99,44 @@ func TestWithTxReleasesLockOnPanic(t *testing.T) {
 	}
 }
 
+// TestWithReadTxTakesNoWriteLock checks that a read transaction does not hold the
+// write lock. Inside one, a write through WithTx on another goroutine must commit
+// at once. Under BEGIN IMMEDIATE the write would wait for the lock, and the wait
+// is cut short at 2 s, well inside the 5 s busy timeout.
+func TestWithReadTxTakesNoWriteLock(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	const id = "task-20261028-01"
+	done := make(chan error, 1)
+	err := s.WithReadTx(ctx, func(q Querier) error {
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks`).Scan(&n); err != nil {
+			return err
+		}
+		go func() {
+			done <- s.WithTx(ctx, func(q Querier) error {
+				return InsertTask(ctx, q, newTask(id, "acme-api", t0))
+			})
+		}()
+		select {
+		case werr := <-done:
+			if werr != nil {
+				t.Errorf("write inside a read transaction: %v", werr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("write waited for the write lock while a read transaction was open")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithReadTx: %v", err)
+	}
+	if n := countTasks(t, s, id); n != 1 {
+		t.Errorf("task rows after the write = %d, want 1", n)
+	}
+}
+
 // TestAllocateTaskIDSequence checks that sequential allocations, each followed by
 // its insert in one transaction, give distinct ids in order, and that a new day
 // starts again at 01. The concurrent case is covered by the core tests.

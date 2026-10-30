@@ -107,7 +107,8 @@ The first call of a session.
 `recent_events` (newest first, at most 5), `directives` (those that apply
 to the project, as `directive_list` with no agent), and `other_active`
 (when parallel tasks are on and more than one is active, `task` is the one
-started last).
+started last). The answer is one consistent snapshot: every part is read from
+the same state of the project (§9 item 35).
 
 ```json
 {"task": {"id": "task-20261027-03", "project": "acme-api", "title": "Add rate limit",
@@ -473,3 +474,9 @@ where only a core test checks it. An item with no check at all is marked
     `identity/blank_agent_refused`; the operator case is
     `identity/operator_blank_name_refused`. *Bishop default, pending operator
     approval.*
+35. **`task_current` is one snapshot (2026-10-30).** The reads behind
+    `task_current` (the task, its criteria, its steps, its last five events and
+    the project's directives) run in one read transaction. The answer is one
+    consistent state of the project: a write that lands during the call is seen
+    by all of it or by none (§2). *Bishop default, pending operator approval.*
+    (core test only)

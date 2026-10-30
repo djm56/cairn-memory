@@ -57,9 +57,9 @@ func (s *Store) QueryRowContext(ctx context.Context, query string, args ...any) 
 // a read inside fn sees a consistent state. Calling WithTx again on the same
 // Store from inside fn waits for the write lock the outer call holds, and fails
 // at the 5 s busy timeout; it does not wait forever. Use WithTx for writes
-// only. Reads run outside it, on the Store itself: a read in a transaction
-// still waits for the write lock, which serialises it against every writer
-// for no gain.
+// only. Reads that need no write run on the Store itself, or in WithReadTx when
+// several of them must agree. A read inside WithTx still waits for the write
+// lock, which serialises it against every writer for no gain.
 //
 // Allocation (AllocateTaskID) reads a counter and then inserts, so it must run
 // inside WithTx: the lock is what makes two allocations get different numbers.
@@ -78,4 +78,24 @@ func (s *Store) WithTx(ctx context.Context, fn func(q Querier) error) error {
 		return fmt.Errorf("store: commit transaction: %w", err)
 	}
 	return nil
+}
+
+// WithReadTx runs fn inside one read transaction and returns fn's error
+// unwrapped. Every read fn makes through q sees the same snapshot of the
+// database, so a caller that reads several tables gets one consistent state.
+//
+// Unlike WithTx, it takes no write lock. The driver opens a transaction with
+// ReadOnly set as a plain, deferred BEGIN, where WithTx gets BEGIN IMMEDIATE
+// from the _txlock option. In WAL mode a snapshot starts at the first read and
+// lasts until the transaction ends, so writers are not held up. fn must not
+// write through q. Passing s inside fn bypasses the snapshot.
+func (s *Store) WithReadTx(ctx context.Context, fn func(q Querier) error) error {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("store: begin read transaction: %w", err)
+	}
+	// Nothing was written, so the rollback only ends the transaction and frees
+	// its snapshot. It runs on a panic in fn too.
+	defer tx.Rollback()
+	return fn(tx)
 }
