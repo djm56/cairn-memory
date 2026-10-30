@@ -3,13 +3,20 @@ package conformance
 import (
 	"regexp"
 	"slices"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
 var taskID = regexp.MustCompile(`^task-\d{8}-\d{2,}$`)
+
+// namesStep reports whether msg contains the step number n as a whole number.
+// The word boundaries stop 1 from matching inside 13, so the check does not
+// depend on which of the two numbers a message happens to list first.
+func namesStep(msg string, n int) bool {
+	return regexp.MustCompile(`\b` + strconv.Itoa(n) + `\b`).MatchString(msg)
+}
 
 var taskCases = []Case{
 	{"task/current_none", func(t T, s core.Service) {
@@ -481,8 +488,19 @@ var stepCases = []Case{
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventNote, Text: "about three"}))(t)
 		_, err := s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
 		wantKind(t, err, core.KindRefused, "step_plan over two pending steps with events")
-		if err != nil && !strings.Contains(err.Error(), "steps 1 and 3") {
-			t.Errorf("refusal %q does not name both recorded steps, 1 and 3", err)
+		// The message must name each recorded step (1 and 3) and must not name the
+		// unrecorded one (2). The wording is core's to choose, so only the numbers
+		// are checked.
+		if err != nil {
+			msg := err.Error()
+			for _, n := range []int{1, 3} {
+				if !namesStep(msg, n) {
+					t.Errorf("refusal %q does not name recorded step %d", msg, n)
+				}
+			}
+			if namesStep(msg, 2) {
+				t.Errorf("refusal %q names step 2, which has no record", msg)
+			}
 		}
 		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
 		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one", "two", "three"}) {

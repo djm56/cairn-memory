@@ -200,3 +200,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   project resolution is built and that agent and session resolution come in a
   later phase. The identity test pins the path. The refusals that name
   `cairn init` already do, so no message changed.
+- Phase 2 tests, follow-up to issue #52 (item 1, review of step 8): conformance
+  case `step/plan_refusal_names_each_recorded_step` checks that the refusal
+  names steps 1 and 3 and not step 2, as whole numbers, instead of core's exact
+  wording.
