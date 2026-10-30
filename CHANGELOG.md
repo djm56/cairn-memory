@@ -169,3 +169,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   closes the rows of its second query. Recall tests drop a single upper-case
   letter and a single CJK character. A queued task's start time is checked
   before activation.
+- Phase 2 core, follow-up to issue #52 (item 1): `step_plan` refused over
+  pending steps with events or reviews names every such step, not only the
+  first. CONTRACT §3 and §9 item 15 say so, and conformance case
+  `step/plan_refusal_names_each_recorded_step` pins two. The conformance suite
+  has 70 cases.

@@ -92,8 +92,8 @@ func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
 	if core.KindOf(err) != core.KindRefused {
 		t.Fatalf("StepPlan over a recorded pending step: error %v, want refused", err)
 	}
-	if !strings.Contains(err.Error(), "step 2 has events or reviews") {
-		t.Errorf("refusal %q does not name the first recorded step, 2", err)
+	if !strings.Contains(err.Error(), "steps 2 and 3 have events or reviews") {
+		t.Errorf("refusal %q does not name both recorded steps, 2 and 3", err)
 	}
 	cur, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps})
 	if err != nil {

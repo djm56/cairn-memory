@@ -32,7 +32,7 @@ make mutation                     # Gremlins on internal/core and internal/store
 
 Run the four checks before you push. CI runs build, vet, fmt-check and test on every pull request. See [CONTRIBUTING.md](https://github.com/djm56/cairn-memory/blob/main/CONTRIBUTING.md#build-and-check) and the [Makefile](https://github.com/djm56/cairn-memory/blob/main/Makefile).
 
-What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands). The tests in `internal/conformance` check that every conformance case fails against the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against the local service over SQLite, and all 66 pass. The tests in `internal/store` include the two-process task-id test.
+What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands). The tests in `internal/conformance` check that every conformance case fails against the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against the local service over SQLite, and all 70 pass. The tests in `internal/store` include the two-process task-id test.
 
 ## What exists and what is later
 
@@ -40,7 +40,7 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 |---|---|---|
 | Binary | `cairn version` | `init`, `status`, `doctor`, `hook`, `export` and `mcp` in phase 3. `serve` in phase 5. `import` in phase 7. `review run` in phase 8. |
 | Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | Nothing further in phase 1. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
-| Conformance suite | `internal/conformance`: 66 cases, all passing against the local service | Nothing further in phase 2. |
+| Conformance suite | `internal/conformance`: 70 cases, all passing against the local service | Nothing further in phase 2. |
 | Store | SQLite store with migrations, full-text search and task-id allocation (phase 2) | Nothing further in phase 2. |
 | MCP adapter | Nothing yet | `cairn mcp` in phase 3. |
 | Claude Code plugin | Nothing yet | Phase 4. |

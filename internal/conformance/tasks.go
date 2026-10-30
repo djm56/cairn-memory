@@ -3,6 +3,7 @@ package conformance
 import (
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -469,6 +470,30 @@ var stepCases = []Case{
 		replanned := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
 		if titles := stepTitles(t, replanned.Steps); !slices.Equal(titles, []string{"alpha", "new"}) {
 			t.Errorf("reviewed task after skip and replan = %v, want [alpha new]", titles)
+		}
+	}},
+	{"step/plan_refusal_names_each_recorded_step", func(t T, s core.Service) {
+		// CONTRACT §3: the refusal names each pending step with a record, not only
+		// the first. The way out is to skip each of them.
+		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
+		one, three := core.NumberRef(1), core.NumberRef(3)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &one, Kind: core.EventNote, Text: "about one"}))(t)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventNote, Text: "about three"}))(t)
+		_, err := s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
+		wantKind(t, err, core.KindRefused, "step_plan over two pending steps with events")
+		if err != nil && !strings.Contains(err.Error(), "steps 1 and 3") {
+			t.Errorf("refusal %q does not name both recorded steps, 1 and 3", err)
+		}
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one", "two", "three"}) {
+			t.Errorf("steps after the refused plan = %v, want unchanged", titles)
+		}
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: three, Action: core.StepSkip, Summary: "not needed"}))(t)
+		got := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
+		// The pending step "two" is removed; the skipped steps "one" and "three" are kept.
+		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, []string{"one", "three", "new"}) {
+			t.Errorf("steps after skip and replan = %v, want [one three new]", titles)
 		}
 	}},
 }

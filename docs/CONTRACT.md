@@ -3,7 +3,7 @@
 **Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
 2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
 approval. Items 13 and later await the operator's approval.
-`core.Local` passes all 66 cases in `internal/conformance` (count as of
+`core.Local` passes all 70 cases in `internal/conformance` (count as of
 2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
@@ -220,9 +220,9 @@ Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
 A `pending` step that an event or a review refers to cannot be removed, so
-the call is `refused` and changes nothing. The way out: skip that
-step with `step_update` (`skip`, with a summary), then plan again. A skipped
-step is kept.
+the call is `refused` and changes nothing. The refusal names each such step.
+The way out: skip each such step with `step_update` (`skip`, with a summary),
+then plan again. A skipped step is kept.
 
 ### `step_add`
 
@@ -395,8 +395,8 @@ where only a core test checks it. An item with no check at all is marked
     operator approval.*
 15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
     pending step with an event or a review is not removed. The call is
-    `refused` and changes nothing. The refusal names the first such step in
-    display order, and the way out is to skip it and plan again (§3). *Bishop
+    `refused` and changes nothing. The refusal names each such step, in
+    display order, and the way out is to skip each of them and plan again (§3). *Bishop
     default, pending operator approval.*
 16. **`search` hides retired directives (2026-10-29).** A retired
     directive is not a `search` hit, as it is not listed by `directive_list`,
