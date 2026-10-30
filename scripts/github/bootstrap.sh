@@ -45,14 +45,15 @@
 #                    A body without exactly one start line and one end line, in
 #                    that order, is warned about and left alone. A body that
 #                    would not change is not written.
-#   ensure_field     creates a single-select field (Status, Phase, Area) when the
+#   ensure_field     creates a single-select field (Status, Phase, Milestone, Area) when the
 #                    project lacks it, with its options. An existing field is
 #                    never changed; missing options are reported with manual
 #                    steps.
 #   sync_project     creates the "Cairn Memory Roadmap" project when none exists
 #                    and links it to the repository when it is not linked.
 #   sync_items       adds a roadmap issue to the board when it is not there, and
-#                    sets its Phase or Area only when that value is empty.
+#                    sets its Phase, Milestone or Area only when that value is
+#                    empty. Phase is history for work from before Plan v1.
 #
 # Nothing is deleted, closed or reopened. Roadmap issues are matched by the
 # exact marker line <!-- cairn-roadmap: KEY -->. A missing marker is never
@@ -626,7 +627,7 @@ sync_children() {
 Q_OWNER='query($login: String!) { repositoryOwner(login: $login) { id ... on ProjectV2Owner { projectsV2(first: 100) { nodes { id title number closed } } } } }'
 Q_REPO='query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { id projectsV2(first: 100) { nodes { id } } } }'
 Q_FIELDS='query($id: ID!) { node(id: $id) { ... on ProjectV2 { fields(first: 100) { nodes { ... on ProjectV2Field { id name } ... on ProjectV2SingleSelectField { id name options { id name color description } } } } } } }'
-Q_ITEMS='query($id: ID!, $after: String) { node(id: $id) { ... on ProjectV2 { items(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { id content { ... on Issue { number repository { nameWithOwner } } } phase: fieldValueByName(name: "Phase") { ... on ProjectV2ItemFieldSingleSelectValue { name } } area: fieldValueByName(name: "Area") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } } } } }'
+Q_ITEMS='query($id: ID!, $after: String) { node(id: $id) { ... on ProjectV2 { items(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { id content { ... on Issue { number repository { nameWithOwner } } } phase: fieldValueByName(name: "Phase") { ... on ProjectV2ItemFieldSingleSelectValue { name } } milestone: fieldValueByName(name: "Milestone") { ... on ProjectV2ItemFieldSingleSelectValue { name } } area: fieldValueByName(name: "Area") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } } } } }'
 M_CREATE_PROJECT='mutation($o: ID!, $t: String!) { createProjectV2(input: {ownerId: $o, title: $t}) { projectV2 { id number } } }'
 M_LINK='mutation($p: ID!, $r: ID!) { linkProjectV2ToRepository(input: {projectId: $p, repositoryId: $r}) { repository { id } } }'
 M_CREATE_FIELD='mutation($p: ID!, $n: String!, $o: [ProjectV2SingleSelectFieldOptionInput!]!) { createProjectV2Field(input: {projectId: $p, dataType: SINGLE_SELECT, name: $n, singleSelectOptions: $o}) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }'
@@ -744,7 +745,10 @@ sync_project() {
   # Status is built in, so this only ever reports missing options. Matching is
   # case-insensitive, so "In Progress" matches "In progress" without a rename.
   ensure_field "Status" '["Todo","In progress","In review","Done"]'
-  ensure_field "Phase" "$(jq -cn '[range(0;11) | tostring]')"
+  # Phase options come from the phase: labels, and Milestone options from the
+  # roadmap's milestone keys (the phase-N entries are history and are left out).
+  ensure_field "Phase" "$(jq -c '[.[] | select(.name | startswith("phase:")) | .name | ltrimstr("phase:")]' "$LABELS_FILE")"
+  ensure_field "Milestone" "$(jq -c '[.milestones[].key | select(startswith("phase-") | not)]' "$ROADMAP_FILE")"
   ensure_field "Area" "$(jq -c '[.[] | select(.name | startswith("area:")) | .name]' "$LABELS_FILE")"
 
   if [ "$APPLY" = 1 ]; then
@@ -760,7 +764,7 @@ sync_project() {
 # on the board yet and fill their Phase and Area. A value that is already set,
 # by this script or by hand, is never overwritten.
 sync_items() {
-  local after resp more item_id cur_phase cur_area want_phase want_area item
+  local after resp more item_id cur_phase cur_area cur_ms want_phase want_area want_ms item
   local key number node line field fid oid
 
   : > "$WORK/items.jsonl"
@@ -776,8 +780,9 @@ sync_items() {
 
   while IFS= read -r issue; do
     key="$(printf '%s' "$issue" | jq -r '.key')"
-    want_phase="$(printf '%s' "$issue" | jq -r '.phase | tostring')"
-    want_area="$(printf '%s' "$issue" | jq -r '.area')"
+    want_phase="$(printf '%s' "$issue" | jq -r '(.phase // "") | tostring')"
+    want_area="$(printf '%s' "$issue" | jq -r '.area // ""')"
+    want_ms="$(printf '%s' "$issue" | jq -r '.mkey // ""')"
 
     line="$(awk -F '\t' -v k="$key" '$1 == k { print; exit }' "$WORK/index.tsv")"
     if [ -z "$line" ]; then
@@ -797,6 +802,7 @@ sync_items() {
         item_id="$(printf '%s' "$resp" | jq -r '.data.addProjectV2ItemById.item.id')"
         cur_phase=""
         cur_area=""
+        cur_ms=""
         log "  added #$number $key to the board"
       else
         log "  would add #$number $key to the board"
@@ -806,16 +812,18 @@ sync_items() {
       item_id="$(printf '%s' "$item" | jq -r '.id')"
       cur_phase="$(printf '%s' "$item" | jq -r '.phase.name // ""')"
       cur_area="$(printf '%s' "$item" | jq -r '.area.name // ""')"
+      cur_ms="$(printf '%s' "$item" | jq -r '.milestone.name // ""')"
     fi
 
-    for field in Phase Area; do
-      if [ "$field" = "Phase" ]; then
-        want="$want_phase"
-        cur="$cur_phase"
-      else
-        want="$want_area"
-        cur="$cur_area"
-      fi
+    for field in Phase Area Milestone; do
+      case "$field" in
+        Phase) want="$want_phase"; cur="$cur_phase" ;;
+        Area) want="$want_area"; cur="$cur_area" ;;
+        *) want="$want_ms"; cur="$cur_ms" ;;
+      esac
+      # Nothing to set when the roadmap gives no value, as for a pre-Plan v1
+      # issue with no milestone key.
+      [ -n "$want" ] || continue
       [ "$cur" = "$want" ] && continue
 
       # Only an empty value is filled. A value someone set by hand stays.
@@ -855,7 +863,7 @@ print_views() {
 Views cannot be created through the API. Do these once, by hand, in the
 "$PROJECT_TITLE" project:
   1. New view > Board. Group by Status.
-  2. New view > Table. Group by Phase.
+  2. New view > Table. Group by Milestone.
   3. New view > Roadmap. Show the milestones. The roadmap layout is driven by
      date fields; add Start and Target date fields if you want bars.
 EOF
