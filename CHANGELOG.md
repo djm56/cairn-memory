@@ -112,28 +112,28 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   retirement, learning writes on done and failed tasks, and reviews of active
   and done steps. The phase markers and status lines move to phase 3
   ([PR #59](https://github.com/djm56/cairn-memory/pull/59)).
-- Phase 2 store, follow-up to issue #46 (S1): `AllocateTaskID` finds the day's
+- Phase 2 store, follow-up to issue #46 (task-id day range): `AllocateTaskID` finds the day's
   task ids with a range on `id` instead of `substr(id, 1, 14)`, so the query can
   search the primary-key index. The `CAST` maximum is unchanged ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store, follow-up to issue #46 (S3): migration 0003 adds the
+- Phase 2 store, follow-up to issue #46 (project-match trigger): migration 0003 adds the
   `events_project_matches_task` trigger, which refuses an event whose project is
   not its task's project. `InsertEvent` returns the new `ErrProjectMismatch` for
   that refusal. DESIGN §3 names the trigger ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 docs, follow-up to issue #46 (item 1): DESIGN §3 says that core owns
+- Phase 2 docs, follow-up to issue #46: DESIGN §3 says that core owns
   the directive scope rule and the non-negative review counts. Core already
   checks both, so no code changed ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store tests, follow-up to issue #46 (item 2): `loadMigrations` has
+- Phase 2 store tests, follow-up to issue #46: `loadMigrations` has
   table-driven refusals for a bad file name, a duplicate version and a gap. The
   enum CHECK test covers all 13 CHECK sets. The migration-failure and
   newer-database tests are table-driven ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store tests, follow-up to issue #46 (S6): the search test asserts the
+- Phase 2 store tests, follow-up to issue #46 (search note row): the search test asserts the
   project of the note row, and that the task_id of the learning and note rows
   is NULL ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store, follow-up to issue #46 (item 3): `Open` joins the close error
+- Phase 2 store, follow-up to issue #46: `Open` joins the close error
   to the migrate error instead of dropping it. `Open(":memory:")` limits the
   pool to one connection, so every call sees one database; its docblock says
   so, and a test checks that a write is read back by a later call ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store, follow-up to issue #46 (S4): the `StepPositionBetween` docblock
+- Phase 2 store, follow-up to issue #46 (StepPositionBetween docblock): the `StepPositionBetween` docblock
   says that about 50 inserts at one spot exhaust float64 precision, and that
   step order then falls back to id ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
 - Phase 2 tests, follow-up to issue #60: each store list function with a limit
@@ -147,21 +147,21 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   connect path too. Migration 0003 drops its dead `task_id` guard. CONTRACT §9
   items 18 and 21 say what the tests pin, and item 21 marks only its
   core-only half ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 1): `task_current` reads its task,
+- Phase 2 core, follow-up to issue #52: `task_current` reads its task,
   criteria, steps, events and directives in one read transaction, so the answer
   is one consistent snapshot. The store has `WithReadTx`, a deferred read
   transaction that takes no write lock. CONTRACT §9 item 35 ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 2): a `task_update` that moves a
+- Phase 2 core, follow-up to issue #52: a `task_update` that moves a
   task from `blocked` to `active` writes an `unblocked` event in the same
   transaction. CONTRACT §9 item 36 ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 3): a `skip` step update sets
+- Phase 2 core, follow-up to issue #52: a `skip` step update sets
   `ended_at` only when the step has none, so a step skipped from `failed` keeps
   the end time of its failure. CONTRACT §9 item 37 ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 4): CONTRACT §1.1 and §9 item 38
+- Phase 2 core, follow-up to issue #52: CONTRACT §1.1 and §9 item 38
   say that a write moves the project's `last_seen_at` on and a read does not.
   The code already behaved so; the `ensureProject` comment now says it, and a
   core test checks it through the store ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 tests, follow-up to issue #60 (items 5 to 9): conformance case
+- Phase 2 tests, follow-up to issue #60 (conformance rename and recall tests): conformance case
   `event/review_record_on_active_and_done_step` is renamed
   `event/review_record_on_each_step_status`, and it reviews a failed and a
   skipped step as well, so all five step statuses are pinned. The `:memory:`
@@ -169,30 +169,30 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   closes the rows of its second query. Recall tests drop a single upper-case
   letter and a single CJK character. A queued task's start time is checked
   before activation ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 1): `step_plan` refused over
+- Phase 2 core, follow-up to issue #52 (step_plan refusal): `step_plan` refused over
   pending steps with events or reviews names every such step, not only the
   first. CONTRACT §3 and §9 item 15 say so, and conformance case
   `step/plan_refusal_names_each_recorded_step` pins two. The conformance suite
   has 70 cases ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 tests, follow-up to issue #52 (item 2), which closes issue #48:
+- Phase 2 tests, follow-up to issue #52, which closes issue #48:
   conformance case `search/hides_retired_directives` ratifies a second, active
   directive with the same word, retires the first, and asserts that search
   returns exactly the active one ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store tests, follow-up to issue #52 (item 3):
+- Phase 2 store tests, follow-up to issue #52 (punctuation-only search words):
   `TestSearchIgnoresWordsWithoutLetters` checks the OR form (`Any`) as well as
   the AND form, so a punctuation word cannot empty either search ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 store, follow-up to issue #52 (items 8 to 10): `TestWithReadTxIsSnapshot`
+- Phase 2 store, follow-up to issue #52 (WithReadTx snapshot test): `TestWithReadTxIsSnapshot`
   pins that a read transaction does not see a write committed while it is open,
   and sees it once it ends. `WithReadTx`'s docblock warns that a call on the
   Store inside fn waits forever on `:memory:`, and DESIGN §3 names it for
   snapshot reads ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core, follow-up to issue #52 (item 11): the `activeTasks` docblock
+- Phase 2 core, follow-up to issue #52 (activeTasks docblock): the `activeTasks` docblock
   says it may run inside a read transaction as well as a write one ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 docs, follow-up to issue #52 (items 6 and 8): the CONTRACT header and
+- Phase 2 docs, follow-up to issue #52 (CONTRACT header and §9 preamble): the CONTRACT header and
   §9 preamble say that items 1 to 11 are operator-approved and that every item
   from 13 on is a Bishop default, pending operator approval. §9 item 35 is
   marked `(not tested)`, since no test checks `task_current`'s snapshot ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 wiki, follow-up to issue #52 (item 7): Getting-Started says the
+- Phase 2 wiki, follow-up to issue #52 (Getting-Started wording): Getting-Started says the
   conformance tests check the suite against `core.Unimplemented`, and that
   `core.Local` passes all 70 cases. It no longer says the contract fails ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
 - Phase 2 docs, follow-up to issue #50: DESIGN §2.1 says that a `.cairn.toml`
