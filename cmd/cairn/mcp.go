@@ -35,7 +35,7 @@ func serveMCP(args []string, stdin io.ReadCloser, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "cairn mcp: takes no arguments, got %q\n", args)
 		return 2
 	}
-	wd, err := os.Getwd()
+	wd, err := workDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn mcp: the working directory: %v\n", err)
 		return 1

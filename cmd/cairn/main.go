@@ -30,6 +30,7 @@ func init() {
 		"version": {summary: "Print the cairn version", run: runVersion},
 		"help":    {summary: "List the sub-commands", run: runHelp},
 		"mcp":     {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
+		"init":    {summary: "Write .cairn.toml: the project name and the server", run: runInit},
 	}
 }
 
