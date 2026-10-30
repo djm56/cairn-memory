@@ -407,7 +407,8 @@ func (l *Local) TaskList(ctx context.Context, req TaskListRequest) (*TaskList, e
 // goal, context, constraints, criteria, key files) is frozen once any step has
 // started. A status change follows taskMayMove, and a move to active follows the
 // one-active rule. A move to blocked or abandoned writes its reason to the
-// journal. A status the task already has is not a move, so it is refused like
+// journal, and a move from blocked to active writes an unblocked event. A status
+// the task already has is not a move, so it is refused like
 // any other transition that taskMayMove does not allow (CONTRACT §1.5).
 func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, error) {
 	c, err := callerFor(ctx, true)
@@ -554,6 +555,13 @@ func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, e
 				text, kind = "Abandoned: "+text, EventDecision
 			}
 			if err := journal(ctx, q, row, c.Agent, nil, kind, text, now); err != nil {
+				return err
+			}
+		}
+		if changing && cur == TaskBlocked && next == TaskActive {
+			// A move out of blocked is journalled in the same transaction as the
+			// move (CONTRACT §1.5, §9 item 36). The request's reason is not written.
+			if err := journal(ctx, q, row, c.Agent, nil, EventUnblocked, "Unblocked", now); err != nil {
 				return err
 			}
 		}

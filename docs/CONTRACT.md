@@ -90,6 +90,9 @@ task_start (queue)                  task_start
   `task_close`. Asking for the status a task already has is `refused`, and the
   call changes nothing.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
+  A move to `blocked` writes a `blocked` event, and a move from `blocked` to
+  `active` writes an `unblocked` event. Each is written in the same transaction
+  as its move (§9 item 36).
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
 - **One active task per project**, unless the project's settings allow
@@ -250,7 +253,8 @@ the task is not `active`.
 `data` (a JSON object, optional).
 An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision` and
 `custom`. `started`, `finished`, `review` and `close` are written by the
-calls they record, and are `invalid` here.
+calls they record, and are `invalid` here. `unblocked` is also written by
+`task_update` (§1.5), and an agent may log it too.
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
 
@@ -480,3 +484,8 @@ where only a core test checks it. An item with no check at all is marked
     consistent state of the project: a write that lands during the call is seen
     by all of it or by none (§2). *Bishop default, pending operator approval.*
     (core test only)
+36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
+    `task_update` from `blocked` to `active` writes an `unblocked` event, in
+    the same transaction as the move. A move to `blocked` writes its `blocked`
+    event as before (§1.5, §4). The reason given with the move is not written.
+    *Bishop default, pending operator approval.*

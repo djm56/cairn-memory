@@ -225,6 +225,29 @@ var taskCases = []Case{
 		_, err := s.TaskList(mainCtx(), core.TaskListRequest{Limit: core.MaxLimit + 1})
 		wantKind(t, err, core.KindInvalid, "limit over the maximum")
 	}},
+	{"task/unblocked_event_on_reactivate", func(t T, s core.Service) {
+		// CONTRACT §1.5, §9 item 36: a move from blocked to active writes an
+		// unblocked event. The event is read back through event_list.
+		res := startTask(t, s, mainCtx(), "t")
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskActive)}))(t)
+		list := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID}))(t)
+		var blocked, unblocked int
+		for _, e := range list.Events {
+			switch e.Kind {
+			case core.EventBlocked:
+				blocked++
+			case core.EventUnblocked:
+				unblocked++
+			}
+		}
+		if blocked != 1 || unblocked != 1 {
+			t.Errorf("blocked events = %d and unblocked events = %d, want 1 each", blocked, unblocked)
+		}
+		if len(list.Events) > 0 && list.Events[0].Kind != core.EventUnblocked {
+			t.Errorf("newest event = %s, want unblocked", list.Events[0].Kind)
+		}
+	}},
 }
 
 var stepCases = []Case{

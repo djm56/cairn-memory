@@ -151,3 +151,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   criteria, steps, events and directives in one read transaction, so the answer
   is one consistent snapshot. The store has `WithReadTx`, a deferred read
   transaction that takes no write lock. CONTRACT §9 item 35.
+- Phase 2 core, follow-up to issue #52 (item 2): a `task_update` that moves a
+  task from `blocked` to `active` writes an `unblocked` event in the same
+  transaction. CONTRACT §9 item 36.
