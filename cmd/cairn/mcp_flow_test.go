@@ -109,10 +109,12 @@ func fieldOf(t *testing.T, obj map[string]any, key string) map[string]any {
 
 // TestMCPStdioFlowAssertsEachResult is the MCP-level test of the task flow over stdio
 // (#18; docs/PLAN.md §3, M1). It drives the whole flow through cairn mcp: a task started
-// with a plan, its brief read back, a step started and finished, a replan, a review and a
-// note in the journal, a learning proposed and listed, the directives and the recall and
-// search reads, a task list and an update, a refused close, and a close. Every call's
-// result is read and asserted, not only the fact that it succeeded (step 8 review S4).
+// with a plan, its brief read back, a step started and finished, a replan, a step added to
+// the end, a review and a note in the journal, a learning proposed and listed, the
+// directives and the recall and search reads, a task list and an update, a refused close,
+// and a close. tools/list names the fifteen tools of DESIGN §4, and no other. Every call's
+// result is read and asserted, not only the fact that it succeeded (step 8 review S4; step
+// 12 review W1).
 func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
 	_, url := newServer(t, nil)
 	useDir(t, t.TempDir())
@@ -122,6 +124,25 @@ func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
 
 	cs, finish := stdioSession(t)
 	defer finish()
+
+	// tools/list: the fifteen names, sorted, and no other tool.
+	listed, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list over stdio: %v", err)
+	}
+	var names []string
+	for _, tool := range listed.Tools {
+		names = append(names, tool.Name)
+	}
+	slices.Sort(names)
+	wantNames := []string{
+		"directive_list", "event_log", "learning_add", "learning_list", "recall", "search",
+		"step_add", "step_plan", "step_update", "task_close", "task_current", "task_get",
+		"task_list", "task_start", "task_update",
+	}
+	if !slices.Equal(names, wantNames) {
+		t.Errorf("tools/list = %v, want %v", names, wantNames)
+	}
 
 	started := stdioDo(t, cs, "task_start", map[string]any{
 		"agent": "main", "title": "Add rate limit", "goal": "Requests over 100 a minute get 429.",
@@ -150,9 +171,18 @@ func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
 		t.Errorf("task_get brief criteria = %v, want the one criterion", criteria)
 	}
 
-	stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 1}, "action": "start"})
-	stdioDo(t, cs, "event_log", map[string]any{"agent": "main", "task_id": id, "kind": "note", "text": "Test first."})
-	stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 1}, "action": "finish", "summary": "The test fails as it should."})
+	started1 := stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 1}, "action": "start"})
+	if started1["number"] != float64(1) || started1["status"] != "active" {
+		t.Errorf("step_update start of step 1 = %v, want step 1 active", started1)
+	}
+	note := stdioDo(t, cs, "event_log", map[string]any{"agent": "main", "task_id": id, "kind": "note", "text": "Test first."})
+	if note["kind"] != "note" || note["text"] != "Test first." || note["agent"] != "main" {
+		t.Errorf("event_log note = %v, want a note by main reading Test first.", note)
+	}
+	finished1 := stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 1}, "action": "finish", "summary": "The test fails as it should."})
+	if finished1["status"] != "done" || finished1["summary"] != "The test fails as it should." {
+		t.Errorf("step_update finish of step 1 = %v, want step 1 done with its summary", finished1)
+	}
 
 	// Replan: step 1 is finished and kept; step 2 is pending with no event, so it is replaced.
 	planned := stdioDo(t, cs, "step_plan", map[string]any{
@@ -181,13 +211,28 @@ func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
 		t.Errorf("task_get events: no cursor for the rest of the journal")
 	}
 
-	stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 2}, "action": "start"})
-	stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 2}, "action": "finish", "summary": "Limited."})
+	started2 := stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 2}, "action": "start"})
+	if started2["number"] != float64(2) || started2["status"] != "active" {
+		t.Errorf("step_update start of step 2 = %v, want step 2 active", started2)
+	}
+	finished2 := stdioDo(t, cs, "step_update", map[string]any{"agent": "main", "task_id": id, "step": map[string]any{"number": 2}, "action": "finish", "summary": "Limited."})
+	if finished2["status"] != "done" || finished2["summary"] != "Limited." {
+		t.Errorf("step_update finish of step 2 = %v, want step 2 done with its summary", finished2)
+	}
+
+	// A step added with no position goes last, numbered 3, for hicks, and is pending.
+	added := stdioDo(t, cs, "step_add", map[string]any{"agent": "main", "task_id": id, "title": "Document the limit", "assignee": "hicks"})
+	if added["number"] != float64(3) || added["title"] != "Document the limit" || added["agent"] != "hicks" || added["status"] != "pending" {
+		t.Errorf("step_add = %v, want step 3, Document the limit, for hicks, pending", added)
+	}
 
 	// A learning is proposed, and listed as proposed with its title.
-	stdioDo(t, cs, "learning_add", map[string]any{
+	learned := stdioDo(t, cs, "learning_add", map[string]any{
 		"agent": "main", "task_id": id, "kind": "finding", "title": "Limit in one place", "body": "The limit could live in the router.",
 	})
+	if learned["title"] != "Limit in one place" || learned["status"] != "proposed" {
+		t.Errorf("learning_add = %v, want the proposed learning with its title", learned)
+	}
 	learnings := stdioDo(t, cs, "learning_list", map[string]any{"status": []string{"proposed"}})
 	if list := listOf(t, learnings, "learnings"); len(list) != 1 || asObj(t, list[0])["title"] != "Limit in one place" || asObj(t, list[0])["status"] != "proposed" {
 		t.Errorf("learning_list = %v, want the one proposed learning", learnings)
