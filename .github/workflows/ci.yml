@@ -1,7 +1,7 @@
 name: CI
 
 # The local verification gate (CONTRIBUTING.md) on Linux. No secrets and no
-# publishing; release builds arrive in phase 10 of docs/PLAN.md.
+# publishing; release builds arrive with Later in docs/PLAN.md §3.
 on:
   push:
     branches: [main]
