@@ -133,3 +133,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   to the migrate error instead of dropping it. `Open(":memory:")` limits the
   pool to one connection, so every call sees one database; its docblock says
   so, and a test checks that a write is read back by a later call.
+- Phase 2 store, follow-up to issue #46 (S4): the `StepPositionBetween` docblock
+  says that about 50 inserts at one spot exhaust float64 precision, and that
+  step order then falls back to id.
