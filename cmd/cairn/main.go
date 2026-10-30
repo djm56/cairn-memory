@@ -29,6 +29,7 @@ func init() {
 	commands = map[string]command{
 		"version": {summary: "Print the cairn version", run: runVersion},
 		"help":    {summary: "List the sub-commands", run: runHelp},
+		"mcp":     {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
 	}
 }
 
