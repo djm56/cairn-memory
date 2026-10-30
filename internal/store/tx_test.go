@@ -137,6 +137,47 @@ func TestWithReadTxTakesNoWriteLock(t *testing.T) {
 	}
 }
 
+// TestWithReadTxIsSnapshot checks that a read transaction reads one snapshot. A
+// write committed on another connection while the transaction is open is not
+// seen by a read inside it, and is seen once the transaction ends. The write is
+// synchronous and its commit is awaited before the second read, so nothing here
+// depends on timing.
+func TestWithReadTxIsSnapshot(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	const id = "task-20261028-01"
+	countIn := func(q Querier) int {
+		t.Helper()
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE id = ?`, id).Scan(&n); err != nil {
+			t.Fatalf("count inside the read transaction: %v", err)
+		}
+		return n
+	}
+	err := s.WithReadTx(ctx, func(q Querier) error {
+		// The first read starts the snapshot.
+		if n := countIn(q); n != 0 {
+			t.Fatalf("task rows before the write = %d, want 0", n)
+		}
+		if err := s.WithTx(ctx, func(w Querier) error {
+			return InsertTask(ctx, w, newTask(id, "acme-api", t0))
+		}); err != nil {
+			t.Fatalf("write while the read transaction is open: %v", err)
+		}
+		if n := countIn(q); n != 0 {
+			t.Errorf("read inside the transaction saw the committed write: rows = %d, want 0", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithReadTx: %v", err)
+	}
+	if n := countTasks(t, s, id); n != 1 {
+		t.Errorf("task rows after the transaction = %d, want 1", n)
+	}
+}
+
 // TestAllocateTaskIDSequence checks that sequential allocations, each followed by
 // its insert in one transaction, give distinct ids in order, and that a new day
 // starts again at 01. The concurrent case is covered by the core tests.

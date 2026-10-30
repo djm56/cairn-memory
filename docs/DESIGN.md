@@ -122,7 +122,8 @@ change. `events.project` must equal its task's project: a trigger in migration
 0003 refuses an event that names another project. Core owns two rules the schema
 does not state: a directive's scope must match its project and agent, and a
 review's `critical` and `warnings` counts are not negative. The store reads
-outside transactions and writes inside `WithTx`.
+outside transactions, reads one snapshot inside `WithReadTx` when several reads
+must agree, and writes inside `WithTx`.
 
 ### 3.1 Tasks
 

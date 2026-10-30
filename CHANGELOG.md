@@ -181,3 +181,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 store tests, follow-up to issue #52 (item 3):
   `TestSearchIgnoresWordsWithoutLetters` checks the OR form (`Any`) as well as
   the AND form, so a punctuation word cannot empty either search.
+- Phase 2 store, follow-up to issue #52 (items 8 to 10): `TestWithReadTxIsSnapshot`
+  pins that a read transaction does not see a write committed while it is open,
+  and sees it once it ends. `WithReadTx`'s docblock warns that a call on the
+  Store inside fn waits forever on `:memory:`, and DESIGN §3 names it for
+  snapshot reads.

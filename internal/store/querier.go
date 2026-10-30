@@ -88,7 +88,9 @@ func (s *Store) WithTx(ctx context.Context, fn func(q Querier) error) error {
 // ReadOnly set as a plain, deferred BEGIN, where WithTx gets BEGIN IMMEDIATE
 // from the _txlock option. In WAL mode a snapshot starts at the first read and
 // lasts until the transaction ends, so writers are not held up. fn must not
-// write through q. Passing s inside fn bypasses the snapshot.
+// write through q. Passing s inside fn bypasses the snapshot. On a ":memory:"
+// database, a call on the Store made inside fn waits forever, as Open's
+// docblock says for WithTx: inside fn, use q.
 func (s *Store) WithReadTx(ctx context.Context, fn func(q Querier) error) error {
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
