@@ -215,9 +215,19 @@ func TestTaskFlowReachesEveryTool(t *testing.T) {
 		t.Errorf("task_get events: no next cursor on a page of 2 with more to come")
 	}
 
-	mustCall(t, cs, "task_get", map[string]any{"id": taskID, "section": "brief"})
+	// The brief reads back what the start wrote (step 8 review S4: results are asserted).
+	brief := mustCall(t, cs, "task_get", map[string]any{"id": taskID, "section": "brief"})
+	if task, _ := brief["task"].(map[string]any); task["goal"] != "Requests over 100 a minute get 429." {
+		t.Errorf("task_get brief = %v, want the goal the start wrote", brief)
+	}
+	if criteria, _ := brief["criteria"].([]any); len(criteria) != 1 {
+		t.Errorf("task_get brief criteria = %v, want the one criterion", brief["criteria"])
+	}
 	mustCall(t, cs, "task_get", map[string]any{"id": taskID})
-	mustCall(t, cs, "task_list", map[string]any{"status": []string{"active"}})
+	active := mustCall(t, cs, "task_list", map[string]any{"status": []string{"active"}})
+	if tasks, _ := active["tasks"].([]any); len(tasks) != 1 || tasks[0].(map[string]any)["id"] != taskID {
+		t.Errorf("task_list active = %v, want only %s", active["tasks"], taskID)
+	}
 
 	// Replan: a pending step is kept only when it has no event. Step 2 is pending
 	// and has none, so the new plan replaces it, and step 1 (finished) is kept.
@@ -237,9 +247,12 @@ func TestTaskFlowReachesEveryTool(t *testing.T) {
 	if added["agent"] != "hicks" {
 		t.Errorf("step_add agent = %v, want the assignee hicks", added["agent"])
 	}
-	mustCall(t, cs, "task_update", map[string]any{
+	updated := mustCall(t, cs, "task_update", map[string]any{
 		"agent": "main", "id": taskID, "next_action": "wire the middleware", "owner": "main",
 	})
+	if updated["next_action"] != "wire the middleware" || updated["owner"] != "main" {
+		t.Errorf("task_update = %v, want the next action and owner it set", updated)
+	}
 
 	// A learning is proposed, and the list shows it as proposed.
 	mustCall(t, cs, "learning_add", map[string]any{
@@ -251,10 +264,28 @@ func TestTaskFlowReachesEveryTool(t *testing.T) {
 		t.Errorf("learning_list = %v, want the one proposed learning", learnings)
 	}
 
-	mustCall(t, cs, "directive_list", map[string]any{})
-	mustCall(t, cs, "directive_list", map[string]any{"agent": "reviewer"})
-	mustCall(t, cs, "recall", map[string]any{"goal": "rate limit the API"})
-	mustCall(t, cs, "search", map[string]any{"query": "middleware"})
+	// No directive is ratified here, so the lists are present and empty.
+	for _, args := range []map[string]any{{}, {"agent": "reviewer"}} {
+		dirs := mustCall(t, cs, "directive_list", args)
+		if list, _ := dirs["directives"].([]any); len(list) != 0 {
+			t.Errorf("directive_list %v = %v, want none", args, list)
+		}
+	}
+	recalled := mustCall(t, cs, "recall", map[string]any{"goal": "rate limit the API"})
+	if tasks, _ := recalled["tasks"].([]any); !slices.ContainsFunc(tasks, func(v any) bool {
+		return v.(map[string]any)["id"] == taskID
+	}) {
+		t.Errorf("recall tasks = %v, want %s", recalled["tasks"], taskID)
+	}
+	// The task is found by its title and goal. "middleware" finds no hit here, although
+	// the next action and a step title hold it, so the query is one the title answers.
+	searched := mustCall(t, cs, "search", map[string]any{"query": "rate limit"})
+	if hits, _ := searched["hits"].([]any); !slices.ContainsFunc(hits, func(v any) bool {
+		h := v.(map[string]any)
+		return h["id"] == taskID && h["kind"] == "task"
+	}) {
+		t.Errorf("search hits = %v, want a task hit on %s", searched["hits"], taskID)
+	}
 
 	// Close is refused, and the refusal lists what is missing: no summary, no
 	// criteria results, no lessons, no mistakes.
