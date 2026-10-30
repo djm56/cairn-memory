@@ -140,8 +140,8 @@ the only thing that moves the status line (§9).
 
 | Milestone | Was | Work | Exit check |
 | --- | --- | --- | --- |
-| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2 | A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it |
-| M2 Server | Phase 5 | `cairn serve`: HTTP API over `core`, TLS by files or proxy, loopback default, body caps, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set |
+| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. `internal/api` lands here as handlers only, with no network listener and no `cairn serve`; `internal/client` is tested against an in-process `httptest` server (D19). The directive cap and `review_by` land in M2 | An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live Claude Code run against `cairn serve` on another machine is M2's exit check (#19) |
+| M2 Server | Phase 5 | `cairn serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or proxy, loopback default, body caps, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it |
 | M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
 | M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
 | M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairn:init`, `/cairn:status`, `cairn-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
@@ -249,7 +249,7 @@ harness. The import reads a copy.
 
 The cut-over is milestone M8 (Roll-out). Before it:
 
-1. A new test project uses Cairn from M1.
+1. A new test project uses Cairn from M2, once `cairn serve` runs (D19).
 2. After M6, the history is imported into a Cairn server, and the import is
    repeated (it is idempotent) until cut-over.
 
@@ -311,7 +311,7 @@ From what went well and badly in bishop-memory:
 **Adopted 2026-10-27 by the operator: D1–D10, each as recommended.** D10's
 order was the phase order that §2 and §3 then gave. Plan v1 (2026-10-30)
 replaces that order with the milestones in §2 and §3. D11–D18 come from Plan
-v1's decisions table.
+v1's decisions table, and D19 from issue #71.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -376,6 +376,18 @@ that is not a numbered decision here, and the table says what.
   "operating record for coding agents". *Replaces "cairn-memory". Why: "memory"
   invites the wrong comparison and hides task state and directives.*
 
+**Adopted 2026-10-30 by the operator (issue #71): D19.**
+
+- **D19. M1 builds no network listener.** `internal/api` lands in M1 as
+  handlers only (decode, call `core`, encode). `internal/client` is tested
+  against an in-process `httptest` server. `cairn serve` (the listener, TLS,
+  keys and scopes) is M2, and the live Claude Code run against `cairn serve` on
+  another machine moves to M2's exit check (#19). M1's exit check is an MCP
+  stdio test over that in-process server. *Replaces the M1 exit check against
+  a live `cairn serve`, which M2 builds (§10). Why: a server reachable from
+  another machine with no keys or TLS must never exist, even briefly, so M1
+  builds no listener.*
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
@@ -413,6 +425,8 @@ that is not a numbered decision here, and the table says what.
 - [ ] Do viewers see proposed learnings, or only ratified directives?
 - [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
 - [ ] Rename to `cairn` now (one PR, before M1) or after M8?
-- [ ] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
+- [x] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
   `internal/client` and a serve skeleton into M1, or does it test against an
-  in-process test server?
+  in-process test server? **Answered 2026-10-30 (D19, #71):** M1 tests against
+  an in-process `httptest` server. M1 adds no listener and no `cairn serve`. The
+  live run against `cairn serve` on another machine moves to M2's exit check (#19).
