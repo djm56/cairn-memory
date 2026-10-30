@@ -188,3 +188,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   snapshot reads.
 - Phase 2 core, follow-up to issue #52 (item 11): the `activeTasks` docblock
   says it may run inside a read transaction as well as a write one.
+- Phase 2 docs, follow-up to issue #52 (items 6 and 8): the CONTRACT header and
+  §9 preamble say that items 1 to 11 are operator-approved and that every item
+  from 13 on is a Bishop default, pending operator approval. §9 item 35 is
+  marked `(not tested)`, since no test checks `task_current`'s snapshot.

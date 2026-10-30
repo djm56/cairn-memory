@@ -1,10 +1,12 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
-2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
-approval. Items 13 and later await the operator's approval.
+**Status as of 2026-10-30.** Items 1–11 of §9 are operator-approved, approved on
+2026-10-28 (phase 1 exit). Item 12 is deferred by the operator. Items 13 and
+later are Bishop defaults, pending operator approval: each is marked *Bishop
+default, pending operator approval.* where it is written. None of them is
+approved.
 `core.Local` passes all 70 cases in `internal/conformance` (count as of
-2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
+2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
@@ -13,9 +15,9 @@ operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open. Items 1–11 were
-approved by the operator on 2026-10-28, item 12 is deferred, and items 13 and
-later await approval.
+§9 lists what this contract settles that DESIGN.md left open. Items 1–11 are
+operator-approved (2026-10-28), item 12 is deferred, and every item from 13 on
+is a Bishop default, pending operator approval.
 
 ## 1. Conventions
 
@@ -351,11 +353,13 @@ refuse a nameless call all the same.
 
 ## 9. Settled here, for review
 
-Each item answers a question that DESIGN.md left open. Items 1–11 were approved
-by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, an
-item is checked by a conformance case unless it is marked `(core test only)`,
-where only a core test checks it. An item with no check at all is marked
-`(not tested)`; none is.
+Each item answers a question that DESIGN.md left open. Items 1–11 are
+operator-approved (2026-10-28), and item 12 is deferred. Every item from 13 on
+is a Bishop default, pending operator approval, and is marked so; a marked item
+is not approved until the operator says it is. From item 13 on, an item is
+checked by a conformance case unless it is marked `(core test only)`, where
+only a core test checks it. An item with no check of its own is marked
+`(not tested)`. Item 35 is the one such item today (see its entry).
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -485,7 +489,9 @@ where only a core test checks it. An item with no check at all is marked
     the project's directives) run in one read transaction. The answer is one
     consistent state of the project: a write that lands during the call is seen
     by all of it or by none (§2). *Bishop default, pending operator approval.*
-    (core test only)
+    (not tested). The store test `TestWithReadTxIsSnapshot` pins the snapshot
+    that a read transaction gives, but no test checks that `task_current` reads
+    through one, so no check of this item exists.
 36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
     `task_update` from `blocked` to `active` writes an `unblocked` event, in
     the same transaction as the move. A move to `blocked` writes its `blocked`
