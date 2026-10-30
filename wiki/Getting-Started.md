@@ -32,20 +32,20 @@ make mutation                     # Gremlins on internal/core and internal/store
 
 Run the four checks before you push. CI runs build, vet, fmt-check and test on every pull request. See [CONTRIBUTING.md](https://github.com/djm56/cairn-memory/blob/main/CONTRIBUTING.md#build-and-check) and the [Makefile](https://github.com/djm56/cairn-memory/blob/main/Makefile).
 
-What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands). The tests in `internal/conformance` check that every conformance case fails against `core.Unimplemented`, the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against `core.Local`, the local service over SQLite. `core.Local` passes all 70. The tests in `internal/store` include the two-process task-id test.
+What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands), and each M1 command against an in-process server: `init`, `status`, `doctor`, `export task` and `hook session-start`. The tests in `internal/conformance` check that every conformance case fails against `core.Unimplemented`, the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against `core.Local`, the local service over SQLite. `core.Local` passes all 86. The tests in `internal/store` include the two-process task-id test.
 
 ## What exists and what is later
 
 | Area | Exists now | Planned |
 |---|---|---|
-| Binary | `cairn version` and `cairn mcp` (server only) | `init`, `status`, `doctor`, `export task` and `hook session-start` in M1. `serve` in M2. `enable` and the other hooks in M4. `import` in M6. `review run` is Later. |
+| Binary | `cairn version`, `cairn mcp` (server only), `cairn init`, `status`, `doctor`, `export task` and `hook session-start` (server only) | `serve` in M2. `enable` and the other hooks in M4. `import` in M6. `review run` is Later. |
 | Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | The M1 tool changes are in the code. Item 12 is deferred to Later ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
-| Conformance suite | `internal/conformance`: 82 cases, all passing against the local service and over the HTTP client | — |
+| Conformance suite | `internal/conformance`: 86 cases, all passing against the local service and over the HTTP client | — |
 | Store | SQLite store with migrations, full-text search and task-id allocation (phase 2) | Postgres is Later. |
 | MCP adapter | `cairn mcp`: the 15 tools over stdio, to the server named by `server` in `.cairn.toml` or `CAIRN_SERVER`. It refuses to start without one. | The server it talks to is `cairn serve`, in M2. |
 | Claude Code plugin | Nothing yet | M5. |
 | Server | Nothing yet | `cairn serve` in M2; the web UI and dashboard in M3. |
-| CLI and hooks | Nothing yet | `internal/cli`, `pre-compact` and `stop`, in M4. |
+| CLI and hooks | `cairn hook session-start` (M1), and the M1 commands in the Binary row | `internal/cli` (the CLI over the whole API, with `--json`), `pre-compact` and `stop`, in M4. |
 
 The milestones are in [PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones). The commands are in [DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).
 
