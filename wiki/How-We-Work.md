@@ -43,7 +43,7 @@ The labels are defined in [labels.json](https://github.com/djm56/cairn-memory/bl
 
 - Each milestone (M1 to M8, and Later) is a GitHub milestone.
 - A milestone's epic, a `type:epic` issue, holds its work, its exit check and a list of its child issues.
-- Each piece of work is a `type:task` issue. The roadmap task form asks for the phase, the area, what to build and an acceptance check a reviewer can run.
+- Each piece of work is a `type:task` issue. The roadmap task form asks for the milestone, the area, what to build and an acceptance check a reviewer can run.
 
 Roadmap issues are created from [roadmap.json](https://github.com/djm56/cairn-memory/blob/main/.github/roadmap.json).
 
