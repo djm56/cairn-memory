@@ -17,9 +17,9 @@ import (
 var unsafeAdvice = []string{"--force", "rm ", "reset"}
 
 // errorSources are the directories whose error strings the audit reads: the
-// core, the HTTP handlers and client that carry its errors to a caller, and the
-// CLI, which prints them.
-var errorSources = []string{"../core", "../api", "../client", "../../cmd/cairn"}
+// core, the HTTP handlers and client that carry its errors to a caller, the MCP
+// tools that carry them to a model, and the CLI, which prints them.
+var errorSources = []string{"../core", "../api", "../client", "../mcp", "../../cmd/cairn"}
 
 // errorConstructors are the core helpers that build an error for the caller.
 var errorConstructors = map[string]bool{
