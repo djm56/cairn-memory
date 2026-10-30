@@ -196,6 +196,7 @@ func AllocateTaskID(ctx context.Context, q Querier, day time.Time) (string, erro
 	// The ids of one day are those from prefix up to, not including, the prefix
 	// with its last byte raised by one ('-' becomes '.'). A range on id lets
 	// SQLite search the primary-key index; substr(id, 1, 14) does not.
+	// The last byte of the prefix is '-' (0x2D); '.' is 0x2E, the next byte.
 	upper := prefix[:len(prefix)-1] + "."
 	var last int
 	err := q.QueryRowContext(ctx, `SELECT COALESCE(MAX(CAST(substr(id, 15) AS INTEGER)), 0)
