@@ -122,3 +122,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 docs, follow-up to issue #46 (item 1): DESIGN §3 says that core owns
   the directive scope rule and the non-negative review counts. Core already
   checks both, so no code changed.
+- Phase 2 store tests, follow-up to issue #46 (item 2): `loadMigrations` has
+  table-driven refusals for a bad file name, a duplicate version and a gap. The
+  enum CHECK test covers all 13 CHECK sets. The migration-failure and
+  newer-database tests are table-driven.

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -59,19 +60,63 @@ func TestForeignKeysAreEnforced(t *testing.T) {
 	}
 }
 
-// TestEnumCheckRefusesUnknownValue checks that a status outside the DESIGN §3
-// list is refused by the schema, not only by core.
+// TestEnumCheckRefusesUnknownValue checks that a value outside each enumerated
+// column's list in DESIGN §3 is refused by the schema, not only by core. There is
+// one case per CHECK in the migrations, so a dropped or narrowed CHECK fails here.
+// Each case runs on a fresh database seeded with a project, a task and a step,
+// and the refusal must be a CHECK failure, not some other constraint.
 func TestEnumCheckRefusesUnknownValue(t *testing.T) {
-	s := openTemp(t)
-	if _, err := s.db.Exec(`INSERT INTO projects (name, created_at, last_seen_at)
-		VALUES ('acme-api', 'now', 'now')`); err != nil {
-		t.Fatalf("insert project: %v", err)
+	seed := []string{
+		`INSERT INTO projects (name, created_at, last_seen_at) VALUES ('acme-api', 'now', 'now')`,
+		`INSERT INTO tasks (id, project, title, goal, status, priority, opened_at, updated_at)
+			VALUES ('task-20261028-01', 'acme-api', 't', 'g', 'open', 'normal', 'now', 'now')`,
+		`INSERT INTO steps (task_id, position, title, status)
+			VALUES ('task-20261028-01', 1, 's', 'pending')`,
 	}
-	_, err := s.db.Exec(`INSERT INTO tasks (id, project, title, goal, status, priority,
-		opened_at, updated_at) VALUES ('task-20261028-01', 'acme-api',
-		't', 'g', 'whenever', 'normal', 'now', 'now')`)
-	if err == nil {
-		t.Fatal("insert with status 'whenever' succeeded")
+	cases := []struct {
+		column string // the CHECK's column, as in the migration
+		insert string // an insert whose one enumerated value is not in the list
+	}{
+		{"tasks.status", `INSERT INTO tasks (id, project, title, goal, status, priority, opened_at, updated_at)
+			VALUES ('task-20261028-02', 'acme-api', 't', 'g', 'whenever', 'normal', 'now', 'now')`},
+		{"tasks.priority", `INSERT INTO tasks (id, project, title, goal, status, priority, opened_at, updated_at)
+			VALUES ('task-20261028-02', 'acme-api', 't', 'g', 'open', 'whenever', 'now', 'now')`},
+		{"task_criteria.result", `INSERT INTO task_criteria (task_id, ord, criterion, result)
+			VALUES ('task-20261028-01', 1, 'c', 'whenever')`},
+		{"task_files.role", `INSERT INTO task_files (task_id, role, ord, path)
+			VALUES ('task-20261028-01', 'whenever', 1, 'p')`},
+		{"task_lessons.kind", `INSERT INTO task_lessons (task_id, ord, kind, text)
+			VALUES ('task-20261028-01', 1, 'whenever', 't')`},
+		{"task_mistakes.impact", `INSERT INTO task_mistakes (task_id, ord, agent, mistake, impact)
+			VALUES ('task-20261028-01', 1, 'main', 'm', 'whenever')`},
+		{"steps.status", `INSERT INTO steps (task_id, position, title, status)
+			VALUES ('task-20261028-01', 2, 's', 'whenever')`},
+		{"events.kind", `INSERT INTO events (task_id, project, agent, kind, text, occurred_at)
+			VALUES ('task-20261028-01', 'acme-api', 'main', 'whenever', 't', 'now')`},
+		{"reviews.verdict", `INSERT INTO reviews (task_id, step_id, reviewer, verdict, critical, warnings, created_at)
+			VALUES ('task-20261028-01', 1, 'apone', 'whenever', 0, 0, 'now')`},
+		{"learnings.kind", `INSERT INTO learnings (project, agent, kind, title, body, status, created_at)
+			VALUES ('acme-api', 'main', 'whenever', 't', 'b', 'proposed', 'now')`},
+		{"learnings.status", `INSERT INTO learnings (project, agent, kind, title, body, status, created_at)
+			VALUES ('acme-api', 'main', 'finding', 't', 'b', 'whenever', 'now')`},
+		{"directives.scope", `INSERT INTO directives (code, scope, title, rule, status)
+			VALUES ('D-0001', 'whenever', 't', 'r', 'active')`},
+		{"directives.status", `INSERT INTO directives (code, scope, title, rule, status)
+			VALUES ('D-0001', 'global', 't', 'r', 'whenever')`},
+	}
+	for _, c := range cases {
+		t.Run(c.column, func(t *testing.T) {
+			s := openTemp(t)
+			for _, q := range seed {
+				if _, err := s.db.Exec(q); err != nil {
+					t.Fatalf("seed: %v", err)
+				}
+			}
+			_, err := s.db.Exec(c.insert)
+			if err == nil || !strings.Contains(err.Error(), "CHECK constraint failed") {
+				t.Errorf("%s: err = %v, want a CHECK constraint refusal", c.column, err)
+			}
+		})
 	}
 }
 
@@ -254,69 +299,154 @@ func TestMigrationsRecordVersions(t *testing.T) {
 	}
 }
 
-// TestFailedMigrationLeavesPreviousVersion runs two migrations, the second of
-// which fails. The first must stay applied and the failed one must roll back
-// completely, so the database is at version 1.
+// TestFailedMigrationLeavesPreviousVersion runs a migration list in which one
+// migration fails. Each migration before it must stay applied, the failed one
+// must roll back completely, and the database must be left at the version before
+// it. Each case runs on a fresh database.
 func TestFailedMigrationLeavesPreviousVersion(t *testing.T) {
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
-	if err != nil {
-		t.Fatalf("sql.Open: %v", err)
+	one := migration{version: 1, name: "first", sql: `CREATE TABLE first_table (id INTEGER PRIMARY KEY);`}
+	two := migration{version: 2, name: "second", sql: `CREATE TABLE second_table (id INTEGER PRIMARY KEY);`}
+	cases := []struct {
+		name        string
+		list        []migration
+		wantVersion int
+		wantTables  []string // present after the failure
+		goneTables  []string // absent after the failure
+	}{
+		{
+			name: "broken second migration",
+			list: []migration{one, {version: 2, name: "broken", sql: `CREATE TABLE broken_table (id INTEGER PRIMARY KEY);
+				THIS IS NOT SQL;`}},
+			wantVersion: 1,
+			wantTables:  []string{"first_table"},
+			goneTables:  []string{"broken_table"},
+		},
+		{
+			name: "broken first migration",
+			list: []migration{{version: 1, name: "broken", sql: `CREATE TABLE first_table (id INTEGER PRIMARY KEY);
+				THIS IS NOT SQL;`}},
+			wantVersion: 0,
+			goneTables:  []string{"first_table"},
+		},
+		{
+			name: "broken third migration",
+			list: []migration{one, two, {version: 3, name: "broken", sql: `CREATE TABLE third_table (id INTEGER PRIMARY KEY);
+				THIS IS NOT SQL;`}},
+			wantVersion: 2,
+			wantTables:  []string{"first_table", "second_table"},
+			goneTables:  []string{"third_table"},
+		},
 	}
-	defer db.Close()
-
-	list := []migration{
-		{version: 1, name: "first", sql: `CREATE TABLE first_table (id INTEGER PRIMARY KEY);`},
-		{version: 2, name: "broken", sql: `CREATE TABLE second_table (id INTEGER PRIMARY KEY);
-			THIS IS NOT SQL;`},
-	}
-	if err := migrate(db, list); err == nil {
-		t.Fatal("migrate succeeded with a broken migration")
-	}
-
-	var v int
-	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&v); err != nil {
-		t.Fatalf("read version: %v", err)
-	}
-	if v != 1 {
-		t.Errorf("version after failure = %d, want 1", v)
-	}
-	if !tableExists(t, db, "first_table") {
-		t.Error("first_table (version 1) was rolled back with the failed migration")
-	}
-	if tableExists(t, db, "second_table") {
-		t.Error("second_table exists: the failed migration was not rolled back")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+			if err != nil {
+				t.Fatalf("sql.Open: %v", err)
+			}
+			defer db.Close()
+			if err := migrate(db, c.list); err == nil {
+				t.Fatal("migrate succeeded with a broken migration")
+			}
+			v, err := currentVersion(context.Background(), db)
+			if err != nil {
+				t.Fatalf("read version: %v", err)
+			}
+			if v != c.wantVersion {
+				t.Errorf("version after failure = %d, want %d", v, c.wantVersion)
+			}
+			for _, name := range c.wantTables {
+				if !tableExists(t, db, name) {
+					t.Errorf("%s was rolled back with the failed migration", name)
+				}
+			}
+			for _, name := range c.goneTables {
+				if tableExists(t, db, name) {
+					t.Errorf("%s exists: the failed migration was not rolled back", name)
+				}
+			}
+		})
 	}
 }
 
-// TestMigrateRefusesNewerDatabase checks that a database at a version this
-// build does not know is refused, not opened and left alone.
+// TestMigrateRefusesNewerDatabase checks migrate against the version the database
+// is at. A build at that version or above opens it. A build older than the
+// database is refused, and the database stays at its version. Each case runs on a
+// fresh database.
 func TestMigrateRefusesNewerDatabase(t *testing.T) {
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
-	if err != nil {
-		t.Fatalf("sql.Open: %v", err)
-	}
-	defer db.Close()
 	full := []migration{
 		{version: 1, name: "one", sql: `CREATE TABLE a (id INTEGER);`},
 		{version: 2, name: "two", sql: `CREATE TABLE b (id INTEGER);`},
 	}
-	if err := migrate(db, full); err != nil {
-		t.Fatalf("migrate to 2: %v", err)
+	cases := []struct {
+		name        string
+		applied     []migration // applied first, to set the database's version
+		build       []migration // the build's list, then migrated to
+		wantErr     bool
+		wantVersion int
+	}{
+		{"build at the database version", full, full, false, 2},
+		{"build newer than the database", full[:1], full, false, 2},
+		{"build older than the database", full, full[:1], true, 2},
 	}
-	if err := migrate(db, full[:1]); err == nil {
-		t.Error("migrate to 1 accepted a database at version 2")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+			if err != nil {
+				t.Fatalf("sql.Open: %v", err)
+			}
+			defer db.Close()
+			if err := migrate(db, c.applied); err != nil {
+				t.Fatalf("migrate to %d: %v", len(c.applied), err)
+			}
+			err = migrate(db, c.build)
+			if (err != nil) != c.wantErr {
+				t.Errorf("migrate err = %v, want an error: %v", err, c.wantErr)
+			}
+			v, verr := currentVersion(context.Background(), db)
+			if verr != nil {
+				t.Fatalf("read version: %v", verr)
+			}
+			if v != c.wantVersion {
+				t.Errorf("version = %d, want %d", v, c.wantVersion)
+			}
+		})
 	}
 }
 
-// TestLoadMigrationsRejectsGap checks that a missing version is refused when
-// the migration files are loaded.
-func TestLoadMigrationsRejectsGap(t *testing.T) {
-	fsys := fstest.MapFS{
-		"migrations/0001_one.sql":   {Data: []byte("SELECT 1;")},
-		"migrations/0003_three.sql": {Data: []byte("SELECT 1;")},
+// TestLoadMigrationsRejects checks that loadMigrations refuses a set of files it
+// cannot run: a name that does not match NNNN_name.sql, two files with one
+// version, and a missing version. Each case names the reason the error must give,
+// so a refusal for the wrong reason fails the case.
+func TestLoadMigrationsRejects(t *testing.T) {
+	cases := []struct {
+		name    string
+		files   map[string]string
+		wantErr string // substring of the error
+	}{
+		{"name without the four-digit number", map[string]string{
+			"migrations/1_one.sql": "SELECT 1;"}, "does not match NNNN_name.sql"},
+		{"name with a hyphen", map[string]string{
+			"migrations/0001-one.sql": "SELECT 1;"}, "does not match NNNN_name.sql"},
+		{"name with an upper-case letter", map[string]string{
+			"migrations/0001_One.sql": "SELECT 1;"}, "does not match NNNN_name.sql"},
+		{"two files with one version", map[string]string{
+			"migrations/0001_one.sql": "SELECT 1;",
+			"migrations/0001_uno.sql": "SELECT 2;"}, "found version 1 at position 2"},
+		{"a missing version", map[string]string{
+			"migrations/0001_one.sql":   "SELECT 1;",
+			"migrations/0003_three.sql": "SELECT 1;"}, "found version 3 at position 2"},
 	}
-	if _, err := loadMigrations(fsys); err == nil {
-		t.Error("loadMigrations accepted versions 1 and 3 with 2 missing")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fsys := fstest.MapFS{}
+			for name, text := range c.files {
+				fsys[name] = &fstest.MapFile{Data: []byte(text)}
+			}
+			_, err := loadMigrations(fsys)
+			if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+				t.Errorf("loadMigrations err = %v, want it to contain %q", err, c.wantErr)
+			}
+		})
 	}
 }
 
