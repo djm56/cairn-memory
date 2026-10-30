@@ -178,3 +178,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   conformance case `search/hides_retired_directives` ratifies a second, active
   directive with the same word, retires the first, and asserts that search
   returns exactly the active one.
+- Phase 2 store tests, follow-up to issue #52 (item 3):
+  `TestSearchIgnoresWordsWithoutLetters` checks the OR form (`Any`) as well as
+  the AND form, so a punctuation word cannot empty either search.
