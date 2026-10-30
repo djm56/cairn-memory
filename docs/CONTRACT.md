@@ -27,7 +27,9 @@ client, and a role. The adapter sets it; request types do not carry it.
 - **Project.** Required for every agent call, reads included. Absent →
   `invalid`, with a message that names `cairn init`. A name is lowercase
   letters and digits in hyphen-separated groups, at most 64 characters
-  (`acme-api`). A project row is created on its first call.
+  (`acme-api`). A project row is created on its first call. Each write call
+  moves the project's `last_seen_at` on to the server's time. A read does not,
+  and creates the row only when the project has none (§9 item 38).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
   of only spaces counts as no name, and is `invalid`.
@@ -494,3 +496,7 @@ where only a core test checks it. An item with no check at all is marked
     `failed` keeps the `ended_at` its failure set, and a step skipped from
     `pending` gets one now (§3). Item 29 holds for the pending case. *Bishop
     default, pending operator approval.*
+38. **Reads do not move `last_seen_at` (2026-10-30).** Each write call moves
+    the project's `last_seen_at` on, and a read leaves it where the last write
+    put it. A read creates the project only when the project does not yet exist
+    (§1.1). *Bishop default, pending operator approval.* (core test only)

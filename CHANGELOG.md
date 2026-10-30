@@ -157,3 +157,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 core, follow-up to issue #52 (item 3): a `skip` step update sets
   `ended_at` only when the step has none, so a step skipped from `failed` keeps
   the end time of its failure. CONTRACT §9 item 37.
+- Phase 2 core, follow-up to issue #52 (item 4): CONTRACT §1.1 and §9 item 38
+  say that a write moves the project's `last_seen_at` on and a read does not.
+  The code already behaved so; the `ensureProject` comment now says it, and a
+  core test checks it through the store.

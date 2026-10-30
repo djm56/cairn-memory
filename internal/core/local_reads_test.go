@@ -249,6 +249,67 @@ func TestTaskCurrentResultShape(t *testing.T) {
 	}
 }
 
+// TestReadsDoNotMoveLastSeenAt checks that reads leave the project's last_seen_at
+// where the last write put it (CONTRACT §1.1, §9 item 38). The Service has no
+// read of a project, so the row is read through the store. A write must move the
+// time on, or the reads would pass for the wrong reason, so one is made at the
+// end.
+func TestReadsDoNotMoveLastSeenAt(t *testing.T) {
+	s, st := openLocal(t)
+	ctx := agent("acme-api", "main")
+	lastSeen := func() time.Time {
+		t.Helper()
+		row, err := store.GetProject(context.Background(), st, "acme-api")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row.LastSeenAt
+	}
+
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Steps: []core.StepInput{{Title: "one"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := lastSeen()
+
+	// The sleep puts each later time after the write's, so a read that moved
+	// last_seen_at would show.
+	time.Sleep(2 * time.Millisecond)
+	if _, err := s.TaskCurrent(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TaskList(ctx, core.TaskListRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.EventList(ctx, core.EventListRequest{TaskID: res.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DirectiveList(ctx, core.DirectiveListRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LearningList(ctx, core.LearningListRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastSeen(); !got.Equal(seen) {
+		t.Errorf("last_seen_at after reads = %v, want %v: a read moved it", got, seen)
+	}
+
+	// A write does move it on, so the check above is not passing for want of a change.
+	time.Sleep(2 * time.Millisecond)
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, NextAction: ptr("next")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastSeen(); !got.After(seen) {
+		t.Errorf("last_seen_at after a write = %v, want later than %v", got, seen)
+	}
+}
+
+// ptr returns a pointer to v, for optional request fields in this file.
+func ptr[V any](v V) *V { return &v }
+
 // mustLearning adds a learning and fails the test on error.
 func mustLearning(ctx context.Context, t *testing.T, s *core.Local, req core.LearningAddRequest) *core.Learning {
 	t.Helper()
