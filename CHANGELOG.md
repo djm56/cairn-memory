@@ -126,3 +126,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   table-driven refusals for a bad file name, a duplicate version and a gap. The
   enum CHECK test covers all 13 CHECK sets. The migration-failure and
   newer-database tests are table-driven.
+- Phase 2 store tests, follow-up to issue #46 (S6): the search test asserts the
+  project of the note row, and that the task_id of the learning and note rows
+  is NULL.

@@ -90,7 +90,8 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 		name, kind             string
 		insert, update, remove string
 		// wantProject and wantTaskID are checked after the insert for the
-		// kinds that carry them: a lesson, a mistake and an event.
+		// kinds that carry a project. An empty wantTaskID means the row's
+		// task_id must be NULL, as for a note or a learning.
 		wantProject, wantTaskID string
 	}{
 		{
@@ -108,8 +109,10 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 			kind: "learning",
 			insert: `INSERT INTO learnings (id, project, agent, kind, title, body, status, created_at)
 			         VALUES (1, 'acme-api', 'main', 'finding', 'title', '%s', 'proposed', 'now')`,
-			update: `UPDATE learnings SET body = '%s' WHERE id = 1`,
-			remove: `DELETE FROM learnings WHERE id = 1`,
+			update:      `UPDATE learnings SET body = '%s' WHERE id = 1`,
+			remove:      `DELETE FROM learnings WHERE id = 1`,
+			wantProject: "acme-api",
+			wantTaskID:  "", // a learning has no task: its search row's task_id is NULL
 		},
 		{
 			name: "directive",
@@ -124,8 +127,10 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 			kind: "note",
 			insert: `INSERT INTO notes (id, project, title, body, created_by, updated_at)
 			         VALUES (1, 'acme-api', 'title', '%s', 'main', 'now')`,
-			update: `UPDATE notes SET body = '%s' WHERE id = 1`,
-			remove: `DELETE FROM notes WHERE id = 1`,
+			update:      `UPDATE notes SET body = '%s' WHERE id = 1`,
+			remove:      `DELETE FROM notes WHERE id = 1`,
+			wantProject: "acme-api",
+			wantTaskID:  "", // a note has no task: its search row's task_id is NULL
 		},
 		{
 			name: "lesson",
@@ -160,16 +165,25 @@ func TestFTSSourcesInsertUpdateDelete(t *testing.T) {
 				t.Fatalf("after insert, alpha hits = %v, want one %s", got, c.kind)
 			}
 			if c.wantProject != "" {
-				var project, taskID string
+				var project string
+				var taskID sql.NullString
 				// Only one row of this kind exists at this point (seedTask adds
 				// tasks, not these kinds), so the kind alone identifies it.
 				if err := s.db.QueryRow(`SELECT project, task_id FROM search_index
 					WHERE kind = ?`, c.kind).Scan(&project, &taskID); err != nil {
 					t.Fatalf("read %s row: %v", c.kind, err)
 				}
-				if project != c.wantProject || taskID != c.wantTaskID {
-					t.Errorf("%s row project %q task_id %q, want %q %q",
-						c.kind, project, taskID, c.wantProject, c.wantTaskID)
+				// An empty wantTaskID asserts NULL, not the empty string.
+				gotTask := taskID.String
+				if c.wantTaskID == "" && taskID.Valid {
+					t.Errorf("%s row task_id = %q, want NULL", c.kind, gotTask)
+				}
+				if c.wantTaskID != "" && (!taskID.Valid || gotTask != c.wantTaskID) {
+					t.Errorf("%s row task_id = %q (valid %v), want %q",
+						c.kind, gotTask, taskID.Valid, c.wantTaskID)
+				}
+				if project != c.wantProject {
+					t.Errorf("%s row project = %q, want %q", c.kind, project, c.wantProject)
 				}
 			}
 
