@@ -355,9 +355,9 @@ Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 
 ## 5. Architecture
 
-The target after M1: one server, no local backend. The local backend in §5.3
-was designed under D2 and cut by D11 before it was built. M1 builds the
-server-only adapter.
+The target after M1: one server, no local backend. D2 designed a local backend,
+and D11 cut it before it was built; §5.3, "The server", says what replaces it.
+M1 builds the server-only adapter.
 
 ```
             ┌──────────── project ─────────────┐
