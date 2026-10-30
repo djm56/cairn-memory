@@ -192,3 +192,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   §9 preamble say that items 1 to 11 are operator-approved and that every item
   from 13 on is a Bishop default, pending operator approval. §9 item 35 is
   marked `(not tested)`, since no test checks `task_current`'s snapshot.
+- Phase 2 wiki, follow-up to issue #52 (item 7): Getting-Started says the
+  conformance tests check the suite against `core.Unimplemented`, and that
+  `core.Local` passes all 70 cases. It no longer says the contract fails.

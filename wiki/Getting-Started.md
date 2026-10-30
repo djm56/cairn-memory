@@ -32,7 +32,7 @@ make mutation                     # Gremlins on internal/core and internal/store
 
 Run the four checks before you push. CI runs build, vet, fmt-check and test on every pull request. See [CONTRIBUTING.md](https://github.com/djm56/cairn-memory/blob/main/CONTRIBUTING.md#build-and-check) and the [Makefile](https://github.com/djm56/cairn-memory/blob/main/Makefile).
 
-What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands). The tests in `internal/conformance` check that every conformance case fails against the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against the local service over SQLite, and all 70 pass. The tests in `internal/store` include the two-process task-id test.
+What `make test` checks today: the tests in `cmd/cairn` cover the command frame (usage, `version`, `help` and unknown commands). The tests in `internal/conformance` check that every conformance case fails against `core.Unimplemented`, the stub, and that the recorder used to run a case stops it on a fatal error. These tests pass. The tests in `internal/core` run every conformance case against `core.Local`, the local service over SQLite. `core.Local` passes all 70. The tests in `internal/store` include the two-process task-id test.
 
 ## What exists and what is later
 
