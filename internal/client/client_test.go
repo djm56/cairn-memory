@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func newLocal(t *testing.T) *core.Local {
 // (D19); the test fails if it does not.
 func loopback(t *testing.T, svc core.Service) *client.Client {
 	t.Helper()
-	srv := httptest.NewServer(api.Handler(svc, api.HeaderCaller))
+	srv := httptest.NewServer(api.Handler(svc, api.UnauthenticatedHeaderCaller, nil))
 	t.Cleanup(srv.Close)
 	if !strings.HasPrefix(srv.URL, "http://127.0.0.1:") {
 		t.Fatalf("test server at %s is not on loopback", srv.URL)
@@ -144,6 +145,56 @@ func TestMalformedAnswerIsAnError(t *testing.T) {
 	}
 	if core.KindOf(err) != "" {
 		t.Errorf("a malformed answer read as kind %q", core.KindOf(err))
+	}
+}
+
+// TestOversizedAnswerIsAnError checks that a success larger than MaxResponseBytes
+// is refused, not read into memory, and is not a result.
+func TestOversizedAnswerIsAnError(t *testing.T) {
+	big := `{"task":{"id":"` + strings.Repeat("x", client.MaxResponseBytes) + `"}}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(big))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := client.New(srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.TaskCurrent(agentCtx())
+	if err == nil || res != nil || !strings.Contains(err.Error(), "larger than") {
+		t.Errorf("oversized answer gave result %v and error %v, want a size error", res, err)
+	}
+}
+
+// TestNonJSONDataIsRefusedBeforeTheCall checks W1: data that is not JSON never
+// reaches the server, and the caller gets core's own message for it, as invalid.
+// The server here fails the test if it is reached.
+func TestNonJSONDataIsRefusedBeforeTheCall(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("a call with data that is not JSON reached the server: %s", r.URL.Path)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := client.New(srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		kind core.EventKind
+		data string
+		want string
+	}{
+		{core.EventReview, `{"verdict":`, "fix the data and log the review again"},
+		{core.EventNote, `{"word":`, "event data must be a JSON object"},
+	}
+	for _, tc := range cases {
+		req := core.EventLogRequest{TaskID: "task-20261030-01", Kind: tc.kind, Text: "x", Data: json.RawMessage(tc.data)}
+		_, err := c.EventLog(agentCtx(), req)
+		if got := core.KindOf(err); got != core.KindInvalid {
+			t.Errorf("%s with %s: kind %q (err %v), want invalid", tc.kind, tc.data, got, err)
+		}
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s with %s: error %v, want the message core gives: %q", tc.kind, tc.data, err, tc.want)
+		}
 	}
 }
 

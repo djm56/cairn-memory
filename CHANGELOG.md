@@ -75,12 +75,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   An agent that calls an operator call gets `operator_only`. All 39 conformance
   cases pass, so issue #9 is complete once its pull request chain lands on
   `main` ([PR #56](https://github.com/djm56/cairn-memory/pull/56)).
-
-### Added
-
 - M1 HTTP wire form (issues #14, #17): `internal/api` serves `core.Service` as thin handlers, one POST per call, with each error answered at a status for its kind and a body of kind, message and missing list. `internal/client` is a `Service` over that form. The whole conformance suite runs through the client over an in-process loopback server, and all 80 cases pass. The form is in DESIGN §5.4. The shipped binary has no listener (D19).
 
 ### Changed
+
+- M1 wire form, the step 6 review warnings of PR #103: event data that is not JSON is refused with core's own message, on the client as in process, and is not sent; `core.CheckEventData` is that check. A review key spelled in the wrong case names the key to rename it to. `api.Handler` takes a failure hook that receives the cause of each internal failure, and a panic in a call is answered as an internal failure. `api.HeaderCaller` is renamed `api.UnauthenticatedHeaderCaller`. The client has a 30-second default timeout and refuses a successful answer over 16 MiB. The conformance suite has 82 cases.
 
 - M1 surface (issues #67, #68, #62, #70): the agent surface is 13 tools plus
   `recall` and `search`. `event_list` folds into `task_get` (`section: events`,

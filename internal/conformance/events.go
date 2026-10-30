@@ -181,15 +181,48 @@ var eventCases = []Case{
 		// warnings. A key in another case is not read as one of them, so it is
 		// invalid, and the message names the key.
 		res := startTask(t, s, mainCtx(), "t")
-		for _, data := range []string{
-			`{"Verdict": "approved", "critical": 0, "warnings": 0}`,
-			`{"verdict": "approved", "CRITICAL": 0, "warnings": 0}`,
-			`{"verdict": "approved", "critical": 0, "Warnings": 0}`,
+		for _, c := range []struct{ data, right string }{
+			{`{"Verdict": "approved", "critical": 0, "warnings": 0}`, "verdict"},
+			{`{"verdict": "approved", "CRITICAL": 0, "warnings": 0}`, "critical"},
+			{`{"verdict": "approved", "critical": 0, "Warnings": 0}`, "warnings"},
 		} {
-			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(data)})
-			wantKind(t, err, core.KindInvalid, "review data "+data)
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(c.data)})
+			wantKind(t, err, core.KindInvalid, "review data "+c.data)
+			// The near-match names the key to use, so the fix is the rename, not a removal.
+			if err != nil && !strings.Contains(err.Error(), `rename it to "`+c.right+`"`) {
+				t.Errorf("review data %s: the message %q does not name %q as the key to use", c.data, err, c.right)
+			}
 		}
 		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_data_truncated_refused", func(t T, s core.Service) {
+		// CONTRACT §4: data that is not JSON is a malformed review, and the message
+		// names the fix. Over HTTP the client refuses it before the call, with the
+		// same message core gives in process (W1).
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(`{"verdict":`)})
+		wantKind(t, err, core.KindInvalid, "review with truncated data")
+		if err != nil && !strings.Contains(err.Error(), "fix the data and log the review again") {
+			t.Errorf("review with truncated data: the message %q does not name the fix", err)
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/note_data_truncated_refused", func(t T, s core.Service) {
+		// CONTRACT §4: the data of any other kind, when given, is a JSON object. Data
+		// that is not JSON is invalid, with the message core gives in process, and
+		// writes no row (W1).
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "x", Data: json.RawMessage(`{"word":`)})
+		wantKind(t, err, core.KindInvalid, "note with truncated data")
+		if err != nil && !strings.Contains(err.Error(), "event data must be a JSON object") {
+			t.Errorf("note with truncated data: the message %q is not the one core gives", err)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
+		for _, e := range d.Events {
+			if e.Kind == core.EventNote && e.Text == "x" {
+				t.Errorf("a refused note was written: %+v", e)
+			}
+		}
 	}},
 	{"event/review_data_extra_key_refused", func(t T, s core.Service) {
 		// CONTRACT §4: review data holds exactly the three keys. An extra key is

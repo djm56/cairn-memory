@@ -61,7 +61,8 @@ const (
 const MaxBodyBytes = 1 << 20
 
 // KindInternal is the error kind of a failure that is not a core.Error. Its
-// message is always internalMessage: the cause stays on the server.
+// message is always internalMessage, so the caller never sees the cause. The
+// cause goes to the FailureHook that Handler was given (DESIGN.md §5.4).
 const KindInternal core.Kind = "internal"
 
 const internalMessage = "internal error"
@@ -78,11 +79,19 @@ type ErrorBody struct {
 // derives it from the API key's scope (CONTRACT §1.1).
 type CallerFunc func(r *http.Request) core.Caller
 
-// HeaderCaller returns the caller that the request's Cairn headers name. A
-// missing or unknown role is an agent. It trusts the role header, so it is for
-// in-process use only. M2 replaces it with a key-scope resolver before any
-// listener exists.
-func HeaderCaller(r *http.Request) core.Caller {
+// FailureHook receives the cause of every internal failure: an error that is
+// not a core.Error, and a panic in a call, which arrives as an error naming the
+// panic value. It is for the server's own record and is never sent to the
+// caller. A nil hook discards the cause.
+type FailureHook func(r *http.Request, err error)
+
+// UnauthenticatedHeaderCaller returns the caller that the request's Cairn
+// headers name, and trusts the role header as it is sent. No key checks it, so
+// it is for in-process tests only. It must never be the caller of a listener:
+// M2 replaces it with a resolver that takes the role from the API key's scope
+// (CONTRACT §1.1 M1 exception, DESIGN.md §5.4). A missing or unknown role is an
+// agent.
+func UnauthenticatedHeaderCaller(r *http.Request) core.Caller {
 	role := core.RoleAgent
 	if r.Header.Get(HeaderRole) == string(core.RoleOperator) {
 		role = core.RoleOperator
@@ -98,36 +107,37 @@ func HeaderCaller(r *http.Request) core.Caller {
 
 // Handler returns the handler for every call of svc, under Prefix. caller
 // derives the caller of each request. It must not be nil: there is no default
-// caller, because a default identity is a silent one (CONTRACT §1.1).
-func Handler(svc core.Service, caller CallerFunc) http.Handler {
+// caller, because a default identity is a silent one (CONTRACT §1.1). onFailure
+// receives the cause of each internal failure and may be nil.
+func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Handler {
 	if caller == nil {
 		panic("api: Handler needs a CallerFunc, and there is no default")
 	}
 	mux := http.NewServeMux()
 	handle := func(route string, h http.Handler) { mux.Handle(Prefix+route, h) }
 
-	handle(RouteTaskCurrent, call(caller, func(ctx context.Context, _ struct{}) (*core.TaskCurrent, error) {
+	handle(RouteTaskCurrent, call(caller, onFailure, func(ctx context.Context, _ struct{}) (*core.TaskCurrent, error) {
 		return svc.TaskCurrent(ctx)
 	}))
-	handle(RouteTaskStart, call(caller, svc.TaskStart))
-	handle(RouteTaskGet, call(caller, svc.TaskGet))
-	handle(RouteTaskList, call(caller, svc.TaskList))
-	handle(RouteTaskUpdate, call(caller, svc.TaskUpdate))
-	handle(RouteTaskClose, call(caller, svc.TaskClose))
-	handle(RouteStepPlan, call(caller, svc.StepPlan))
-	handle(RouteStepAdd, call(caller, svc.StepAdd))
-	handle(RouteStepUpdate, call(caller, svc.StepUpdate))
-	handle(RouteEventLog, call(caller, svc.EventLog))
-	handle(RouteLearningAdd, call(caller, svc.LearningAdd))
-	handle(RouteLearningList, call(caller, svc.LearningList))
-	handle(RouteDirectiveList, call(caller, svc.DirectiveList))
-	handle(RouteRecall, call(caller, svc.Recall))
-	handle(RouteSearch, call(caller, svc.Search))
+	handle(RouteTaskStart, call(caller, onFailure, svc.TaskStart))
+	handle(RouteTaskGet, call(caller, onFailure, svc.TaskGet))
+	handle(RouteTaskList, call(caller, onFailure, svc.TaskList))
+	handle(RouteTaskUpdate, call(caller, onFailure, svc.TaskUpdate))
+	handle(RouteTaskClose, call(caller, onFailure, svc.TaskClose))
+	handle(RouteStepPlan, call(caller, onFailure, svc.StepPlan))
+	handle(RouteStepAdd, call(caller, onFailure, svc.StepAdd))
+	handle(RouteStepUpdate, call(caller, onFailure, svc.StepUpdate))
+	handle(RouteEventLog, call(caller, onFailure, svc.EventLog))
+	handle(RouteLearningAdd, call(caller, onFailure, svc.LearningAdd))
+	handle(RouteLearningList, call(caller, onFailure, svc.LearningList))
+	handle(RouteDirectiveList, call(caller, onFailure, svc.DirectiveList))
+	handle(RouteRecall, call(caller, onFailure, svc.Recall))
+	handle(RouteSearch, call(caller, onFailure, svc.Search))
 
-	handle(RouteLearningDecide, call(caller, svc.LearningDecide))
-	handle(RouteDirectiveRatify, call(caller, svc.DirectiveRatify))
-	handle(RouteDirectiveRetire, call(caller, svc.DirectiveRetire))
-	handle(RouteProjectSettingsSet, call(caller, svc.ProjectSettingsSet))
+	handle(RouteLearningDecide, call(caller, onFailure, svc.LearningDecide))
+	handle(RouteDirectiveRatify, call(caller, onFailure, svc.DirectiveRatify))
+	handle(RouteDirectiveRetire, call(caller, onFailure, svc.DirectiveRetire))
+	handle(RouteProjectSettingsSet, call(caller, onFailure, svc.ProjectSettingsSet))
 
 	mux.Handle("/", http.HandlerFunc(notFound))
 	return mux
@@ -135,9 +145,11 @@ func Handler(svc core.Service, caller CallerFunc) http.Handler {
 
 // call returns the handler of one call. It decodes the request body into Req,
 // calls fn with the caller in the context, and writes the result or the error.
-// Only POST is a call; any other method is refused.
-func call[Req any, Res any](caller CallerFunc, fn func(context.Context, Req) (*Res, error)) http.Handler {
+// Only POST is a call; any other method is refused. A panic in fn is recovered
+// and answered as an internal failure.
+func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, fn func(context.Context, Req) (*Res, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverInternal(w, r, onFailure)
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
 			writeError(w, http.StatusMethodNotAllowed, &core.Error{Kind: core.KindInvalid, Message: "a call is a POST with a JSON body"})
@@ -150,11 +162,27 @@ func call[Req any, Res any](caller CallerFunc, fn func(context.Context, Req) (*R
 		}
 		res, err := fn(core.WithCaller(r.Context(), caller(r)), req)
 		if err != nil {
-			writeFailure(w, err)
+			writeFailure(w, r, onFailure, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, res)
 	})
+}
+
+// recoverInternal is deferred by call. A panic becomes an internal failure: the
+// panic value goes to onFailure, and the caller gets the same answer as any other
+// internal failure. http.ErrAbortHandler is passed on, since net/http uses it to
+// abort a response on purpose.
+func recoverInternal(w http.ResponseWriter, r *http.Request, onFailure FailureHook) {
+	p := recover()
+	if p == nil {
+		return
+	}
+	if p == http.ErrAbortHandler {
+		panic(p)
+	}
+	report(onFailure, r, fmt.Errorf("panic: %v", p))
+	writeError(w, http.StatusInternalServerError, &core.Error{Kind: KindInternal, Message: internalMessage})
 }
 
 // decode reads the one JSON object of a request body into v. An empty body is
@@ -181,15 +209,23 @@ func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
 }
 
 // writeFailure writes err as the answer to a call. A core.Error keeps its kind
-// and message. Any other error is an internal failure, and says nothing of its
-// cause.
-func writeFailure(w http.ResponseWriter, err error) {
+// and message. Any other error is an internal failure: its cause goes to
+// onFailure, and the caller gets the fixed internal answer.
+func writeFailure(w http.ResponseWriter, r *http.Request, onFailure FailureHook, err error) {
 	var ce *core.Error
 	if errors.As(err, &ce) {
 		writeError(w, statusOf(ce.Kind), ce)
 		return
 	}
+	report(onFailure, r, err)
 	writeError(w, http.StatusInternalServerError, &core.Error{Kind: KindInternal, Message: internalMessage})
+}
+
+// report hands the cause of an internal failure to onFailure, when there is one.
+func report(onFailure FailureHook, r *http.Request, err error) {
+	if onFailure != nil {
+		onFailure(r, err)
+	}
 }
 
 // statusOf returns the HTTP status for an error kind (DESIGN.md §5.4). A kind

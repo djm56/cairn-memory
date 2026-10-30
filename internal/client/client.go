@@ -13,10 +13,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/djm56/cairn-memory/internal/api"
 	"github.com/djm56/cairn-memory/internal/core"
 )
+
+// DefaultTimeout bounds one call when New is given no HTTP client. The default
+// client of net/http has no timeout, so a server that stops answering would hang
+// a caller for ever.
+const DefaultTimeout = 30 * time.Second
+
+// MaxResponseBytes caps the body of a successful answer. The server does not cap
+// its answers, so this is the client's guard: a larger answer is an error, not
+// read into memory. A failed answer is capped by api.MaxBodyBytes.
+const MaxResponseBytes = 16 << 20
 
 // Client is a core.Service over HTTP. Build one with New; the zero value has no
 // server to call.
@@ -29,14 +40,16 @@ var _ core.Service = (*Client)(nil)
 
 // New returns a Client for the server at base, such as http://127.0.0.1:8787.
 // base must be an absolute http or https URL with a host, and no query or
-// fragment. hc is the HTTP client the calls use; nil means http.DefaultClient.
+// fragment. hc is the HTTP client the calls use. nil means a client with
+// DefaultTimeout, not http.DefaultClient, which has no timeout. A caller that
+// passes its own client should give it a timeout too.
 func New(base string, hc *http.Client) (*Client, error) {
 	u, err := url.Parse(base)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
 		return nil, fmt.Errorf("client: base %q is not an http or https URL with a host", base)
 	}
 	if hc == nil {
-		hc = http.DefaultClient
+		hc = &http.Client{Timeout: DefaultTimeout}
 	}
 	return &Client{base: strings.TrimRight(base, "/"), hc: hc}, nil
 }
@@ -86,8 +99,17 @@ func (c *Client) StepUpdate(ctx context.Context, req core.StepUpdateRequest) (*c
 	return post[core.Step](ctx, c, api.RouteStepUpdate, req)
 }
 
-// EventLog sends the event_log call.
+// EventLog sends the event_log call. Data that is not JSON cannot be written into
+// a request body, so the client does not send it. It refuses the call with the
+// message core gives for that data in process, so the answer is the same on both
+// paths (W1). A request with other faults as well gets the data fault first.
 func (c *Client) EventLog(ctx context.Context, req core.EventLogRequest) (*core.Event, error) {
+	if len(req.Data) > 0 && !json.Valid(req.Data) {
+		if err := core.CheckEventData(req.Kind, req.Data); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("client: %s: the data is not JSON", api.RouteEventLog)
+	}
 	return post[core.Event](ctx, c, api.RouteEventLog, req)
 }
 
@@ -158,8 +180,15 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, failure(route, resp)
 	}
+	answer, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("client: %s: read the answer: %w", route, err)
+	}
+	if len(answer) > MaxResponseBytes {
+		return nil, fmt.Errorf("client: %s: the answer is larger than %d bytes", route, MaxResponseBytes)
+	}
 	var out Res
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.Unmarshal(answer, &out); err != nil {
 		return nil, fmt.Errorf("client: %s: the answer is not the call's result: %w", route, err)
 	}
 	return &out, nil

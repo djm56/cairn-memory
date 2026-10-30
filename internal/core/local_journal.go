@@ -6,9 +6,21 @@ import (
 	"encoding/json"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/djm56/cairn-memory/internal/store"
 )
+
+// CheckEventData checks the data of an event_log call of kind, as EventLog
+// does, and writes nothing. An adapter that cannot send data to core, such as
+// the HTTP client when the data is not JSON, uses it to refuse the call with
+// core's own message (CONTRACT §4).
+func CheckEventData(kind EventKind, data json.RawMessage) error {
+	if kind == EventReview {
+		return checkReviewData(data)
+	}
+	return checkData(data)
+}
 
 // checkData checks that the data of an event, when given, is a JSON object
 // (CONTRACT §4). An absent value is no data. null, an array and a scalar are
@@ -40,7 +52,8 @@ var reviewKeys = []string{"critical", "verdict", "warnings"}
 // is approved or not-approved, and each count is 0 or more. A wrong key case, an
 // extra key, a repeated key and null are invalid. So is a malformed value, such
 // as a count as text or a fraction. Each message names the fix, so the agent can
-// log the review again without guessing.
+// log the review again without guessing. A key that differs from a required one
+// only in case is named as the key to rename it to.
 func checkReviewData(data json.RawMessage) error {
 	const shape = `a review needs data {"verdict": "approved" or "not-approved", "critical": 0, "warnings": 0}`
 	if len(data) == 0 {
@@ -57,9 +70,13 @@ func checkReviewData(data json.RawMessage) error {
 		return Invalid("review data repeats the key %q: give each key once and log the review again", key)
 	}
 	for _, key := range slices.Sorted(maps.Keys(obj)) {
-		if !slices.Contains(reviewKeys, key) {
-			return Invalid("review data has the key %q, which is not verdict, critical or warnings: remove it and log the review again", key)
+		if slices.Contains(reviewKeys, key) {
+			continue
 		}
+		if near, ok := nearReviewKey(key); ok {
+			return Invalid("review data has the key %q, which is not spelled as %q: rename it to %q and log the review again", key, near, near)
+		}
+		return Invalid("review data has the key %q, which is not verdict, critical or warnings: remove it and log the review again", key)
 	}
 	for _, key := range reviewKeys {
 		if v, ok := obj[key]; !ok || string(v) == "null" {
@@ -79,6 +96,17 @@ func checkReviewData(data json.RawMessage) error {
 		return Invalid("review critical and warnings must be 0 or more: fix the counts and log the review again")
 	}
 	return nil
+}
+
+// nearReviewKey returns the required review key that key matches without regard
+// to case, and true. It returns "", false when key matches none of them.
+func nearReviewKey(key string) (string, bool) {
+	for _, want := range reviewKeys {
+		if strings.EqualFold(key, want) {
+			return want, true
+		}
+	}
+	return "", false
 }
 
 // repeatedKey returns the first key that data, a JSON object, gives more than
@@ -131,11 +159,7 @@ func (l *Local) EventLog(ctx context.Context, req EventLogRequest) (*Event, erro
 	}
 	// A review checks its own data, which names the fix for every fault. Other
 	// kinds only need an object when they have data.
-	if req.Kind == EventReview {
-		if err := checkReviewData(req.Data); err != nil {
-			return nil, err
-		}
-	} else if err := checkData(req.Data); err != nil {
+	if err := CheckEventData(req.Kind, req.Data); err != nil {
 		return nil, err
 	}
 	if req.Step != nil {

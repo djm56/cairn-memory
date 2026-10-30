@@ -42,6 +42,11 @@ func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Glob returns nothing, and no error, for a directory that is gone. A
+		// renamed package would then drop out of the audit without a word.
+		if len(files) == 0 {
+			t.Fatalf("the audit lists %s, which matches no Go files: update errorSources", dir)
+		}
 		for _, file := range files {
 			if strings.HasSuffix(file, "_test.go") {
 				continue

@@ -461,9 +461,10 @@ client and the CLI. This section is how the adapter reaches the server.
   `X-Cairn-Session`, `X-Cairn-Client` and `X-Cairn-Role` carry the caller
   (CONTRACT §1.1). A call with no project is `invalid`. `X-Cairn-Role` is
   `operator` for an operator call and is an agent otherwise. M1's
-  `api.HeaderCaller` trusts that header. That is safe only while nothing
-  listens. M2 replaces it with a resolver that takes the role from the API
-  key's scope, so a client never sets its own role.
+  `api.UnauthenticatedHeaderCaller` trusts that header, with no key behind
+  it. That is safe only while nothing listens. M2 replaces it with a resolver
+  that takes the role from the API key's scope, so a client never sets its own
+  role, and it does so before any listener exists (CONTRACT §1.1, M1 exception).
 - **Success.** `200`, with the result as JSON, in the field names of the core
   types. Empty optional fields are left out (CONTRACT §1.3). A read of section
   `events` always carries `events`, as `[]` when the page is empty (CONTRACT §2).
@@ -480,12 +481,22 @@ client and the CLI. This section is how the adapter reaches the server.
   | `internal` | 500 |
 
   `internal` is a wire kind, not a core kind. It is the answer to any error
-  that is not a `core.Error`, and its message is always `internal error`, so
-  the cause stays on the server.
+  that is not a `core.Error`, and to a panic in a call, which the handler
+  recovers. Its message is always `internal error`, so the caller never sees
+  the cause. The cause goes to the failure hook that `api.Handler` is given
+  (`FailureHook`, nil discards it), so the server can keep it for its own
+  record. A `http.ErrAbortHandler` panic is not recovered.
 - **The client.** It returns the `core.Error` the server named, with the same
   kind, message and missing list. Any other failure is a plain error that names
   the route and the status, and it is not a `core.Error`. The client ignores
   unknown response fields, so the server can add a field without a new prefix.
+  Event data that is not JSON cannot be sent in a request body, so the client
+  refuses that call before it is sent, with the message core gives for the
+  same data in process (`core.CheckEventData`). The answer is the same on both
+  paths. A request with another fault as well gets the data fault first.
+  With no HTTP client given, `client.New` uses one with a 30-second timeout. A
+  successful answer over 16 MiB is an error. The server does not cap its
+  answers, so the cap is the client's guard.
 - **Versions.** A breaking change takes a new prefix (`/v2`).
 
 Tests: `internal/client` runs the whole conformance suite over an `httptest`

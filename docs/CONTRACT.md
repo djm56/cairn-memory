@@ -5,7 +5,7 @@ phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
-`core.Local` passes all 80 cases in `internal/conformance` (count as of
+`core.Local` passes all 82 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
@@ -48,6 +48,10 @@ client, and a role. The adapter sets it; request types do not carry it.
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.
+  *M1 exception (2026-10-30):* `internal/api` has no API key yet, so its
+  `UnauthenticatedHeaderCaller` takes the role from the `X-Cairn-Role` header.
+  That is safe only while no listener exists (D19). M2 replaces it with the
+  key-scope resolver before `cairn serve` listens (DESIGN §5.4, M2 exit check).
 
 ### 1.2 Errors
 

@@ -16,16 +16,21 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// fake is a Service whose TaskStart fails with err and whose TaskGet answers
-// detail. Its TaskCurrent records the caller it was given, in seen.
+// fake is a Service whose TaskStart fails with err, or panics with panicWith
+// when that is set, and whose TaskGet answers detail. Its TaskCurrent records
+// the caller it was given, in seen.
 type fake struct {
 	core.Unimplemented
-	err    error
-	detail *core.TaskDetail
-	seen   core.Caller
+	err       error
+	panicWith any
+	detail    *core.TaskDetail
+	seen      core.Caller
 }
 
 func (f *fake) TaskStart(context.Context, core.TaskStartRequest) (*core.TaskStartResult, error) {
+	if f.panicWith != nil {
+		panic(f.panicWith)
+	}
 	return nil, f.err
 }
 
@@ -73,6 +78,14 @@ func openLocal(t *testing.T) *core.Local {
 	return core.NewLocal(st)
 }
 
+// failures collects the causes a handler reports to its FailureHook.
+type failures struct{ errs []error }
+
+// hook returns a FailureHook that appends each cause to f.errs.
+func (f *failures) hook() api.FailureHook {
+	return func(_ *http.Request, err error) { f.errs = append(f.errs, err) }
+}
+
 // TestErrorKindsKeepTheirStatusAndBody checks that each core kind is answered
 // with its status and carries its kind, message and missing list in the body.
 func TestErrorKindsKeepTheirStatusAndBody(t *testing.T) {
@@ -86,7 +99,7 @@ func TestErrorKindsKeepTheirStatusAndBody(t *testing.T) {
 		{&core.Error{Kind: core.KindOperatorOnly, Message: "an operator call"}, http.StatusForbidden},
 	}
 	for _, c := range cases {
-		h := api.Handler(&fake{err: c.err}, api.HeaderCaller)
+		h := api.Handler(&fake{err: c.err}, api.UnauthenticatedHeaderCaller, nil)
 		rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, `{"title":"t","goal":"g"}`, agentHeaders)
 		if rec.Code != c.status {
 			t.Errorf("%s: status %d, want %d", c.err.Kind, rec.Code, c.status)
@@ -102,10 +115,11 @@ func TestErrorKindsKeepTheirStatusAndBody(t *testing.T) {
 }
 
 // TestInternalFailureHidesItsCause checks that an error which is not a
-// core.Error is answered 500 with the kind internal and a fixed message, and
-// that its text does not reach the caller.
+// core.Error is answered 500 with the kind internal and a fixed message, that its
+// text does not reach the caller, and that the FailureHook receives it.
 func TestInternalFailureHidesItsCause(t *testing.T) {
-	h := api.Handler(&fake{err: errors.New("disk on fire")}, api.HeaderCaller)
+	var f failures
+	h := api.Handler(&fake{err: errors.New("disk on fire")}, api.UnauthenticatedHeaderCaller, f.hook())
 	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, `{"title":"t","goal":"g"}`, agentHeaders)
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status %d, want 500", rec.Code)
@@ -117,12 +131,50 @@ func TestInternalFailureHidesItsCause(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "disk on fire") {
 		t.Errorf("the cause reached the caller: %s", rec.Body.String())
 	}
+	if len(f.errs) != 1 || f.errs[0].Error() != "disk on fire" {
+		t.Errorf("the hook received %v, want the cause disk on fire", f.errs)
+	}
+}
+
+// TestPanicIsAnInternalFailure checks that a panic in a call is answered as an
+// internal failure, with the same body, and that the panic value reaches the
+// FailureHook. The server keeps serving after it.
+func TestPanicIsAnInternalFailure(t *testing.T) {
+	var f failures
+	h := api.Handler(&fake{panicWith: "nil map write"}, api.UnauthenticatedHeaderCaller, f.hook())
+	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, `{"title":"t","goal":"g"}`, agentHeaders)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d, want 500", rec.Code)
+	}
+	got := errorBody(t, rec)
+	if got.Kind != api.KindInternal || got.Message != "internal error" {
+		t.Errorf("body = %+v, want kind internal and message internal error", got)
+	}
+	if strings.Contains(rec.Body.String(), "nil map write") {
+		t.Errorf("the panic reached the caller: %s", rec.Body.String())
+	}
+	if len(f.errs) != 1 || !strings.Contains(f.errs[0].Error(), "nil map write") {
+		t.Errorf("the hook received %v, want the panic value", f.errs)
+	}
+}
+
+// TestAbortHandlerPanicPassesThrough checks that http.ErrAbortHandler is not
+// recovered: net/http uses it to abort a response on purpose.
+func TestAbortHandlerPanicPassesThrough(t *testing.T) {
+	h := api.Handler(&fake{panicWith: http.ErrAbortHandler}, api.UnauthenticatedHeaderCaller, nil)
+	defer func() {
+		if p := recover(); p != http.ErrAbortHandler {
+			t.Errorf("recover() = %v, want http.ErrAbortHandler to pass through", p)
+		}
+	}()
+	serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, `{"title":"t","goal":"g"}`, agentHeaders)
+	t.Error("the abort panic did not reach the caller of the handler")
 }
 
 // TestCallsAreOnlyPost checks that a call answers a method other than POST with
 // 405, names POST in Allow, and carries the error body.
 func TestCallsAreOnlyPost(t *testing.T) {
-	h := api.Handler(core.Unimplemented{}, api.HeaderCaller)
+	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
 	rec := serve(h, http.MethodGet, api.Prefix+api.RouteTaskStart, "", agentHeaders)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET status %d, want 405", rec.Code)
@@ -139,7 +191,7 @@ func TestCallsAreOnlyPost(t *testing.T) {
 // request is refused before the service is reached. Core.Unimplemented answers
 // every call with an internal failure, so a 400 or 413 shows the handler stopped.
 func TestMalformedRequestsAreInvalid(t *testing.T) {
-	h := api.Handler(core.Unimplemented{}, api.HeaderCaller)
+	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
 	huge := `{"title":"` + strings.Repeat("x", api.MaxBodyBytes) + `","goal":"g"}`
 	cases := []struct {
 		what   string
@@ -151,7 +203,7 @@ func TestMalformedRequestsAreInvalid(t *testing.T) {
 		{"an array, not an object", `[]`, http.StatusBadRequest, ""},
 		{"an unknown field", `{"title":"t","goal":"g","limt":1}`, http.StatusBadRequest, "limt"},
 		{"two JSON values", `{}{}`, http.StatusBadRequest, ""},
-		{"a string for a number", `{"title":"t","goal":"g","priority":5}`, http.StatusBadRequest, ""},
+		{"a number for a string", `{"title":"t","goal":"g","priority":5}`, http.StatusBadRequest, ""},
 		{"a body over the cap", huge, http.StatusRequestEntityTooLarge, ""},
 	}
 	for _, c := range cases {
@@ -174,7 +226,7 @@ func TestMalformedRequestsAreInvalid(t *testing.T) {
 // with the kind invalid, and names where the calls are. A missing trailing
 // slash and a missing prefix both count.
 func TestUnknownPathIsNotACall(t *testing.T) {
-	h := api.Handler(core.Unimplemented{}, api.HeaderCaller)
+	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
 	for _, path := range []string{
 		api.Prefix + "/agent/nope",
 		api.Prefix + api.RouteTaskStart + "/",
@@ -196,7 +248,7 @@ func TestUnknownPathIsNotACall(t *testing.T) {
 // the call, and that a call with no role header is an agent.
 func TestHeadersCarryTheCaller(t *testing.T) {
 	f := &fake{}
-	h := api.Handler(f, api.HeaderCaller)
+	h := api.Handler(f, api.UnauthenticatedHeaderCaller, nil)
 	headers := map[string]string{
 		api.HeaderProject: "acme-api", api.HeaderAgent: "hicks",
 		api.HeaderSession: "s-1", api.HeaderClient: "claude-code", api.HeaderRole: "operator",
@@ -220,7 +272,7 @@ func TestHeadersCarryTheCaller(t *testing.T) {
 // object, reaches the service as the zero request.
 func TestEmptyBodyIsTheZeroRequest(t *testing.T) {
 	f := &fake{}
-	h := api.Handler(f, api.HeaderCaller)
+	h := api.Handler(f, api.UnauthenticatedHeaderCaller, nil)
 	for _, body := range []string{"", "{}"} {
 		if rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskCurrent, body, agentHeaders); rec.Code != http.StatusOK {
 			t.Errorf("body %q: status %d", body, rec.Code)
@@ -232,7 +284,7 @@ func TestEmptyBodyIsTheZeroRequest(t *testing.T) {
 // and that its message names the fix (CONTRACT §1.1). The core decides this, so
 // the test runs over a real Local.
 func TestMissingProjectNamesInit(t *testing.T) {
-	h := api.Handler(openLocal(t), api.HeaderCaller)
+	h := api.Handler(openLocal(t), api.UnauthenticatedHeaderCaller, nil)
 	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskCurrent, "{}", nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", rec.Code)
@@ -246,7 +298,7 @@ func TestMissingProjectNamesInit(t *testing.T) {
 // call on an operator route is operator_only, and the same call with the
 // operator role reaches the service and finds no such learning.
 func TestOperatorCallNeedsTheOperatorRole(t *testing.T) {
-	h := api.Handler(openLocal(t), api.HeaderCaller)
+	h := api.Handler(openLocal(t), api.UnauthenticatedHeaderCaller, nil)
 	path := api.Prefix + api.RouteLearningDecide
 	body := `{"id":999,"status":"accepted"}`
 
@@ -267,7 +319,7 @@ func TestOperatorCallNeedsTheOperatorRole(t *testing.T) {
 // that did not ask for events writes no events key.
 func TestEmptyEventsPageIsWritten(t *testing.T) {
 	f := &fake{detail: &core.TaskDetail{Task: core.Task{ID: "task-20261030-01"}, Events: []core.Event{}}}
-	h := api.Handler(f, api.HeaderCaller)
+	h := api.Handler(f, api.UnauthenticatedHeaderCaller, nil)
 	body := `{"id":"task-20261030-01","section":"events"}`
 	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskGet, body, agentHeaders)
 	if !strings.Contains(rec.Body.String(), `"events":[]`) {
@@ -289,5 +341,5 @@ func TestHandlerNeedsACallerFunc(t *testing.T) {
 			t.Error("Handler with a nil CallerFunc did not panic")
 		}
 	}()
-	api.Handler(core.Unimplemented{}, nil)
+	api.Handler(core.Unimplemented{}, nil, nil)
 }
