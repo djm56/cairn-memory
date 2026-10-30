@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 
@@ -41,7 +44,9 @@ var writeContent = func(w io.Writer, content []byte) error {
 //
 // The project directory is the one identity starts from: CLAUDE_PROJECT_DIR when Claude
 // Code sets it, else the working directory (step 10 review W6). So the file init writes
-// is the one every other command finds, from any directory of the project.
+// is the one every other command finds, from any directory of the project. A run from a
+// directory outside CLAUDE_PROJECT_DIR is refused, since it would write into that
+// project (step 12 review W5).
 //
 // It is idempotent (#69). Run again with the same values, it changes nothing and
 // says so, here or in a directory below a project file that has the same values. It
@@ -88,6 +93,10 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	if err := checkProjectDir(); err != nil {
+		fmt.Fprintf(stderr, "cairn init: %v\n", err)
+		return 1
+	}
 	dir, err := initDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn init: the working directory: %v\n", err)
@@ -118,7 +127,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "cairn init: %s appeared while cairn init was running: run cairn init again to compare it\n", path)
 			return 1
 		}
-		fmt.Fprintf(stderr, "cairn init: write %s: %v\n", path, err)
+		fmt.Fprintf(stderr, "cairn init: %v\n", err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "cairn init: wrote %s with project %q and server %q.\n", path, *project, *server)
@@ -144,6 +153,55 @@ func initDir() (string, error) {
 	return workDir()
 }
 
+// checkProjectDir refuses an init run from outside CLAUDE_PROJECT_DIR (step 12 review
+// W5). The variable is set by Claude Code and inherited by the shells it starts, so a
+// cd into another project would otherwise write that project's file into the first
+// one's root, and exit 0. Both directories are resolved through their symlinks before
+// they are compared, and the comparison is by path elements, so a sibling whose name
+// starts the same way is outside. With no variable set there is nothing to check.
+func checkProjectDir() error {
+	env := os.Getenv(identity.EnvProjectDir)
+	if env == "" {
+		return nil
+	}
+	proj, err := filepath.Abs(env)
+	if err != nil {
+		return fmt.Errorf("%s %q: %w", identity.EnvProjectDir, env, err)
+	}
+	wd, err := workDir()
+	if err != nil {
+		return fmt.Errorf("the working directory: %w", err)
+	}
+	projReal, err := filepath.EvalSymlinks(proj)
+	if err != nil {
+		return fmt.Errorf("%s is %s, which cannot be read: %w", identity.EnvProjectDir, proj, err)
+	}
+	wdReal, err := filepath.EvalSymlinks(wd)
+	if err != nil {
+		return fmt.Errorf("the working directory %s cannot be read: %w", wd, err)
+	}
+	rel, err := filepath.Rel(projReal, wdReal)
+	if err != nil {
+		return fmt.Errorf("%s is %s, and the working directory is %s: %w", identity.EnvProjectDir, proj, wd, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("%s is %s, but the working directory %s is not inside it, and cairn init would write into %s: unset %s, or cd into the project and run cairn init again",
+			identity.EnvProjectDir, proj, wd, proj, identity.EnvProjectDir)
+	}
+	return nil
+}
+
+// shownServer describes a server value read from an existing file, for a message. A
+// string is shown through client.DisplayURL, so a user name or a password in it is never
+// printed (step 10 review W5; step 12 review W6). A value of another type is described as
+// shown describes it.
+func shownServer(v any) string {
+	if s, ok := v.(string); ok {
+		return fmt.Sprintf("%q", client.DisplayURL(s))
+	}
+	return shown(v)
+}
+
 // compareExisting handles a .cairn.toml that is already in the directory. When it
 // has the same project and server, nothing changes and the answer says so. Any other
 // content is refused, and the file is not touched. Its other keys are left alone.
@@ -158,7 +216,7 @@ func compareExisting(path, project, server string, stdout, stderr io.Writer) int
 		return 0
 	}
 	fmt.Fprintf(stderr, "cairn init: %s already sets project %s and server %s. cairn init does not change a value it finds; to use other values, edit the file by hand.\n",
-		path, shown(have), shown(srv))
+		path, shown(have), shownServer(srv))
 	return 1
 }
 
@@ -225,41 +283,130 @@ func fileAbove(dir string) (string, bool) {
 	}
 }
 
+// linkFile makes a second name for an existing file. It is os.Link, and a variable so a
+// test can make the link fail the way a filesystem without hard links does (step 12
+// review W4).
+var linkFile = os.Link
+
 // writeNew creates path with the project and server keys, all at once or not at all.
 // The whole file is written to a temporary file in the same directory, and that file
-// is then linked to path. os.Link fails when path exists, so an existing file is never
+// is then linked to path. A link fails when path exists, so an existing file is never
 // replaced, even one that appears after the check, and the link is atomic. The
 // temporary file is removed in every case, so a write that fails part way leaves no
 // partial .cairn.toml behind (step 10 review W4).
+//
+// A filesystem with no hard links refuses the link with an errno that says so. Then the
+// file is created at path directly, with O_EXCL, which keeps the no-overwrite rule but
+// is not atomic: a failure part way removes the partial file. Every other link failure,
+// and an existing name, are returned as they are and never fall back (step 12 review
+// W4). Errors name path, and never the temporary file.
 func writeNew(path, project, server string) error {
 	content, err := projectContent(project, server)
 	if err != nil {
-		return err
+		return fmt.Errorf("write %s: %w", path, cause(err))
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".cairn.toml.*.tmp")
+	f, tmp, err := createTemp(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("write %s: %w", path, cause(err))
+	}
+	defer os.Remove(tmp)
+	if err := finishFile(f, content); err != nil {
+		return fmt.Errorf("write %s: %w", path, cause(err))
+	}
+	if err := linkFile(tmp, path); err != nil {
+		if errors.Is(err, fs.ErrExist) || !noHardLinks(err) {
+			return fmt.Errorf("write %s: %w", path, cause(err))
+		}
+		if err := writeDirect(path, content); err != nil {
+			return fmt.Errorf("write %s: %w", path, cause(err))
+		}
+	}
+	syncDir(filepath.Dir(path))
+	return nil
+}
+
+// createTemp creates a new file in dir, named .cairn.toml and a random suffix, with the
+// mode a committed file gets (0644, before the umask). os.CreateTemp would make it 0600.
+// A name that already exists is tried again.
+func createTemp(dir string) (*os.File, string, error) {
+	for range 100 {
+		name := filepath.Join(dir, identity.FileName+"."+rand.Text()+".tmp")
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o644)
+		if err == nil {
+			return f, name, nil
+		}
+		if !errors.Is(err, fs.ErrExist) {
+			return nil, "", err
+		}
+	}
+	return nil, "", &fs.PathError{Op: "create", Path: dir, Err: fs.ErrExist}
+}
+
+// writeDirect creates path with content, and no other name. O_EXCL makes it refuse an
+// existing file, so nothing is replaced. The mode is 0644 before the umask, as the
+// temporary file's is. A failure after the file is made removes it, since a partial
+// .cairn.toml is worse than none.
+func writeDirect(path string, content []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return err
 	}
-	tmp := f.Name()
-	defer os.Remove(tmp)
-	if err := finishTemp(f, content); err != nil {
+	if err := finishFile(f, content); err != nil {
+		os.Remove(path)
 		return err
 	}
-	return os.Link(tmp, path)
+	return nil
 }
 
-// finishTemp writes content to f, gives the file the mode of a committed file, makes
-// it durable, and closes it. The first failure is the one returned.
-func finishTemp(f *os.File, content []byte) error {
+// finishFile writes content to f, makes it durable, and closes it. The first failure is
+// the one returned. The file keeps the mode it was created with, so the umask applies.
+func finishFile(f *os.File, content []byte) error {
 	err := writeContent(f, content)
-	if err == nil {
-		err = f.Chmod(0o644)
-	}
 	if err == nil {
 		err = f.Sync()
 	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
+	}
+	return err
+}
+
+// noHardLinks reports whether a failed link means the filesystem cannot make one: EPERM
+// (FAT and exFAT on macOS), ENOTSUP and EOPNOTSUPP (one value on Linux, two on macOS),
+// EXDEV, and ENOSYS (a mount that does not implement link). It is false for EEXIST, and
+// for every other failure, which is returned rather than worked around.
+func noHardLinks(err error) bool {
+	for _, errno := range []syscall.Errno{syscall.EPERM, syscall.ENOTSUP, syscall.EOPNOTSUPP, syscall.EXDEV, syscall.ENOSYS} {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
+	return false
+}
+
+// syncDir makes the new name durable, where the platform lets a directory be synced. It
+// is best effort: the file is already in place when it runs, so a failure is not
+// reported as a failed write. It only means a crash could lose the name, which is then
+// as if there were no file.
+func syncDir(dir string) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	_ = d.Sync()
+	_ = d.Close()
+}
+
+// cause returns the error under a path error or a link error, so a message names the
+// file that was meant and not a temporary file the caller made.
+func cause(err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Err
+	}
+	var le *os.LinkError
+	if errors.As(err, &le) {
+		return le.Err
 	}
 	return err
 }

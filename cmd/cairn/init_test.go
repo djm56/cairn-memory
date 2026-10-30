@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -362,5 +364,242 @@ func TestInitHelpGoesToStdout(t *testing.T) {
 		if !strings.Contains(stdout, "Usage: cairn init") || !strings.Contains(stdout, "-project") {
 			t.Errorf("%v: stdout %q does not carry the usage and the flags", args, stdout)
 		}
+	}
+}
+
+// stubLink makes every link fail with err, as a filesystem with no hard links does, and
+// puts os.Link back when the test ends (step 12 review W4).
+func stubLink(t *testing.T, err error) {
+	t.Helper()
+	prev := linkFile
+	linkFile = func(oldname, newname string) error {
+		return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: err}
+	}
+	t.Cleanup(func() { linkFile = prev })
+}
+
+// dirNames returns the names in dir, failing the test when it cannot be read.
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// TestInitFallsBackWhenTheFilesystemHasNoHardLinks is step 12 review W4. A filesystem
+// that refuses a hard link gets the file written directly, with the same content, and
+// no temporary file is left behind. Each errno that means no hard links takes the
+// fallback.
+func TestInitFallsBackWhenTheFilesystemHasNoHardLinks(t *testing.T) {
+	errnos := map[string]syscall.Errno{
+		"EPERM": syscall.EPERM, "ENOTSUP": syscall.ENOTSUP, "EOPNOTSUPP": syscall.EOPNOTSUPP,
+		"EXDEV": syscall.EXDEV, "ENOSYS": syscall.ENOSYS,
+	}
+	for name, errno := range errnos {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			stubLink(t, errno)
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 0 {
+				t.Fatalf("exit %d, want 0 (stderr %q)", code, stderr)
+			}
+			want, err := projectContent(initProject, initServer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := readBytes(t, filepath.Join(dir, ".cairn.toml")); string(got) != string(want) {
+				t.Errorf("file:\n%s\nwant:\n%s", got, want)
+			}
+			if names := dirNames(t, dir); len(names) != 1 || names[0] != ".cairn.toml" {
+				t.Errorf("the directory holds %v, want only .cairn.toml", names)
+			}
+			if !strings.Contains(stdout, "wrote") {
+				t.Errorf("stdout %q does not say the file was written", stdout)
+			}
+		})
+	}
+}
+
+// TestInitFallbackRefusesAnExistingFile checks that the fallback keeps the no-overwrite
+// rule: when the name is taken, the link is refused and the direct create is refused
+// too, and the file is not touched.
+func TestInitFallbackRefusesAnExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, ".cairn.toml", "project = \"keep-me\"\n")
+	stubLink(t, syscall.EPERM)
+
+	err := writeNew(path, initProject, initServer)
+	if !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("writeNew = %v, want an error that is fs.ErrExist", err)
+	}
+	if string(readBytes(t, path)) != "project = \"keep-me\"\n" {
+		t.Errorf("file changed: %q", readBytes(t, path))
+	}
+	if names := dirNames(t, dir); len(names) != 1 {
+		t.Errorf("the directory holds %v, want only the existing file", names)
+	}
+}
+
+// TestInitFallbackLeavesNothingOnAFailedWrite checks that a direct write that fails part
+// way removes the partial file it made, so no .cairn.toml is left behind.
+func TestInitFallbackLeavesNothingOnAFailedWrite(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	stubLink(t, syscall.EPERM)
+	prev := writeContent
+	writeContent = func(w io.Writer, content []byte) error {
+		_, _ = w.Write(content[:len(content)/2])
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeContent = prev })
+
+	code, _, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "disk full") {
+		t.Errorf("exit %d, stderr %q: want 1 and the write error", code, stderr)
+	}
+	if names := dirNames(t, dir); len(names) != 0 {
+		t.Errorf("a failed fallback write left %v, want nothing", names)
+	}
+}
+
+// TestInitDoesNotFallBackOnOtherLinkFailures checks that only the errnos that mean no
+// hard links fall back. An existing name, which is a race, and an I/O error are returned,
+// and the file is not created another way.
+func TestInitDoesNotFallBackOnOtherLinkFailures(t *testing.T) {
+	cases := map[string]syscall.Errno{"EEXIST": syscall.EEXIST, "EIO": syscall.EIO}
+	for name, errno := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			stubLink(t, errno)
+			path := filepath.Join(dir, ".cairn.toml")
+
+			err := writeNew(path, initProject, initServer)
+			if err == nil {
+				t.Fatal("writeNew succeeded, want the link error")
+			}
+			if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+				t.Errorf("the file was created another way: %v", statErr)
+			}
+			if names := dirNames(t, dir); len(names) != 0 {
+				t.Errorf("the directory holds %v, want nothing", names)
+			}
+		})
+	}
+}
+
+// TestInitErrorsNameTheProjectFileNotTheTemporaryOne is step 12 review W4: a link failure
+// that is not a missing hard link is reported against .cairn.toml, never against the
+// temporary file the write made.
+func TestInitErrorsNameTheProjectFileNotTheTemporaryOne(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	stubLink(t, syscall.EIO)
+
+	code, _, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1 (stderr %q)", code, stderr)
+	}
+	if !strings.Contains(stderr, filepath.Join(dir, ".cairn.toml")) {
+		t.Errorf("stderr %q does not name the project file", stderr)
+	}
+	if strings.Contains(stderr, ".tmp") {
+		t.Errorf("stderr %q names the temporary file", stderr)
+	}
+	if n := strings.Count(stderr, "write "); n != 1 {
+		t.Errorf("stderr %q says write %d times, want once", stderr, n)
+	}
+}
+
+// TestInitRefusesToRunOutsideTheProjectDirectory is step 12 review W5. With
+// CLAUDE_PROJECT_DIR set, a run from a directory outside it is refused with exit 1: the
+// message names both directories and says to unset the variable or cd into the project,
+// and no file is written in either.
+func TestInitRefusesToRunOutsideTheProjectDirectory(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	useDir(t, other)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+
+	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1 (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+	for _, want := range []string{root, other, "unset CLAUDE_PROJECT_DIR", "cd into the project"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr %q lacks %q", stderr, want)
+		}
+	}
+	for _, dir := range []string{root, other} {
+		if _, err := os.Stat(filepath.Join(dir, ".cairn.toml")); !os.IsNotExist(err) {
+			t.Errorf("a file was written in %s: %v", dir, err)
+		}
+	}
+}
+
+// TestInitOutsideTheProjectDirectoryCompares checks the rule's edges: a sibling whose
+// name starts the same way is outside, a symlink into the project is inside, and a
+// symlink inside the project that leads out is outside, since the paths are resolved
+// before they are compared.
+func TestInitOutsideTheProjectDirectoryCompares(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "acme")
+	sibling := filepath.Join(base, "acme-other")
+	sub := filepath.Join(root, "service")
+	for _, d := range []string{root, sibling, sub} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// useDir clears CLAUDE_PROJECT_DIR, so the variable is set after each call.
+	useDir(t, sibling)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+	if code, _, _ := runCmd(t, initArgs(initProject, initServer)...); code != 1 {
+		t.Errorf("a sibling with the same start: exit %d, want 1", code)
+	}
+
+	inside := filepath.Join(base, "into-acme")
+	if err := os.Symlink(sub, inside); err != nil {
+		t.Fatal(err)
+	}
+	useDir(t, inside)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+	if code, _, stderr := runCmd(t, initArgs(initProject, initServer)...); code != 0 {
+		t.Errorf("a symlink into the project: exit %d, want 0 (stderr %q)", code, stderr)
+	}
+
+	leak := filepath.Join(root, "leak")
+	if err := os.Symlink(sibling, leak); err != nil {
+		t.Fatal(err)
+	}
+	useDir(t, leak)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+	if code, _, _ := runCmd(t, initArgs(initProject, initServer)...); code != 1 {
+		t.Errorf("a symlink inside the project that leads out: exit %d, want 1", code)
+	}
+}
+
+// TestInitDoesNotPrintACredentialFromAnExistingFile is step 12 review W6. A file that
+// already names a server with a user name and a password is refused by a run with other
+// values, and the refusal shows the server without them.
+func TestInitDoesNotPrintACredentialFromAnExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \""+initProject+"\"\nserver = \"https://keeper:secret@cairn.lan:8787\"\n")
+
+	code, stdout, stderr := runCmd(t, initArgs("other-project", initServer)...)
+	if code != 1 {
+		t.Errorf("exit %d, want 1 (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+	assertNoCredentials(t, stdout, stderr)
+	if !strings.Contains(stderr, `"https://cairn.lan:8787"`) {
+		t.Errorf("stderr %q does not show the server without its credentials", stderr)
 	}
 }
