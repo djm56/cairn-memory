@@ -1,7 +1,7 @@
 # Contributing to Cairn
 
 What Cairn is: [docs/DESIGN.md](docs/DESIGN.md). What is built next and how
-each phase is checked: [docs/PLAN.md](docs/PLAN.md).
+each milestone is checked: [docs/PLAN.md](docs/PLAN.md).
 
 ## Build and check
 

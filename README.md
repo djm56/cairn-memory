@@ -1,6 +1,6 @@
 # Cairn Memory
 
-A memory for coding agents. Agents record the task they are on, the steps
+An operating record for coding agents. Agents record the task they are on, the steps
 they take, what happened and what they learned. The next agent reads that
 back before it starts. An operator turns the best lessons into rules that
 every agent follows.
@@ -38,24 +38,25 @@ in Cairn leaves the same kind of marker.
 
 ## Design in brief
 
-- **Works with any agent harness.** Plain Claude Code first; OpenCode, pi,
-  Bishop and others through the same tools. Nothing in the core assumes a
+- **Works with any agent harness.** Plain Claude Code first, through MCP; OpenCode,
+  pi, Bishop and others through the CLI over the same HTTP API (D14). Nothing in the core assumes a
   framework, a crew or a file layout.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server, the HTTP server and web UI,
   the hook helper and the admin tool. Go and SQLite with full-text search;
   no C toolchain.
-- **No server needed to start.** On one machine, `cairn mcp` uses a local
-  database. Point it at `cairn serve` when you want a home server or a team.
+- **One server.** Clients connect to `cairn serve` over HTTP with an API key,
+  so a team or several machines share one place to look and back up (decision
+  D11). `cairn mcp` and the CLI need `server` in `.cairn.toml` or `CAIRN_SERVER`.
 - **The operator decides.** Agents can only propose. Accepting a finding or
   ratifying a directive is an operator action.
 
 ## How it will be used
 
-Until release archives exist (phase 10 of the plan), build the binary from
+Until release archives exist (Later in the plan), build the binary from
 source with `make build`; see [CONTRIBUTING.md](CONTRIBUTING.md). The plugin
-flow arrives at phase 4. Once phase 4 is done, the intended steps are:
+flow arrives in M5. Once M5 is done, the intended steps are:
 
 ```bash
 # With cairn on PATH, in Claude Code:
@@ -69,12 +70,17 @@ flow arrives at phase 4. Once phase 4 is done, the intended steps are:
 From then on, each session starts with the active task in context, and the
 `cairn` skill tells the agent how to start, step through and close a task.
 
-`.cairn.toml` is committed to the project:
+`.cairn.toml` is committed to the project. `server` is required (D11); the
+API key does not go in this file.
 
 ```toml
 project = "acme-api"
-# server = "https://cairn.lan:8787"   # optional; absent means local
+server = "https://cairn.lan:8787"
 ```
+
+The repository and the Go module still carry the name `cairn-memory`.
+Renaming them to `cairn` is planned (decision D18), and the rename has not
+been done.
 
 ## Documentation
 
@@ -82,14 +88,14 @@ project = "acme-api"
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
 | [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |
-| [docs/PLAN.md](docs/PLAN.md) | Build phases with exit checks, what is guided by bishop-memory, migration, decisions |
+| [docs/PLAN.md](docs/PLAN.md) | Build order: milestones M1 to M8 and Later with exit checks, what is guided by bishop-memory, migration, decisions |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, by pull request, under Unreleased |
 | [The wiki](https://github.com/djm56/cairn-memory/wiki) | Summaries, the roadmap in plain words, and how the work is run. Published from `wiki/` |
 
 ## Project management
 
 - [Wiki](https://github.com/djm56/cairn-memory/wiki): summaries and how the work is run.
-- [Milestones](https://github.com/djm56/cairn-memory/milestones): one per phase.
+- [Milestones](https://github.com/djm56/cairn-memory/milestones): one per milestone, M1 to M8 and Later.
 - [Issues](https://github.com/djm56/cairn-memory/issues): the work, from forms.
 - [Projects](https://github.com/djm56/cairn-memory/projects): the board that tracks each issue.
 - [CHANGELOG.md](CHANGELOG.md): what each pull request changed.
