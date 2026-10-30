@@ -1,9 +1,7 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-29: phase 1 (contract) is done, and its exit check passed
-with the operator's review of
-[CONTRACT.md §9](CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local
-store) is done, and its exit check passed. Phase 3 (MCP adapter) is current. Live progress is on the
+**Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are
+done, and their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
 

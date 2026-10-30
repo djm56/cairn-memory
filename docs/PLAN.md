@@ -1,11 +1,10 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-phase: 3 -->
+<!-- cairn-milestone: M1 -->
 
-**Status as of 2026-10-29: phase 1 (contract) is done, and its exit check
-passed with the operator's review of [CONTRACT.md](CONTRACT.md) §9. Phase 2
-(core and local store) is done, and its exit check passed. Phase 3
-(MCP adapter) is current. Live progress is on the
+**Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are
+done, and their exit checks passed. Plan v1 replaces phases 3 to 10 with the
+milestones in §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
@@ -378,24 +377,28 @@ that is not a numbered decision here, and the table says what.
 
 ## 9. Project management
 
-- **Milestones** mirror the phases in §3, one milestone per phase.
-- **`.github/roadmap.json`** holds copies of each phase's exit check and work
-  items from §3. Change §3 and roadmap.json together.
-- **Board, labels and bootstrap.** The labels, the Projects board and the
-  roadmap issues are set up by `scripts/github/bootstrap.sh`. It is a dry run
-  by default. `--apply` fills what is missing and never changes what a person
-  set. The operator runs `--apply`.
+- **Milestones** are the rows of the milestone table in §3: M1 to M8, and
+  Later. Each has a GitHub milestone of the same name. Phases 0 to 2 are
+  history; their milestones and labels stay as they are.
+- **`.github/roadmap.json`** holds copies of each milestone's exit check, and
+  the issues that §3 and the Plan v1 issue list name. Change §3 and
+  roadmap.json together.
+- **Board, labels and bootstrap.** The labels (`m1` to `m8`, `later`), the
+  Projects board and the roadmap issues are set up by
+  `scripts/github/bootstrap.sh`. It is a dry run by default. `--apply` fills
+  what is missing and never changes what a person set. The operator runs
+  `--apply`.
 - **Wiki.** The GitHub wiki is published from `wiki/` in this repository.
 - **Status.** The status line appears in README.md, in this file, in
-  docs/DESIGN.md, in docs/CONTRACT.md (whose line states the contract's own
-  state, draft or approved, rather than the phase), and at the top of each
-  `wiki/*.md` content page. The `cairn-phase` marker appears in README.md and in
-  this file. All of these carry the phase only: which phase is current, and
+  docs/DESIGN.md, and at the top of each `wiki/*.md` content page. The
+  `cairn-milestone` marker appears in README.md and in this file, and
+  `scripts/check-docs.sh` checks that the two agree. docs/CONTRACT.md's line
+  states the contract's own state (draft or approved), not a milestone. The
+  status lines and the marker name only the milestone that is current, and
   whether its exit check has passed. They change together, and only when a
-  phase's exit check passes, so they cannot go stale between exits.
-  `scripts/check-docs.sh` checks only the README and PLAN markers, not the
-  status lines. They never carry pull request numbers or merge state. Live
-  progress (pull requests, issues, merges) is on the
+  milestone's exit check passes, so they cannot go stale between exits. They
+  never carry pull request numbers or merge state. Live progress (pull
+  requests, issues, merges) is on the
   [milestones](https://github.com/djm56/cairn-memory/milestones) and the
   [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 

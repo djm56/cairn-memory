@@ -35,9 +35,9 @@ request as equivalent or accepted, with a reason.
    one, and reference it.
 2. **Branch.** Branch from `main`, named for the change.
 3. **Pull request.** Use the pull request template. It asks for `Closes #N`
-   and the phase milestone.
-4. **CI.** `build, vet, fmt, test` must pass. The docs job checks the phase
-   markers and the changelog, and shellcheck lints the scripts. Only
+   and the milestone.
+4. **CI.** `build, vet, fmt, test` must pass. The docs job checks the milestone
+   marker and the changelog, and shellcheck lints the scripts. Only
    `build, vet, fmt, test` is required on `main`.
 5. **Review.** See the rule below.
 6. **Merge.** An agent may merge a pull request once CI is green and the
@@ -110,10 +110,11 @@ the reason. Adopted decisions are listed in PLAN.md §8.
 
 - **Changelog.** Every pull request adds an entry under `## [Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md), unless it carries the `skip-changelog` label.
-- **Phase marker.** README.md and docs/PLAN.md each carry one
-  `<!-- cairn-phase: N -->` marker, and the two N values match.
-  `scripts/check-docs.sh` checks that they agree. When N and the status lines
-  change is set out in [PLAN §9](docs/PLAN.md#9-project-management).
+- **Milestone marker.** README.md and docs/PLAN.md each carry one
+  `<!-- cairn-milestone: M -->` marker, naming the current milestone (M1 to M8,
+  or Later), and the two values match. `scripts/check-docs.sh` checks that they
+  agree. When the marker and the status lines change is set out in
+  [PLAN §9](docs/PLAN.md#9-project-management).
 - **Contract changes.** DESIGN.md, CONTRACT.md, `internal/core` and
   `internal/conformance` change together. See
   [Changes to the design](#changes-to-the-design) above.
