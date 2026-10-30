@@ -78,7 +78,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 ### Changed
 
-- Plan v1: central server only, 13 tools plus recall and search, viewer scope, hooks and CLI, dashboard; milestones M1–M8 and Later replace phases 3–10.
+- Plan v1: central server only, 13 tools plus recall and search, viewer scope, hooks and CLI, dashboard; milestones M1–M8 and Later replace phases 3–10 ([PR #65](https://github.com/djm56/cairn-memory/pull/65)).
 - Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on
   2026-10-28, item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)),
   and `DESIGN.md` is aligned with the contract
