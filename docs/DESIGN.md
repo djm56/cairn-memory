@@ -312,7 +312,7 @@ Plan v1 (decisions D11 and D14) sets the agent surface for M1: 13 tools plus
 the read tools `recall` and `search` (15 names). The table below lists all 15.
 Until M1, the contract and `internal/core` still carried `event_list`,
 `review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
-removed them, and `event_list` folded into `task_get` (`section: events`). Each
+removes them, and `event_list` folds into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
 is how every harness other than Claude Code reaches Cairn.
 
@@ -391,7 +391,7 @@ against an in-process server (D19).
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Planned, M1: handlers only, with no listener (D19). The `cairn serve` listener that mounts them is M2. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Planned, M1: handlers only. The shipped binary has no network listener (D19). The `cairn serve` listener that mounts them is M2. |
 | `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Planned, M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. |
 | `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
@@ -427,8 +427,9 @@ any other backend. A behaviour exists when the conformance suite says so.
 Clients open no database. `cairn mcp` and the CLI send each call to
 `cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
 without a `server` (M1). The store stays inside `cairn serve`, and the web UI
-is served by the same process. Until M2 there is no listener to send to, so
-M1's flow runs against an in-process server (D19).
+is served by the same process. Until M2 the shipped binary has no network
+listener, so M1's flow runs against an in-process server bound to loopback
+(D19).
 
 D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend

@@ -5,14 +5,14 @@ phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
-`core.Local` passes all 72 cases in `internal/conformance` (count as of
+`core.Local` passes all 80 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
 > **Plan v1 (2026-10-30).** The agent tool surface is 13 tools plus the read
 > tools `recall` and `search` (15 names; see [DESIGN.md](DESIGN.md) §4). M1
-> removed `note_put`, `note_get`, `review_record` and `event_list` from this
+> removes `note_put`, `note_get`, `review_record` and `event_list` from this
 > contract, `internal/core` and `internal/conformance`, in one change: `event_list`
 > folds into `task_get` with `section=events`, and a review is recorded as a
 > `review` event through `event_log` (§4, §9 item 39). CLI equivalents per tool come
@@ -235,7 +235,7 @@ All three are writes, and are `refused` on a terminal task.
 Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
-A `pending` step that an event or a review refers to cannot be removed, so
+A `pending` step that an event (a review is one) refers to cannot be removed, so
 the call is `refused` and changes nothing. The refusal names each such step.
 The way out: skip each such step with `step_update` (`skip`, with a summary),
 then plan again. A skipped step is kept.
@@ -276,9 +276,13 @@ calls they record, and are `invalid` here. `unblocked` is also written by
 
 A `review` needs `data`, a JSON object of the form
 `{"verdict": "approved" | "not-approved", "critical": n, "warnings": n}`,
-where each count is 0 or more (§9 item 39). A missing field, a malformed
+where each count is 0 or more (§9 item 39). The three keys are matched
+exactly, in lower case, and the object has no other key: a key in another
+case, an extra key (such as `summary`), a key given twice, a `null` in place
+of the object or of any of the three values, a missing field, a malformed
 value, a verdict outside those two, or a negative count is `invalid`, and the
-message names the fix. The step is optional, and may be in any status.
+message names the fix. Extra keys are refused, not kept, so nothing rides
+along unread. The step is optional, and may be in any status.
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
 
@@ -326,7 +330,9 @@ all); `all_projects`; `limit` (default 10); `cursor`.
 match first), and `next`. Global directives are found from every project.
 A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
-either.
+either. A `note` hit comes only from a row written before the M1 change that
+removed notes.
+No call reads a note, so such a hit has its snippet and no call to open it.
 
 ## 7. Notes
 
@@ -374,7 +380,7 @@ only a core test checks it. An item with no check of its own is marked
    starts". This is the precise form.
 6. **Agents cannot log `started`, `finished`, `review` or `close` events.**
    The calls they record write them, so the journal cannot claim work that
-   the step table does not show. Item 39 excepts `review` (see there).
+   the step table does not show.
 7. **Step refs are an object.** `{"number": n}` or `{"id": n}`, never a
    bare integer, which could mean either.
 8. **`fail` and `skip` need a summary.** A failed attempt with no reason
@@ -398,7 +404,7 @@ only a core test checks it. An item with no check of its own is marked
     where it means before the first step (§1.4, §3). *Bishop default, pending
     operator approval.*
 15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
-    pending step with an event or a review is not removed. The call is
+    pending step with an event (a review is one) is not removed. The call is
     `refused` and changes nothing. The refusal names each such step, in
     display order, and the way out is to skip each of them and plan again
     (§3). *Bishop default, pending operator approval.*
@@ -471,11 +477,9 @@ only a core test checks it. An item with no check of its own is marked
     own writes (update, steps, events and close), and it is not among them. *Bishop default, pending operator approval.*
 31. **`note_put` shape (2026-10-29), withdrawn 2026-10-30.** `note_put` is cut
     from v1 (§7), so this item no longer applies. Giving `id` with `task_id` was
-    to be `invalid`, and so was a blank title or body. *Bishop default, pending operator
-    approval.* (core test only)
+    to be `invalid`, and so was a blank title or body.
 32. **`review_record` on any step (2026-10-29), withdrawn 2026-10-30.**
-    `review_record` is cut from v1 (§4), so this item no longer applies. *Bishop default, pending
-    operator approval.*
+    `review_record` is cut from v1 (§4), so this item no longer applies.
 33. **Event on a pending step (2026-10-29).** `event_log` may name a pending
     step (§4). *Bishop default, pending operator approval.*
 34. **A name of only spaces is no name (2026-10-29).** An agent write whose
@@ -514,4 +518,6 @@ only a core test checks it. An item with no check of its own is marked
     message names the fix. The step is optional and may be in any status
     (item 33). The reviewer is the calling agent. This amends item 6 for
     `review` only: `review_record` is cut from v1 (§4), so the review event is
-    the only record of a review. *Bishop default, pending operator veto.*
+    the only record of a review. A review event recorded before M1 has no
+    `data`, since it was written by `review_record`. A reader of review events
+    must tolerate one with no data. *Bishop default, pending operator approval.*

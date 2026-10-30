@@ -39,8 +39,8 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 | Area | Exists now | Planned |
 |---|---|---|
 | Binary | `cairn version` | `init`, `status`, `doctor`, `export task` and `hook session-start` in M1, and `mcp` (server only). `serve` in M2. `enable` and the other hooks in M4. `import` in M6. `review run` is Later. |
-| Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | The M1 tool changes land with the code. Item 12 is deferred to Later ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
-| Conformance suite | `internal/conformance`: 72 cases, all passing against the local service | Grows with the M1 tool changes. |
+| Contract | [CONTRACT.md](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md) and the types in `internal/core` | The M1 tool changes are in the code. Item 12 is deferred to Later ([#41](https://github.com/djm56/cairn-memory/issues/41)). |
+| Conformance suite | `internal/conformance`: 80 cases, all passing against the local service | |
 | Store | SQLite store with migrations, full-text search and task-id allocation (phase 2) | Postgres is Later. |
 | MCP adapter | Nothing yet | `cairn mcp`, server only, in M1. |
 | Claude Code plugin | Nothing yet | M5. |
