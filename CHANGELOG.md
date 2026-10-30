@@ -186,3 +186,5 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   and sees it once it ends. `WithReadTx`'s docblock warns that a call on the
   Store inside fn waits forever on `:memory:`, and DESIGN §3 names it for
   snapshot reads.
+- Phase 2 core, follow-up to issue #52 (item 11): the `activeTasks` docblock
+  says it may run inside a read transaction as well as a write one.

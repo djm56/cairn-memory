@@ -29,7 +29,8 @@ func taskMayMove(from, to TaskStatus) bool {
 // page by page, so a project with more active tasks than one page is counted in
 // full.
 //
-// Read function: call it on the store or inside a write transaction.
+// Read function: call it on the store, or inside a write transaction or a read
+// transaction.
 func activeTasks(ctx context.Context, q store.Querier, project string) ([]store.TaskRow, error) {
 	var out []store.TaskRow
 	var after *store.TaskKey
