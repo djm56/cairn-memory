@@ -1,13 +1,14 @@
 name: Decision
-description: A design question for the operator. Decisions D1–D10 in docs/PLAN.md §8 are adopted.
+description: A design question for the operator. Decisions D1–D18 in docs/PLAN.md §8 are adopted.
 title: "[decision] "
 labels: ["type:decision", "needs-operator"]
 body:
   - type: markdown
     attributes:
       value: |
-        Decisions D1–D10 in docs/PLAN.md §8 are adopted (2026-10-27). Reopening one
-        needs the operator, so say which one and why in the question below.
+        Decisions D1–D10 in docs/PLAN.md §8 were adopted on 2026-10-27, and D11–D18
+        on 2026-10-30. D2, D8 and D10 are superseded and kept as the record. Reopening
+        one needs the operator, so say which one and why in the question below.
   - type: textarea
     id: question
     attributes:
@@ -22,15 +23,23 @@ body:
       options:
         - "None: a new decision"
         - "D1. Vocabulary: task"
-        - "D2. Local mode with no daemon"
+        - "D2. Local mode with no daemon (superseded by D11)"
         - "D3. One learnings table"
         - "D4. Task ids task-YYYYMMDD-NN"
         - "D5. Step positions, not step numbers"
         - "D6. One binary cairn"
         - "D7. The project file is .cairn.toml"
-        - "D8. The review loop waits for phase 8"
+        - "D8. The review loop waits for phase 8 (superseded by D17)"
         - "D9. Local marketplace first"
-        - "D10. Build from the outside in"
+        - "D10. Build from the outside in (superseded by the M1–M8 order in §2)"
+        - "D11. Central server only"
+        - "D12. SQLite stays, behind Service and store"
+        - "D13. Three key scopes: agent, operator, viewer"
+        - "D14. Two agent surfaces: MCP and a CLI"
+        - "D15. Hooks on session-start, pre-compact and stop"
+        - "D16. Directives returned per call are capped at 12"
+        - "D17. No scheduled review agents in v1"
+        - "D18. Repo, binary and plugin are named cairn"
     validations:
       required: true
   - type: textarea

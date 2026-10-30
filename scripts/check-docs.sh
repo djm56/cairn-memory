@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # check-docs.sh — documentation checks for Cairn (CONTRIBUTING.md).
 #
-# Phase markers: README.md and docs/PLAN.md must each carry exactly one
-# <!-- cairn-phase: N --> marker, N an integer from 0 to 10, and the two N
-# must match.
+# Milestone markers: README.md and docs/PLAN.md must each carry exactly one
+# <!-- cairn-milestone: M --> marker, M the current milestone (M1 to M8, or
+# Later), and the two M values must match. The marker changes together with
+# the status lines (PLAN §9).
 #
 # Changelog (pull requests only): CHANGELOG.md must be among the files the
 # pull request changes, unless the pull request has the skip-changelog label.
@@ -13,7 +14,7 @@
 #
 # --base and --labels default to $PR_BASE_SHA and $PR_LABELS, which the docs
 # workflow sets. Without a base the changelog check is skipped, so the script
-# also runs locally with the phase check alone. --labels is comma-separated.
+# also runs locally with the milestone check alone. --labels is comma-separated.
 # Exits 0 when every check passes, 1 when any fails.
 
 set -euo pipefail
@@ -62,10 +63,10 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# marker_phase FILE: print the phase N in FILE's single cairn-phase marker.
-# Returns 1 with a reason on stderr when the marker is missing, repeated,
-# malformed or out of range.
-marker_phase() {
+# marker_milestone FILE: print the milestone named in FILE's single
+# cairn-milestone marker. Returns 1 with a reason on stderr when the marker is
+# missing, repeated, malformed or names no milestone.
+marker_milestone() {
   local file="$1" opens value
   if [ ! -f "$file" ]; then
     echo "$file: not found" >&2
@@ -73,47 +74,44 @@ marker_phase() {
   fi
 
   # Count occurrences, not lines, so two markers on one line still fail.
-  opens="$(grep -o -E '<!-- *cairn-phase:' "$file" | wc -l | tr -d ' ' || true)"
+  opens="$(grep -o -E '<!-- *cairn-milestone:' "$file" | wc -l | tr -d ' ' || true)"
   if [ "$opens" -eq 0 ]; then
-    echo "$file: no <!-- cairn-phase: N --> marker" >&2
+    echo "$file: no <!-- cairn-milestone: M --> marker" >&2
     return 1
   fi
   if [ "$opens" -gt 1 ]; then
-    echo "$file: $opens cairn-phase markers, expected exactly one" >&2
+    echo "$file: $opens cairn-milestone markers, expected exactly one" >&2
     return 1
   fi
 
-  value="$(grep -o -E '<!-- *cairn-phase: *[^ >]* *-->' "$file" | head -n 1 \
-    | sed -E 's/.*cairn-phase: *([^ >]*) *-->.*/\1/' || true)"
+  value="$(grep -o -E '<!-- *cairn-milestone: *[^ >]* *-->' "$file" | head -n 1 \
+    | sed -E 's/.*cairn-milestone: *([^ >]*) *-->.*/\1/' || true)"
   case "$value" in
-    ''|*[!0-9]*)
-      echo "$file: cairn-phase marker is malformed (value: '${value}')" >&2
+    M[1-8]|Later) ;;
+    *)
+      echo "$file: cairn-milestone marker is malformed or names no milestone (value: '${value}'; expected M1 to M8 or Later)" >&2
       return 1
       ;;
   esac
-  if [ "$value" -gt 10 ]; then
-    echo "$file: cairn-phase $value is out of range (0 to 10)" >&2
-    return 1
-  fi
   printf '%s\n' "$value"
 }
 
 FAILED=0
 
-readme_phase=""
-plan_phase=""
-if readme_phase="$(marker_phase "$ROOT/README.md")"; then
-  echo "phase marker: README.md says $readme_phase"
+readme_milestone=""
+plan_milestone=""
+if readme_milestone="$(marker_milestone "$ROOT/README.md")"; then
+  echo "milestone marker: README.md says $readme_milestone"
 else
   FAILED=1
 fi
-if plan_phase="$(marker_phase "$ROOT/docs/PLAN.md")"; then
-  echo "phase marker: docs/PLAN.md says $plan_phase"
+if plan_milestone="$(marker_milestone "$ROOT/docs/PLAN.md")"; then
+  echo "milestone marker: docs/PLAN.md says $plan_milestone"
 else
   FAILED=1
 fi
-if [ -n "$readme_phase" ] && [ -n "$plan_phase" ] && [ "$readme_phase" != "$plan_phase" ]; then
-  echo "phase marker: README.md ($readme_phase) and docs/PLAN.md ($plan_phase) disagree" >&2
+if [ -n "$readme_milestone" ] && [ -n "$plan_milestone" ] && [ "$readme_milestone" != "$plan_milestone" ]; then
+  echo "milestone marker: README.md ($readme_milestone) and docs/PLAN.md ($plan_milestone) disagree" >&2
   FAILED=1
 fi
 

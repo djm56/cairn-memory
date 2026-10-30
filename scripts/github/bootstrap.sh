@@ -52,7 +52,11 @@
 #   sync_project     creates the "Cairn Memory Roadmap" project when none exists
 #                    and links it to the repository when it is not linked.
 #   sync_items       adds a roadmap issue to the board when it is not there, and
-#                    sets its Phase or Area only when that value is empty.
+#                    sets its Phase or Area only when that value is empty. Phase
+#                    is history for work from before Plan v1. Milestone is
+#                    GitHub's built-in board field: it follows the issue's own
+#                    milestone, which sync_issues sets on create. This script
+#                    creates no Milestone field and sets no Milestone value.
 #
 # Nothing is deleted, closed or reopened. Roadmap issues are matched by the
 # exact marker line <!-- cairn-roadmap: KEY -->. A missing marker is never
@@ -744,7 +748,9 @@ sync_project() {
   # Status is built in, so this only ever reports missing options. Matching is
   # case-insensitive, so "In Progress" matches "In progress" without a rename.
   ensure_field "Status" '["Todo","In progress","In review","Done"]'
-  ensure_field "Phase" "$(jq -cn '[range(0;11) | tostring]')"
+  # Phase options come from the phase: labels. Milestone is GitHub's built-in
+  # field, so it is not created here.
+  ensure_field "Phase" "$(jq -c '[.[] | select(.name | startswith("phase:")) | .name | ltrimstr("phase:")]' "$LABELS_FILE")"
   ensure_field "Area" "$(jq -c '[.[] | select(.name | startswith("area:")) | .name]' "$LABELS_FILE")"
 
   if [ "$APPLY" = 1 ]; then
@@ -776,8 +782,8 @@ sync_items() {
 
   while IFS= read -r issue; do
     key="$(printf '%s' "$issue" | jq -r '.key')"
-    want_phase="$(printf '%s' "$issue" | jq -r '.phase | tostring')"
-    want_area="$(printf '%s' "$issue" | jq -r '.area')"
+    want_phase="$(printf '%s' "$issue" | jq -r '(.phase // "") | tostring')"
+    want_area="$(printf '%s' "$issue" | jq -r '.area // ""')"
 
     line="$(awk -F '\t' -v k="$key" '$1 == k { print; exit }' "$WORK/index.tsv")"
     if [ -z "$line" ]; then
@@ -809,13 +815,13 @@ sync_items() {
     fi
 
     for field in Phase Area; do
-      if [ "$field" = "Phase" ]; then
-        want="$want_phase"
-        cur="$cur_phase"
-      else
-        want="$want_area"
-        cur="$cur_area"
-      fi
+      case "$field" in
+        Phase) want="$want_phase"; cur="$cur_phase" ;;
+        *) want="$want_area"; cur="$cur_area" ;;
+      esac
+      # Nothing to set when the roadmap gives no value. A Plan v1 issue has
+      # phase: null, so its Phase stays empty.
+      [ -n "$want" ] || continue
       [ "$cur" = "$want" ] && continue
 
       # Only an empty value is filled. A value someone set by hand stays.
@@ -855,7 +861,8 @@ print_views() {
 Views cannot be created through the API. Do these once, by hand, in the
 "$PROJECT_TITLE" project:
   1. New view > Board. Group by Status.
-  2. New view > Table. Group by Phase.
+  2. New view > Table. Group by Milestone. Milestone is GitHub's built-in
+     field; do not add a custom Milestone field.
   3. New view > Roadmap. Show the milestones. The roadmap layout is driven by
      date fields; add Start and Target date fields if you want bars.
 EOF

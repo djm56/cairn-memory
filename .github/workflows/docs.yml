@@ -1,6 +1,6 @@
 name: Docs
 
-# Phase markers and the changelog rule (scripts/check-docs.sh), and shellcheck
+# Milestone marker and the changelog rule (scripts/check-docs.sh), and shellcheck
 # over every script. Reads only; no secrets, no publishing.
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   docs:
-    name: phase markers and changelog
+    name: milestone marker and changelog
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -1,7 +1,7 @@
 # Contributing to Cairn
 
 What Cairn is: [docs/DESIGN.md](docs/DESIGN.md). What is built next and how
-each phase is checked: [docs/PLAN.md](docs/PLAN.md).
+each milestone is checked: [docs/PLAN.md](docs/PLAN.md).
 
 ## Build and check
 
@@ -35,9 +35,9 @@ request as equivalent or accepted, with a reason.
    one, and reference it.
 2. **Branch.** Branch from `main`, named for the change.
 3. **Pull request.** Use the pull request template. It asks for `Closes #N`
-   and the phase milestone.
-4. **CI.** `build, vet, fmt, test` must pass. The docs job checks the phase
-   markers and the changelog, and shellcheck lints the scripts. Only
+   and the milestone.
+4. **CI.** `build, vet, fmt, test` must pass. The docs job checks the milestone
+   marker and the changelog, and shellcheck lints the scripts. Only
    `build, vet, fmt, test` is required on `main`.
 5. **Review.** See the rule below.
 6. **Merge.** An agent may merge a pull request once CI is green and the
@@ -71,6 +71,35 @@ From what went well and badly in bishop-memory (PLAN.md §6):
   says how to fix it (`cairn init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.
 
+### Plan v1 rules
+
+Ten rules from Plan v1 (2026-10-30), added to the rules above.
+
+1. **Boring storage.** SQLite stays. A new store passes the conformance suite
+   before it is mentioned in docs. A migration never renames or removes its
+   source before import succeeds, and always has `--dry-run`.
+2. **No destructive advice in error text.** A refusal names only a safe fix. A
+   CI test, not yet written, fails on `--force`, `rm`, `reset`, or any `init`
+   other than `cairn init`, in an error string.
+3. **One source of truth.** Exports are exports; nothing reads an export back
+   except `import` on an explicit command.
+4. **Hooks remind, tools record.** Every task-loop step the skill asks for has a
+   hook that reminds the agent of it after compaction or at stop.
+5. **Directives are capped.** 12 per call, ranked, with `review_by`; the UI
+   shows the count and the oldest. A rule that keeps being broken becomes a
+   hook check, not a longer sentence.
+6. **The loop stays cheap.** No scheduled agents in v1; a human decides findings
+   daily and the "waiting on you" count stays under 15.
+7. **No silent identity.** Missing `project` or `server` is an error that names
+   `cairn init`.
+8. **Small tool surface.** 13 tools plus the read tools `recall` and `search`
+   (15 names), descriptions under 200 characters, every non-obvious affordance
+   shown by example in the skill text.
+9. **Confirm plugin facts live.** Tool names and `CLAUDE_PROJECT_DIR` behaviour
+   are checked in a live session at M5 and on every Claude Code minor release.
+10. **Rules live in core.** No rule in a handler, hook or skill that the
+    conformance suite does not also check.
+
 ## Changes to the design
 
 DESIGN.md and PLAN.md are the contract for this repository. A change that
@@ -81,10 +110,11 @@ the reason. Adopted decisions are listed in PLAN.md §8.
 
 - **Changelog.** Every pull request adds an entry under `## [Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md), unless it carries the `skip-changelog` label.
-- **Phase marker.** README.md and docs/PLAN.md each carry one
-  `<!-- cairn-phase: N -->` marker, and the two N values match.
-  `scripts/check-docs.sh` checks that they agree. When N and the status lines
-  change is set out in [PLAN §9](docs/PLAN.md#9-project-management).
+- **Milestone marker.** README.md and docs/PLAN.md each carry one
+  `<!-- cairn-milestone: M -->` marker, naming the current milestone (M1 to M8,
+  or Later), and the two values match. `scripts/check-docs.sh` checks that they
+  agree. When the marker and the status lines change is set out in
+  [PLAN §9](docs/PLAN.md#9-project-management).
 - **Contract changes.** DESIGN.md, CONTRACT.md, `internal/core` and
   `internal/conformance` change together. See
   [Changes to the design](#changes-to-the-design) above.

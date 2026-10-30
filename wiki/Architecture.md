@@ -1,6 +1,6 @@
 # Architecture
 
-_Status as of 2026-10-29: phase 1 (contract) is done, and its exit check passed with the operator's review of [CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review). Phase 2 (core and local store) is done, and its exit check passed. Phase 3 (MCP adapter) is current. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 Parts that are not built yet are marked in [Getting started](Getting-Started#what-exists-and-what-is-later).
 
@@ -12,26 +12,23 @@ This page summarises [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main
 
 _Design: [DESIGN.md §1.1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#11-principles)._
 
-## Local and server mode
+## One server
 
-The same code runs in two modes:
+Clients open no database. `cairn mcp` and the CLI send each call over HTTP to `cairn serve`, with an API key. One server suits a home server, a team, or several machines (decision D11). `cairn mcp` refuses to start without a `server` in `.cairn.toml` or `CAIRN_SERVER` (M1).
 
-- **Local.** `cairn mcp` opens a SQLite file on the machine. No daemon is needed (decision D2).
-- **Server.** `cairn mcp` sends each call to `cairn serve` with an API key. This suits a home server, a team, or several machines.
+The local database path that decision D2 designed was cut before it was built.
 
-Switching modes is one line in the project file or one environment variable. The database path and the switch are described in the design.
-
-_Design: [DESIGN.md §5.3](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#53-local-and-remote-backends)._
+_Design: [DESIGN.md §5.3](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#53-the-server)._
 
 ## Layers
 
-An MCP client talks to `cairn mcp` over stdio. The adapter calls the `Service` interface. The local backend writes to the store. The remote backend calls `cairn serve`, which calls the same core. The packages:
+An MCP client talks to `cairn mcp` over stdio. The adapter calls the `Service` interface through `internal/client`, which sends each call over HTTP to `cairn serve`. `cairn serve` calls core, and core writes to the store. The packages:
 
 - `internal/core`: the `Service` interface and every rule, including the close policy, status moves and operator-only changes.
 - `internal/store`: SQLite access, migrations and full-text search. It is the only package with SQL.
 - `internal/api`: HTTP handlers. They decode the request, call core and encode the result.
-- `internal/client`: a `Service` over HTTP, used by the remote backend.
-- `internal/mcp`: the MCP tools. Each one calls `Service`.
+- `internal/client`: a `Service` over HTTP, the way every client reaches `cairn serve`.
+- `internal/mcp`: the MCP tools. Each one calls `Service` through `internal/client`.
 - `internal/identity`: finds the project, agent and session for a call.
 - `internal/auth`: API keys and scopes in server mode.
 - `internal/ui`: the web pages, embedded in the binary.
@@ -63,19 +60,19 @@ _Design: [DESIGN.md §5.1](https://github.com/djm56/cairn-memory/blob/main/docs/
 
 ## Clients
 
-Claude Code comes first, as a plugin in phase 4. OpenCode and pi follow in phase 9. Any MCP client can run `cairn mcp` over stdio. Bishop will become a crew pack in its own repository.
+Claude Code comes first, as a plugin in M5. Other clients use the CLI over the same HTTP API (M4). Any MCP client can run `cairn mcp` over stdio, against a server. Bishop will become a crew pack in its own repository.
 
 _Design: [DESIGN.md §6](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#6-clients)._
 
 ## Security
 
-Local mode listens on nothing. `cairn serve` binds to loopback by default, and it refuses any other address unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes.
+Clients open no database and listen on nothing. `cairn serve` binds to loopback by default, and it refuses any other address unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes.
 
 _Design: [DESIGN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#8-security)._
 
 ## The review loop (later)
 
-The review loop is optional and comes in phase 8. Scheduled agents classify findings and grade finished tasks. The operator decides on their recommendations.
+The review loop is optional and comes later (PLAN.md, Later). Scheduled agents classify findings and grade finished tasks. The operator decides on their recommendations.
 
 _Design: [DESIGN.md §7](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#7-review-loop-optional-later)._
 

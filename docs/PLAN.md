@@ -1,11 +1,10 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-phase: 3 -->
+<!-- cairn-milestone: M1 -->
 
-**Status as of 2026-10-29: phase 1 (contract) is done, and its exit check
-passed with the operator's review of [CONTRACT.md](CONTRACT.md) §9. Phase 2
-(core and local store) is done, and its exit check passed. Phase 3
-(MCP adapter) is current. Live progress is on the
+**Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are
+done, and their exit checks passed. Plan v1 replaces phases 3 to 10 with the
+milestones in §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
@@ -14,8 +13,8 @@ What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from
 
-Cairn replaces [bishop-memory](https://github.com/djm56/bishop-memory) (local
-checkout `/Users/djm56/bishop-memory`). bishop-memory works, and it holds the
+Cairn replaces [bishop-memory](https://github.com/djm56/bishop-memory) (a local
+bishop-memory checkout). bishop-memory works, and it holds the
 operator's history: missions, findings, directives and grades. It was built
 around one harness, Bishop, and around one idea: the harness writes Markdown
 files and the service imports them.
@@ -59,24 +58,26 @@ fresh too, guided by bishop-memory's tests.
 
 ## 2. Build order
 
-The plan builds **from the outside in**: first the contract an agent sees
-(the tools and their behaviour, as a test suite), then the core that
-satisfies it, then the ways to reach it (MCP, plugin, server), then the
-operator's pages, then migration from bishop-memory, then the review loop.
-Each phase leaves something that works end to end. *(Decision D10 confirms
-this order.)*
+Phases 0–2 are done. Plan v1 (2026-10-30) replaces the phase list with eight
+milestones and a Later set, in this order. Each milestone ends with an exit
+check a reviewer can run (§3).
 
 ```
-0 skeleton → 1 contract → 2 core + local store → 3 MCP → 4 Claude Code plugin
-          → 5 server + remote → 6 web UI → 7 migration → 8 review loop
-          → 9 other clients → 10 releases
+M1 Server-mode MCP → M2 Server → M3 Web UI + dashboard → M4 Hooks + CLI
+  → M5 Plugin → M6 Import → M7 Pilot → M8 Roll-out → Later
 ```
 
-Bishop's crew pack (bishop-harness) can start after phase 4.
+This order replaces the phase order adopted as D10 on 2026-10-27 (see §8).
+Bishop's crew pack (bishop-harness) is deferred until after roll-out (see
+Scope of v1, §3).
 
-## 3. Phases
+## 3. Milestones
 
-Each phase has work and an exit check a reviewer can run.
+Phases 0–2 are done and stay here as history. Plan v1 replaces phases 3–7 with
+milestones M1, M2, M3, M5 and M6, adds M4, M7 and M8, and moves phases 8–10 to
+Later. Each
+milestone has work and an exit check a reviewer can run. The milestone table
+is under the heading Milestone table, below Phase 2.
 
 ### Phase 0 — Skeleton
 
@@ -130,126 +131,73 @@ sequence from `internal/api/allocate.go`.
 processes writing the same database at once allocate distinct task ids
 (a test). `go test -race` is clean.
 
-### Phase 3 — MCP adapter
+### Milestone table
 
-**Work.** `internal/mcp`: every tool in DESIGN.md §4 over `Service`, with
-compact output and paging. `cairn mcp` (local backend). `cairn init`,
-`cairn status`, `cairn doctor`, `cairn hook session-start`, `cairn export`.
+Plan v1 (2026-10-30). Milestones M1, M2, M3, M5 and M6 carry the work of
+phases 3–7 forward; M4, M7 and M8 are new; phases 8–10 and Postgres sit in
+Later. Each exit check is
+the only thing that moves the status line (§9).
 
-Guided by bishop-memory, for reference: the result and error helpers in
-`cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the
-tool-description style.
+| Milestone | Was | Work | Exit check |
+| --- | --- | --- | --- |
+| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2 | A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it |
+| M2 Server | Phase 5 | `cairn serve`: HTTP API over `core`, TLS by files or proxy, loopback default, body caps, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set |
+| M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
+| M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
+| M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairn:init`, `/cairn:status`, `cairn-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
+| M6 Import | Phase 7 | `cairn import bishop-memory --db --dry-run`; mapping per PLAN.md §5.1 minus the reviews table (verdicts become `review` events); idempotent; counts report | Dry run on a copy maps every mission, step, event, finding, directive, criterion, lesson, mistake and deliverable, or names each skip; counts match; history visible on the dashboard |
+| M7 Pilot | New | One pilot project, two developers, one operator; daily review of findings; weekly look at the dashboard with a project manager | Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone |
+| M8 Roll-out | Cut-over (§5.3) | `.cairn.toml` in every active project; operator keys to leads, viewer keys to project managers; harnesses move between tasks; bishop-memory read-only, then archived | No harness writes to bishop-memory; backups verified by a restore to a scratch server |
+| Later | Phases 8–10, Postgres | Scheduled review loop; per-harness plugins; public releases; Postgres store; documentation ingestion | Opened only after M8 |
 
-**Exit.** A plain Claude Code project with a hand-written `.mcp.json` entry
-for `cairn mcp`, after `cairn init`, completes a small real task: Claude
-starts it, plans it, steps through it, records a learning and closes it.
-`cairn export` prints the task as Markdown. An MCP-level test drives the same
-flow through stdio.
+### Scope of v1
 
-### Phase 4 — Claude Code plugin
+V1 is what the pilot on one project needs, and nothing that only a product
+needs.
 
-**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/
-marketplace.json` at the repository root (local marketplace first). The
-`cairn` skill: the task loop, when to log, what makes a good finding, how to
-answer a close refusal. `cairn-launch`: finds `cairn` on PATH, in
-`~/.local/bin`, or in `CAIRN_HOME/bin`; otherwise prints the install command.
-`claude plugin validate` in CI. An install guide.
+| In v1 | Cut from v1 | Deferred (after roll-out) |
+| --- | --- | --- |
+| Tasks: brief, criteria, steps, journal, close policy (as built) | Local no-server mode | Scheduled classify, process, grade (Later) |
+| Learnings proposed by agents; accept, reject, supersede by operators | `note_put` / `note_get` (long briefs go in `context`) | Per-harness plugins beyond the CLI (Later) |
+| Directives: global, project, agent scope; cap of 12 per call and `review_by` (both M2) | `review_record` and the reviews table (a `review` event carries verdict and counts until a crew needs more) | Public releases, Homebrew, public marketplace (Later) |
+| `recall` and `search` over tasks, learnings, directives | Path-scoped directives | Postgres store, vectors, graph, documentation ingestion |
+| HTTP API, API keys with `agent` / `operator` / `viewer` scopes, TLS, body caps, `/healthz` | OKF export | Bishop crew pack (bishop-harness repo) |
+| Web UI: Tasks, Learnings, Directives, Projects, Dashboard | Multi-organisation, SSO, hosting | |
+| MCP adapter (server mode) and CLI with `--json` | | |
+| Hooks: session-start, pre-compact, stop; `cairn enable --agent` | | |
+| `cairn init`, `status`, `doctor`, `key`, `backup`, `export task`, `export project` | | |
+| Import from bishop-memory | | |
 
-Confirm in a live session, and record in the guide: the exact tool names
-(`mcp__plugin_cairn_cairn__*` is inferred from the docs, not stated), that
-`CLAUDE_PROJECT_DIR` reaches `cairn mcp`, and the SessionStart output.
+Tool surface after the cuts: `task_current`, `task_start`, `task_get`,
+`task_list`, `task_update`, `task_close`, `step_plan`, `step_add`,
+`step_update`, `event_log`, `learning_add`, `learning_list`, `directive_list`,
+plus `recall` and `search` as read tools. `event_list` folds into `task_get`
+with `section: events`. That is 13 tools plus the read tools `recall` and
+`search` (15 names).
 
-**Exit.** On a machine with no bishop-memory: install `cairn`, add the
-marketplace, install the plugin, run `/cairn:init` in an empty project, and
-ask Claude to do a small task "using Cairn". The task is recorded with its
-brief, steps, events and close, without any other instruction file.
+### After v1
 
-### Phase 5 — Server and remote backend
+Nothing here is built now, and none of it is a commitment. Three habits during
+v1 keep each of these cheap.
 
-**Work.** `cairn serve`: the HTTP API over `core`, API keys with scopes
-(DESIGN.md §8), TLS, loopback by default, body caps, `/healthz`.
-`internal/client`: the `Service` over HTTP. `cairn mcp` uses it when
-`server` is set. `cairn key add/list/revoke`.
-
-Guided by bishop-memory, for reference: `internal/auth/keys.go`,
-`internal/middleware`, `internal/config`, the TLS and key handling in
-`cmd/memoryd`, and the network tests (`internal/api/network_test.go`).
-
-**Exit.** The conformance suite passes against the HTTP client talking to a
-test server. An agent key is refused on an operator route (a test). The
-phase 4 flow works with `server` set in `.cairn.toml`.
-
-### Phase 6 — Web UI
-
-**Work.** Pages embedded in the binary, served by `cairn serve`:
-
-- **Tasks**: a list across projects; one task's page with its brief, steps,
-  journal, reviews and close record. Guided by bishop-memory's mission HUD.
-- **Learnings**: proposed findings with accept, reject and supersede, each
-  with a note. Guided by bishop-memory's triage review page.
-- **Directives**: ratify a directive from an accepted finding, edit scope,
-  retire.
-- **Projects**: settings, including the close policy.
-
-**Exit.** The operator can run the whole learning loop from the browser: see
-a proposed finding, accept it, ratify it as a directive, and see it returned
-by `directive_list` and `task_current` in the next session.
-
-### Phase 7 — Migration from bishop-memory
-
-**Work.** `cairn import bishop-memory --db <path> [--dry-run]`. Reads the
-bishop-memory SQLite file directly; never reads harness Markdown. The mapping
-is in §5. Idempotent: running it twice changes nothing the second time.
-Reports counts for each table, read and written, and every row it could not
-map.
-
-**Exit.** A dry run against a copy of the live bishop-memory database maps
-every mission, step, event, finding, directive, criterion, lesson, mistake,
-deliverable and grade, or names each one it skipped and why. Counts are
-checked against the source. The operator reviews the result in the web UI.
-
-### Phase 8 — Review loop
-
-**Work.** Build triage and grading fresh (DESIGN.md §7), guided by
-bishop-memory: categories, classification, groups, recommendations, directive
-proposals, grades, runs; the MCP review profile; the agent definitions and
-skills, rewritten without Bishop names; an engine-neutral runner
-(`cairn review run classify|process|grade`) that starts the chosen client
-headless. A scheduling guide for launchd and systemd.
-
-Guided by bishop-memory, for reference: the triage and grade routes in
-`internal/api/triage.go` and `grades.go`, `internal/store/triage_runs.go` and
-`mission_grades.go`, `scripts/triage-run.sh`, the three agents and two skills
-under `.claude/`, and their tests.
-
-**Exit.** A scheduled run classifies new findings and grades closed tasks,
-and the operator accepts the recommendations on the review page. Then the
-bishop-memory nightly runs are switched off (§5.3).
-
-### Phase 9 — Other clients
-
-**Work.** OpenCode: a generated `opencode.json` entry and instruction file;
-check the timeout and the tool prefix live. pi: `.pi/mcp.json` with
-`"exposure": "direct"`; check that the tools are visible to the model. A
-short page per client.
-
-**Exit.** Each client completes the phase 3 flow in a live session.
-
-### Phase 10 — Releases
-
-**Work.** Release archives for linux and darwin, amd64 and arm64, built by CI
-on a tag (`CGO_ENABLED=0`, as bishop-memory's `make dist`). A Homebrew tap. A
-plugin release tagged `cairn--v<version>`, which is the tag form plugin
-dependencies resolve against. A public marketplace only after a review of the
-plugin's hook text *(decision D9)*.
-
-**Exit.** A clean machine installs `cairn` from a release, installs the
-plugin, and completes the phase 4 flow.
+- **Postgres store.** All SQL stays in `internal/store`; `Search(query, filters)`
+  is one store function; migrations are numbered SQL per backend; timestamps
+  stay ISO text. A `store/postgres` package then passes the same conformance
+  suite, and `cairn serve --db postgres://…` is the only user-visible change.
+- **Vectors and graph.** Both sit behind `Search` and `recall`; the agent tools
+  do not change. pgvector for embeddings; recursive queries or a graph extension
+  for links between tasks, learnings and directives.
+- **Documentation ingestion.** A `documents` table and a `cairn ingest` command.
+  Documents are read-only knowledge, kept separate from agent-written learnings
+  so the trust boundary stays clear.
+- **Scheduled review loop (Later).** Classify, process and grade as
+  recommendations only, once the daily human review is routine and the
+  dashboard shows the backlog is stable.
 
 ## 4. What Bishop needs from Cairn
 
 Bishop's crew pack is bishop-harness's work, not this repository's. Cairn
-must provide, by phase 4:
+must provide, by M5:
 
 - every operation Bishop's lifecycle uses: brief, plan, steps with
   attempts and assignees, reviews with verdicts, journal, findings, patterns,
@@ -286,8 +234,8 @@ depends on `cairn`; keep `workspace/` for scratch and QA evidence, and keep
 | `patterns` | `learnings` kind `pattern` |
 | `service_records` | `learnings` kind `agent-note` |
 | `directives` | `directives`, scope `global` unless the source names a harness |
-| review verdicts, parsed at import from reviewer steps' notes and summaries with bishop-memory's `internal/review` rules (it stores no review table) | `reviews` |
-| `mission_grades`, triage tables | carried in phase 8, when those tables exist |
+| review verdicts, parsed at import from reviewer steps' notes and summaries with bishop-memory's `internal/review` rules (it stores no review table) | `review` events (M6); the reviews table is cut from v1 |
+| `mission_grades`, triage tables | carried in Later, when those tables exist |
 | `crew` | not carried; agent names live on rows |
 | workspace documents | not carried; scratch stays where it is |
 
@@ -299,15 +247,20 @@ harness. The import reads a copy.
 
 ### 5.3 Cut-over
 
-1. A new test project uses Cairn from phase 4.
-2. After phase 7, the history is imported into a Cairn server, and the import
-   is repeated (it is idempotent) until cut-over.
+The cut-over is milestone M8 (Roll-out). Before it:
+
+1. A new test project uses Cairn from M1.
+2. After M6, the history is imported into a Cairn server, and the import is
+   repeated (it is idempotent) until cut-over.
+
+In M8:
+
 3. Each harness moves when its crew pack or instructions are ready, between
    missions, never during one. bishop-memory stays read-only for that harness
    afterwards.
-4. After phase 8 runs cleanly for a week, bishop-memory's nightly classify,
-   process and grade runs are switched off. Not before: they must not break
-   while any harness still writes to bishop-memory.
+4. bishop-memory's nightly classify, process and grade runs are switched off.
+   Not before: they must not break while any harness still writes to
+   bishop-memory.
 5. bishop-memory is archived when no harness writes to it.
 
 Rollback at any step: the harness goes back to its bishop-memory
@@ -336,26 +289,29 @@ From what went well and badly in bishop-memory:
 
 ## 7. Risks
 
-- **Rebuilding more than needed.** Version 1 is phases 0–4: a local memory a
-  plain Claude Code project can use. The server, the UI, the import and the
-  review loop follow. Anything not in DESIGN.md §4 waits for a reason.
+- **Rebuilding more than needed.** Version 1 is the scope of M1 to M8 in §3: a
+  central server, the web UI and dashboard, hooks and the CLI, the plugin, the
+  import, and the pilot and roll-out. The review loop is Later. Anything not in
+  DESIGN.md §4 waits for a reason.
 - **Losing hard-won behaviour.** bishop-memory's tests encode bugs already
   found: the mission-id extraction rule, the unknown-status warning, the
-  N/A grade, the FK guards in grade rebuilds. Phase 7 and phase 8 go through
-  those tests and carry each one that still applies.
+  N/A grade, the FK guards in grade rebuilds. M6 and Later go through those
+  tests and carry each one that still applies.
 - **Two systems at once.** Until cut-over the operator watches two services.
-  Keep the overlap short by moving harnesses soon after phase 7.
+  Keep the overlap short by moving harnesses soon after M6.
 - **Plugin facts change.** Tool naming for plugin servers and the subagent
-  wildcard form are inferred, not documented. Phase 4 confirms them live.
-  Re-read the Claude Code plugin pages before phases 4 and 10.
-- **Local mode under concurrency.** Several MCP processes on one SQLite file
-  is safe in WAL mode, but busy errors must surface as a retry, not a lost
-  write. Phase 2 tests it.
+  wildcard form are inferred, not documented. M5 confirms them live. Re-read
+  the Claude Code plugin pages before M5 and before any public release (Later).
+- **Concurrency on one database.** Several processes on one SQLite file are
+  safe in WAL mode, but busy errors must surface as a retry, not a lost write.
+  Phase 2 tests it. Local mode, which first raised this, is cut by D11.
 
 ## 8. Decisions
 
 **Adopted 2026-10-27 by the operator: D1–D10, each as recommended.** D10's
-order is the one in §2.
+order was the phase order that §2 and §3 then gave. Plan v1 (2026-10-30)
+replaces that order with the milestones in §2 and §3. D11–D18 come from Plan
+v1's decisions table.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -363,7 +319,7 @@ order is the one in §2.
 - **D2. Local mode with no daemon.** `cairn mcp` opens a local SQLite file
   when no server is configured. The alternative is always running
   `cairn serve`. *Recommended: local mode, because it makes the first install
-  one step.*
+  one step.* **Superseded by D11** (Plan v1, 2026-10-30); kept as the record.
 - **D3. One `learnings` table** for findings, patterns and agent notes, with
   a `kind`. The alternative is three tables, as in bishop-memory.
   *Recommended: one table; they share a lifecycle and the review page.*
@@ -377,32 +333,86 @@ order is the one in §2.
 - **D7. The project file is `.cairn.toml`** at the project root.
   *Recommended.*
 - **D8. The review loop waits for phase 8.** Version 1 has no scheduled
-  agents. *Recommended.*
+  agents. *Recommended.* **Superseded by D17** (Plan v1, 2026-10-30); kept as
+  the record.
 - **D9. Local marketplace first**, public after a review of the plugin's
   hook text and install guide. *Recommended.*
 - **D10. Build from the outside in**, in the order in §2: contract, core,
   MCP, plugin, server, UI, migration, review loop. *Recommended; confirmed
-  by the operator 2026-10-27.*
+  by the operator 2026-10-27.* **Superseded by the M1–M8 order in §2**
+  (Plan v1, 2026-10-30); kept as the record.
+
+Plan v1 (2026-10-30) adds D11–D18. Each row names what it replaces and why.
+D2, D8 and D10 are marked superseded above; the other rows replace something
+that is not a numbered decision here, and the table says what.
+
+**Adopted 2026-10-30 by the operator (Plan v1): D11–D18.**
+
+- **D11. Central server only.** `cairn mcp` and the CLI require a `server` in
+  `.cairn.toml` or `CAIRN_SERVER`; no local database path for clients.
+  *Replaces D2 (local mode). Why: one place to look and back up; one backend to
+  test; the first users are a team, not one developer.*
+- **D12. SQLite stays, behind `Service` and `store`.** Postgres is a second
+  `store` package later, gated by the conformance suite. *Replaces: nothing.
+  Why: already built and passing; vectors and graph are not v1.*
+- **D13. Three key scopes:** `agent` (tools), `operator` (decisions,
+  ratification), `viewer` (read-only UI and dashboard). *Replaces DESIGN.md §8's
+  two agent and operator scopes plus admin. Why: leads and project managers
+  need to look without being able to change anything.*
+- **D14. Two agent surfaces.** MCP for Claude Code; a CLI over the same HTTP API
+  for every other harness. *Replaces: nothing. Why: no per-harness plugin work
+  in v1; bash is enough.*
+- **D15. Hooks on `session-start`, `pre-compact` and `stop`,** installed by
+  `cairn enable --agent`. *Replaces DESIGN.md §4.1, session-start only. Why: a
+  task loop must survive compaction.*
+- **D16. Directives returned per call are capped at 12,** ranked agent >
+  project > global, then newest. Each has a `review_by` date, 90 days by
+  default. *Replaces: nothing. Why: instruction-following degrades as rules pile
+  up; a cap forces retirement.*
+- **D17. No scheduled review agents in v1.** The review loop moves to Later; a
+  lead reviews proposed findings daily from the UI. *Replaces D8 (already
+  deferred). Why: token cost and oversight; the UI is the loop.*
+- **D18. Repo, binary and plugin are named `cairn`.** The category line is
+  "operating record for coding agents". *Replaces "cairn-memory". Why: "memory"
+  invites the wrong comparison and hides task state and directives.*
 
 ## 9. Project management
 
-- **Milestones** mirror the phases in §3, one milestone per phase.
-- **`.github/roadmap.json`** holds copies of each phase's exit check and work
-  items from §3. Change §3 and roadmap.json together.
-- **Board, labels and bootstrap.** The labels, the Projects board and the
-  roadmap issues are set up by `scripts/github/bootstrap.sh`. It is a dry run
-  by default. `--apply` fills what is missing and never changes what a person
-  set. The operator runs `--apply`.
+- **Milestones** are the rows of the milestone table in §3: M1 to M8, and
+  Later. Each has a GitHub milestone of the same name. Phases 0 to 2 are
+  history; their milestones and labels stay as they are.
+- **`.github/roadmap.json`** holds copies of each milestone's exit check, and
+  the issues that §3 and the Plan v1 issue list name. Change §3 and
+  roadmap.json together.
+- **Board, labels and bootstrap.** The labels (`m1` to `m8`, `later`), the
+  Projects board and the roadmap issues are set up by
+  `scripts/github/bootstrap.sh`. It is a dry run by default. `--apply` fills
+  what is missing and never changes what a person set. The operator runs
+  `--apply`.
 - **Wiki.** The GitHub wiki is published from `wiki/` in this repository.
 - **Status.** The status line appears in README.md, in this file, in
-  docs/DESIGN.md, in docs/CONTRACT.md (whose line states the contract's own
-  state, draft or approved, rather than the phase), and at the top of each
-  `wiki/*.md` content page. The `cairn-phase` marker appears in README.md and in
-  this file. All of these carry the phase only: which phase is current, and
+  docs/DESIGN.md, and at the top of each `wiki/*.md` content page. The
+  `cairn-milestone` marker appears in README.md and in this file, and
+  `scripts/check-docs.sh` checks that the two agree. docs/CONTRACT.md's line
+  states the contract's own state (draft or approved), not a milestone. The
+  status lines and the marker name only the milestone that is current, and
   whether its exit check has passed. They change together, and only when a
-  phase's exit check passes, so they cannot go stale between exits.
-  `scripts/check-docs.sh` checks only the README and PLAN markers, not the
-  status lines. They never carry pull request numbers or merge state. Live
-  progress (pull requests, issues, merges) is on the
+  milestone's exit check passes, so they cannot go stale between exits. They
+  never carry pull request numbers or merge state. Live progress (pull
+  requests, issues, merges) is on the
   [milestones](https://github.com/djm56/cairn-memory/milestones) and the
   [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
+
+## 10. Open questions
+
+- [ ] Pilot project and the two developers (M7).
+- [ ] A second operator besides the first, so that daily review does not
+  depend on one person.
+- [ ] Does the proxy in front of the server terminate TLS, or does `cairn serve`
+  carry certificates?
+- [ ] Do viewers see proposed learnings, or only ratified directives?
+- [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
+- [ ] Rename to `cairn` now (one PR, before M1) or after M8?
+- [ ] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
+  `internal/client` and a serve skeleton into M1, or does it test against an
+  in-process test server?

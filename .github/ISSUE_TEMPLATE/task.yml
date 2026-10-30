@@ -1,22 +1,31 @@
 name: Roadmap task
-description: A unit of work from a phase in docs/PLAN.md §3.
+description: A unit of work from a milestone in docs/PLAN.md §3.
 title: "[task] "
 labels: ["type:task"]
 body:
   - type: markdown
     attributes:
       value: |
-        One task is one piece of a phase. Quote the work line from PLAN §3 where you can.
-        The phase and area you pick here are for the reader. Issues opened from this
+        One task is one piece of a milestone. Quote the work line from PLAN §3 where you can.
+        The milestone and area you pick here are for the reader. Issues opened from this
         form are not touched by the bootstrap script (scripts/github/bootstrap.sh).
         The maintainer sets this issue's labels, milestone and project board fields
-        (Phase, Area) by hand.
+        by hand.
   - type: dropdown
-    id: phase
+    id: milestone
     attributes:
-      label: Phase
-      description: The phase in docs/PLAN.md §3 this work belongs to.
-      options: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+      label: Milestone
+      description: The milestone in docs/PLAN.md §3 this work belongs to.
+      options:
+        - "M1 Server-mode MCP"
+        - "M2 Server"
+        - "M3 Web UI + dashboard"
+        - "M4 Hooks + CLI"
+        - "M5 Plugin"
+        - "M6 Import"
+        - "M7 Pilot"
+        - "M8 Roll-out"
+        - "Later"
     validations:
       required: true
   - type: dropdown
@@ -67,5 +76,5 @@ body:
       label: Links
       description: The PLAN and DESIGN sections this touches.
       placeholder: |
-        - docs/PLAN.md §3, phase N
+        - docs/PLAN.md §3, milestone M
         - docs/DESIGN.md §X

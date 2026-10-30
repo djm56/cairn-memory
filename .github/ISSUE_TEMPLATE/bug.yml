@@ -43,7 +43,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, architecture, and whether you use a server (cairn serve) or the local database.
+      description: OS, architecture, and whether you use a server (cairn serve).
   - type: textarea
     id: logs
     attributes:
