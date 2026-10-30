@@ -52,7 +52,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		checks = append(checks, check{name: "server", status: "fail", detail: reason(err)})
 		checks = append(checks, check{name: "reach", status: "skip", detail: "no server to reach"})
 	} else {
-		checks = append(checks, check{name: "server", status: "ok", detail: fmt.Sprintf("%s (from %s)", url, serverSource())})
+		checks = append(checks, check{name: "server", status: "ok", detail: fmt.Sprintf("%s (from %s)", client.DisplayURL(url), serverSource())})
 		checks = append(checks, reachCheck(url))
 	}
 

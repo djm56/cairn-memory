@@ -1,12 +1,16 @@
 package main
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 const (
@@ -218,5 +222,145 @@ func TestWriteNewNeverReplacesAFile(t *testing.T) {
 	}
 	if string(readBytes(t, path)) != "project = \"keep-me\"\n" {
 		t.Errorf("file changed: %q", readBytes(t, path))
+	}
+}
+
+// TestInitWritesAtomicallyOrNotAtAll is step 10 review W4. A write that fails part way
+// leaves no .cairn.toml and no temporary file: the file appears whole, or it does not
+// appear.
+func TestInitWritesAtomicallyOrNotAtAll(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	prev := writeContent
+	writeContent = func(w io.Writer, content []byte) error {
+		_, _ = w.Write(content[:len(content)/2])
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeContent = prev })
+
+	code, _, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "disk full") {
+		t.Errorf("exit %d, stderr %q: want 1 and the write error", code, stderr)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Errorf("a failed write left %v in the directory, want nothing", names)
+	}
+}
+
+// TestInitLeavesOnlyTheFile checks that a successful write leaves the project file and
+// nothing else in the directory: the temporary file is removed once the file is linked.
+func TestInitLeavesOnlyTheFile(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	if code, _, stderr := runCmd(t, initArgs(initProject, initServer)...); code != 0 {
+		t.Fatalf("exit %d (stderr %q)", code, stderr)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != ".cairn.toml" {
+		t.Errorf("the directory holds %d entries, want only .cairn.toml", len(entries))
+	}
+	if info, err := os.Stat(filepath.Join(dir, ".cairn.toml")); err == nil && info.Mode().Perm() != 0o644 {
+		t.Errorf("the file mode is %v, want 0644", info.Mode().Perm())
+	}
+}
+
+// TestInitRefusesCredentialsInTheServerURL is step 10 review W5. A user name or password
+// in the server URL is refused, since the file is committed, and the refusal does not
+// print any part of the URL.
+func TestInitRefusesCredentialsInTheServerURL(t *testing.T) {
+	for _, server := range []string{"https://keeper:secret@cairn.lan:8787", "https://keeper@cairn.lan:8787"} {
+		t.Run(server, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			code, stdout, stderr := runCmd(t, initArgs(initProject, server)...)
+			if code != 2 {
+				t.Errorf("exit %d, want 2 (stderr %q)", code, stderr)
+			}
+			if strings.Contains(stderr, "secret") || strings.Contains(stderr, "keeper") || strings.Contains(stdout, "keeper") {
+				t.Errorf("the refusal shows the credentials: stdout %q, stderr %q", stdout, stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".cairn.toml")); !os.IsNotExist(err) {
+				t.Errorf("a refused URL wrote a file: %v", err)
+			}
+		})
+	}
+}
+
+// TestInitWritesWhereIdentityLooks is step 10 review W6. With CLAUDE_PROJECT_DIR set,
+// init writes the file in that directory, even when it runs from a subdirectory, and the
+// project resolves from the subdirectory to the value it wrote.
+func TestInitWritesWhereIdentityLooks(t *testing.T) {
+	root := t.TempDir()
+	sub := filepath.Join(root, "service")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	useDir(t, sub)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+
+	if code, _, stderr := runCmd(t, initArgs(initProject, initServer)...); code != 0 {
+		t.Fatalf("exit %d (stderr %q)", code, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".cairn.toml")); err != nil {
+		t.Errorf("the file is not in the project directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(sub, ".cairn.toml")); !os.IsNotExist(err) {
+		t.Errorf("a file was written in the subdirectory: %v", err)
+	}
+	p, err := identity.Resolve(sub)
+	if err != nil || p.Name != initProject {
+		t.Errorf("identity from the subdirectory = %+v, %v; want %q", p, err, initProject)
+	}
+}
+
+// TestInitBelowAFileWithTheSameValuesChangesNothing is step 10 review W6, the second
+// half: init in a directory below a project file that has the same values answers that
+// nothing changed, and writes nothing; different values are still refused.
+func TestInitBelowAFileWithTheSameValuesChangesNothing(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".cairn.toml", "project = \""+initProject+"\"\nserver = \""+initServer+"\"\n")
+	sub := filepath.Join(root, "service")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	useDir(t, sub)
+
+	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 0 || !strings.Contains(stdout, "nothing changed") {
+		t.Errorf("same values below the file: exit %d, stdout %q, stderr %q: want 0 and nothing changed", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(sub, ".cairn.toml")); !os.IsNotExist(err) {
+		t.Errorf("a file was written below the project file: %v", err)
+	}
+
+	code, _, stderr = runCmd(t, initArgs("other", initServer)...)
+	if code != 1 || !strings.Contains(stderr, "would shadow it") {
+		t.Errorf("other values below the file: exit %d, stderr %q: want 1 and the shadowing refusal", code, stderr)
+	}
+}
+
+// TestInitHelpGoesToStdout is step 10 review S7. init --help is the usage, on stdout,
+// and exits 0. Nothing is written to stderr.
+func TestInitHelpGoesToStdout(t *testing.T) {
+	useDir(t, t.TempDir())
+	for _, args := range [][]string{{"init", "--help"}, {"init", "-h"}} {
+		code, stdout, stderr := runCmd(t, args...)
+		if code != 0 || stderr != "" {
+			t.Errorf("%v: exit %d, stderr %q: want 0 and nothing on stderr", args, code, stderr)
+		}
+		if !strings.Contains(stdout, "Usage: cairn init") || !strings.Contains(stdout, "-project") {
+			t.Errorf("%v: stdout %q does not carry the usage and the flags", args, stdout)
+		}
 	}
 }
