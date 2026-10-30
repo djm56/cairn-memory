@@ -69,3 +69,45 @@ func TestFoldLineHasNoCap(t *testing.T) {
 		t.Errorf("foldLine cut a text of %d runes", len(long))
 	}
 }
+
+// TestFormatCharactersAreDropped is step 10 review W2. A format character (Unicode
+// category Cf) shows nothing and changes how the text around it is read, so plain,
+// foldLine and blockText drop each group of them, and keep the text on both sides.
+func TestFormatCharactersAreDropped(t *testing.T) {
+	groups := map[string][]rune{
+		"soft hyphen":            {0x00ad},
+		"arabic letter mark":     {0x061c},
+		"left and right marks":   {0x200e, 0x200f},
+		"bidi embeddings":        {0x202a, 0x202b, 0x202c, 0x202d, 0x202e},
+		"zero-width characters":  {0x200b, 0x200c, 0x200d},
+		"word joiner":            {0x2060},
+		"bidi isolates":          {0x2066, 0x2067, 0x2068, 0x2069},
+		"byte order mark":        {0xfeff},
+		"tag characters":         {0xe0001, 0xe0041, 0xe007f},
+		"interlinear annotation": {0xfff9, 0xfffb},
+	}
+	for name, runes := range groups {
+		for _, r := range runes {
+			in := "a" + string(r) + "b"
+			for fn, got := range map[string]string{
+				"plain":     plain(in),
+				"foldLine":  foldLine(in),
+				"blockText": blockText(in),
+			} {
+				if got != "ab" {
+					t.Errorf("%s: %s(U+%04X) = %q, want %q", name, fn, r, got, "ab")
+				}
+			}
+		}
+	}
+}
+
+// TestFormatCharactersKeepOtherText checks that the cut is only of format characters: a
+// letter with a mark, a CJK pair and an emoji are text, and stay.
+func TestFormatCharactersKeepOtherText(t *testing.T) {
+	in := "café 日本 👍 \u202eend"
+	want := "café 日本 👍 end"
+	if got := plain(in); got != want {
+		t.Errorf("plain(%q) = %q, want %q", in, got, want)
+	}
+}

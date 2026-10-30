@@ -12,8 +12,8 @@ import (
 const maxLineRunes = 200
 
 // plain returns a server-derived text as one printable line, capped at maxLineRunes.
-// Line breaks become spaces, control characters and escape sequences are dropped, and
-// a text that is too long is cut with an ellipsis. Every text the hook or status
+// Line breaks become spaces, control characters, format characters and escape sequences
+// are dropped, and a text that is too long is cut with an ellipsis. Every text the hook or status
 // prints from the server goes through it (step 10 review W3), so a title cannot end a
 // line and start another, or move a terminal's cursor, or carry a line into a model's
 // context that the hook did not write.
@@ -25,7 +25,7 @@ func plain(s string) string {
 // the single-line fields of a document: a title, an owner, a file path, an event's
 // text. Every line break, tab and separator becomes a space, every other control
 // character is dropped, and an escape sequence is removed whole. Edge spaces are
-// trimmed.
+// trimmed. A format character (isFormat) is dropped too.
 func foldLine(s string) string {
 	var b strings.Builder
 	rs := []rune(s)
@@ -42,13 +42,25 @@ func foldLine(s string) string {
 			i++
 		case isLineBreak(r):
 			b.WriteByte(' ')
-		case unicode.IsControl(r):
-			// Dropped: C0, DEL and C1 controls have no printable form.
+		case unicode.IsControl(r), isFormat(r):
+			// Dropped: C0, DEL and C1 controls have no printable form, and a format
+			// character reorders or hides text without showing anything.
 		default:
 			b.WriteRune(r)
 		}
 	}
 	return collapseSpaces(b.String())
+}
+
+// isFormat reports whether r is a Unicode format character, general category Cf. Such a
+// character shows nothing of its own but changes how the text around it is shown, or
+// hides it: the soft hyphen U+00AD, the bidi marks U+061C, U+200E and U+200F, the bidi
+// embeddings and overrides U+202A to U+202E, the zero-width characters U+200B to U+200D,
+// the word joiner U+2060, the bidi isolates U+2066 to U+2069, the byte order mark
+// U+FEFF, and the tag characters U+E0000 to U+E007F. All of Cf goes, the joiner U+200D
+// included, so no emoji sequence survives.
+func isFormat(r rune) bool {
+	return unicode.Is(unicode.Cf, r)
 }
 
 // collapseSpaces turns each run of ASCII spaces in s into one space, and trims the edges.
@@ -74,7 +86,8 @@ func collapseSpaces(s string) string {
 // blockText returns a text that keeps its line breaks, for the body of a section of a
 // document. Carriage returns and the Unicode line separators become line feeds, and
 // every control character other than the line feed and the tab is dropped, with any
-// escape sequence. The Markdown structure of the body is the author's, so it stays.
+// escape sequence, and every format character (isFormat) is dropped as well. The
+// Markdown structure of the body is the author's, so it stays.
 func blockText(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
@@ -89,7 +102,7 @@ func blockText(s string) string {
 			i = skipEscape(rs, i)
 		case r == '\n' || r == '\t':
 			b.WriteRune(r)
-		case unicode.IsControl(r):
+		case unicode.IsControl(r), isFormat(r):
 			// Dropped, as foldLine drops it.
 		default:
 			b.WriteRune(r)

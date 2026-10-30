@@ -60,13 +60,17 @@ func dial(wd string, timeout time.Duration) (*target, error) {
 }
 
 // reason is the text of err for a person: the message of a core.Error, without its
-// kind, and the error's own text for any other failure.
+// kind, and the error's own text for any other failure. The message is server text, so
+// it goes through plain (step 10 review W3, step 12 review W3): one printable line,
+// capped at maxLineRunes, with no control or format character. Every print of reason's
+// result is a print of server text or of an error that may carry it, so all of them
+// get the same rule.
 func reason(err error) string {
 	var ce *core.Error
 	if errors.As(err, &ce) {
-		return ce.Message
+		return plain(ce.Message)
 	}
-	return err.Error()
+	return plain(err.Error())
 }
 
 // serverSource says where the server URL came from, for a person reading status or

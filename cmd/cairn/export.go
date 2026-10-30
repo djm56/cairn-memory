@@ -233,9 +233,10 @@ func section(w io.Writer, title, body string) {
 }
 
 // fileLine is one key file or deliverable, with its role and note when it has them.
-// The path is one line without control characters (step 10 review W3).
+// The path is one line without control characters (step 10 review W3), in a code span
+// that a backtick in the path cannot end (step 12 review S5).
 func fileLine(f core.TaskFile) string {
-	line := "- `" + foldLine(f.Path) + "`"
+	line := "- " + codeSpan(foldLine(f.Path))
 	if f.Role != "" {
 		line += " (" + foldLine(string(f.Role)) + ")"
 	}
@@ -243,6 +244,28 @@ func fileLine(f core.TaskFile) string {
 		line += ": " + foldLine(f.Note)
 	}
 	return line
+}
+
+// codeSpan returns s as a Markdown code span. The fence is one backtick longer than the
+// longest run of backticks in s, so no run in s can close the span, and a space pads
+// each side when s begins or ends with a backtick, which the fence would otherwise take
+// as its own (CommonMark, section 6.1).
+func codeSpan(s string) string {
+	longest, run := 0, 0
+	for _, r := range s {
+		if r == '`' {
+			run++
+			longest = max(longest, run)
+			continue
+		}
+		run = 0
+	}
+	fence := strings.Repeat("`", longest+1)
+	pad := ""
+	if strings.HasPrefix(s, "`") || strings.HasSuffix(s, "`") {
+		pad = " "
+	}
+	return fence + pad + s + pad + fence
 }
 
 // stamp formats a time as the UTC form the journal uses, YYYY-MM-DD HH:MM UTC.

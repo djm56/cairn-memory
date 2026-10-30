@@ -46,10 +46,10 @@ client, and a role. The adapter sets it; request types do not carry it.
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
   of only spaces counts as no name, and is `invalid`. A name with a control
   character, or a space at either end, is `invalid` on every call, reads
-  included, and so is a client name of that kind: the HTTP form cannot carry
-  either unchanged, so the name is refused, not trimmed. The message names the
-  field. On the MCP surface the adapter takes it from the `agent` argument of
-  each write tool (DESIGN §4).
+  included. A client name and a session name of that kind are `invalid` too, on
+  every call: the HTTP form cannot carry any of them unchanged, so each is refused,
+  not trimmed. The message names the field. On the MCP surface the adapter
+  takes it from the `agent` argument of each write tool (DESIGN §4).
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.

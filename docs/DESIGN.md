@@ -516,7 +516,8 @@ client and the CLI. This section is how the adapter reaches the server.
   task id, an unknown kind or empty text is reported before the data; over the
   client, the data is checked first. A caller name that the headers cannot carry
   (a control character, or a space at either end) is refused by the client the
-  same way, with core's message (`core.CheckCaller`), and is not sent.
+  same way, with core's message (`core.CheckCaller`), and is not sent. The names
+  checked are the agent, the client and the session, as CONTRACT §1.1 says.
   With no HTTP client given, `client.New` uses one with a 30-second timeout. A
   successful answer over 16 MiB is an error. The server does not cap its
   answers, so the cap is the client's guard.

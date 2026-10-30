@@ -286,3 +286,21 @@ func TestExportFoldsServerText(t *testing.T) {
 		t.Errorf("export carries a control character or a separator: %q", stdout)
 	}
 }
+
+// TestExportCodeSpanHoldsABacktick is step 12 review S5. A backtick in a key file's path
+// does not end the code span the path sits in: the fence is longer than any run of
+// backticks in the path, and a path that begins or ends with one is padded.
+func TestExportCodeSpanHoldsABacktick(t *testing.T) {
+	cases := map[string]string{
+		"src/plain.go": "- `src/plain.go`\n",
+		"a`b.go":       "- ``a`b.go``\n",
+		"a``b.go":      "- ```a``b.go```\n",
+		"`tick.go":     "- `` `tick.go ``\n",
+		"tick.go`":     "- `` tick.go` ``\n",
+	}
+	for path, want := range cases {
+		if got := fileLine(core.TaskFile{Path: path}) + "\n"; got != want {
+			t.Errorf("fileLine(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
