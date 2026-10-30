@@ -119,8 +119,10 @@ driver opens with `_txlock=immediate`, so the version is read under the write
 lock. Enumerated columns carry CHECK constraints, and references are declared
 foreign keys. `tasks.project` is immutable: a trigger in migration 0002 refuses a
 change. `events.project` must equal its task's project: a trigger in migration
-0003 refuses an event that names another project. The store reads outside
-transactions and writes inside `WithTx`.
+0003 refuses an event that names another project. Core owns two rules the schema
+does not state: a directive's scope must match its project and agent, and a
+review's `critical` and `warnings` counts are not negative. The store reads
+outside transactions and writes inside `WithTx`.
 
 ### 3.1 Tasks
 

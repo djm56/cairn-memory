@@ -119,3 +119,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   `events_project_matches_task` trigger, which refuses an event whose project is
   not its task's project. `InsertEvent` returns the new `ErrProjectMismatch` for
   that refusal. DESIGN §3 names the trigger.
+- Phase 2 docs, follow-up to issue #46 (item 1): DESIGN §3 says that core owns
+  the directive scope rule and the non-negative review counts. Core already
+  checks both, so no code changed.
