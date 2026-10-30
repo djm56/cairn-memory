@@ -1,6 +1,8 @@
-// Package identity finds the project a Cairn call belongs to (docs/DESIGN.md
-// §2.1). It resolves the project only. The agent and the session are the
-// caller's own fields, supplied by the adapter, and are not resolved here.
+// Package identity finds the project a Cairn call belongs to, and the server it
+// goes to (docs/DESIGN.md §2.1). Resolve gives the project; ResolveServer gives
+// the server URL, read from CAIRN_SERVER or the server key of the same file. The
+// agent and the session are the caller's own fields, supplied by the adapter, and
+// are not resolved here.
 //
 // The rules are checked in this order, and the first that applies wins:
 //
@@ -28,6 +30,10 @@ import (
 
 // EnvProject is the environment variable that names the project (DESIGN.md §2.1, rule 1).
 const EnvProject = "CAIRN_PROJECT"
+
+// EnvServer is the environment variable that names the server a call goes to
+// (DESIGN.md §2.1, D11). It is read before the server key of the file.
+const EnvServer = "CAIRN_SERVER"
 
 // EnvProjectDir is the environment variable Claude Code sets for MCP servers.
 // When it is set, the .cairn.toml search starts there, not in the working directory.
@@ -84,16 +90,7 @@ func Resolve(workDir string) (Project, error) {
 		return Project{Name: name, Source: SourceEnv}, nil
 	}
 
-	start := os.Getenv(EnvProjectDir)
-	if start == "" {
-		start = workDir
-	}
-	abs, err := filepath.Abs(start)
-	if err != nil {
-		return Project{}, fmt.Errorf("identity: resolve start directory %q: %w", start, err)
-	}
-
-	path, found, err := findFile(abs)
+	path, found, err := nearestFile(workDir)
 	if err != nil {
 		return Project{}, err
 	}
@@ -101,6 +98,69 @@ func Resolve(workDir string) (Project, error) {
 		return Project{}, core.ErrNoProject
 	}
 	return readFile(path)
+}
+
+// nearestFile returns the .cairn.toml that a call from workDir finds: the nearest
+// one, walking up from CLAUDE_PROJECT_DIR when Claude Code sets it, else from
+// workDir. found is false when the walk reaches the root without one.
+func nearestFile(workDir string) (string, bool, error) {
+	start := os.Getenv(EnvProjectDir)
+	if start == "" {
+		start = workDir
+	}
+	abs, err := filepath.Abs(start)
+	if err != nil {
+		return "", false, fmt.Errorf("identity: resolve start directory %q: %w", start, err)
+	}
+	return findFile(abs)
+}
+
+// serverFile is the part of .cairn.toml that ResolveServer reads. Server is
+// decoded as any, as projectFile decodes Project, so a value of the wrong type is
+// named as such and not reported as a syntax fault.
+type serverFile struct {
+	Server any `toml:"server"`
+}
+
+// ResolveServer returns the server URL that calls from workDir go to (DESIGN.md
+// §2.1, D11). CAIRN_SERVER is read first, and an empty value counts as unset.
+// Otherwise the server key of the nearest .cairn.toml is the URL. The URL is not
+// checked here: the client checks it when it is built.
+//
+// A call with no server is core.Invalid, and the message names the fix, as a
+// call with no project does. There is no default server.
+func ResolveServer(workDir string) (string, error) {
+	if server := os.Getenv(EnvServer); server != "" {
+		return server, nil
+	}
+	path, found, err := nearestFile(workDir)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", core.Invalid("no server: run `cairn init` in the project to write one, or set %s", EnvServer)
+	}
+	var sf serverFile
+	if _, err := toml.DecodeFile(path, &sf); err != nil {
+		return "", core.Invalid("%s is not valid TOML: %v", path, err)
+	}
+	switch v := sf.Server.(type) {
+	case nil:
+		return "", noServerKey(path)
+	case string:
+		if v == "" {
+			return "", noServerKey(path)
+		}
+		return v, nil
+	default:
+		return "", core.Invalid("%s has the wrong type for server: the value must be a quoted string, server = \"https://...\"", path)
+	}
+}
+
+// noServerKey is the KindInvalid error for a .cairn.toml with no server key, or an
+// empty one. The text names the key to set and the command that writes it.
+func noServerKey(path string) *core.Error {
+	return core.Invalid("%s has no server key: set server = \"<url>\", or run `cairn init`", path)
 }
 
 // findFile walks up from dir and returns the first .cairn.toml it meets. It
