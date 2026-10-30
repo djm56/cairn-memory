@@ -1,7 +1,7 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-30.** Items 1–11 of §9 are operator-approved, approved on
-2026-10-28 (phase 1 exit). Item 12 is deferred by the operator. Items 13 and
+**Status as of 2026-10-30.** Items 1–11 of §9 are operator-approved (2026-10-28,
+phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
