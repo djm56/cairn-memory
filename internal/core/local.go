@@ -53,8 +53,11 @@ func callerFor(ctx context.Context, write bool) (Caller, error) {
 }
 
 // ensureProject creates the caller's project on its first call and moves
-// last_seen_at on (CONTRACT §1.1). It runs inside a write transaction. It
-// returns the project's settings, which the rules read.
+// last_seen_at on to the server's time. Write calls use it, and ensureReadProject
+// uses it only to create a project that is new. A read of an existing project
+// leaves last_seen_at where the last write put it (CONTRACT §1.1, §9 item 38).
+// It runs inside a write transaction. It returns the project's settings, which
+// the rules read.
 func ensureProject(ctx context.Context, q store.Querier, project string, now time.Time) (ProjectSettings, error) {
 	defaults, err := json.Marshal(DefaultSettings())
 	if err != nil {

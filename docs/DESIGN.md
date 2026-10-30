@@ -98,6 +98,11 @@ The MCP adapter finds the project in this order:
    There is no default project. A silent default writes under the wrong
    name, which is the trap bishop-memory's `claude-code` default fell into.
 
+A `.cairn.toml` that is a directory is refused, not skipped: the walk stops at
+it and the call is `invalid`. The error names that path, as in
+`<path> is a directory, not a project file`. It does not name `cairn init`,
+because the fix is to move the directory aside, and init would not replace it.
+
 `.cairn.toml` is committed to the project, so everyone who works on it writes
 under the same name. Its full contents:
 
@@ -118,7 +123,12 @@ file, applied in its own transaction and recorded in `schema_migrations`. The
 driver opens with `_txlock=immediate`, so the version is read under the write
 lock. Enumerated columns carry CHECK constraints, and references are declared
 foreign keys. `tasks.project` is immutable: a trigger in migration 0002 refuses a
-change. The store reads outside transactions and writes inside `WithTx`.
+change. `events.project` must equal its task's project: a trigger in migration
+0003 refuses an event that names another project. Core owns two rules the schema
+does not state: a directive's scope must match its project and agent, and a
+review's `critical` and `warnings` counts are not negative. The store reads
+outside transactions, reads one snapshot inside `WithReadTx` when several reads
+must agree, and writes inside `WithTx`.
 
 ### 3.1 Tasks
 
@@ -345,7 +355,7 @@ When no task is active it says so in one line. It writes nothing.
 | `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. |
 | `internal/client` | A `Service` implemented over HTTP, for the remote backend. |
 | `internal/mcp` | MCP tools. Each tool calls `Service`, so it works the same against the local or the remote backend. |
-| `internal/identity` | Project, agent and session resolution (§2.1). |
+| `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come in a later phase. |
 | `internal/auth` | API keys and scopes (server mode). |
 | `internal/ui` | The web pages, embedded in the binary. |
 | `internal/conformance` | The conformance suite that checks any `Service`. |

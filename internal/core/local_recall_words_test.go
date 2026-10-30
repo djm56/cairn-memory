@@ -166,3 +166,74 @@ func TestRecallMixedCaseKeepsNames(t *testing.T) {
 		}
 	}
 }
+
+// TestRecallDropsOneCharacterWord checks that a one-character word is never
+// kept, even in a goal that is not in capitals. "2" is the only word of
+// "Upgrade to 2" that could match the lesson holding it, and it is dropped, so
+// only the lesson with "upgrade" is found. Had "2" been kept, both would be.
+func TestRecallDropsOneCharacterWord(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Release", Goal: "Release work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Upgrade the release.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Pipeline", Goal: "Pipeline work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Use the 2 pipeline.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Upgrade to 2"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Upgrade the release." {
+		t.Errorf("recall of \"Upgrade to 2\" lessons = %+v, want only the upgrade lesson", got.Lessons)
+	}
+}
+
+// TestRecallDropsSingleLetterAndCJKCharacter checks the one-character rule for
+// the two kinds of single character a goal can hold: an upper-case Latin letter,
+// and a CJK character, which upper-casing leaves unchanged. The goal is in mixed
+// case, so neither is kept by the case test. "A" and "猫" are each dropped, so the
+// lessons that hold only one of them are not found. The lesson with "Upgrade" is.
+func TestRecallDropsSingleLetterAndCJKCharacter(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Release", Goal: "Release work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Upgrade the release.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Plan", Goal: "Plan work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Plan A for it.")
+	third := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Pets", Goal: "Pets work.", Queue: true}))(t)
+	seedLesson(t, st, third.ID, "Feed 猫 daily.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Upgrade A 猫"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Upgrade the release." {
+		t.Errorf("recall of \"Upgrade A 猫\" lessons = %+v, want only the upgrade lesson", got.Lessons)
+	}
+}
+
+// TestRecallDropsGoWordInMixedCase checks that "Go" is dropped from a goal that
+// is in mixed case. It has no digit and is not all upper case, so it is not a
+// name. The lesson that holds only "Go" must not be found, and the lesson with
+// "Write" must.
+func TestRecallDropsGoWordInMixedCase(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Docs", Goal: "Docs work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Write the docs.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Tool", Goal: "Tool work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Use Go for the tool.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Write Go services"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Write the docs." {
+		t.Errorf("recall of \"Write Go services\" lessons = %+v, want only the write lesson", got.Lessons)
+	}
+}
+
+// TestRecallKeepsAllDigitWord checks that an all-digit word is kept in a goal
+// written in capitals, where the case test says nothing and only a digit can
+// keep a short word. "42" is kept, so the lesson holding it is found along with
+// the lesson that holds "Migrate". "TO" is dropped, as a short word with no digit.
+func TestRecallKeepsAllDigitWord(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Store", Goal: "Store work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Migrate the store.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Limits", Goal: "Limit work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Set the 42 limit.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "MIGRATE TO 42"})
+	if len(got.Lessons) != 2 {
+		t.Errorf("recall of \"MIGRATE TO 42\" lessons = %+v, want both", got.Lessons)
+	}
+}

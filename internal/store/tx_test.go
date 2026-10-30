@@ -99,6 +99,85 @@ func TestWithTxReleasesLockOnPanic(t *testing.T) {
 	}
 }
 
+// TestWithReadTxTakesNoWriteLock checks that a read transaction does not hold the
+// write lock. Inside one, a write through WithTx on another goroutine must commit
+// at once. Under BEGIN IMMEDIATE the write would wait for the lock, and the wait
+// is cut short at 2 s, well inside the 5 s busy timeout.
+func TestWithReadTxTakesNoWriteLock(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	const id = "task-20261028-01"
+	done := make(chan error, 1)
+	err := s.WithReadTx(ctx, func(q Querier) error {
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks`).Scan(&n); err != nil {
+			return err
+		}
+		go func() {
+			done <- s.WithTx(ctx, func(q Querier) error {
+				return InsertTask(ctx, q, newTask(id, "acme-api", t0))
+			})
+		}()
+		select {
+		case werr := <-done:
+			if werr != nil {
+				t.Errorf("write inside a read transaction: %v", werr)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("write waited for the write lock while a read transaction was open")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithReadTx: %v", err)
+	}
+	if n := countTasks(t, s, id); n != 1 {
+		t.Errorf("task rows after the write = %d, want 1", n)
+	}
+}
+
+// TestWithReadTxIsSnapshot checks that a read transaction reads one snapshot. A
+// write committed on another connection while the transaction is open is not
+// seen by a read inside it, and is seen once the transaction ends. The write is
+// synchronous and its commit is awaited before the second read, so nothing here
+// depends on timing.
+func TestWithReadTxIsSnapshot(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	const id = "task-20261028-01"
+	countIn := func(q Querier) int {
+		t.Helper()
+		var n int
+		if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE id = ?`, id).Scan(&n); err != nil {
+			t.Fatalf("count inside the read transaction: %v", err)
+		}
+		return n
+	}
+	err := s.WithReadTx(ctx, func(q Querier) error {
+		// The first read starts the snapshot.
+		if n := countIn(q); n != 0 {
+			t.Fatalf("task rows before the write = %d, want 0", n)
+		}
+		if err := s.WithTx(ctx, func(w Querier) error {
+			return InsertTask(ctx, w, newTask(id, "acme-api", t0))
+		}); err != nil {
+			t.Fatalf("write while the read transaction is open: %v", err)
+		}
+		if n := countIn(q); n != 0 {
+			t.Errorf("read inside the transaction saw the committed write: rows = %d, want 0", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithReadTx: %v", err)
+	}
+	if n := countTasks(t, s, id); n != 1 {
+		t.Errorf("task rows after the transaction = %d, want 1", n)
+	}
+}
+
 // TestAllocateTaskIDSequence checks that sequential allocations, each followed by
 // its insert in one transaction, give distinct ids in order, and that a new day
 // starts again at 01. The concurrent case is covered by the core tests.
@@ -144,6 +223,52 @@ func TestAllocateTaskIDSequence(t *testing.T) {
 		if got[i] == got[i-1] {
 			t.Errorf("ids not distinct: %s twice", got[i])
 		}
+	}
+}
+
+// TestAllocateTaskIDIgnoresOtherDays checks both edges of the day range in
+// AllocateTaskID. Ids of a later day must not raise an earlier day's counter, and
+// ids of an earlier day must not raise a later one's.
+func TestAllocateTaskIDIgnoresOtherDays(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	earlier := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+	seed := func(day time.Time, n int) {
+		t.Helper()
+		if err := s.WithTx(ctx, func(q Querier) error {
+			for i := 1; i <= n; i++ {
+				id := fmt.Sprintf("task-%s-%02d", day.Format("20060102"), i)
+				if err := InsertTask(ctx, q, newTask(id, "acme-api", day)); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			t.Fatalf("seed %s: %v", day.Format("2006-01-02"), err)
+		}
+	}
+	allocate := func(day time.Time) string {
+		t.Helper()
+		var id string
+		if err := s.WithTx(ctx, func(q Querier) error {
+			var err error
+			id, err = AllocateTaskID(ctx, q, day)
+			return err
+		}); err != nil {
+			t.Fatalf("AllocateTaskID %s: %v", day.Format("2006-01-02"), err)
+		}
+		return id
+	}
+
+	seed(later, 5)
+	if got := allocate(earlier); got != "task-20261028-01" {
+		t.Errorf("earlier day after later ids = %s, want task-20261028-01", got)
+	}
+	seed(earlier, 7) // more than the later day's 5, so a missing lower bound shows
+	if got := allocate(later); got != "task-20261029-06" {
+		t.Errorf("later day after earlier ids = %s, want task-20261029-06", got)
 	}
 }
 
@@ -231,5 +356,49 @@ func TestTasksProjectGuardKeepsSearchRows(t *testing.T) {
 	}
 	if project != "acme-api" {
 		t.Errorf("event search row project = %q, want acme-api", project)
+	}
+}
+
+// TestEventsProjectMatchesTask checks the migration 0003 trigger through
+// InsertEvent. An event in its task's project is written. An event in another
+// project is refused with ErrProjectMismatch and not written. A row with no
+// task is not checked by the trigger: the NOT NULL on task_id refuses it, and
+// the refusal is not the trigger's message.
+func TestEventsProjectMatchesTask(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProjects(t, s, "acme-api", "other")
+	const id = "task-20261028-01"
+	insertTask(t, s, newTask(id, "acme-api", t0))
+
+	insert := func(project string) error {
+		return s.WithTx(ctx, func(q Querier) error {
+			_, err := InsertEvent(ctx, q, EventRow{TaskID: id, Project: project,
+				Agent: "main", Kind: "note", Text: "words", OccurredAt: t0})
+			return err
+		})
+	}
+	if err := insert("acme-api"); err != nil {
+		t.Fatalf("matching project: %v", err)
+	}
+	if err := insert("other"); !errors.Is(err, ErrProjectMismatch) {
+		t.Fatalf("mismatched project: err = %v, want ErrProjectMismatch", err)
+	}
+	var n int
+	if err := s.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE task_id = ?`, id).Scan(&n); err != nil {
+		t.Fatalf("count events: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("events on the task = %d, want 1 (the mismatched one must not be written)", n)
+	}
+
+	_, err := s.ExecContext(ctx, `INSERT INTO events
+		(task_id, project, agent, kind, text, occurred_at)
+		VALUES (NULL, 'acme-api', 'main', 'note', 'words', 'now')`)
+	if err == nil || !strings.Contains(err.Error(), "NOT NULL") {
+		t.Fatalf("event with no task: err = %v, want the NOT NULL refusal", err)
+	}
+	if strings.Contains(err.Error(), eventProjectRefusal) {
+		t.Errorf("event with no task was checked by the project trigger: %v", err)
 	}
 }

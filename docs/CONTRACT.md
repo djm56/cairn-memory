@@ -1,10 +1,12 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-29.** Items 1–11 of §9 were approved by the operator on
-2026-10-28 (phase 1 exit). Item 12 is deferred by the operator, not awaiting
-approval. Items 13 and later await the operator's approval.
-`core.Local` passes all 66 cases in `internal/conformance` (count as of
-2026-10-29), and none is deferred. The Go form is `internal/core` (`Service`,
+**Status as of 2026-10-30.** Items 1–11 of §9 are operator-approved (2026-10-28,
+phase 1 exit). Item 12 is deferred by the operator. Items 13 and
+later are Bishop defaults, pending operator approval: each is marked *Bishop
+default, pending operator approval.* where it is written. None of them is
+approved.
+`core.Local` passes all 70 cases in `internal/conformance` (count as of
+2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
@@ -13,9 +15,9 @@ operator calls behind the web UI and the CLI. Field names are the JSON names
 an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
-§9 lists what this contract settles that DESIGN.md left open. Items 1–11 were
-approved by the operator on 2026-10-28, item 12 is deferred, and items 13 and
-later await approval.
+§9 lists what this contract settles that DESIGN.md left open. Items 1–11 are
+operator-approved (2026-10-28), item 12 is deferred, and every item from 13 on
+is a Bishop default, pending operator approval.
 
 ## 1. Conventions
 
@@ -27,7 +29,9 @@ client, and a role. The adapter sets it; request types do not carry it.
 - **Project.** Required for every agent call, reads included. Absent →
   `invalid`, with a message that names `cairn init`. A name is lowercase
   letters and digits in hyphen-separated groups, at most 64 characters
-  (`acme-api`). A project row is created on its first call.
+  (`acme-api`). A project row is created on its first call. Each write call
+  moves the project's `last_seen_at` on to the server's time. A read does not,
+  and creates the row only when the project has none (§9 item 38).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
   of only spaces counts as no name, and is `invalid`.
@@ -90,6 +94,9 @@ task_start (queue)                  task_start
   `task_close`. Asking for the status a task already has is `refused`, and the
   call changes nothing.
 - `blocked` and `abandoned` need a `reason`, which is written to the journal.
+  A move to `blocked` writes a `blocked` event, and a move from `blocked` to
+  `active` writes an `unblocked` event. Each is written in the same transaction
+  as its move (§9 item 36).
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
   the task is `refused`: update, steps, events, reviews and close.
 - **One active task per project**, unless the project's settings allow
@@ -107,7 +114,8 @@ The first call of a session.
 `recent_events` (newest first, at most 5), `directives` (those that apply
 to the project, as `directive_list` with no agent), and `other_active`
 (when parallel tasks are on and more than one is active, `task` is the one
-started last).
+started last). The answer is one consistent snapshot: every part is read from
+the same state of the project (§9 item 35).
 
 ```json
 {"task": {"id": "task-20261027-03", "project": "acme-api", "title": "Add rate limit",
@@ -214,9 +222,9 @@ Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
 A `pending` step that an event or a review refers to cannot be removed, so
-the call is `refused` and changes nothing. The way out: skip that
-step with `step_update` (`skip`, with a summary), then plan again. A skipped
-step is kept.
+the call is `refused` and changes nothing. The refusal names each such step.
+The way out: skip each such step with `step_update` (`skip`, with a summary),
+then plan again. A skipped step is kept.
 
 ### `step_add`
 
@@ -235,7 +243,7 @@ No other step's id changes. Display numbers after it move up by one.
 | `start` | `pending`, `failed` | `active` | `attempts` +1; `started_at`; a `started` event. The task must be `active`. |
 | `finish` | `active` | `done` | `summary` required; `ended_at`; a `finished` event |
 | `fail` | `active` | `failed` | `summary` required; `ended_at`; a `note` event |
-| `skip` | `pending`, `failed` | `skipped` | `summary` required (the reason); a `note` event |
+| `skip` | `pending`, `failed` | `skipped` | `summary` required (the reason); `ended_at`, unless the step already has one (§9 item 37); a `note` event |
 
 **Errors:** `invalid` for a bad ref, an unknown action, or a missing
 summary. `not_found`. `refused` for any other transition, or `start` when
@@ -249,7 +257,8 @@ the task is not `active`.
 `data` (a JSON object, optional).
 An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision` and
 `custom`. `started`, `finished`, `review` and `close` are written by the
-calls they record, and are `invalid` here.
+calls they record, and are `invalid` here. `unblocked` is also written by
+`task_update` (§1.5), and an agent may log it too.
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
 
@@ -344,11 +353,13 @@ refuse a nameless call all the same.
 
 ## 9. Settled here, for review
 
-Each item answers a question that DESIGN.md left open. Items 1–11 were approved
-by the operator on 2026-10-28, and item 12 is deferred. From item 13 on, an
-item is checked by a conformance case unless it is marked `(core test only)`,
-where only a core test checks it. An item with no check at all is marked
-`(not tested)`; none is.
+Each item answers a question that DESIGN.md left open. Items 1–11 are
+operator-approved (2026-10-28), and item 12 is deferred. Every item from 13 on
+is a Bishop default, pending operator approval, and is marked so; a marked item
+is not approved until the operator says it is. From item 13 on, an item is
+checked by a conformance case unless it is marked `(core test only)`, where
+only a core test checks it. An item with no check of its own is marked
+`(not tested)`. Item 35 is the one such item today (see its entry).
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -388,9 +399,9 @@ where only a core test checks it. An item with no check at all is marked
     operator approval.*
 15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
     pending step with an event or a review is not removed. The call is
-    `refused` and changes nothing. The refusal names the first such step in
-    display order, and the way out is to skip it and plan again (§3). *Bishop
-    default, pending operator approval.*
+    `refused` and changes nothing. The refusal names each such step, in
+    display order, and the way out is to skip each of them and plan again
+    (§3). *Bishop default, pending operator approval.*
 16. **`search` hides retired directives (2026-10-29).** A retired
     directive is not a `search` hit, as it is not listed by `directive_list`,
     `recall` or `task_current` (§6). *Bishop default, pending operator
@@ -404,10 +415,11 @@ where only a core test checks it. An item with no check at all is marked
     mixes cases, it keeps upper-case short words (`JWT`, `SQL`, `TLS`, `CLI`)
     and words with a digit (`v2`). In a goal written wholly in capitals, it
     keeps only words of four or more letters and words with a digit, so
-    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. Elsewhere, a word
-    under four letters is kept if it has a digit or is unchanged by
-    upper-casing, so `JWT` is kept and `fix` is dropped. A word in an uncased
-    script (CJK, for one) is unchanged by upper-casing, so it is kept.
+    `ADD RATE LIMIT TO API` matches on `RATE` and `LIMIT`. In any other goal, a
+    word under four letters is kept if it has a digit or is unchanged by
+    upper-casing, so `JWT` is kept and `fix` is dropped. In that branch, a word
+    in an uncased script (CJK, for one) is unchanged by upper-casing, so it is
+    kept. A word of one character is never kept.
     *Bishop default, pending operator approval.*
     (core test only)
 19. **Ids and numbers start at 1 (2026-10-29).** `{"id": 0, "number":
@@ -421,9 +433,8 @@ where only a core test checks it. An item with no check at all is marked
     `ProjectSettingsSet` store none, and refuse a nameless call all the same
     (§8). *Bishop default, pending operator approval.*
 21. **A directive retires once (2026-10-29).** A second
-    `directive_retire` of the same code is `refused`, and the first retirement
-    time stands `(core test only)` (§8). *Bishop default, pending operator
-    approval.*
+    `directive_retire` of the same code is `refused` (§8). The first retirement
+    time stands (core test only). *Bishop default, pending operator approval.*
 22. **Learning moves and supersede cycles (2026-10-29).**
     `learning_decide` may set any status except `proposed`, from any current
     status. A `superseded_by` that leads back to the learning being decided,
@@ -473,3 +484,26 @@ where only a core test checks it. An item with no check at all is marked
     `identity/blank_agent_refused`; the operator case is
     `identity/operator_blank_name_refused`. *Bishop default, pending operator
     approval.*
+35. **`task_current` is one snapshot (2026-10-30).** The reads behind
+    `task_current` (the task, its criteria, its steps, its last five events and
+    the project's directives) run in one read transaction. The answer is one
+    consistent state of the project: a write that lands during the call is seen
+    by all of it or by none (§2). *Bishop default, pending operator approval.*
+    (not tested)
+    The store test `TestWithReadTxIsSnapshot` pins the snapshot
+    that a read transaction gives, but no test checks that `task_current` reads
+    through one, so no check of this item exists.
+36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
+    `task_update` from `blocked` to `active` writes an `unblocked` event, in
+    the same transaction as the move. A move to `blocked` writes its `blocked`
+    event as before (§1.5, §4). The reason given with the move is not written.
+    *Bishop default, pending operator approval.*
+37. **A skip keeps a failure's end time (2026-10-30).** A `skip` step update
+    sets the step's `ended_at` only when the step has none. A step skipped from
+    `failed` keeps the `ended_at` its failure set, and a step skipped from
+    `pending` gets one now (§3). Item 29 holds for the pending case. *Bishop
+    default, pending operator approval.*
+38. **Reads do not move `last_seen_at` (2026-10-30).** Each write call moves
+    the project's `last_seen_at` on, and a read leaves it where the last write
+    put it. A read creates the project only when the project does not yet exist
+    (§1.1). *Bishop default, pending operator approval.* (core test only)

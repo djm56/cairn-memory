@@ -168,6 +168,11 @@ func StepPositionLast(ctx context.Context, q Querier, taskID string) (float64, e
 // the last one gets after+1; the first step, with nothing before it, gets half
 // of the first position.
 //
+// Each insert at one spot halves the gap to the step before it. About 50 such
+// inserts exhaust float64 precision: the midpoint then equals one of its
+// neighbours, and two steps share a position. The order then falls back to id,
+// because the step list sorts by position and then id (migration 0002).
+//
 // Core checks the task's project first, with GetTask.
 //
 // Read function: call it on s, outside a transaction. As with StepPositionLast,

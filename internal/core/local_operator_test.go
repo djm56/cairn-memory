@@ -106,6 +106,34 @@ func TestDirectiveRatifyShape(t *testing.T) {
 	}
 }
 
+// TestDirectiveRatifyGlobalScope checks the scope combinations of a global
+// directive. It applies to every project and agent, so it is refused with a
+// project, with an agent, or with both. Given neither, it is ratified with the
+// scope and no project or agent.
+func TestDirectiveRatifyGlobalScope(t *testing.T) {
+	s, _ := openLocal(t)
+	refused := []struct {
+		name string
+		req  core.DirectiveRatifyRequest
+	}{
+		{"global with a project", core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Project: projA, Title: "t", Rule: "r"}},
+		{"global with an agent", core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Agent: "main", Title: "t", Rule: "r"}},
+		{"global with a project and an agent", core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Project: projA, Agent: "main", Title: "t", Rule: "r"}},
+	}
+	for _, c := range refused {
+		_, err := s.DirectiveRatify(opCtx(), c.req)
+		wantKindLocal(t, err, core.KindInvalid, c.name)
+	}
+
+	d, err := s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "r"})
+	if err != nil {
+		t.Fatalf("global with neither a project nor an agent: %v", err)
+	}
+	if d.Scope != core.ScopeGlobal || d.Project != "" || d.Agent != "" {
+		t.Errorf("global directive = scope %q project %q agent %q, want global with neither", d.Scope, d.Project, d.Agent)
+	}
+}
+
 // TestDirectiveRatifyFromUnknownLearning checks that from_learning names a
 // learning that exists. The accepted check is covered by the conformance case
 // from_learning, which refuses a proposed one.

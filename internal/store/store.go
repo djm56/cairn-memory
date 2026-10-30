@@ -54,6 +54,13 @@ type Store struct {
 // the file cannot be opened, when a migration fails (the database is then left at
 // the last version that applied), or when the schema is newer than this build.
 // Open writes to the file.
+//
+// When path is ":memory:", Open limits the pool to one connection, so every call
+// on the Store shares one database. Without the limit each pooled connection
+// would open its own empty database. The cost is that the one connection is
+// shared: a call on the Store waits while a WithTx holds it, and a call on the
+// Store made inside WithTx waits forever. Inside WithTx, use the Querier that
+// WithTx passes in.
 func Open(path string) (*Store, error) {
 	migrations, err := loadMigrations(migrationFiles)
 	if err != nil {
@@ -63,13 +70,18 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
 	}
+	if path == ":memory:" {
+		// Each pooled connection to ":memory:" is a separate, empty database.
+		// One connection makes every call on the Store see the same data.
+		db.SetMaxOpenConns(1)
+	}
 	if err := connect(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("store: open %s: %w", path, err)
+		// The close error is joined, as on the migrate path below.
+		return nil, errors.Join(fmt.Errorf("store: open %s: %w", path, err), db.Close())
 	}
 	if err := migrate(db, migrations); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("store: migrate %s: %w", path, err)
+		// The close error is joined, not dropped. errors.Join ignores a nil one.
+		return nil, errors.Join(fmt.Errorf("store: migrate %s: %w", path, err), db.Close())
 	}
 	return &Store{db: db}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/djm56/cairn-memory/internal/conformance"
 	"github.com/djm56/cairn-memory/internal/core"
@@ -91,8 +92,8 @@ func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
 	if core.KindOf(err) != core.KindRefused {
 		t.Fatalf("StepPlan over a recorded pending step: error %v, want refused", err)
 	}
-	if !strings.Contains(err.Error(), "step 2 has events or reviews") {
-		t.Errorf("refusal %q does not name the first recorded step, 2", err)
+	if !strings.Contains(err.Error(), "steps 2 and 3 have events or reviews") {
+		t.Errorf("refusal %q does not name both recorded steps, 2 and 3", err)
 	}
 	cur, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps})
 	if err != nil {
@@ -177,6 +178,111 @@ func TestTaskStartActiveSetsStartedAt(t *testing.T) {
 	}
 	if d.Task.StartedAt == nil {
 		t.Errorf("active task has no started_at")
+	}
+}
+
+// TestQueuedTaskStartedAtOnActivate checks that a task queued by task_start has
+// no start time, and that the first move to active sets one. The row is read
+// back through task_get.
+func TestQueuedTaskStartedAtOnActivate(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Queue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if queued.Task.StartedAt != nil {
+		t.Errorf("queued task has started_at %v before activation, want none", *queued.Task.StartedAt)
+	}
+	active := core.TaskActive
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &active}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Task.StartedAt == nil {
+		t.Errorf("queued task activated by task_update has no started_at")
+	}
+}
+
+// TestReactivatedTaskKeepsStartedAt checks that a task blocked after its first
+// activation, then reactivated, keeps the start time of that first activation.
+// A start time is set only when the task has none. The sleep makes a fresh
+// start time differ from the first, so a write of one would show.
+func TestReactivatedTaskKeepsStartedAt(t *testing.T) {
+	s, _ := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g", Queue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := core.TaskActive
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &active}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil || d.Task.StartedAt == nil {
+		t.Fatalf("first activation: started_at nil, err %v", err)
+	}
+	first := *d.Task.StartedAt
+
+	time.Sleep(time.Millisecond)
+	blocked := core.TaskBlocked
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &blocked, Reason: "waiting"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &active}); err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Task.StartedAt == nil || !d.Task.StartedAt.Equal(first) {
+		t.Errorf("started_at after reactivation = %v, want the first %v", d.Task.StartedAt, first)
+	}
+}
+
+// TestTaskUpdateKeyFilesWithBlock checks one task_update that carries key files
+// and a move to blocked. The files are replaced, and the blocked journal row is
+// written, in that one update. The file replacement runs before the journal
+// write, so a failure there must leave neither change behind. A refused write
+// of the files is not reachable through a valid call, so the error branch
+// itself is not run here.
+func TestTaskUpdateKeyFilesWithBlock(t *testing.T) {
+	s, st := openLocal(t)
+	ctx := agent("acme-api", "main")
+	res, err := s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := []core.TaskFile{{Path: "internal/core/caller.go", Note: "the rule"}}
+	blocked := core.TaskBlocked
+	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &blocked, Reason: "waiting on review", KeyFiles: &files}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Task.Status != core.TaskBlocked {
+		t.Errorf("status = %q, want blocked", d.Task.Status)
+	}
+	if len(d.KeyFiles) != 1 || d.KeyFiles[0].Path != "internal/core/caller.go" {
+		t.Errorf("key files = %+v, want the one given", d.KeyFiles)
+	}
+	events, _, err := store.ListEvents(context.Background(), st, store.EventFilter{TaskID: res.ID, Project: "acme-api", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Kind != string(core.EventBlocked) || events[0].Text != "waiting on review" {
+		t.Errorf("journal = %+v, want one blocked row with the reason", events)
 	}
 }
 

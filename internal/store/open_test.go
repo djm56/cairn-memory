@@ -3,11 +3,13 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestEveryConnectionHasOptions checks the connection settings on several
@@ -146,5 +148,62 @@ func TestApplyOneCases(t *testing.T) {
 				t.Error("table of the refused migration was created")
 			}
 		})
+	}
+}
+
+// TestMemoryDatabaseIsShared checks the ":memory:" path. The pool holds one
+// connection, so a write made by one call is read by a later call. Without the
+// one-connection limit the read could land on a second, empty database.
+//
+// The wait check holds one row set open, so the pool has no free connection. A
+// second query must then wait for that connection and time out. Without the
+// one-connection limit it would open a second, empty database and fail at once
+// with "no such table", so the timeout is what separates the two.
+//
+// The result is set by the pool, not by the clock. The rows stay open until the
+// test closes them below, after the second query has returned, so with one
+// connection that query always waits to its deadline. The 200 ms is only the
+// bound on that wait, and the test costs about that long on every run.
+func TestMemoryDatabaseIsShared(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("Open(:memory:): %v", err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	if _, err := s.ExecContext(ctx, `INSERT INTO projects (name, created_at, last_seen_at)
+		VALUES ('acme-api', 'now', 'now')`); err != nil {
+		t.Fatalf("write on one call: %v", err)
+	}
+	var n int
+	if err := s.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects`).Scan(&n); err != nil {
+		t.Fatalf("read on another call: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("projects = %d on a later call, want 1: the write was not seen", n)
+	}
+
+	rows, err := s.QueryContext(ctx, `SELECT name FROM projects`)
+	if err != nil {
+		t.Fatalf("open rows: %v", err)
+	}
+	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	second, err := s.QueryContext(short, `SELECT COUNT(*) FROM projects`)
+	if err == nil {
+		// The query did not wait, so it returned rows. The test fails below, and
+		// the rows are closed here rather than dropped.
+		if cerr := second.Close(); cerr != nil {
+			t.Errorf("close rows of the second query: %v", cerr)
+		}
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("query while rows are open: err = %v, want a wait that times out", err)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("close rows: %v", err)
+	}
+	if got := s.db.Stats().MaxOpenConnections; got != 1 {
+		t.Errorf("MaxOpenConnections = %d, want 1", got)
 	}
 }

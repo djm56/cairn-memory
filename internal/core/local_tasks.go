@@ -29,7 +29,8 @@ func taskMayMove(from, to TaskStatus) bool {
 // page by page, so a project with more active tasks than one page is counted in
 // full.
 //
-// Read function: call it on the store or inside a write transaction.
+// Read function: call it on the store, or inside a write transaction or a read
+// transaction.
 func activeTasks(ctx context.Context, q store.Querier, project string) ([]store.TaskRow, error) {
 	var out []store.TaskRow
 	var after *store.TaskKey
@@ -121,51 +122,64 @@ func fileRows(id string, role FileRole, files []TaskFile) []store.FileRow {
 // last five events. Task is nil when no task is active. OtherActive counts the
 // rest when the project allows parallel tasks. Directives are those that apply
 // to the project, as directive_list gives them with no agent.
+//
+// The reads run in one read transaction, so the answer is one consistent
+// snapshot of the project (CONTRACT §2, §9 item 35). The store's WithTx would
+// take the write lock, which a read does not need, so WithReadTx is used.
 func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
 		return nil, err
 	}
+	// ensureReadProject runs before the snapshot opens: it may write a new
+	// project row, which a read transaction must not do.
 	if err := l.ensureReadProject(ctx, c.Project); err != nil {
 		return nil, err
 	}
-	// Directives are read whether or not a task is active: they belong to the
-	// project, and CONTRACT §2 gives them with every answer.
 	cur := &TaskCurrent{}
-	cur.Directives, err = directivesFor(ctx, l.st, c.Project, "")
+	err = l.st.WithReadTx(ctx, func(q store.Querier) error {
+		// Directives are read whether or not a task is active: they belong to the
+		// project, and CONTRACT §2 gives them with every answer.
+		dirs, err := directivesFor(ctx, q, c.Project, "")
+		if err != nil {
+			return err
+		}
+		cur.Directives = dirs
+		active, err := activeTasks(ctx, q, c.Project)
+		if err != nil {
+			return err
+		}
+		if len(active) == 0 {
+			return nil
+		}
+		// The task comes from a list scoped to the caller's project, so the child
+		// reads below go by its id without GetTask. Each read is then of a row the
+		// project owns, which is the scoping GetTask gives the other calls.
+		row := active[0]
+		t := taskFromRow(row)
+		cur.Task = &t
+		cur.OtherActive = len(active) - 1
+		crit, err := store.ListCriteria(ctx, q, row.ID)
+		if err != nil {
+			return err
+		}
+		cur.Criteria = criteriaFromRows(crit)
+		steps, err := store.ListSteps(ctx, q, row.ID)
+		if err != nil {
+			return err
+		}
+		cur.Steps = stepsFromRows(steps)
+		events, _, err := store.ListEvents(ctx, q, store.EventFilter{TaskID: row.ID, Project: c.Project, Limit: 5})
+		if err != nil {
+			return err
+		}
+		for _, e := range events {
+			cur.RecentEvents = append(cur.RecentEvents, eventFromRow(e))
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	active, err := activeTasks(ctx, l.st, c.Project)
-	if err != nil {
-		return nil, err
-	}
-	if len(active) == 0 {
-		return cur, nil
-	}
-	// The task comes from a list scoped to the caller's project, so the child
-	// reads below go by its id without GetTask. Each read is then of a row the
-	// project owns, which is the scoping GetTask gives the other calls.
-	row := active[0]
-	t := taskFromRow(row)
-	cur.Task = &t
-	cur.OtherActive = len(active) - 1
-	crit, err := store.ListCriteria(ctx, l.st, row.ID)
-	if err != nil {
-		return nil, err
-	}
-	cur.Criteria = criteriaFromRows(crit)
-	steps, err := store.ListSteps(ctx, l.st, row.ID)
-	if err != nil {
-		return nil, err
-	}
-	cur.Steps = stepsFromRows(steps)
-	events, _, err := store.ListEvents(ctx, l.st, store.EventFilter{TaskID: row.ID, Project: c.Project, Limit: 5})
-	if err != nil {
-		return nil, err
-	}
-	for _, e := range events {
-		cur.RecentEvents = append(cur.RecentEvents, eventFromRow(e))
 	}
 	return cur, nil
 }
@@ -394,7 +408,8 @@ func (l *Local) TaskList(ctx context.Context, req TaskListRequest) (*TaskList, e
 // goal, context, constraints, criteria, key files) is frozen once any step has
 // started. A status change follows taskMayMove, and a move to active follows the
 // one-active rule. A move to blocked or abandoned writes its reason to the
-// journal. A status the task already has is not a move, so it is refused like
+// journal, and a move from blocked to active writes an unblocked event. A status
+// the task already has is not a move, so it is refused like
 // any other transition that taskMayMove does not allow (CONTRACT §1.5).
 func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, error) {
 	c, err := callerFor(ctx, true)
@@ -541,6 +556,13 @@ func (l *Local) TaskUpdate(ctx context.Context, req TaskUpdateRequest) (*Task, e
 				text, kind = "Abandoned: "+text, EventDecision
 			}
 			if err := journal(ctx, q, row, c.Agent, nil, kind, text, now); err != nil {
+				return err
+			}
+		}
+		if changing && cur == TaskBlocked && next == TaskActive {
+			// A move out of blocked is journalled in the same transaction as the
+			// move (CONTRACT §1.5, §9 item 36). The request's reason is not written.
+			if err := journal(ctx, q, row, c.Agent, nil, EventUnblocked, "Unblocked", now); err != nil {
 				return err
 			}
 		}

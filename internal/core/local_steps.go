@@ -4,9 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/djm56/cairn-memory/internal/store"
 )
+
+// recordedRefusal is the step_plan refusal for pending steps that have events or
+// reviews. numbers are their display numbers, in order, and the message names
+// each one, so the caller can skip them all before it plans again (CONTRACT §3).
+func recordedRefusal(numbers []int) error {
+	if len(numbers) == 1 {
+		return Refused("step %d has events or reviews, so step_plan cannot remove it: skip the step, then plan again", numbers[0])
+	}
+	names := make([]string, len(numbers))
+	for i, n := range numbers {
+		names[i] = fmt.Sprint(n)
+	}
+	last := len(names) - 1
+	list := strings.Join(names[:last], ", ") + " and " + names[last]
+	return Refused("steps %s have events or reviews, so step_plan cannot remove them: skip each step, then plan again", list)
+}
 
 // checkRef checks the shape of a step ref: exactly one of id and number, each
 // positive (CONTRACT §1.4). {} is refused here, as is number 0. StepAdd is the
@@ -85,7 +103,8 @@ func stepSlot(ctx context.Context, q store.Querier, taskID string, after *StepRe
 // StepPlan replaces the task's pending steps with the list given. Steps that
 // have started are kept in their order, and the new steps follow the last kept
 // step (CONTRACT §3). A pending step that an event or a review refers to cannot
-// be removed, and the call is refused rather than detach the journal.
+// be removed, and the call is refused rather than detach the journal. The
+// refusal names each such step.
 func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, error) {
 	c, err := callerFor(ctx, true)
 	if err != nil {
@@ -116,18 +135,20 @@ func (l *Local) StepPlan(ctx context.Context, req StepPlanRequest) (*StepList, e
 		if err != nil {
 			return err
 		}
-		// One query finds the pending steps with records. The first of them, in
-		// display order, names the refusal.
+		// One query finds the pending steps with records. The refusal names every
+		// one of them, in display order.
 		recorded, err := store.PendingStepsWithRecords(ctx, q, task.ID)
 		if err != nil {
 			return err
 		}
-		if len(recorded) > 0 {
-			for _, s := range steps {
-				if s.ID == recorded[0] {
-					return Refused("step %d has events or reviews, so step_plan cannot remove it: skip the step, then plan again", s.Number)
-				}
+		var numbers []int
+		for _, s := range steps {
+			if slices.Contains(recorded, s.ID) {
+				numbers = append(numbers, s.Number)
 			}
+		}
+		if len(numbers) > 0 {
+			return recordedRefusal(numbers)
 		}
 		if _, err := store.DeletePendingSteps(ctx, q, task.ID); err != nil {
 			return err
@@ -302,7 +323,12 @@ func (l *Local) StepUpdate(ctx context.Context, req StepUpdateRequest) (*Step, e
 				return Refused("step %d is %s; only a pending or failed step is skipped", st.Number, from)
 			}
 			st.Status = string(StepSkipped)
-			endNow()
+			// A failed step keeps the end time its failure set, so the skip does
+			// not move it. A pending step has none, and gets one now (CONTRACT §3,
+			// §9 item 37).
+			if st.EndedAt == nil {
+				endNow()
+			}
 			kind, text = EventNote, fmt.Sprintf("Step %d skipped: %s", st.Number, req.Summary)
 		}
 		if !blank(req.Summary) {

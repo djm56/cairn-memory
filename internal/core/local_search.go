@@ -141,7 +141,7 @@ func goalWords(goal string) []string {
 	return out
 }
 
-// isCapitals reports whether goal is written all in upper case: it has a
+// isCapitals reports whether goal is written all in upper case: it has an
 // upper-case letter, and no lower-case letter. In such a goal every word is upper
 // case, so the case of a word says nothing about whether it is a name. A goal
 // with no upper-case letter, such as one in an uncased script (CJK, for one), is

@@ -3,11 +3,21 @@ package conformance
 import (
 	"regexp"
 	"slices"
+	"strconv"
+	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
 var taskID = regexp.MustCompile(`^task-\d{8}-\d{2,}$`)
+
+// namesStep reports whether msg contains the step number n as a whole number.
+// The word boundaries stop 1 from matching inside 13, so the check does not
+// depend on which of the two numbers a message happens to list first.
+// It compiles its pattern on each call: it runs only a few times per test run.
+func namesStep(msg string, n int) bool {
+	return regexp.MustCompile(`\b` + strconv.Itoa(n) + `\b`).MatchString(msg)
+}
 
 var taskCases = []Case{
 	{"task/current_none", func(t T, s core.Service) {
@@ -225,6 +235,29 @@ var taskCases = []Case{
 		_, err := s.TaskList(mainCtx(), core.TaskListRequest{Limit: core.MaxLimit + 1})
 		wantKind(t, err, core.KindInvalid, "limit over the maximum")
 	}},
+	{"task/unblocked_event_on_reactivate", func(t T, s core.Service) {
+		// CONTRACT §1.5, §9 item 36: a move from blocked to active writes an
+		// unblocked event. The event is read back through event_list.
+		res := startTask(t, s, mainCtx(), "t")
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskActive)}))(t)
+		list := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID}))(t)
+		var blocked, unblocked int
+		for _, e := range list.Events {
+			switch e.Kind {
+			case core.EventBlocked:
+				blocked++
+			case core.EventUnblocked:
+				unblocked++
+			}
+		}
+		if blocked != 1 || unblocked != 1 {
+			t.Errorf("blocked events = %d and unblocked events = %d, want 1 each", blocked, unblocked)
+		}
+		if len(list.Events) > 0 && list.Events[0].Kind != core.EventUnblocked {
+			t.Errorf("newest event = %s, want unblocked", list.Events[0].Kind)
+		}
+	}},
 }
 
 var stepCases = []Case{
@@ -234,6 +267,45 @@ var stepCases = []Case{
 		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
 		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil {
 			t.Errorf("skipped step = %+v, want ended_at set", skipped)
+		}
+	}},
+	{"step/skip_pending_sets_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 37: a pending step has no end time, so a skip sets
+		// one. It is the skip's own time, and the read back agrees.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		before := time.Now().UTC().Add(-time.Second)
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
+		after := time.Now().UTC().Add(time.Second)
+		if skipped.EndedAt == nil {
+			t.Fatalf("pending step skipped with no ended_at: %+v", skipped)
+		}
+		if skipped.EndedAt.Before(before) || skipped.EndedAt.After(after) {
+			t.Errorf("ended_at %v is not the skip's time (between %v and %v)", *skipped.EndedAt, before, after)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if got := d.Steps[0].EndedAt; got == nil || !got.Equal(*skipped.EndedAt) {
+			t.Errorf("stored ended_at = %v, want %v", got, skipped.EndedAt)
+		}
+	}},
+	{"step/skip_failed_keeps_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 37: a skip from failed keeps the end time that the
+		// failure set. The sleep puts the skip's time after the failure's, so an
+		// overwrite would show.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		one := core.NumberRef(1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepStart}))(t)
+		failed := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepFail, Summary: "broke"}))(t)
+		if failed.EndedAt == nil {
+			t.Fatalf("failed step has no ended_at: %+v", failed)
+		}
+		time.Sleep(2 * time.Millisecond)
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"}))(t)
+		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil || !skipped.EndedAt.Equal(*failed.EndedAt) {
+			t.Errorf("skipped step ended_at = %v, want the failure's %v", skipped.EndedAt, failed.EndedAt)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if got := d.Steps[0].EndedAt; got == nil || !got.Equal(*failed.EndedAt) {
+			t.Errorf("stored ended_at = %v, want the failure's %v", got, failed.EndedAt)
 		}
 	}},
 	{"step/insert_without_renumbering", func(t T, s core.Service) {
@@ -406,6 +478,41 @@ var stepCases = []Case{
 		replanned := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
 		if titles := stepTitles(t, replanned.Steps); !slices.Equal(titles, []string{"alpha", "new"}) {
 			t.Errorf("reviewed task after skip and replan = %v, want [alpha new]", titles)
+		}
+	}},
+	{"step/plan_refusal_names_each_recorded_step", func(t T, s core.Service) {
+		// CONTRACT §3: the refusal names each pending step with a record, not only
+		// the first. The way out is to skip each of them.
+		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
+		one, three := core.NumberRef(1), core.NumberRef(3)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &one, Kind: core.EventNote, Text: "about one"}))(t)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventNote, Text: "about three"}))(t)
+		_, err := s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
+		wantKind(t, err, core.KindRefused, "step_plan over two pending steps with events")
+		// The message must name each recorded step (1 and 3) and must not name the
+		// unrecorded one (2). The wording is core's to choose, so only the numbers
+		// are checked.
+		if err != nil {
+			msg := err.Error()
+			for _, n := range []int{1, 3} {
+				if !namesStep(msg, n) {
+					t.Errorf("refusal %q does not name recorded step %d", msg, n)
+				}
+			}
+			if namesStep(msg, 2) {
+				t.Errorf("refusal %q names step 2, which has no record", msg)
+			}
+		}
+		kept := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if titles := stepTitles(t, kept.Steps); !slices.Equal(titles, []string{"one", "two", "three"}) {
+			t.Errorf("steps after the refused plan = %v, want unchanged", titles)
+		}
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: three, Action: core.StepSkip, Summary: "not needed"}))(t)
+		got := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
+		// The pending step "two" is removed; the skipped steps "one" and "three" are kept.
+		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, []string{"one", "three", "new"}) {
+			t.Errorf("steps after skip and replan = %v, want [one three new]", titles)
 		}
 	}},
 }
