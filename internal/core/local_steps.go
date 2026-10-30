@@ -302,7 +302,12 @@ func (l *Local) StepUpdate(ctx context.Context, req StepUpdateRequest) (*Step, e
 				return Refused("step %d is %s; only a pending or failed step is skipped", st.Number, from)
 			}
 			st.Status = string(StepSkipped)
-			endNow()
+			// A failed step keeps the end time its failure set, so the skip does
+			// not move it. A pending step has none, and gets one now (CONTRACT §3,
+			// §9 item 37).
+			if st.EndedAt == nil {
+				endNow()
+			}
 			kind, text = EventNote, fmt.Sprintf("Step %d skipped: %s", st.Number, req.Summary)
 		}
 		if !blank(req.Summary) {

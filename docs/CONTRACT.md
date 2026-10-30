@@ -239,7 +239,7 @@ No other step's id changes. Display numbers after it move up by one.
 | `start` | `pending`, `failed` | `active` | `attempts` +1; `started_at`; a `started` event. The task must be `active`. |
 | `finish` | `active` | `done` | `summary` required; `ended_at`; a `finished` event |
 | `fail` | `active` | `failed` | `summary` required; `ended_at`; a `note` event |
-| `skip` | `pending`, `failed` | `skipped` | `summary` required (the reason); a `note` event |
+| `skip` | `pending`, `failed` | `skipped` | `summary` required (the reason); `ended_at`, unless the step already has one (§9 item 37); a `note` event |
 
 **Errors:** `invalid` for a bad ref, an unknown action, or a missing
 summary. `not_found`. `refused` for any other transition, or `start` when
@@ -489,3 +489,8 @@ where only a core test checks it. An item with no check at all is marked
     the same transaction as the move. A move to `blocked` writes its `blocked`
     event as before (§1.5, §4). The reason given with the move is not written.
     *Bishop default, pending operator approval.*
+37. **A skip keeps a failure's end time (2026-10-30).** A `skip` step update
+    sets the step's `ended_at` only when the step has none. A step skipped from
+    `failed` keeps the `ended_at` its failure set, and a step skipped from
+    `pending` gets one now (§3). Item 29 holds for the pending case. *Bishop
+    default, pending operator approval.*

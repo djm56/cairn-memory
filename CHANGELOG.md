@@ -154,3 +154,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 core, follow-up to issue #52 (item 2): a `task_update` that moves a
   task from `blocked` to `active` writes an `unblocked` event in the same
   transaction. CONTRACT §9 item 36.
+- Phase 2 core, follow-up to issue #52 (item 3): a `skip` step update sets
+  `ended_at` only when the step has none, so a step skipped from `failed` keeps
+  the end time of its failure. CONTRACT §9 item 37.

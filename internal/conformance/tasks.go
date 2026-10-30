@@ -3,6 +3,7 @@ package conformance
 import (
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
@@ -257,6 +258,45 @@ var stepCases = []Case{
 		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
 		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil {
 			t.Errorf("skipped step = %+v, want ended_at set", skipped)
+		}
+	}},
+	{"step/skip_pending_sets_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 37: a pending step has no end time, so a skip sets
+		// one. It is the skip's own time, and the read back agrees.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		before := time.Now().UTC().Add(-time.Second)
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
+		after := time.Now().UTC().Add(time.Second)
+		if skipped.EndedAt == nil {
+			t.Fatalf("pending step skipped with no ended_at: %+v", skipped)
+		}
+		if skipped.EndedAt.Before(before) || skipped.EndedAt.After(after) {
+			t.Errorf("ended_at %v is not the skip's time (between %v and %v)", *skipped.EndedAt, before, after)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if got := d.Steps[0].EndedAt; got == nil || !got.Equal(*skipped.EndedAt) {
+			t.Errorf("stored ended_at = %v, want %v", got, skipped.EndedAt)
+		}
+	}},
+	{"step/skip_failed_keeps_ended_at", func(t T, s core.Service) {
+		// CONTRACT §3, §9 item 37: a skip from failed keeps the end time that the
+		// failure set. The sleep puts the skip's time after the failure's, so an
+		// overwrite would show.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		one := core.NumberRef(1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepStart}))(t)
+		failed := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepFail, Summary: "broke"}))(t)
+		if failed.EndedAt == nil {
+			t.Fatalf("failed step has no ended_at: %+v", failed)
+		}
+		time.Sleep(2 * time.Millisecond)
+		skipped := must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: one, Action: core.StepSkip, Summary: "not needed"}))(t)
+		if skipped.Status != core.StepSkipped || skipped.EndedAt == nil || !skipped.EndedAt.Equal(*failed.EndedAt) {
+			t.Errorf("skipped step ended_at = %v, want the failure's %v", skipped.EndedAt, failed.EndedAt)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t)
+		if got := d.Steps[0].EndedAt; got == nil || !got.Equal(*failed.EndedAt) {
+			t.Errorf("stored ended_at = %v, want the failure's %v", got, failed.EndedAt)
 		}
 	}},
 	{"step/insert_without_renumbering", func(t T, s core.Service) {
