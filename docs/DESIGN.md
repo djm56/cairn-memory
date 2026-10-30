@@ -11,7 +11,7 @@ rests on one as *(decision Dn)*.
 
 ## 1. What Cairn is
 
-Cairn is a memory for coding agents. An agent records what it is working on,
+Cairn is an operating record for coding agents. An agent records what it is working on,
 the steps it takes, what happened, and what it learned. The next agent, in
 the same project or another one, reads that back before it starts.
 
