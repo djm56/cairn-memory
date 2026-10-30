@@ -505,8 +505,12 @@ client and the CLI. This section is how the adapter reaches the server.
   unknown response fields, so the server can add a field without a new prefix.
   Event data that is not JSON cannot be sent in a request body, so the client
   refuses that call before it is sent, with the message core gives for the
-  same data in process (`core.CheckEventData`). The answer is the same on both
-  paths. A request with another fault as well gets the data fault first.
+  same data in process (`core.CheckEventData`). The message is the same for the
+  same data fault. With several faults the order differs: in process, a missing
+  task id, an unknown kind or empty text is reported before the data; over the
+  client, the data is checked first. A caller name that the headers cannot carry
+  (a control character, or a space at either end) is refused by the client the
+  same way, with core's message (`core.CheckCaller`), and is not sent.
   With no HTTP client given, `client.New` uses one with a 30-second timeout. A
   successful answer over 16 MiB is an error. The server does not cap its
   answers, so the cap is the client's guard.

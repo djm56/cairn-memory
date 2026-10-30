@@ -54,6 +54,9 @@ func callerFor(ctx context.Context, write bool) (Caller, error) {
 	if write && blank(c.Agent) {
 		return c, Invalid("this call writes, so the caller needs an agent name")
 	}
+	if err := CheckCaller(c); err != nil {
+		return c, err
+	}
 	return c, nil
 }
 
