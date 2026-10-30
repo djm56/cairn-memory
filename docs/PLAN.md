@@ -71,13 +71,13 @@ This order replaces the phase order adopted as D10 on 2026-10-27 (see §8).
 Bishop's crew pack (bishop-harness) is deferred until after roll-out (see
 Scope of v1, §3).
 
-## 3. Phases
+## 3. Milestones
 
 Phases 0–2 are done and stay here as history. Plan v1 replaces phases 3–7 with
 milestones M1, M2, M3, M5 and M6, adds M4, M7 and M8, and moves phases 8–10 to
 Later. Each
 milestone has work and an exit check a reviewer can run. The milestone table
-is under Milestones, below Phase 2.
+is under the heading Milestone table, below Phase 2.
 
 ### Phase 0 — Skeleton
 
@@ -131,7 +131,7 @@ sequence from `internal/api/allocate.go`.
 processes writing the same database at once allocate distinct task ids
 (a test). `go test -race` is clean.
 
-### Milestones
+### Milestone table
 
 Plan v1 (2026-10-30). Milestones M1, M2, M3, M5 and M6 carry the work of
 phases 3–7 forward; M4, M7 and M8 are new; phases 8–10 and Postgres sit in
@@ -140,8 +140,8 @@ the only thing that moves the status line (§9).
 
 | Milestone | Was | Work | Exit check |
 | --- | --- | --- | --- |
-| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; tool surface as set in Scope of v1; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`; compact, paged output; MCP stdio test | A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it |
-| M2 Server | Phase 5 | `cairn serve`: HTTP API over `core`, TLS by files or proxy, loopback default, body caps, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/` | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set |
+| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2 | A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it |
+| M2 Server | Phase 5 | `cairn serve`: HTTP API over `core`, TLS by files or proxy, loopback default, body caps, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set |
 | M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
 | M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
 | M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairn:init`, `/cairn:status`, `cairn-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
@@ -159,7 +159,7 @@ needs.
 | --- | --- | --- |
 | Tasks: brief, criteria, steps, journal, close policy (as built) | Local no-server mode | Scheduled classify, process, grade (Later) |
 | Learnings proposed by agents; accept, reject, supersede by operators | `note_put` / `note_get` (long briefs go in `context`) | Per-harness plugins beyond the CLI (Later) |
-| Directives: global, project, agent scope; cap of 12 per call; `review_by` | `review_record` and the reviews table (a `review` event carries verdict and counts until a crew needs more) | Public releases, Homebrew, public marketplace (Later) |
+| Directives: global, project, agent scope; cap of 12 per call and `review_by` (both M2) | `review_record` and the reviews table (a `review` event carries verdict and counts until a crew needs more) | Public releases, Homebrew, public marketplace (Later) |
 | `recall` and `search` over tasks, learnings, directives | Path-scoped directives | Postgres store, vectors, graph, documentation ingestion |
 | HTTP API, API keys with `agent` / `operator` / `viewer` scopes, TLS, body caps, `/healthz` | OKF export | Bishop crew pack (bishop-harness repo) |
 | Web UI: Tasks, Learnings, Directives, Projects, Dashboard | Multi-organisation, SSO, hosting | |
@@ -197,7 +197,7 @@ v1 keep each of these cheap.
 ## 4. What Bishop needs from Cairn
 
 Bishop's crew pack is bishop-harness's work, not this repository's. Cairn
-must provide, by phase 4:
+must provide, by M5:
 
 - every operation Bishop's lifecycle uses: brief, plan, steps with
   attempts and assignees, reviews with verdicts, journal, findings, patterns,
@@ -234,8 +234,8 @@ depends on `cairn`; keep `workspace/` for scratch and QA evidence, and keep
 | `patterns` | `learnings` kind `pattern` |
 | `service_records` | `learnings` kind `agent-note` |
 | `directives` | `directives`, scope `global` unless the source names a harness |
-| review verdicts, parsed at import from reviewer steps' notes and summaries with bishop-memory's `internal/review` rules (it stores no review table) | `reviews` |
-| `mission_grades`, triage tables | carried in phase 8, when those tables exist |
+| review verdicts, parsed at import from reviewer steps' notes and summaries with bishop-memory's `internal/review` rules (it stores no review table) | `review` events (M6); the reviews table is cut from v1 |
+| `mission_grades`, triage tables | carried in Later, when those tables exist |
 | `crew` | not carried; agent names live on rows |
 | workspace documents | not carried; scratch stays where it is |
 
@@ -289,21 +289,22 @@ From what went well and badly in bishop-memory:
 
 ## 7. Risks
 
-- **Rebuilding more than needed.** Version 1 is phases 0–4: a local memory a
-  plain Claude Code project can use. The server, the UI, the import and the
-  review loop follow. Anything not in DESIGN.md §4 waits for a reason.
+- **Rebuilding more than needed.** Version 1 is the scope of M1 to M8 in §3: a
+  central server, the web UI and dashboard, hooks and the CLI, the plugin, the
+  import, and the pilot and roll-out. The review loop is Later. Anything not in
+  DESIGN.md §4 waits for a reason.
 - **Losing hard-won behaviour.** bishop-memory's tests encode bugs already
   found: the mission-id extraction rule, the unknown-status warning, the
-  N/A grade, the FK guards in grade rebuilds. Phase 7 and phase 8 go through
-  those tests and carry each one that still applies.
+  N/A grade, the FK guards in grade rebuilds. M6 and Later go through those
+  tests and carry each one that still applies.
 - **Two systems at once.** Until cut-over the operator watches two services.
-  Keep the overlap short by moving harnesses soon after phase 7.
+  Keep the overlap short by moving harnesses soon after M6.
 - **Plugin facts change.** Tool naming for plugin servers and the subagent
-  wildcard form are inferred, not documented. Phase 4 confirms them live.
-  Re-read the Claude Code plugin pages before phases 4 and 10.
-- **Local mode under concurrency.** Several MCP processes on one SQLite file
-  is safe in WAL mode, but busy errors must surface as a retry, not a lost
-  write. Phase 2 tests it.
+  wildcard form are inferred, not documented. M5 confirms them live. Re-read
+  the Claude Code plugin pages before M5 and before any public release (Later).
+- **Concurrency on one database.** Several processes on one SQLite file are
+  safe in WAL mode, but busy errors must surface as a retry, not a lost write.
+  Phase 2 tests it. Local mode, which first raised this, is cut by D11.
 
 ## 8. Decisions
 
