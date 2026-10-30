@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,12 +47,26 @@ var _ core.Service = (*Client)(nil)
 func New(base string, hc *http.Client) (*Client, error) {
 	u, err := url.Parse(base)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("client: base %q is not an http or https URL with a host", base)
+		return nil, fmt.Errorf("client: base %s is not an http or https URL with a host", DisplayURL(base))
 	}
 	if hc == nil {
 		hc = &http.Client{Timeout: DefaultTimeout}
 	}
 	return &Client{base: strings.TrimRight(base, "/"), hc: hc}, nil
+}
+
+// DisplayURL returns a server URL as it may be printed: with its user name and
+// password removed. A server URL with credentials must not reach a terminal, a log or
+// a committed file, so every message that names the URL goes through here (step 10
+// review W5). A URL that does not parse is shown as a fixed phrase, since its
+// credentials cannot be told apart from the rest.
+func DisplayURL(base string) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		return "(not a URL)"
+	}
+	u.User = nil
+	return u.String()
 }
 
 // TaskCurrent sends the task_current call.
@@ -177,6 +192,12 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 	}
 	resp, err := c.hc.Do(hreq)
 	if err != nil {
+		// net/http names the URL in its error, with the password hidden but the user
+		// name kept. The URL is shown without its credentials.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			ue.URL = DisplayURL(ue.URL)
+		}
 		return nil, fmt.Errorf("client: %s: %w", route, err)
 	}
 	defer resp.Body.Close()
