@@ -23,7 +23,7 @@ The labels are defined in [labels.json](https://github.com/djm56/cairn-memory/bl
 | `area:store` | SQLite store, migrations and typed queries: `internal/store`. |
 | `area:mcp` | MCP adapter and `cairn mcp`: `internal/mcp`. |
 | `area:plugin` | Claude Code plugin and marketplace. |
-| `area:server` | HTTP server, API keys and the remote backend. |
+| `area:server` | HTTP server and API keys: `cairn serve`. |
 | `area:ui` | Web UI pages embedded in the binary. |
 | `area:migration` | Import from bishop-memory. |
 | `area:review` | Triage and grading loop. |
