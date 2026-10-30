@@ -32,7 +32,7 @@ Cairn has four jobs:
    similar past tasks that apply to it.
 4. **Review.** A web page where the operator follows tasks, decides on
    findings and ratifies directives. Optional scheduled agents classify
-   findings and grade finished tasks (PLAN.md phase 8).
+   findings and grade finished tasks (PLAN.md, Later).
 
 ### 1.1 Principles
 
@@ -205,6 +205,11 @@ reviews
 
 Events are append-only. There is no update or delete tool.
 
+**Cut from the v1 agent surface.** The `reviews` table is built in the store
+today. M1's tool consolidation removes `review_record` from the MCP surface,
+and the `review` event carries the verdict, `critical` and `warnings` in
+`data` instead (Scope of v1, PLAN.md §3). From M1 no MCP tool writes or reads it.
+
 ### 3.4 Learnings and directives
 
 ```
@@ -261,6 +266,11 @@ search_index   FTS5 over tasks (title, goal, context, outcome), events (text),
 columns. Each source table has insert, update and delete triggers. Update and
 delete find a row by `ref`, which scans the index; that is accepted at v1 scale.
 
+**Cut from the v1 agent surface.** The `notes` table is built in the store
+today. M1's tool consolidation removes `note_put` and `note_get` from the MCP
+surface, and a long brief goes in the task's `context` (Scope of v1, PLAN.md
+§3). No v1 tool writes or reads notes.
+
 ### 3.6 Projects and settings
 
 ```
@@ -273,7 +283,7 @@ api_keys        (server mode) name, hash, scopes, created_at, last_used_at
   (surrogate key `id`; this table names no key of its own)
 ```
 
-The step-review rule is deferred to phase 8 (#41).
+The step-review rule is deferred to Later (#41).
 
 ### 3.7 The close policy
 
@@ -334,8 +344,8 @@ directives that apply, and one line telling the agent to call `task_current`.
 When no task is active it says so in one line. It writes nothing.
 
 Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
-`stop`. `session-start` is designed and not yet built; PLAN.md §3 does not yet
-place it in a milestone's work row. `pre-compact` and `stop` are planned for M4.
+`stop`. `session-start` is planned, M1, and not yet built; issue #16 carries it.
+`pre-compact` and `stop` are planned for M4.
 `cairn enable --agent` installs all three.
 
 - `pre-compact` (planned, M4) prints the active task, the current step, the
@@ -379,10 +389,10 @@ server-only adapter.
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
 | `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. |
-| `internal/client` | A `Service` implemented over HTTP, for the remote backend. |
-| `internal/mcp` | MCP tools. Each tool calls `Service`, so it works the same against the local or the remote backend. |
+| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. |
+| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
-| `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come in a later phase. |
+| `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
 | `internal/auth` | API keys and scopes (server mode). |
 | `internal/ui` | The web pages, embedded in the binary. |
 | `internal/conformance` | The conformance suite that checks any `Service`. |
@@ -396,37 +406,32 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairn init` | Writes `.cairn.toml` in the current project and registers the project. |
-| `cairn mcp` | The MCP stdio server. Local backend unless `server` or `CAIRN_SERVER` is set. |
-| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. |
-| `cairn hook <event>` | Output for client hooks (`session-start`). |
-| `cairn status` | The active task and the backend in use, for a terminal. |
-| `cairn export <task>` | A task as Markdown. |
-| `cairn key add/list/revoke` | API keys for server mode. |
+| `cairn init` | Writes `.cairn.toml` in the current project and registers the project. Planned, M1. |
+| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). |
+| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2; the web UI is M3. |
+| `cairn hook <event>` | Output for client hooks. `session-start` is planned, M1; `pre-compact` and `stop` are planned, M4. |
+| `cairn status` | The active task and the server in use, for a terminal. Planned, M1. |
+| `cairn export <task>` | A task as Markdown (`export task`, planned, M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
+| `cairn key add/list/revoke` | API keys for server mode. Planned, M2. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
 | `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
 | `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
-| `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). |
-| `cairn doctor` | Checks the binary, the config, the database or server, and the project file. |
+| `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
+| `cairn doctor` | Checks the binary, the config, the database or server, and the project file. Planned, M1; `--agent` is planned, M4. |
 
-### 5.3 Local and remote backends
+### 5.3 The server
 
-- **Local (designed under D2; cut by D11 before it was built):** the design had
-  `cairn mcp` open `~/.local/share/cairn/cairn.db` (or `CAIRN_DB`) in WAL mode
-  with a busy timeout, so several MCP processes on one machine would share it.
-  Task-id allocation is one transaction in the store, which is built. No daemon
-  would be needed, and `cairn serve` on the same database would show the web UI.
-  D11 removes this path before it exists: `cairn mcp` refuses to start without a
-  `server` (M1), and this backend is not a client option. The store stays inside
-  `cairn serve`.
-- **Remote:** `cairn mcp` sends each call to `cairn serve` with the API key.
-  Used for a home server, a team, or several machines, and the only client
-  backend from M1.
+Clients open no database. `cairn mcp` and the CLI send each call to
+`cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
+without a `server` (M1). The store stays inside `cairn serve`, and the web UI
+is served by the same process.
 
-Under D2 (designed, never built), switching would have been one line in
-`.cairn.toml` or one environment variable. D11 removes the choice. A project's
-data does not move automatically; `cairn serve` can be pointed at
-the local database file to make it the server's.
+D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
+the machine. D11 cut it before it was built, so there is no choice of backend
+and no switch in `.cairn.toml`.
+
+A project's data does not move automatically. `cairn serve` can be pointed at
+an existing SQLite file to make it the server's own database.
 
 ## 6. Clients
 
@@ -443,9 +448,9 @@ plugins/claude-code/
   bin/cairn-launch             finds the cairn binary; if missing, exits
                                with the one-line install command
   hooks/hooks.json             SessionStart → cairn hook session-start
-                               (designed, not yet built; milestone not set in
-                               PLAN §3); PreCompact and Stop → cairn hook
-                               pre-compact and stop (planned, M4, D15)
+                               (planned, M1, not yet built; issue #16);
+                               PreCompact and Stop → cairn hook pre-compact
+                               and stop (planned, M4, D15)
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below
   commands/init.md             /cairn:init → cairn init
   commands/status.md           /cairn:status
@@ -494,8 +499,7 @@ repository. PLAN.md lists what Cairn must provide for it.
 
 ## 7. Review loop (optional, later)
 
-Written fresh after the core is in use, guided by bishop-memory (PLAN.md phase
-8):
+Written fresh after the core is in use, guided by bishop-memory (PLAN.md, Later):
 
 - **Classify**: a scheduled agent assigns a category and a confidence to each
   new finding.
