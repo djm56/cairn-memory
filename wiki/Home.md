@@ -35,6 +35,6 @@ Cairn is one binary, `cairn`. It uses SQLite with full-text search. Clients use 
 - [Getting started](Getting-Started): clone, build and check the code.
 - [Architecture](Architecture): the shape of the design, with links into DESIGN.md.
 - [Roadmap](Roadmap): the milestones M1 to M8 and Later, their goals, exit checks and status.
-- [Decisions](Decisions): the adopted decisions D1 to D18, and the contract items the operator approved (item 12 is deferred to Later).
+- [Decisions](Decisions): the adopted decisions D1 to D19, and the contract items the operator approved (item 12 is deferred to Later).
 - [How we work](How-We-Work): issues, branches, pull requests, CI, labels and the board.
 - [Glossary](Glossary): the terms Cairn uses.

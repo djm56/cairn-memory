@@ -53,7 +53,7 @@ Cairn has four jobs:
   `CAIRN_SERVER`. The local database path that D2 designed (the MCP adapter
   opening a database when no server is set) was cut by D11 before it was built.
   M1 builds the server-only adapter *(decision D2, superseded by D11)*, and the
-  `internal/api` handlers with no network listener (decision D19).
+  `internal/api` handlers with no network listener in the shipped binary (decision D19).
 - **The operator decides.** Agents propose findings and directives. Only the
   operator accepts them. No tool lets an agent change a finding's status or
   ratify a rule.
@@ -356,10 +356,10 @@ Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 
 ## 5. Architecture
 
-The target after M1: one server, no local backend. D2 designed a local backend,
+The target after M2: one server, no local backend. D2 designed a local backend,
 and D11 cut it before it was built; §5.3, "The server", says what replaces it.
 M1 builds the server-only adapter and the `internal/api` handlers. It builds no
-network listener and no `cairn serve`: `cairn serve` is M2, and M1's tests run
+network listener in the shipped binary and no `cairn serve`: `cairn serve` is M2, and M1's tests run
 against an in-process server (D19).
 
 ```

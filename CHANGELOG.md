@@ -79,7 +79,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 ### Changed
 
 - Plan v1: central server only, 13 tools plus recall and search, viewer scope, hooks and CLI, dashboard; milestones M1–M8 and Later replace phases 3–10 ([PR #65](https://github.com/djm56/cairn-memory/pull/65)).
-- Decision D19 (issue #71): M1 builds no network listener. `internal/api` lands in M1 as handlers only, and `internal/client` is tested against an in-process server. M1's exit check is an MCP stdio test over that server. The live run against `cairn serve` moves to M2's exit check (#19).
+- Decision D19 (issue #71): M1 builds no network listener in the shipped binary. `internal/api` lands in M1 as handlers only, and `internal/client` is tested against an in-process server. M1's exit check is an MCP stdio test over that server. The live run against `cairn serve` moves to M2's exit check (#19) ([PR #101](https://github.com/djm56/cairn-memory/pull/101)).
 - Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on
   2026-10-28, item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)),
   and `DESIGN.md` is aligned with the contract

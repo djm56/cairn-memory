@@ -151,7 +151,7 @@
       "title": "M1 Server-mode MCP",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:epic", "m1", "area:mcp"],
-      "body": "**Work.** `internal/mcp` over `internal/client`; `internal/api` handlers over `core`, with no network listener (D19); `cairn mcp` refuses to start without a server; 13 tools plus recall and search; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, and `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` is M2's exit check (#19).\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision,m1-export-project-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
+      "body": "**Work.** `internal/mcp` over `internal/client`; `internal/api` handlers over `core`, with no network listener in the shipped binary (D19; tests use an `httptest` server bound to loopback for the test's lifetime); `cairn mcp` refuses to start without a server; 13 tools plus recall and search; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, and `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` is M2's exit check (#19).\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision,m1-export-project-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
     },
     {
       "key": "p3-mcp-tools",
@@ -221,7 +221,7 @@
       "title": "cairn mcp requires server; remove the local-database path from the adapter (D11)",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Work.** `cairn mcp` refuses to start without `server` in `.cairn.toml` or `CAIRN_SERVER`. The local-database path is removed from the adapter, so no client opens a database (D11).\n\n**Exit.** Part of M1's exit check: a project completes a small task against `cairn serve` on another machine.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-requires-server -->"
+      "body": "**Work.** `cairn mcp` refuses to start without `server` in `.cairn.toml` or `CAIRN_SERVER`. The local-database path is removed from the adapter, so no client opens a database (D11).\n\n**Exit.** Part of M1's exit check: an MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against an in-process server, and `cairn export task` prints it.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-requires-server -->"
     },
     {
       "key": "m1-consolidate-tools",
@@ -270,8 +270,8 @@
       "area": "area:mcp",
       "title": "Decide whether M1 moves internal/client and a serve skeleton in, or tests against an in-process test server",
       "milestone": "M1 Server-mode MCP",
-      "labels": ["type:decision", "needs-operator", "m1", "area:mcp"],
-      "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
+      "labels": ["type:decision", "m1", "area:mcp"],
+      "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Answer (2026-10-30, option B: test against an in-process test server, D19).** M1 tests against an in-process `httptest` server. M1 adds no listener and no `cairn serve`. The live run against `cairn serve` on another machine is M2's exit check (#19).\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
     },
     {
       "key": "m1-export-project-decision",
