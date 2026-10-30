@@ -211,7 +211,7 @@
       "title": "Live Claude Code run of a small task against cairn serve",
       "milestone": "M2 Server",
       "labels": ["type:task", "m2", "area:mcp"],
-      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine, and `cairn export task` prints it. Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
+      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine, and `cairn export task` prints it. Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
     },
     {
       "key": "m1-requires-server",
