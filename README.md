@@ -52,8 +52,9 @@ in Cairn leaves the same kind of marker.
   so a team or several machines share one place to look and back up (decision
   D11). `cairn serve` is planned for M2. `cairn mcp` and the M1 commands need
   `server` in `.cairn.toml` or `CAIRN_SERVER`, and `cairn mcp` refuses to start
-  without one. `cairn init` writes that file: `cairn init --project <name>
-  --server <url>`.
+  without one. `cairn init` writes that file in the project directory, and does
+  not contact the server: `cairn init --project <name> --server <url>`. The
+  server URL may not carry a user name or password, since the file is committed.
 - **The operator decides.** Agents can only propose. Accepting a finding or
   ratifying a directive is an operator action.
 
@@ -76,7 +77,8 @@ From then on, each session starts with the active task in context, and the
 `cairn` skill tells the agent how to start, step through and close a task.
 
 `.cairn.toml` is committed to the project. `server` is required (D11); the
-API key does not go in this file.
+API key does not go in this file, and neither does a user name or password in
+the server URL.
 
 ```toml
 project = "acme-api"

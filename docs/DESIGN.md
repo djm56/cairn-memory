@@ -114,7 +114,9 @@ server = "https://cairn.lan:8787"   # required from M1 (decision D11); D2's loca
 ```
 
 The API key never goes in this file. It comes from the plugin's secure option,
-`CAIRN_API_KEY`, or `~/.config/cairn/client.env`.
+`CAIRN_API_KEY`, or `~/.config/cairn/client.env`. Nor does a user name or a
+password in the server URL: `cairn init` refuses one, and no command prints a URL
+with them.
 
 The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
 key of the nearest `.cairn.toml`, found by the same walk (M1). `CAIRN_SERVER`
@@ -426,7 +428,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairn init` | Writes `.cairn.toml` in the current project, with `--project` and `--server`. Built in M1. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, and never changes a value the file has. |
+| `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
