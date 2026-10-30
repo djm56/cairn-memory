@@ -357,6 +357,10 @@ func TestResolveDirectoryNamedFile(t *testing.T) {
 	if !strings.Contains(err.Error(), "is a directory, not a project file") {
 		t.Errorf("error %q does not say the entry is a directory", err)
 	}
+	// DESIGN §2.1: the refusal names the path of the directory.
+	if !strings.Contains(err.Error(), dir) {
+		t.Errorf("error %q does not name the directory %q", err, dir)
+	}
 	if strings.Contains(err.Error(), "not valid TOML") {
 		t.Errorf("error %q wrongly reports a TOML fault", err)
 	}

@@ -195,3 +195,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 wiki, follow-up to issue #52 (item 7): Getting-Started says the
   conformance tests check the suite against `core.Unimplemented`, and that
   `core.Local` passes all 70 cases. It no longer says the contract fails.
+- Phase 2 docs, follow-up to issue #50: DESIGN §2.1 says that a `.cairn.toml`
+  which is a directory is refused and names its path, and DESIGN §5.1 says that
+  project resolution is built and that agent and session resolution come in a
+  later phase. The identity test pins the path. The refusals that name
+  `cairn init` already do, so no message changed.
