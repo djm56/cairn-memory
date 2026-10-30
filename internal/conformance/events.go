@@ -157,21 +157,43 @@ var eventCases = []Case{
 		}
 	}},
 	{"event/review_record_on_each_step_status", func(t T, s core.Service) {
-		// CONTRACT §9 item 32: review_record accepts a step in any status. The
-		// same step is reviewed while pending, then while active, then once done.
-		res := startTask(t, s, mainCtx(), "t", "one")
+		// CONTRACT §9 item 32: review_record accepts a step in any of its five
+		// statuses. Step 1 is reviewed while pending, then while active, then once
+		// done. Step 2 is reviewed once failed, and step 3 once skipped. The task
+		// read back at the end shows each step in the status the case meant.
+		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
+		reviewer := as(projA, "reviewer")
 		step := core.NumberRef(1)
-		pending := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		pending := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepStart}))(t)
-		active := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+		active := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepFinish, Summary: "Built it."}))(t)
-		done := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-		if pending.StepID != res.Steps[0].ID || active.StepID != res.Steps[0].ID || done.StepID != res.Steps[0].ID {
-			t.Errorf("reviews name steps %d, %d and %d, want %d", pending.StepID, active.StepID, done.StepID, res.Steps[0].ID)
+		done := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
+
+		failStep := core.NumberRef(2)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: failStep, Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: failStep, Action: core.StepFail, Summary: "Broke."}))(t)
+		failed := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: failStep, Verdict: core.VerdictNotApproved}))(t)
+
+		skipStep := core.NumberRef(3)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: skipStep, Action: core.StepSkip, Summary: "Not needed."}))(t)
+		skipped := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: skipStep, Verdict: core.VerdictApproved}))(t)
+
+		want := []int64{res.Steps[0].ID, res.Steps[0].ID, res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
+		got := []int64{pending.StepID, active.StepID, done.StepID, failed.StepID, skipped.StepID}
+		if !slices.Equal(got, want) {
+			t.Errorf("reviews name steps %v, want %v", got, want)
 		}
 		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
-		if len(d.Reviews) != 3 {
-			t.Errorf("task reviews = %d, want 3", len(d.Reviews))
+		var statuses []core.StepStatus
+		for _, st := range d.Steps {
+			statuses = append(statuses, st.Status)
+		}
+		if wantStatus := []core.StepStatus{core.StepDone, core.StepFailed, core.StepSkipped}; !slices.Equal(statuses, wantStatus) {
+			t.Errorf("step statuses = %v, want %v", statuses, wantStatus)
+		}
+		if len(d.Reviews) != 5 {
+			t.Errorf("task reviews = %d, want 5", len(d.Reviews))
 		}
 	}},
 }

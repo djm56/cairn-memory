@@ -191,6 +191,13 @@ func TestQueuedTaskStartedAtOnActivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	queued, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if queued.Task.StartedAt != nil {
+		t.Errorf("queued task has started_at %v before activation, want none", *queued.Task.StartedAt)
+	}
 	active := core.TaskActive
 	if _, err := s.TaskUpdate(ctx, core.TaskUpdateRequest{ID: res.ID, Status: &active}); err != nil {
 		t.Fatal(err)

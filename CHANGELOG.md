@@ -161,3 +161,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   say that a write moves the project's `last_seen_at` on and a read does not.
   The code already behaved so; the `ensureProject` comment now says it, and a
   core test checks it through the store.
+- Phase 2 tests, follow-up to issue #52 (items 5 to 9): conformance case
+  `event/review_record_on_active_and_done_step` is renamed
+  `event/review_record_on_each_step_status`, and it reviews a failed and a
+  skipped step as well, so all five step statuses are pinned. The `:memory:`
+  test's docblock says its result is set by the pool, not the clock, and it
+  closes the rows of its second query. Recall tests drop a single upper-case
+  letter and a single CJK character. A queued task's start time is checked
+  before activation.

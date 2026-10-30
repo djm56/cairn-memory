@@ -158,9 +158,12 @@ func TestApplyOneCases(t *testing.T) {
 // The wait check holds one row set open, so the pool has no free connection. A
 // second query must then wait for that connection and time out. Without the
 // one-connection limit it would open a second, empty database and fail at once
-// with "no such table", so the timeout is what separates the two. The check is
-// by timeout rather than by row contents, so it is deterministic: no timing
-// race decides the result, only whether the pool blocks.
+// with "no such table", so the timeout is what separates the two.
+//
+// The result is set by the pool, not by the clock. The rows stay open until the
+// test closes them below, after the second query has returned, so with one
+// connection that query always waits to its deadline. The 200 ms is only the
+// bound on that wait, and the test costs about that long on every run.
 func TestMemoryDatabaseIsShared(t *testing.T) {
 	s, err := Open(":memory:")
 	if err != nil {
@@ -186,7 +189,14 @@ func TestMemoryDatabaseIsShared(t *testing.T) {
 	}
 	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
-	_, err = s.QueryContext(short, `SELECT COUNT(*) FROM projects`)
+	second, err := s.QueryContext(short, `SELECT COUNT(*) FROM projects`)
+	if err == nil {
+		// The query did not wait, so it returned rows. The test fails below, and
+		// the rows are closed here rather than dropped.
+		if cerr := second.Close(); cerr != nil {
+			t.Errorf("close rows of the second query: %v", cerr)
+		}
+	}
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("query while rows are open: err = %v, want a wait that times out", err)
 	}

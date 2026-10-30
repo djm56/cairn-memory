@@ -184,6 +184,26 @@ func TestRecallDropsOneCharacterWord(t *testing.T) {
 	}
 }
 
+// TestRecallDropsSingleLetterAndCJKCharacter checks the one-character rule for
+// the two kinds of single character a goal can hold: an upper-case Latin letter,
+// and a CJK character, which upper-casing leaves unchanged. The goal is in mixed
+// case, so neither is kept by the case test. "A" and "猫" are each dropped, so the
+// lessons that hold only one of them are not found. The lesson with "Upgrade" is.
+func TestRecallDropsSingleLetterAndCJKCharacter(t *testing.T) {
+	s, st := openLocal(t)
+	first := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Release", Goal: "Release work.", Queue: true}))(t)
+	seedLesson(t, st, first.ID, "Upgrade the release.")
+	second := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Plan", Goal: "Plan work.", Queue: true}))(t)
+	seedLesson(t, st, second.ID, "Plan A for it.")
+	third := must(s.TaskStart(as(projB, "main"), core.TaskStartRequest{Title: "Pets", Goal: "Pets work.", Queue: true}))(t)
+	seedLesson(t, st, third.ID, "Feed 猫 daily.")
+
+	got := mustRecall(mainCtx(), t, s, core.RecallRequest{Goal: "Upgrade A 猫"})
+	if len(got.Lessons) != 1 || got.Lessons[0].Text != "Upgrade the release." {
+		t.Errorf("recall of \"Upgrade A 猫\" lessons = %+v, want only the upgrade lesson", got.Lessons)
+	}
+}
+
 // TestRecallDropsGoWordInMixedCase checks that "Go" is dropped from a goal that
 // is in mixed case. It has no digit and is not all upper case, so it is not a
 // name. The lesson that holds only "Go" must not be found, and the lesson with
