@@ -9,15 +9,15 @@ import (
 )
 
 var eventCases = []Case{
-	{"event/pending_step_takes_review_and_event", func(t T, s core.Service) {
-		// CONTRACT §9 items 32 and 33: review_record and event_log each accept a
-		// step in any status, and the step here is still pending.
+	{"event/pending_step_takes_event", func(t T, s core.Service) {
+		// CONTRACT §9 item 33: event_log accepts a step in any status, and the
+		// step here is still pending.
 		res := startTask(t, s, mainCtx(), "t", "one")
 		step := core.NumberRef(1)
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventNote, Text: "Before the work starts."}))(t)
-		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-		if rv.StepID != res.Steps[0].ID {
-			t.Errorf("review of a pending step names step %d, want %d", rv.StepID, res.Steps[0].ID)
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Step: &step}))(t)
+		if len(d.Events) != 1 || d.Events[0].StepID == nil || *d.Events[0].StepID != res.Steps[0].ID {
+			t.Errorf("events of a pending step = %+v, want one on step %d", d.Events, res.Steps[0].ID)
 		}
 	}},
 	{"event/append_only_with_server_time", func(t T, s core.Service) {
@@ -31,7 +31,7 @@ var eventCases = []Case{
 			}
 		}
 		after := time.Now().UTC().Add(time.Second)
-		list := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID}))(t)
+		list := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
 		var got []string
 		for _, e := range list.Events {
 			if e.Kind == core.EventDecision {
@@ -76,7 +76,7 @@ var eventCases = []Case{
 		cursor := ""
 		pages := 0
 		for {
-			page := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID, Limit: 10, Cursor: cursor}))(t)
+			page := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Limit: 10, Cursor: cursor}))(t)
 			pages++
 			for _, e := range page.Events {
 				if seen[e.ID] {
@@ -92,7 +92,7 @@ var eventCases = []Case{
 		if len(seen) < 25 || pages != (len(seen)+9)/10 {
 			t.Errorf("paged %d events over %d pages", len(seen), pages)
 		}
-		def := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID}))(t)
+		def := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
 		if len(def.Events) != 20 {
 			t.Errorf("default page = %d events, want 20", len(def.Events))
 		}
@@ -100,7 +100,7 @@ var eventCases = []Case{
 	{"event/step_refs_must_name_a_step", func(t T, s core.Service) {
 		// CONTRACT §1.4: a step ref names one step. {} names none, number 0
 		// names none (it is valid only as step_add's after), and an id of 0 with
-		// a number is two faults at once. Each of the three journal calls that
+		// a number is two faults at once. Each of the two journal calls that
 		// take a ref refuses all three, and writes nothing.
 		res := startTask(t, s, mainCtx(), "t", "one")
 		refs := []struct {
@@ -117,83 +117,14 @@ var eventCases = []Case{
 			ref := r.ref
 			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &ref, Kind: core.EventNote, Text: "refused"})
 			wantKind(t, err, core.KindInvalid, "event_log with step "+r.what)
-			_, err = s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID, Step: &ref})
-			wantKind(t, err, core.KindInvalid, "event_list with step "+r.what)
-			_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: ref, Verdict: core.VerdictApproved})
-			wantKind(t, err, core.KindInvalid, "review_record with step "+r.what)
+			_, err = s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Step: &ref})
+			wantKind(t, err, core.KindInvalid, "task_get events with step "+r.what)
 		}
-		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
-		if len(d.Reviews) != 0 {
-			t.Errorf("reviews after refused calls = %+v", d.Reviews)
-		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
 		for _, e := range d.Events {
 			if e.Text == "refused" {
 				t.Errorf("a refused event_log was written: %+v", e)
 			}
-		}
-	}},
-	{"event/review_record_writes_event", func(t T, s core.Service) {
-		res := startTask(t, s, mainCtx(), "t", "build", "review")
-		rv := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{
-			TaskID: res.ID, Step: core.NumberRef(1), Verdict: core.VerdictNotApproved, Critical: 1, Warnings: 2, Summary: "missing test",
-		}))(t)
-		if rv.Reviewer != "reviewer" || rv.StepID != res.Steps[0].ID || rv.Critical != 1 {
-			t.Errorf("review = %+v", rv)
-		}
-		_, err := s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(1), Verdict: "meh"})
-		wantKind(t, err, core.KindInvalid, "unknown verdict")
-		_, err = s.ReviewRecord(mainCtx(), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(1), Verdict: core.VerdictApproved, Critical: -1})
-		wantKind(t, err, core.KindInvalid, "negative count")
-		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
-		if len(d.Reviews) != 1 {
-			t.Errorf("task reviews = %+v", d.Reviews)
-		}
-		found := false
-		for _, e := range d.Events {
-			found = found || e.Kind == core.EventReview
-		}
-		if !found {
-			t.Errorf("no review event in %+v", d.Events)
-		}
-	}},
-	{"event/review_record_on_each_step_status", func(t T, s core.Service) {
-		// CONTRACT §9 item 32: review_record accepts a step in any of its five
-		// statuses. Step 1 is reviewed while pending, then while active, then once
-		// done. Step 2 is reviewed once failed, and step 3 once skipped. The task
-		// read back at the end shows each step in the status the case meant.
-		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
-		reviewer := as(projA, "reviewer")
-		step := core.NumberRef(1)
-		pending := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepStart}))(t)
-		active := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepFinish, Summary: "Built it."}))(t)
-		done := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-
-		failStep := core.NumberRef(2)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: failStep, Action: core.StepStart}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: failStep, Action: core.StepFail, Summary: "Broke."}))(t)
-		failed := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: failStep, Verdict: core.VerdictNotApproved}))(t)
-
-		skipStep := core.NumberRef(3)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: skipStep, Action: core.StepSkip, Summary: "Not needed."}))(t)
-		skipped := must(s.ReviewRecord(reviewer, core.ReviewRecordRequest{TaskID: res.ID, Step: skipStep, Verdict: core.VerdictApproved}))(t)
-
-		want := []int64{res.Steps[0].ID, res.Steps[0].ID, res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
-		got := []int64{pending.StepID, active.StepID, done.StepID, failed.StepID, skipped.StepID}
-		if !slices.Equal(got, want) {
-			t.Errorf("reviews name steps %v, want %v", got, want)
-		}
-		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
-		var statuses []core.StepStatus
-		for _, st := range d.Steps {
-			statuses = append(statuses, st.Status)
-		}
-		if wantStatus := []core.StepStatus{core.StepDone, core.StepFailed, core.StepSkipped}; !slices.Equal(statuses, wantStatus) {
-			t.Errorf("step statuses = %v, want %v", statuses, wantStatus)
-		}
-		if len(d.Reviews) != 5 {
-			t.Errorf("task reviews = %d, want 5", len(d.Reviews))
 		}
 	}},
 }
@@ -282,7 +213,7 @@ var closeCases = []Case{
 		}
 		must(s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventDecision, Text: "Allow only same-origin paths."}))(t)
 		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(3), Action: core.StepStart}))(t)
-		must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: core.NumberRef(2), Verdict: core.VerdictApproved}))(t)
+		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: ptr(core.NumberRef(2)), Kind: core.EventNote, Text: "Step 2 looked at by the reviewer."}))(t)
 		l := must(s.LearningAdd(ctx, core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "Check redirects", Body: "Every redirect needs an origin check.", Target: "reviewer"}))(t)
 		if l.Status != core.LearningProposed || l.TaskID != res.ID {
 			t.Errorf("learning = %+v", l)

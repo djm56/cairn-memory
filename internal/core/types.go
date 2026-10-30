@@ -193,18 +193,6 @@ const (
 	VerdictNotApproved Verdict = "not-approved"
 )
 
-type Review struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id"`
-	StepID    int64     `json:"step_id"`
-	Reviewer  string    `json:"reviewer"`
-	Verdict   Verdict   `json:"verdict"`
-	Critical  int       `json:"critical"`
-	Warnings  int       `json:"warnings"`
-	Summary   string    `json:"summary,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type LearningKind string
 
 const (
@@ -275,16 +263,6 @@ type Directive struct {
 	RatifiedBy     string          `json:"ratified_by"`
 	RatifiedAt     time.Time       `json:"ratified_at"`
 	RetiredAt      *time.Time      `json:"retired_at,omitempty"`
-}
-
-type Note struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id,omitempty"`
-	Project   string    `json:"project"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	CreatedBy string    `json:"created_by"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ClosePolicy is what task_close requires (DESIGN.md §3.7). Each field turns

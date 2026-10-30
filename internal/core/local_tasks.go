@@ -280,7 +280,10 @@ func (l *Local) TaskStart(ctx context.Context, req TaskStartRequest) (*TaskStart
 }
 
 // TaskGet returns one task, and the sections asked for. Section empty returns
-// all of them. A task of another project is not_found.
+// all of them. The events section is one page of the journal, newest first,
+// paged and filtered by step as event_list was (CONTRACT §2); the other
+// sections and the empty section give the last 20 events. A task of another
+// project is not_found.
 func (l *Local) TaskGet(ctx context.Context, req TaskGetRequest) (*TaskDetail, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
@@ -293,6 +296,26 @@ func (l *Local) TaskGet(ctx context.Context, req TaskGetRequest) (*TaskDetail, e
 	case SectionAll, SectionBrief, SectionSteps, SectionEvents, SectionClose:
 	default:
 		return nil, Invalid("unknown section %q: use brief, steps, events or close", req.Section)
+	}
+	paged := req.Section == SectionEvents
+	if !paged && (req.Limit != 0 || req.Cursor != "" || req.Step != nil) {
+		return nil, Invalid("limit, cursor and step apply to section events only: set section to events, or leave them out")
+	}
+	var size int
+	var before *int64
+	if paged {
+		var err error
+		if size, err = pageSize(req.Limit, 20); err != nil {
+			return nil, err
+		}
+		if before, err = decodeCursor(req.Cursor); err != nil {
+			return nil, err
+		}
+		if req.Step != nil {
+			if err := checkRef(*req.Step); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if err := l.ensureReadProject(ctx, c.Project); err != nil {
 		return nil, err
@@ -326,21 +349,28 @@ func (l *Local) TaskGet(ctx context.Context, req TaskGetRequest) (*TaskDetail, e
 			return nil, err
 		}
 		d.Steps = stepsFromRows(steps)
-		reviews, err := store.ListReviews(ctx, l.st, row.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range reviews {
-			d.Reviews = append(d.Reviews, reviewFromRow(r))
-		}
 	}
 	if want(SectionEvents) {
-		events, _, err := store.ListEvents(ctx, l.st, store.EventFilter{TaskID: row.ID, Project: c.Project, Limit: 20})
+		filter := store.EventFilter{TaskID: row.ID, Project: c.Project, Before: before, Limit: 20}
+		if paged {
+			filter.Limit = size
+			if req.Step != nil {
+				st, err := resolveStep(ctx, l.st, row.ID, *req.Step)
+				if err != nil {
+					return nil, err
+				}
+				filter.StepID = &st.ID
+			}
+		}
+		events, more, err := store.ListEvents(ctx, l.st, filter)
 		if err != nil {
 			return nil, err
 		}
 		for _, e := range events {
 			d.Events = append(d.Events, eventFromRow(e))
+		}
+		if paged && more && len(events) > 0 {
+			d.Next = encodeCursor(events[len(events)-1].ID)
 		}
 	}
 	if want(SectionClose) {

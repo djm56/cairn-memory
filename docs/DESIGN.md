@@ -310,9 +310,9 @@ Tool names are short and unprefixed; the client adds the server prefix
 
 Plan v1 (decisions D11 and D14) sets the agent surface for M1: 13 tools plus
 the read tools `recall` and `search` (15 names). The table below lists all 15.
-Until M1, the contract and `internal/core` still carry `event_list`,
-`review_record`, `note_put` and `note_get`, and no MCP tool wraps them yet. M1
-removes them, and `event_list` folds into `task_get` (`section: events`). Each
+Until M1, the contract and `internal/core` still carried `event_list`,
+`review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
+removed them, and `event_list` folded into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
 is how every harness other than Claude Code reaches Cairn.
 

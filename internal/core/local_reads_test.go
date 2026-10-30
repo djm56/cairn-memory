@@ -284,7 +284,7 @@ func TestReadsDoNotMoveLastSeenAt(t *testing.T) {
 	if _, err := s.TaskList(ctx, core.TaskListRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.EventList(ctx, core.EventListRequest{TaskID: res.ID}); err != nil {
+	if _, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DirectiveList(ctx, core.DirectiveListRequest{}); err != nil {

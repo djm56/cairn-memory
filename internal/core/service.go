@@ -27,8 +27,6 @@ type Agent interface {
 	StepUpdate(ctx context.Context, req StepUpdateRequest) (*Step, error)
 
 	EventLog(ctx context.Context, req EventLogRequest) (*Event, error)
-	EventList(ctx context.Context, req EventListRequest) (*EventList, error)
-	ReviewRecord(ctx context.Context, req ReviewRecordRequest) (*Review, error)
 
 	LearningAdd(ctx context.Context, req LearningAddRequest) (*Learning, error)
 	LearningList(ctx context.Context, req LearningListRequest) (*LearningList, error)
@@ -36,9 +34,6 @@ type Agent interface {
 
 	Recall(ctx context.Context, req RecallRequest) (*RecallResult, error)
 	Search(ctx context.Context, req SearchRequest) (*SearchResult, error)
-
-	NotePut(ctx context.Context, req NotePutRequest) (*Note, error)
-	NoteGet(ctx context.Context, req NoteGetRequest) (*Note, error)
 }
 
 // Operator holds the decisions only an operator makes (DESIGN.md §3.4,
@@ -91,12 +86,6 @@ func (Unimplemented) StepUpdate(context.Context, StepUpdateRequest) (*Step, erro
 func (Unimplemented) EventLog(context.Context, EventLogRequest) (*Event, error) {
 	return nil, ErrNotImplemented
 }
-func (Unimplemented) EventList(context.Context, EventListRequest) (*EventList, error) {
-	return nil, ErrNotImplemented
-}
-func (Unimplemented) ReviewRecord(context.Context, ReviewRecordRequest) (*Review, error) {
-	return nil, ErrNotImplemented
-}
 func (Unimplemented) LearningAdd(context.Context, LearningAddRequest) (*Learning, error) {
 	return nil, ErrNotImplemented
 }
@@ -110,12 +99,6 @@ func (Unimplemented) Recall(context.Context, RecallRequest) (*RecallResult, erro
 	return nil, ErrNotImplemented
 }
 func (Unimplemented) Search(context.Context, SearchRequest) (*SearchResult, error) {
-	return nil, ErrNotImplemented
-}
-func (Unimplemented) NotePut(context.Context, NotePutRequest) (*Note, error) {
-	return nil, ErrNotImplemented
-}
-func (Unimplemented) NoteGet(context.Context, NoteGetRequest) (*Note, error) {
 	return nil, ErrNotImplemented
 }
 func (Unimplemented) LearningDecide(context.Context, LearningDecideRequest) (*Learning, error) {

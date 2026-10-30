@@ -242,15 +242,6 @@ func stepsFromRows(rows []store.StepRow) []Step {
 	return out
 }
 
-// reviewFromRow converts a stored review.
-func reviewFromRow(r store.ReviewRow) Review {
-	return Review{
-		ID: r.ID, TaskID: r.TaskID, StepID: r.StepID, Reviewer: r.Reviewer,
-		Verdict: Verdict(r.Verdict), Critical: r.Critical, Warnings: r.Warnings,
-		Summary: r.Summary, CreatedAt: r.CreatedAt,
-	}
-}
-
 // eventFromRow converts a stored event. An empty data column is no data.
 func eventFromRow(r store.EventRow) Event {
 	e := Event{

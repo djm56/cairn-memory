@@ -50,12 +50,6 @@ var agentCalls = []call{
 	{"EventLog", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.EventLog(ctx, core.EventLogRequest{TaskID: "task-20260101-01", Kind: core.EventNote, Text: "x"}))
 	}},
-	{"EventList", false, func(ctx context.Context, s core.Service) error {
-		return ignore(s.EventList(ctx, core.EventListRequest{TaskID: "task-20260101-01"}))
-	}},
-	{"ReviewRecord", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: "task-20260101-01", Step: core.NumberRef(1), Verdict: core.VerdictApproved}))
-	}},
 	{"LearningAdd", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))
 	}},
@@ -70,12 +64,6 @@ var agentCalls = []call{
 	}},
 	{"Search", false, func(ctx context.Context, s core.Service) error {
 		return ignore(s.Search(ctx, core.SearchRequest{Query: "q"}))
-	}},
-	{"NotePut", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.NotePut(ctx, core.NotePutRequest{Title: "t", Body: "b"}))
-	}},
-	{"NoteGet", false, func(ctx context.Context, s core.Service) error {
-		return ignore(s.NoteGet(ctx, core.NoteGetRequest{ID: 1}))
 	}},
 }
 

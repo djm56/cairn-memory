@@ -5,21 +5,19 @@ phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
-`core.Local` passes all 70 cases in `internal/conformance` (count as of
+`core.Local` passes all 67 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
-> **Plan v1 (2026-10-30): planned, not yet made.** The agent tool surface
-> narrows as Plan v1 sets it out: 13 tools plus the read tools `recall` and
-> `search` (15 names; see [DESIGN.md](DESIGN.md) §4). In M1, `note_put`,
-> `note_get`, `review_record` and `event_list` are removed, and `event_list`
+> **Plan v1 (2026-10-30).** The agent tool surface is 13 tools plus the read
+> tools `recall` and `search` (15 names; see [DESIGN.md](DESIGN.md) §4). M1
+> removed `note_put`, `note_get`, `review_record` and `event_list` from this
+> contract, `internal/core` and `internal/conformance`, in one change: `event_list`
 > folds into `task_get` with `section=events`. CLI equivalents per tool come
-> with `internal/cli` in M4. The M1 changes land with the code, because this
-> contract, `internal/core` and `internal/conformance` change together. In M2,
-> the directive cap (12 per call, ranked, decision D16) and `review_by` arrive,
-> and are then documented on `task_current` and `recall`. The sections below
-> still describe the surface as it stands.
+> with `internal/cli` in M4. In M2, the directive cap (12 per call, ranked,
+> decision D16) and `review_by` arrive, and are then documented on `task_current`
+> and `recall`.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
@@ -57,7 +55,7 @@ A failure the caller can act on has a kind and a message:
 | Kind | Meaning |
 |---|---|
 | `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
-| `not_found` | The task, step, learning, directive or note does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
+| `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role. |
 
@@ -109,7 +107,7 @@ task_start (queue)                  task_start
   `active` writes an `unblocked` event. Each is written in the same transaction
   as its move (§9 item 36).
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
-  the task is `refused`: update, steps, events, reviews and close.
+  the task is `refused`: update, steps, events and close.
 - **One active task per project**, unless the project's settings allow
   parallel tasks. Making a second task active (`task_start` or `task_update`)
   is `refused`. `blocked` does not count as active.
@@ -158,12 +156,16 @@ numbered 1…n); `key_files` (`[{path, note}]`); `steps` (`[{title, agent}]`);
 ### `task_get` — read
 
 **In:** `id`; `section`: `brief`, `steps`, `events` or `close`. Empty
-returns all of them.
+returns all of them. For `events` only, `limit` (default 20, maximum 100),
+`cursor` and `step` (a ref, to keep one step's events) page and filter the
+journal, as `event_list` did.
 **Out:** `task`, always. `brief` adds `criteria` and `key_files`. `steps`
-adds `steps` and `reviews`. `events` adds the last 20 `events`. `close`
-adds `criteria` with results, `lessons`, `no_lessons_reason`, `mistakes` and
-`deliverables`.
-**Errors:** `not_found`.
+adds `steps`. `events` adds `events`, newest first, one page, and `next` when
+more follow. Empty adds every section, with `events` as the last 20 and no
+`next`. `close` adds `criteria` with results, `lessons`, `no_lessons_reason`,
+`mistakes` and `deliverables`.
+**Errors:** `not_found`. `invalid` for a bad `limit`, `cursor` or `step`, or
+for any of those three with a section other than `events`.
 
 ### `task_list` — read, paged
 
@@ -273,19 +275,6 @@ calls they record, and are `invalid` here. `unblocked` is also written by
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
 
-### `event_list` — read, paged
-
-**In:** `task_id`; `step` (a ref, to filter); `limit` (default 20);
-`cursor`.
-**Out:** `events`, newest first, and `next`.
-
-### `review_record` — write
-
-**In:** `task_id`, `step` (a ref), `verdict` (`approved|not-approved`),
-`critical`, `warnings` (counts, ≥ 0), `summary`.
-**Out:** the review. `reviewer` is the calling agent. A `review` event is
-written.
-
 ## 5. Learnings and directives
 
 ### `learning_add` — write
@@ -334,15 +323,8 @@ either.
 
 ## 7. Notes
 
-### `note_put` — write
-
-**In:** `title`, `body` (Markdown); `task_id` (only when creating); `id`
-(to replace an existing note's title and body).
-**Out:** the note.
-
-### `note_get` — read
-
-**In:** `id`. **Out:** the note. **Errors:** `not_found`.
+Cut from v1: `note_put` and `note_get` are removed. A long brief goes in the
+task's `context`.
 
 ## 8. Operator calls
 
@@ -477,15 +459,15 @@ only a core test checks it. An item with no check of its own is marked
     approval.* (core test only)
 29. **Skip sets `ended_at` (2026-10-29).** A `skip` step update sets the step's
     `ended_at` (§3). *Bishop default, pending operator approval.*
-30. **Learnings and notes on a terminal task (2026-10-29).** `learning_add` and
-    `note_put` are allowed on a `done`, `failed` or `abandoned` task. §1.5
-    refuses the task's own writes (update, steps, events, reviews and close),
-    and these are not among them. *Bishop default, pending operator approval.*
-31. **`note_put` shape (2026-10-29).** Giving `id` with `task_id` is `invalid`,
-    and so is a blank title or body (§7). *Bishop default, pending operator
+30. **Learnings on a terminal task (2026-10-29).** `learning_add` is
+    allowed on a `done`, `failed` or `abandoned` task. §1.5 refuses the task's
+    own writes (update, steps, events and close), and it is not among them. *Bishop default, pending operator approval.*
+31. **`note_put` shape (2026-10-29), withdrawn 2026-10-30.** `note_put` is cut
+    from v1 (§7), so this item no longer applies. Giving `id` with `task_id` was
+    to be `invalid`, and so was a blank title or body. *Bishop default, pending operator
     approval.* (core test only)
-32. **`review_record` on any step (2026-10-29).** `review_record` accepts a step
-    in any status. The contract names none (§4). *Bishop default, pending
+32. **`review_record` on any step (2026-10-29), withdrawn 2026-10-30.**
+    `review_record` is cut from v1 (§4), so this item no longer applies. *Bishop default, pending
     operator approval.*
 33. **Event on a pending step (2026-10-29).** `event_log` may name a pending
     step (§4). *Bishop default, pending operator approval.*
