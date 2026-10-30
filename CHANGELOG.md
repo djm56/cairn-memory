@@ -161,7 +161,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   say that a write moves the project's `last_seen_at` on and a read does not.
   The code already behaved so; the `ensureProject` comment now says it, and a
   core test checks it through the store ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 tests, follow-up to issue #52 (items 5 to 9): conformance case
+- Phase 2 tests, follow-up to issue #60 (items 5 to 9): conformance case
   `event/review_record_on_active_and_done_step` is renamed
   `event/review_record_on_each_step_status`, and it reviews a failed and a
   skipped step as well, so all five step statuses are pinned. The `:memory:`
@@ -200,13 +200,13 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   project resolution is built and that agent and session resolution come in a
   later phase. The identity test pins the path. The refusals that name
   `cairn init` already do, so no message changed ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 tests, follow-up to issue #52 (item 1, review of step 8): conformance
+- Phase 2 tests, follow-up to issue #52 (step_plan refusal wording): conformance
   case `step/plan_refusal_names_each_recorded_step` checks that the refusal
   names steps 1 and 3 and not step 2, as whole numbers, instead of core's exact
   wording ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 core tests, follow-up to issue #52 (item 1, review of step 8):
+- Phase 2 core tests, follow-up to issue #52 (step_plan refusal wording):
   `TestRecordedRefusal` pins the step_plan refusal for one, two and three
   recorded steps: the singular wording, and the ", " and " and " join ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
-- Phase 2 docs, follow-up to issue #52 (item 6 of the review of step 8):
+- Phase 2 docs, follow-up to issue #52 (CONTRACT §9 layout and markers):
   CONTRACT §9 item 15 is reflowed, and item 35's `(not tested)` marker sits on
   its own line, as item 18 places its `(core test only)` marker ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
