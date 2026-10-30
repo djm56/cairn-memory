@@ -819,8 +819,8 @@ sync_items() {
         Phase) want="$want_phase"; cur="$cur_phase" ;;
         *) want="$want_area"; cur="$cur_area" ;;
       esac
-      # Nothing to set when the roadmap gives no value, as for a pre-Plan v1
-      # issue with no milestone key.
+      # Nothing to set when the roadmap gives no value. A Plan v1 issue has
+      # phase: null, so its Phase stays empty.
       [ -n "$want" ] || continue
       [ "$cur" = "$want" ] && continue
 
