@@ -148,3 +148,29 @@ func TestApplyOneCases(t *testing.T) {
 		})
 	}
 }
+
+// TestMemoryDatabaseIsShared checks the ":memory:" path. The pool holds one
+// connection, so a write made by one call is read by a later call. Without the
+// one-connection limit the read could land on a second, empty database.
+func TestMemoryDatabaseIsShared(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("Open(:memory:): %v", err)
+	}
+	defer s.Close()
+	if got := s.db.Stats().MaxOpenConnections; got != 1 {
+		t.Fatalf("MaxOpenConnections = %d, want 1", got)
+	}
+	ctx := context.Background()
+	if _, err := s.ExecContext(ctx, `INSERT INTO projects (name, created_at, last_seen_at)
+		VALUES ('acme-api', 'now', 'now')`); err != nil {
+		t.Fatalf("write on one call: %v", err)
+	}
+	var n int
+	if err := s.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects`).Scan(&n); err != nil {
+		t.Fatalf("read on another call: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("projects = %d on a later call, want 1: the write was not seen", n)
+	}
+}

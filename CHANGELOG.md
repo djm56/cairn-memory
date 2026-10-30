@@ -129,3 +129,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 store tests, follow-up to issue #46 (S6): the search test asserts the
   project of the note row, and that the task_id of the learning and note rows
   is NULL.
+- Phase 2 store, follow-up to issue #46 (item 3): `Open` joins the close error
+  to the migrate error instead of dropping it. `Open(":memory:")` limits the
+  pool to one connection, so every call sees one database; its docblock says
+  so, and a test checks that a write is read back by a later call.
