@@ -156,21 +156,22 @@ var eventCases = []Case{
 			t.Errorf("no review event in %+v", d.Events)
 		}
 	}},
-	{"event/review_record_on_active_and_done_step", func(t T, s core.Service) {
+	{"event/review_record_on_each_step_status", func(t T, s core.Service) {
 		// CONTRACT §9 item 32: review_record accepts a step in any status. The
-		// same step is reviewed while active, then again once it is done.
+		// same step is reviewed while pending, then while active, then once done.
 		res := startTask(t, s, mainCtx(), "t", "one")
 		step := core.NumberRef(1)
+		pending := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepStart}))(t)
 		active := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step, Action: core.StepFinish, Summary: "Built it."}))(t)
 		done := must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: step, Verdict: core.VerdictApproved}))(t)
-		if active.StepID != res.Steps[0].ID || done.StepID != res.Steps[0].ID {
-			t.Errorf("reviews name steps %d and %d, want %d", active.StepID, done.StepID, res.Steps[0].ID)
+		if pending.StepID != res.Steps[0].ID || active.StepID != res.Steps[0].ID || done.StepID != res.Steps[0].ID {
+			t.Errorf("reviews name steps %d, %d and %d, want %d", pending.StepID, active.StepID, done.StepID, res.Steps[0].ID)
 		}
 		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID}))(t)
-		if len(d.Reviews) != 2 {
-			t.Errorf("task reviews = %d, want 2", len(d.Reviews))
+		if len(d.Reviews) != 3 {
+			t.Errorf("task reviews = %d, want 3", len(d.Reviews))
 		}
 	}},
 }
