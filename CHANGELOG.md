@@ -115,3 +115,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 store, follow-up to issue #46 (S1): `AllocateTaskID` finds the day's
   task ids with a range on `id` instead of `substr(id, 1, 14)`, so the query can
   search the primary-key index. The `CAST` maximum is unchanged.
+- Phase 2 store, follow-up to issue #46 (S3): migration 0003 adds the
+  `events_project_matches_task` trigger, which refuses an event whose project is
+  not its task's project. `InsertEvent` returns the new `ErrProjectMismatch` for
+  that refusal. DESIGN §3 names the trigger.

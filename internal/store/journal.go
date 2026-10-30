@@ -4,7 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
+
+// eventProjectRefusal is the message of the events_project_matches_task trigger
+// (migration 0003). InsertEvent matches it to return ErrProjectMismatch. The two
+// must stay equal; TestEventsProjectMatchesTask fails if they drift.
+const eventProjectRefusal = "event project differs from the project of its task"
 
 // EventFilter narrows ListEvents. TaskID and Project are required: a journal is
 // read for one task of one project. StepID, when set, keeps only the events of
@@ -20,7 +26,8 @@ type EventFilter struct {
 
 // InsertEvent appends an event and returns its id. The journal is append-only:
 // there is no update or delete for events (CONTRACT §4). The search_index row
-// is written by a trigger.
+// is written by a trigger. When e.Project is not the project of e.TaskID, the
+// schema refuses the row and InsertEvent returns ErrProjectMismatch (wrapped).
 //
 // Write function: call it through WithTx.
 func InsertEvent(ctx context.Context, q Querier, e EventRow) (int64, error) {
@@ -30,6 +37,9 @@ func InsertEvent(ctx context.Context, q Querier, e EventRow) (int64, error) {
 		e.TaskID, e.Project, e.StepID, e.Agent, textOrNil(e.SessionID), e.Kind, e.Text,
 		textOrNil(e.Data), formatTime(e.OccurredAt))
 	if err != nil {
+		if strings.Contains(err.Error(), eventProjectRefusal) {
+			return 0, fmt.Errorf("store: insert event on %s: %w", e.TaskID, ErrProjectMismatch)
+		}
 		return 0, fmt.Errorf("store: insert event on %s: %w", e.TaskID, err)
 	}
 	id, err := res.LastInsertId()

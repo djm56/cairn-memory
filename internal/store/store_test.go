@@ -169,9 +169,10 @@ func TestMigrationsCreateEveryTableAndIndex(t *testing.T) {
 		t.Fatalf("count triggers: %v", err)
 	}
 	// Seven source tables, each with insert, update and delete triggers (21),
-	// and the tasks project guard from migration 0002.
-	if triggers != 22 {
-		t.Errorf("trigger count = %d, want 22", triggers)
+	// the tasks project guard from migration 0002, and the events project check
+	// from migration 0003.
+	if triggers != 23 {
+		t.Errorf("trigger count = %d, want 23", triggers)
 	}
 
 	// PRAGMA index_list returns seq, name, unique, origin and partial.
@@ -237,12 +238,12 @@ func TestMigration0002IndexesAndGuard(t *testing.T) {
 	}
 }
 
-// TestMigrationsRecordVersions checks that a fresh database ends at version 2,
+// TestMigrationsRecordVersions checks that a fresh database ends at version 3,
 // with one row per migration, each recorded by its number and name.
 func TestMigrationsRecordVersions(t *testing.T) {
 	s := openTemp(t)
 	rows := migrationRows(t, s.db)
-	want := []string{"1|schema_v1|", "2|indexes_and_guards|"}
+	want := []string{"1|schema_v1|", "2|indexes_and_guards|", "3|events_project_guard|"}
 	if len(rows) != len(want) {
 		t.Fatalf("migration rows = %v, want %d", rows, len(want))
 	}
@@ -319,7 +320,7 @@ func TestLoadMigrationsRejectsGap(t *testing.T) {
 	}
 }
 
-// TestLoadMigrationsEmbedsAll checks that the embedded set is exactly the two
+// TestLoadMigrationsEmbedsAll checks that the embedded set is exactly the three
 // schema migrations, in order.
 func TestLoadMigrationsEmbedsAll(t *testing.T) {
 	list, err := loadMigrations(migrationFiles)
@@ -329,7 +330,7 @@ func TestLoadMigrationsEmbedsAll(t *testing.T) {
 	want := []struct {
 		version int
 		name    string
-	}{{1, "schema_v1"}, {2, "indexes_and_guards"}}
+	}{{1, "schema_v1"}, {2, "indexes_and_guards"}, {3, "events_project_guard"}}
 	if len(list) != len(want) {
 		t.Fatalf("embedded migrations = %d, want %d", len(list), len(want))
 	}

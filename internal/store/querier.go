@@ -12,6 +12,11 @@ import (
 // absent. Core maps it to a not_found error with errors.Is.
 var ErrNotFound = errors.New("not found")
 
+// ErrProjectMismatch is returned, wrapped, by InsertEvent when the event's project
+// is not its task's project. The schema refuses such a row (migration 0003). The
+// sentinel lets a caller tell that refusal from a failed write with errors.Is.
+var ErrProjectMismatch = errors.New("event project differs from the project of its task")
+
 // Querier is the part of *sql.DB and *sql.Tx that the store uses. Every query
 // function takes one, so core can run several of them inside one transaction
 // from WithTx.

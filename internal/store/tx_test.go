@@ -233,3 +233,47 @@ func TestTasksProjectGuardKeepsSearchRows(t *testing.T) {
 		t.Errorf("event search row project = %q, want acme-api", project)
 	}
 }
+
+// TestEventsProjectMatchesTask checks the migration 0003 trigger through
+// InsertEvent. An event in its task's project is written. An event in another
+// project is refused with ErrProjectMismatch and not written. A row with no
+// task is not checked by the trigger: the NOT NULL on task_id refuses it, and
+// the refusal is not the trigger's message.
+func TestEventsProjectMatchesTask(t *testing.T) {
+	s := openTemp(t)
+	ctx := context.Background()
+	seedProjects(t, s, "acme-api", "other")
+	const id = "task-20261028-01"
+	insertTask(t, s, newTask(id, "acme-api", t0))
+
+	insert := func(project string) error {
+		return s.WithTx(ctx, func(q Querier) error {
+			_, err := InsertEvent(ctx, q, EventRow{TaskID: id, Project: project,
+				Agent: "main", Kind: "note", Text: "words", OccurredAt: t0})
+			return err
+		})
+	}
+	if err := insert("acme-api"); err != nil {
+		t.Fatalf("matching project: %v", err)
+	}
+	if err := insert("other"); !errors.Is(err, ErrProjectMismatch) {
+		t.Fatalf("mismatched project: err = %v, want ErrProjectMismatch", err)
+	}
+	var n int
+	if err := s.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE task_id = ?`, id).Scan(&n); err != nil {
+		t.Fatalf("count events: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("events on the task = %d, want 1 (the mismatched one must not be written)", n)
+	}
+
+	_, err := s.ExecContext(ctx, `INSERT INTO events
+		(task_id, project, agent, kind, text, occurred_at)
+		VALUES (NULL, 'acme-api', 'main', 'note', 'words', 'now')`)
+	if err == nil || !strings.Contains(err.Error(), "NOT NULL") {
+		t.Fatalf("event with no task: err = %v, want the NOT NULL refusal", err)
+	}
+	if strings.Contains(err.Error(), eventProjectRefusal) {
+		t.Errorf("event with no task was checked by the project trigger: %v", err)
+	}
+}

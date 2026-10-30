@@ -118,7 +118,9 @@ file, applied in its own transaction and recorded in `schema_migrations`. The
 driver opens with `_txlock=immediate`, so the version is read under the write
 lock. Enumerated columns carry CHECK constraints, and references are declared
 foreign keys. `tasks.project` is immutable: a trigger in migration 0002 refuses a
-change. The store reads outside transactions and writes inside `WithTx`.
+change. `events.project` must equal its task's project: a trigger in migration
+0003 refuses an event that names another project. The store reads outside
+transactions and writes inside `WithTx`.
 
 ### 3.1 Tasks
 
