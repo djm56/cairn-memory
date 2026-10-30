@@ -71,6 +71,33 @@ From what went well and badly in bishop-memory (PLAN.md §6):
   says how to fix it (`cairn init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.
 
+### Plan v1 rules
+
+Ten rules from Plan v1 (2026-10-30), added to the rules above.
+
+1. **Boring storage.** SQLite stays. A new store passes the conformance suite
+   before it is mentioned in docs. A migration never renames or removes its
+   source before import succeeds, and always has `--dry-run`.
+2. **No destructive advice in error text.** A refusal names only a safe fix. A
+   CI test fails on `--force`, `rm`, `reset` or `init` in any error string.
+3. **One source of truth.** Exports are exports; nothing reads an export back
+   except `import` on an explicit command.
+4. **Hooks remind, tools record.** Every task-loop step the skill asks for has a
+   hook that reminds the agent of it after compaction or at stop.
+5. **Directives are capped.** 12 per call, ranked, with `review_by`; the UI
+   shows the count and the oldest. A rule that keeps being broken becomes a
+   hook check, not a longer sentence.
+6. **The loop stays cheap.** No scheduled agents in v1; a human decides findings
+   daily and the "waiting on you" count stays under 15.
+7. **No silent identity.** Missing `project` or `server` is an error that names
+   `cairn init`.
+8. **Small tool surface.** 13 tools, descriptions under 200 characters, every
+   non-obvious affordance shown by example in the skill text.
+9. **Confirm plugin facts live.** Tool names and `CLAUDE_PROJECT_DIR` behaviour
+   are checked in a live session at M5 and on every Claude Code minor release.
+10. **Rules live in core.** No rule in a handler, hook or skill that the
+    conformance suite does not also check.
+
 ## Changes to the design
 
 DESIGN.md and PLAN.md are the contract for this repository. A change that
