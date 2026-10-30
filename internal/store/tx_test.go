@@ -147,6 +147,52 @@ func TestAllocateTaskIDSequence(t *testing.T) {
 	}
 }
 
+// TestAllocateTaskIDIgnoresOtherDays checks both edges of the day range in
+// AllocateTaskID. Ids of a later day must not raise an earlier day's counter, and
+// ids of an earlier day must not raise a later one's.
+func TestAllocateTaskIDIgnoresOtherDays(t *testing.T) {
+	s := openTemp(t)
+	seedProjects(t, s, "acme-api")
+	ctx := context.Background()
+	earlier := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+	seed := func(day time.Time, n int) {
+		t.Helper()
+		if err := s.WithTx(ctx, func(q Querier) error {
+			for i := 1; i <= n; i++ {
+				id := fmt.Sprintf("task-%s-%02d", day.Format("20060102"), i)
+				if err := InsertTask(ctx, q, newTask(id, "acme-api", day)); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			t.Fatalf("seed %s: %v", day.Format("2006-01-02"), err)
+		}
+	}
+	allocate := func(day time.Time) string {
+		t.Helper()
+		var id string
+		if err := s.WithTx(ctx, func(q Querier) error {
+			var err error
+			id, err = AllocateTaskID(ctx, q, day)
+			return err
+		}); err != nil {
+			t.Fatalf("AllocateTaskID %s: %v", day.Format("2006-01-02"), err)
+		}
+		return id
+	}
+
+	seed(later, 5)
+	if got := allocate(earlier); got != "task-20261028-01" {
+		t.Errorf("earlier day after later ids = %s, want task-20261028-01", got)
+	}
+	seed(earlier, 7) // more than the later day's 5, so a missing lower bound shows
+	if got := allocate(later); got != "task-20261029-06" {
+		t.Errorf("later day after earlier ids = %s, want task-20261029-06", got)
+	}
+}
+
 // TestAllocateTaskIDPastNinetyNine checks that the counter goes on past 99,
 // because the number is read as an integer and not compared as text.
 func TestAllocateTaskIDPastNinetyNine(t *testing.T) {
