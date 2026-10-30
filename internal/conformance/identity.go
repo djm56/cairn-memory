@@ -242,6 +242,21 @@ var identityCases = []Case{
 			wantKind(t, err, core.KindInvalid, "LearningAdd with the client name "+client)
 		}
 	}},
+	{"identity/session_name_refused", func(t T, s core.Service) {
+		// The session is optional, and the header carries it on the wire, so the
+		// same rule applies to it (step 10 review S4): a control character or an
+		// edge space is refused, on a read and a write, and the message names it.
+		for _, session := range []string{"sess\nion", " session"} {
+			ctx := core.WithCaller(context.Background(), core.Caller{Project: projA, Agent: "main", Session: session, Client: "conformance", Role: core.RoleAgent})
+			_, err := s.TaskCurrent(ctx)
+			wantKind(t, err, core.KindInvalid, "TaskCurrent with the session "+session)
+			if err != nil && !strings.Contains(err.Error(), "session") {
+				t.Errorf("TaskCurrent: error %q does not name the session", err)
+			}
+			_, err = s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"})
+			wantKind(t, err, core.KindInvalid, "LearningAdd with the session "+session)
+		}
+	}},
 	{"identity/agent_name_inner_space_accepted", func(t T, s core.Service) {
 		// Only the edges and the control characters are refused: a name may
 		// hold a space between its words, and it is kept as given.
