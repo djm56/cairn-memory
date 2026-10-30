@@ -193,9 +193,13 @@ func ListTasks(ctx context.Context, q Querier, project string, statuses []string
 // read the same counter, and one of their inserts fails on the primary key.
 func AllocateTaskID(ctx context.Context, q Querier, day time.Time) (string, error) {
 	prefix := "task-" + day.UTC().Format("20060102") + "-"
+	// The ids of one day are those from prefix up to, not including, the prefix
+	// with its last byte raised by one ('-' becomes '.'). A range on id lets
+	// SQLite search the primary-key index; substr(id, 1, 14) does not.
+	upper := prefix[:len(prefix)-1] + "."
 	var last int
 	err := q.QueryRowContext(ctx, `SELECT COALESCE(MAX(CAST(substr(id, 15) AS INTEGER)), 0)
-		FROM tasks WHERE substr(id, 1, 14) = ?`, prefix).Scan(&last)
+		FROM tasks WHERE id >= ? AND id < ?`, prefix, upper).Scan(&last)
 	if err != nil {
 		return "", fmt.Errorf("store: allocate task id: %w", err)
 	}

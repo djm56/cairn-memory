@@ -112,3 +112,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   retirement, learning writes on done and failed tasks, and reviews of active
   and done steps. The phase markers and status lines move to phase 3
   ([PR #59](https://github.com/djm56/cairn-memory/pull/59)).
+- Phase 2 store, follow-up to issue #46 (S1): `AllocateTaskID` finds the day's
+  task ids with a range on `id` instead of `substr(id, 1, 14)`, so the query can
+  search the primary-key index. The `CAST` maximum is unchanged.
