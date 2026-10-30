@@ -207,3 +207,6 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 core tests, follow-up to issue #52 (item 1, review of step 8):
   `TestRecordedRefusal` pins the step_plan refusal for one, two and three
   recorded steps: the singular wording, and the ", " and " and " join.
+- Phase 2 docs, follow-up to issue #52 (item 6 of the review of step 8):
+  CONTRACT §9 item 15 is reflowed, and item 35's `(not tested)` marker sits on
+  its own line, as items 18 and 24 place theirs.

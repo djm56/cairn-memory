@@ -400,8 +400,8 @@ only a core test checks it. An item with no check of its own is marked
 15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
     pending step with an event or a review is not removed. The call is
     `refused` and changes nothing. The refusal names each such step, in
-    display order, and the way out is to skip each of them and plan again (§3). *Bishop
-    default, pending operator approval.*
+    display order, and the way out is to skip each of them and plan again
+    (§3). *Bishop default, pending operator approval.*
 16. **`search` hides retired directives (2026-10-29).** A retired
     directive is not a `search` hit, as it is not listed by `directive_list`,
     `recall` or `task_current` (§6). *Bishop default, pending operator
@@ -489,7 +489,8 @@ only a core test checks it. An item with no check of its own is marked
     the project's directives) run in one read transaction. The answer is one
     consistent state of the project: a write that lands during the call is seen
     by all of it or by none (§2). *Bishop default, pending operator approval.*
-    (not tested). The store test `TestWithReadTxIsSnapshot` pins the snapshot
+    (not tested)
+    The store test `TestWithReadTxIsSnapshot` pins the snapshot
     that a read transaction gives, but no test checks that `task_current` reads
     through one, so no check of this item exists.
 36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
