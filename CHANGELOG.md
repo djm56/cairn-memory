@@ -174,3 +174,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   first. CONTRACT §3 and §9 item 15 say so, and conformance case
   `step/plan_refusal_names_each_recorded_step` pins two. The conformance suite
   has 70 cases.
+- Phase 2 tests, follow-up to issue #52 (item 2), which closes issue #48:
+  conformance case `search/hides_retired_directives` ratifies a second, active
+  directive with the same word, retires the first, and asserts that search
+  returns exactly the active one.

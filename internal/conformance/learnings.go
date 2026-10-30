@@ -280,12 +280,15 @@ var searchCases = []Case{
 	}},
 	{"search/hides_retired_directives", func(t T, s core.Service) {
 		// CONTRACT §6: a retired directive is not a hit, as it is
-		// not listed anywhere else.
-		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Limit requests", Rule: "Rate limit every endpoint."}))(t)
-		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
+		// not listed anywhere else. A second, active directive holds the same word,
+		// so the search must find that one and only that one. A search that found
+		// nothing at all would not pass.
+		retired := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Limit requests", Rule: "Rate limit every endpoint."}))(t)
+		active := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Limit logins", Rule: "Lock an account after five failed logins."}))(t)
+		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: retired.Code}))(t)
 		res := must(s.Search(mainCtx(), core.SearchRequest{Query: "limit", Kinds: []core.HitKind{core.HitDirective}}))(t)
-		if len(res.Hits) != 0 {
-			t.Errorf("search of a retired directive found %d hits, want none", len(res.Hits))
+		if len(res.Hits) != 1 || res.Hits[0].ID != active.Code {
+			t.Errorf("search of limit after a retire = %+v, want exactly the active directive %s", res.Hits, active.Code)
 		}
 	}},
 	{"search/finds_lessons_and_mistakes", func(t T, s core.Service) {
