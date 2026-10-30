@@ -75,7 +75,8 @@ Scope of v1, §3).
 ## 3. Phases
 
 Phases 0–2 are done and stay here as history. Plan v1 replaces phases 3–7 with
-milestones M1–M6, adds M7 and M8, and moves phases 8–10 to Later. Each
+milestones M1, M2, M3, M5 and M6, adds M4, M7 and M8, and moves phases 8–10 to
+Later. Each
 milestone has work and an exit check a reviewer can run. The milestone table
 is under Milestones, below Phase 2.
 
@@ -133,8 +134,9 @@ processes writing the same database at once allocate distinct task ids
 
 ### Milestones
 
-Plan v1 (2026-10-30). Milestones M1–M6 carry the work of phases 3–7 forward;
-M7 and M8 are new; phases 8–10 and Postgres sit in Later. Each exit check is
+Plan v1 (2026-10-30). Milestones M1, M2, M3, M5 and M6 carry the work of
+phases 3–7 forward; M4, M7 and M8 are new; phases 8–10 and Postgres sit in
+Later. Each exit check is
 the only thing that moves the status line (§9).
 
 | Milestone | Was | Work | Exit check |
