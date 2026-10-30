@@ -3,11 +3,13 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestEveryConnectionHasOptions checks the connection settings on several
@@ -152,15 +154,19 @@ func TestApplyOneCases(t *testing.T) {
 // TestMemoryDatabaseIsShared checks the ":memory:" path. The pool holds one
 // connection, so a write made by one call is read by a later call. Without the
 // one-connection limit the read could land on a second, empty database.
+//
+// The wait check holds one row set open, so the pool has no free connection. A
+// second query must then wait for that connection and time out. Without the
+// one-connection limit it would open a second, empty database and fail at once
+// with "no such table", so the timeout is what separates the two. The check is
+// by timeout rather than by row contents, so it is deterministic: no timing
+// race decides the result, only whether the pool blocks.
 func TestMemoryDatabaseIsShared(t *testing.T) {
 	s, err := Open(":memory:")
 	if err != nil {
 		t.Fatalf("Open(:memory:): %v", err)
 	}
 	defer s.Close()
-	if got := s.db.Stats().MaxOpenConnections; got != 1 {
-		t.Fatalf("MaxOpenConnections = %d, want 1", got)
-	}
 	ctx := context.Background()
 	if _, err := s.ExecContext(ctx, `INSERT INTO projects (name, created_at, last_seen_at)
 		VALUES ('acme-api', 'now', 'now')`); err != nil {
@@ -172,5 +178,22 @@ func TestMemoryDatabaseIsShared(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("projects = %d on a later call, want 1: the write was not seen", n)
+	}
+
+	rows, err := s.QueryContext(ctx, `SELECT name FROM projects`)
+	if err != nil {
+		t.Fatalf("open rows: %v", err)
+	}
+	short, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	_, err = s.QueryContext(short, `SELECT COUNT(*) FROM projects`)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("query while rows are open: err = %v, want a wait that times out", err)
+	}
+	if err := rows.Close(); err != nil {
+		t.Fatalf("close rows: %v", err)
+	}
+	if got := s.db.Stats().MaxOpenConnections; got != 1 {
+		t.Errorf("MaxOpenConnections = %d, want 1", got)
 	}
 }
