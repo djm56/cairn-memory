@@ -91,7 +91,7 @@ func (l *Local) LearningDecide(ctx context.Context, req LearningDecideRequest) (
 				return err
 			}
 			if cycle {
-				return Refused("learning %d cannot be superseded by %d: %d is superseded by %d, directly or through a chain, so the links would form a cycle",
+				return Refused("learning %d cannot be superseded by %d: %d is superseded by %d, directly or through a chain, so the links would make a cycle",
 					req.ID, *req.SupersededBy, *req.SupersededBy, req.ID)
 			}
 		}
