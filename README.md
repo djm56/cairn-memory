@@ -39,16 +39,18 @@ in Cairn leaves the same kind of marker.
 ## Design in brief
 
 - **Works with any agent harness.** Plain Claude Code first, through MCP; OpenCode,
-  pi, Bishop and others through the CLI over the same HTTP API (D14). Nothing in the core assumes a
+  pi, Bishop and others through the CLI (planned for M4) over the same HTTP API (D14). Nothing in the core assumes a
   framework, a crew or a file layout.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
-- **One binary, `cairn`.** It is the MCP server, the HTTP server and web UI,
-  the hook helper and the admin tool. Go and SQLite with full-text search;
-  no C toolchain.
+- **One binary, `cairn`.** It is the MCP server (`cairn mcp`, planned for M1),
+  the HTTP server and web UI (`cairn serve`, planned for M2), the hook helper
+  and the admin tool. The CLI is planned for M4. Go and SQLite with full-text
+  search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn mcp` and the CLI need `server` in `.cairn.toml` or `CAIRN_SERVER`.
+  D11). `cairn serve` is planned for M2. `cairn mcp` (planned for M1) and the
+  CLI (planned for M4) need `server` in `.cairn.toml` or `CAIRN_SERVER`.
 - **The operator decides.** Agents can only propose. Accepting a finding or
   ratifying a directive is an operator action.
 
