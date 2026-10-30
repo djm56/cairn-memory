@@ -164,10 +164,11 @@ const (
 )
 
 // AgentLoggable reports whether an agent may log this kind with event_log.
-// started, finished, review and close are written by the calls they record.
+// started, finished and close are written by the calls they record. A review
+// is logged by an agent with its verdict and counts in data (CONTRACT §4).
 func (k EventKind) AgentLoggable() bool {
 	switch k {
-	case EventNote, EventBlocked, EventUnblocked, EventHandoff, EventDecision, EventCustom:
+	case EventNote, EventBlocked, EventUnblocked, EventHandoff, EventDecision, EventReview, EventCustom:
 		return true
 	}
 	return false

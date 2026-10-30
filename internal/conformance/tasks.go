@@ -468,17 +468,17 @@ var stepCases = []Case{
 		if titles := stepTitles(t, got.Steps); !slices.Equal(titles, []string{"two", "new"}) {
 			t.Errorf("steps after skip and replan = %v, want [two new]", titles)
 		}
-		// An event on a pending step counts as a record too: it is refused the same way.
+		// A review counts as a record too: a pending step with only a review is refused.
 		// Queued, so it does not clash with the active task above.
 		other := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true, Steps: []core.StepInput{{Title: "alpha"}, {Title: "beta"}}}))(t)
 		alpha := core.NumberRef(1)
-		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: other.ID, Step: &alpha, Kind: core.EventNote, Text: "about alpha"}))(t)
+		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: other.ID, Step: &alpha, Kind: core.EventReview, Text: "Alpha read.", Data: reviewData("approved", 0, 0)}))(t)
 		_, err = s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}})
-		wantKind(t, err, core.KindRefused, "step_plan over a pending step with an event")
+		wantKind(t, err, core.KindRefused, "step_plan over a pending step with a review")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: other.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)
 		replanned := must(s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}}))(t)
 		if titles := stepTitles(t, replanned.Steps); !slices.Equal(titles, []string{"alpha", "new"}) {
-			t.Errorf("task with an event after skip and replan = %v, want [alpha new]", titles)
+			t.Errorf("reviewed task after skip and replan = %v, want [alpha new]", titles)
 		}
 	}},
 	{"step/plan_refusal_names_each_recorded_step", func(t T, s core.Service) {

@@ -21,9 +21,42 @@ func checkData(data json.RawMessage) error {
 	return nil
 }
 
+// reviewData is the data of a review event (CONTRACT §4). The counts are
+// pointers, so that a missing count is told from a zero one.
+type reviewData struct {
+	Verdict  *Verdict `json:"verdict"`
+	Critical *int     `json:"critical"`
+	Warnings *int     `json:"warnings"`
+}
+
+// checkReviewData checks the data of a review event: an object with a verdict
+// of approved or not-approved and two counts of 0 or more. Each of the three is
+// required. A malformed value is invalid as well, and each message names the
+// fix, so the agent can log the review again without guessing.
+func checkReviewData(data json.RawMessage) error {
+	const shape = `a review needs data {"verdict": "approved" or "not-approved", "critical": 0, "warnings": 0}`
+	var d reviewData
+	if len(data) == 0 || json.Unmarshal(data, &d) != nil {
+		return Invalid("%s: fix the data and log the review again", shape)
+	}
+	if d.Verdict == nil || d.Critical == nil || d.Warnings == nil {
+		return Invalid("%s: fix the missing field and log the review again", shape)
+	}
+	switch *d.Verdict {
+	case VerdictApproved, VerdictNotApproved:
+	default:
+		return Invalid("review verdict %q is not approved or not-approved: fix the verdict and log the review again", *d.Verdict)
+	}
+	if *d.Critical < 0 || *d.Warnings < 0 {
+		return Invalid("review critical and warnings must be 0 or more: fix the counts and log the review again")
+	}
+	return nil
+}
+
 // EventLog appends one entry to a task's journal. An agent may log note,
-// blocked, unblocked, handoff, decision and custom. The kinds the calls record
-// themselves are invalid here (CONTRACT §4). The entry takes the server's time
+// blocked, unblocked, handoff, decision, review and custom. A review needs data
+// with its verdict and counts. The kinds the calls record themselves are invalid
+// here (CONTRACT §4). The entry takes the server's time
 // and the caller's agent, and a step ref, when given, must name a step of the
 // task. A terminal task refuses it (CONTRACT §1.5).
 func (l *Local) EventLog(ctx context.Context, req EventLogRequest) (*Event, error) {
@@ -35,12 +68,18 @@ func (l *Local) EventLog(ctx context.Context, req EventLogRequest) (*Event, erro
 		return nil, Invalid("a task id is required")
 	}
 	if !req.Kind.AgentLoggable() {
-		return nil, Invalid("kind %q cannot be logged by an agent: use note, blocked, unblocked, handoff, decision or custom", req.Kind)
+		return nil, Invalid("kind %q cannot be logged by an agent: use note, blocked, unblocked, handoff, decision, review or custom", req.Kind)
 	}
 	if blank(req.Text) {
 		return nil, Invalid("an event needs text")
 	}
-	if err := checkData(req.Data); err != nil {
+	// A review checks its own data, which names the fix for every fault. Other
+	// kinds only need an object when they have data.
+	if req.Kind == EventReview {
+		if err := checkReviewData(req.Data); err != nil {
+			return nil, err
+		}
+	} else if err := checkData(req.Data); err != nil {
 		return nil, err
 	}
 	if req.Step != nil {

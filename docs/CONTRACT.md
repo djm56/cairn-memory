@@ -5,7 +5,7 @@ phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
-`core.Local` passes all 67 cases in `internal/conformance` (count as of
+`core.Local` passes all 72 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
@@ -14,7 +14,8 @@ described here.
 > tools `recall` and `search` (15 names; see [DESIGN.md](DESIGN.md) §4). M1
 > removed `note_put`, `note_get`, `review_record` and `event_list` from this
 > contract, `internal/core` and `internal/conformance`, in one change: `event_list`
-> folds into `task_get` with `section=events`. CLI equivalents per tool come
+> folds into `task_get` with `section=events`, and a review is recorded as a
+> `review` event through `event_log` (§4, §9 item 39). CLI equivalents per tool come
 > with `internal/cli` in M4. In M2, the directive cap (12 per call, ranked,
 > decision D16) and `review_by` arrive, and are then documented on `task_current`
 > and `recall`.
@@ -268,10 +269,16 @@ the task is not `active`.
 
 **In:** `task_id`; `step` (a ref, optional); `kind`; `text` (required);
 `data` (a JSON object, optional).
-An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision` and
-`custom`. `started`, `finished`, `review` and `close` are written by the
+An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision`,
+`review` and `custom`. `started`, `finished` and `close` are written by the
 calls they record, and are `invalid` here. `unblocked` is also written by
 `task_update` (§1.5), and an agent may log it too.
+
+A `review` needs `data`, a JSON object of the form
+`{"verdict": "approved" | "not-approved", "critical": n, "warnings": n}`,
+where each count is 0 or more (§9 item 39). A missing field, a malformed
+value, a verdict outside those two, or a negative count is `invalid`, and the
+message names the fix. The step is optional, and may be in any status.
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
 
@@ -367,7 +374,7 @@ only a core test checks it. An item with no check of its own is marked
    starts". This is the precise form.
 6. **Agents cannot log `started`, `finished`, `review` or `close` events.**
    The calls they record write them, so the journal cannot claim work that
-   the step table does not show.
+   the step table does not show. Item 39 excepts `review` (see there).
 7. **Step refs are an object.** `{"number": n}` or `{"id": n}`, never a
    bare integer, which could mean either.
 8. **`fail` and `skip` need a summary.** A failed attempt with no reason
@@ -500,3 +507,12 @@ only a core test checks it. An item with no check of its own is marked
     the project's `last_seen_at` on, and a read leaves it where the last write
     put it. A read creates the project only when the project does not yet exist
     (§1.1). *Bishop default, pending operator approval.* (core test only)
+39. **A review is an `event_log` entry (2026-10-30).** An agent records a review
+    with `event_log` of kind `review`, and the event's `data` holds the verdict
+    and counts: `{"verdict": "approved" | "not-approved", "critical": n,
+    "warnings": n}`, each count 0 or more (§4). A missing or malformed field, a
+    verdict outside the two values, or a negative count is `invalid`, and the
+    message names the fix. The step is optional and may be in any status
+    (item 33). The reviewer is the calling agent. This amends item 6 for
+    `review` only: `review_record` is cut from v1 (§4), so the review event is
+    the only record of a review. *Bishop default, pending operator veto.*

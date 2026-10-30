@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,7 +86,7 @@ func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	three := core.NumberRef(3)
-	if _, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventNote, Text: "about three"}); err != nil {
+	if _, err := s.EventLog(agent("acme-api", "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventReview, Text: "about three", Data: json.RawMessage(`{"verdict":"approved","critical":0,"warnings":0}`)}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = s.StepPlan(ctx, core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})
