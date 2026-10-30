@@ -23,7 +23,7 @@ described here.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
-an MCP client sees. The MCP adapter (phase 3) maps each tool's arguments to
+an MCP client sees. The MCP adapter (M1) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
 §9 lists what this contract settles that DESIGN.md left open. Items 1–11 are
@@ -346,7 +346,7 @@ either.
 
 ## 8. Operator calls
 
-These are not MCP tools, and never will be. The web UI (phase 6) and the
+These are not MCP tools, and never will be. The web UI (M3) and the
 CLI reach them. Each one refuses a caller without the operator role
 (`operator_only`) before any other check. Operators act across projects, so
 these calls do not need the caller's project. Every call needs the operator's
@@ -398,7 +398,7 @@ only a core test checks it. An item with no check of its own is marked
 11. **Agent-scoped directives apply in every project.** DESIGN §3.4 has no
     project on an agent-scoped directive.
 12. **Deferred:** the "step-review rule" in project settings is not defined
-    here. The operator deferred it to phase 8 (#41), and DESIGN §3.6 no
+    here. The operator deferred it to phase 8 (#41); Plan v1 moves it to Later, and DESIGN §3.6 no
     longer lists it.
 13. **`task_update` never opens a task (2026-10-29).** No
     `task_update` moves a task into `open`. Only `task_start` with `queue`
