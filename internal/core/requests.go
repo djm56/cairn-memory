@@ -107,6 +107,22 @@ type TaskDetail struct {
 	Deliverables    []TaskFile  `json:"deliverables,omitempty"` // close
 }
 
+// MarshalJSON writes a TaskDetail with the tags above, except for events. The
+// events key is written whenever the call read the events section, even as [],
+// because omitempty would drop an empty list. The other sections keep omitempty,
+// so a brief has no events key. A nil Events is not read, and is left out.
+func (d TaskDetail) MarshalJSON() ([]byte, error) {
+	type plain TaskDetail // the same fields, without this method
+	var events *[]Event
+	if d.Events != nil {
+		events = &d.Events
+	}
+	return json.Marshal(struct {
+		plain
+		Events *[]Event `json:"events,omitempty"`
+	}{plain: plain(d), Events: events})
+}
+
 // ---- task_list ----
 
 type TaskListRequest struct {

@@ -1,8 +1,11 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 
 	"github.com/djm56/cairn-memory/internal/store"
 )
@@ -29,18 +32,43 @@ type reviewData struct {
 	Warnings *int     `json:"warnings"`
 }
 
-// checkReviewData checks the data of a review event: an object with a verdict
-// of approved or not-approved and two counts of 0 or more. Each of the three is
-// required. A malformed value is invalid as well, and each message names the
-// fix, so the agent can log the review again without guessing.
+// reviewKeys are the only keys of review data, spelled exactly (CONTRACT §4).
+var reviewKeys = []string{"critical", "verdict", "warnings"}
+
+// checkReviewData checks the data of a review event: a JSON object with exactly
+// the keys verdict, critical and warnings, spelled as they are here. The verdict
+// is approved or not-approved, and each count is 0 or more. A wrong key case, an
+// extra key, a repeated key and null are invalid. So is a malformed value, such
+// as a count as text or a fraction. Each message names the fix, so the agent can
+// log the review again without guessing.
 func checkReviewData(data json.RawMessage) error {
 	const shape = `a review needs data {"verdict": "approved" or "not-approved", "critical": 0, "warnings": 0}`
-	var d reviewData
-	if len(data) == 0 || json.Unmarshal(data, &d) != nil {
+	if len(data) == 0 {
 		return Invalid("%s: fix the data and log the review again", shape)
 	}
-	if d.Verdict == nil || d.Critical == nil || d.Warnings == nil {
-		return Invalid("%s: fix the missing field and log the review again", shape)
+	// encoding/json matches struct fields without regard to case, so the keys
+	// are checked as a map first. Its decode keeps the last of a repeated key,
+	// so repeats are checked separately.
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(data, &obj); err != nil || obj == nil {
+		return Invalid("%s: fix the data and log the review again", shape)
+	}
+	if key, ok := repeatedKey(data); ok {
+		return Invalid("review data repeats the key %q: give each key once and log the review again", key)
+	}
+	for _, key := range slices.Sorted(maps.Keys(obj)) {
+		if !slices.Contains(reviewKeys, key) {
+			return Invalid("review data has the key %q, which is not verdict, critical or warnings: remove it and log the review again", key)
+		}
+	}
+	for _, key := range reviewKeys {
+		if v, ok := obj[key]; !ok || string(v) == "null" {
+			return Invalid("%s: fix the missing field %q and log the review again", shape, key)
+		}
+	}
+	var d reviewData
+	if err := json.Unmarshal(data, &d); err != nil {
+		return Invalid("%s: fix the malformed value and log the review again", shape)
 	}
 	switch *d.Verdict {
 	case VerdictApproved, VerdictNotApproved:
@@ -51,6 +79,34 @@ func checkReviewData(data json.RawMessage) error {
 		return Invalid("review critical and warnings must be 0 or more: fix the counts and log the review again")
 	}
 	return nil
+}
+
+// repeatedKey returns the first key that data, a JSON object, gives more than
+// once at its top level, and true. It returns "", false when no key repeats, or
+// when data is not an object. It reads tokens, because encoding/json does not
+// report a repeated key.
+func repeatedKey(data json.RawMessage) (string, bool) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return "", false
+	}
+	seen := map[string]bool{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return "", false
+		}
+		key, _ := tok.(string)
+		if seen[key] {
+			return key, true
+		}
+		seen[key] = true
+		var skip json.RawMessage
+		if err := dec.Decode(&skip); err != nil {
+			return "", false
+		}
+	}
+	return "", false
 }
 
 // EventLog appends one entry to a task's journal. An agent may log note,

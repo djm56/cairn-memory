@@ -76,6 +76,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   cases pass, so issue #9 is complete once its pull request chain lands on
   `main` ([PR #56](https://github.com/djm56/cairn-memory/pull/56)).
 
+### Added
+
+- M1 HTTP wire form (issues #14, #17): `internal/api` serves `core.Service` as thin handlers, one POST per call, with each error answered at a status for its kind and a body of kind, message and missing list. `internal/client` is a `Service` over that form. The whole conformance suite runs through the client over an in-process loopback server, and all 80 cases pass. The form is in DESIGN §5.4. The shipped binary has no listener (D19).
+
 ### Changed
 
 - M1 surface (issues #67, #68, #62, #70): the agent surface is 13 tools plus
@@ -84,10 +88,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   removed from `core.Service`. A review is an `event_log` entry of kind
   `review`, whose data holds the verdict and counts; a missing or malformed
   field is `invalid`, and the message names the fix. CONTRACT §9 item 39 (Bishop
-  default, pending operator veto) rules that an agent may log a review. The store
+  default, pending operator approval) rules that an agent may log a review. The store
   is unchanged. The task_current snapshot is tested (CONTRACT §9 item 35), and
-  an error-text audit fails on any error string that advises `--force`, `rm` or
-  `reset`. The conformance suite has 72 cases.
+  an error-text audit fails on any error literal that advises `--force`, `rm` or
+  `reset`. The conformance suite has 80 cases.
 - Plan v1: central server only, 13 tools plus recall and search, viewer scope, hooks and CLI, dashboard; milestones M1–M8 and Later replace phases 3–10 ([PR #65](https://github.com/djm56/cairn-memory/pull/65)).
 - Decision D19 (issue #71): M1 builds no network listener in the shipped binary. `internal/api` lands in M1 as handlers only, and `internal/client` is tested against an in-process server. M1's exit check is an MCP stdio test over that server. The live run against `cairn serve` moves to M2's exit check (#19) ([PR #101](https://github.com/djm56/cairn-memory/pull/101)).
 - Phase 1 closed: the operator approved `CONTRACT.md` §9 items 1 to 11 on

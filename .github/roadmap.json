@@ -271,7 +271,7 @@
       "title": "Decide whether M1 moves internal/client and a serve skeleton in, or tests against an in-process test server",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:decision", "m1", "area:mcp"],
-      "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Answer (2026-10-30, option B: test against an in-process test server, D19).** M1 tests against an in-process `httptest` server. M1 adds no listener and no `cairn serve`. The live run against `cairn serve` on another machine is M2's exit check (#19).\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
+      "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Answer (2026-10-30, option B: test against an in-process test server, D19).** M1 tests against an in-process `httptest` server. M1 adds no network listener to the shipped binary and no `cairn serve`; its tests bind an `httptest` server to loopback (D19). The live run against `cairn serve` on another machine is M2's exit check (#19).\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
     },
     {
       "key": "m1-export-project-decision",

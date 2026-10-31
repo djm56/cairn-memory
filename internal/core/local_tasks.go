@@ -369,6 +369,9 @@ func (l *Local) TaskGet(ctx context.Context, req TaskGetRequest) (*TaskDetail, e
 		if err != nil {
 			return nil, err
 		}
+		// Non-nil even when the page is empty, so the events section is
+		// written as [] and not left out (CONTRACT §2, TaskDetail.MarshalJSON).
+		d.Events = make([]Event, 0, len(events))
 		for _, e := range events {
 			d.Events = append(d.Events, eventFromRow(e))
 		}

@@ -312,7 +312,7 @@ Plan v1 (decisions D11 and D14) sets the agent surface for M1: 13 tools plus
 the read tools `recall` and `search` (15 names). The table below lists all 15.
 Until M1, the contract and `internal/core` still carried `event_list`,
 `review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
-removed them, and `event_list` folded into `task_get` (`section: events`). Each
+removes them, and `event_list` folds into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
 is how every harness other than Claude Code reaches Cairn.
 
@@ -391,8 +391,8 @@ against an in-process server (D19).
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Planned, M1: handlers only, with no listener (D19). The `cairn serve` listener that mounts them is M2. |
-| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Planned, M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The shipped binary has no network listener (D19). The `cairn serve` listener that mounts them is M2. |
+| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
 | `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
 | `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
@@ -427,8 +427,9 @@ any other backend. A behaviour exists when the conformance suite says so.
 Clients open no database. `cairn mcp` and the CLI send each call to
 `cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
 without a `server` (M1). The store stays inside `cairn serve`, and the web UI
-is served by the same process. Until M2 there is no listener to send to, so
-M1's flow runs against an in-process server (D19).
+is served by the same process. Until M2 the shipped binary has no network
+listener, so M1's flow runs against an in-process server bound to loopback
+(D19).
 
 D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend
@@ -436,6 +437,61 @@ and no switch in `.cairn.toml`.
 
 A project's data does not move automatically. `cairn serve` can be pointed at
 an existing SQLite file to make it the server's own database.
+
+### 5.4 The HTTP wire form
+
+`internal/api` serves the `Service` over HTTP, and `internal/client` is a
+`Service` that calls it. Defined in M1 (2026-10-30). M2 serves this form on
+`cairn serve`, and from then on it is public API. It is written here rather
+than in CONTRACT.md because CONTRACT says what each call does for an MCP
+client and the CLI. This section is how the adapter reaches the server.
+
+- **Routes.** Every call is a `POST`. Agent calls go to `/v1/agent/<call>`,
+  for the 15 calls of §4. Operator calls (CONTRACT §8) go to
+  `/v1/operator/<call>`. The names are the snake_case tool names: `task_current`,
+  `task_start` … `search`, and `learning_decide`, `directive_ratify`,
+  `directive_retire`, `project_settings_set`. A path that is no call is `404`.
+  A method other than `POST` is `405`, with `Allow: POST`.
+- **Request.** A JSON object with the call's fields, as the request types in
+  `internal/core` name them. `task_current` takes none: an empty body or `{}`.
+  An unknown field, a value of the wrong type, a second JSON value, and a body
+  over 1 MiB are refused: `400`, or `413` for the size. The server refuses
+  unknown fields, so a misspelt field is not dropped.
+- **Caller.** The headers `X-Cairn-Project`, `X-Cairn-Agent`,
+  `X-Cairn-Session`, `X-Cairn-Client` and `X-Cairn-Role` carry the caller
+  (CONTRACT §1.1). A call with no project is `invalid`. `X-Cairn-Role` is
+  `operator` for an operator call and is an agent otherwise. M1's
+  `api.HeaderCaller` trusts that header. That is safe only while nothing
+  listens. M2 replaces it with a resolver that takes the role from the API
+  key's scope, so a client never sets its own role.
+- **Success.** `200`, with the result as JSON, in the field names of the core
+  types. Empty optional fields are left out (CONTRACT §1.3). A read of section
+  `events` always carries `events`, as `[]` when the page is empty (CONTRACT §2).
+- **Errors.** The status follows the kind, and the body is
+  `{"error": {"kind": ..., "message": ..., "missing": [...]}}`, the same
+  `core.Error` the call returned.
+
+  | Kind | Status |
+  |---|---|
+  | `invalid` (including a malformed request, a bad path or a bad method) | 400, or 404 for a bad path, 405 for a bad method, 413 for a body over the cap |
+  | `operator_only` | 403 |
+  | `not_found` | 404 |
+  | `refused` | 409 |
+  | `internal` | 500 |
+
+  `internal` is a wire kind, not a core kind. It is the answer to any error
+  that is not a `core.Error`, and its message is always `internal error`, so
+  the cause stays on the server.
+- **The client.** It returns the `core.Error` the server named, with the same
+  kind, message and missing list. Any other failure is a plain error that names
+  the route and the status, and it is not a `core.Error`. The client ignores
+  unknown response fields, so the server can add a field without a new prefix.
+- **Versions.** A breaking change takes a new prefix (`/v2`).
+
+Tests: `internal/client` runs the whole conformance suite over an `httptest`
+server on loopback that wraps the handlers over a real `core` (D19).
+`internal/api` tests the statuses, the error body, malformed requests, the
+headers and the events key.
 
 ## 6. Clients
 

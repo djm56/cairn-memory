@@ -117,6 +117,249 @@ var eventCases = []Case{
 			}
 		}
 	}},
+	{"event/pending_step_takes_review_and_event", func(t T, s core.Service) {
+		// CONTRACT §9 items 33 and 39: event_log accepts a review of a step in any
+		// status, and the step here is still pending.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventNote, Text: "Before the work starts."}))(t)
+		rv := must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventReview, Text: "Plan read.", Data: reviewData("approved", 0, 0)}))(t)
+		if rv.StepID == nil || *rv.StepID != res.Steps[0].ID {
+			t.Errorf("review of a pending step names step %v, want %d", rv.StepID, res.Steps[0].ID)
+		}
+	}},
+	{"event/review_data_is_recorded", func(t T, s core.Service) {
+		// CONTRACT §4, §9 item 39: a review event keeps its verdict and counts in
+		// data, names its agent as the reviewer, and is read back through task_get.
+		res := startTask(t, s, mainCtx(), "t", "build")
+		step := core.NumberRef(1)
+		rv := must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventReview, Text: "Missing test.", Data: reviewData("not-approved", 1, 2)}))(t)
+		if rv.Kind != core.EventReview || rv.Agent != "reviewer" || rv.StepID == nil || *rv.StepID != res.Steps[0].ID {
+			t.Errorf("review event = %+v", rv)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(rv.Data, &got); err != nil || got["verdict"] != "not-approved" || got["critical"] != float64(1) || got["warnings"] != float64(2) {
+			t.Errorf("review data = %s (%v)", rv.Data, err)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
+		found := false
+		for _, e := range d.Events {
+			found = found || (e.Kind == core.EventReview && e.ID == rv.ID)
+		}
+		if !found {
+			t.Errorf("review %d is not in the journal: %+v", rv.ID, d.Events)
+		}
+	}},
+	{"event/review_data_missing_field_refused", func(t T, s core.Service) {
+		// CONTRACT §4: a review needs data with a verdict and two counts. A missing
+		// or malformed field is invalid, the message names the fix, and no row is
+		// written.
+		res := startTask(t, s, mainCtx(), "t")
+		for _, c := range []struct{ what, data string }{
+			{"no data", ""},
+			{"no verdict", `{"critical": 0, "warnings": 0}`},
+			{"no critical", `{"verdict": "approved", "warnings": 0}`},
+			{"no warnings", `{"verdict": "approved", "critical": 0}`},
+			{"a count as text", `{"verdict": "approved", "critical": "0", "warnings": 0}`},
+			{"a count as a fraction", `{"verdict": "approved", "critical": 0.5, "warnings": 0}`},
+			{"data as an array", `[1, 2, 3]`},
+		} {
+			var data json.RawMessage
+			if c.data != "" {
+				data = json.RawMessage(c.data)
+			}
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: data})
+			wantKind(t, err, core.KindInvalid, "review with "+c.what)
+			if err != nil && !strings.Contains(err.Error(), `"not-approved"`) {
+				t.Errorf("review with %s: the message %q does not name the fix", c.what, err)
+			}
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_data_key_case_refused", func(t T, s core.Service) {
+		// CONTRACT §4: the keys are spelled exactly as verdict, critical and
+		// warnings. A key in another case is not read as one of them, so it is
+		// invalid, and the message names the key.
+		res := startTask(t, s, mainCtx(), "t")
+		for _, data := range []string{
+			`{"Verdict": "approved", "critical": 0, "warnings": 0}`,
+			`{"verdict": "approved", "CRITICAL": 0, "warnings": 0}`,
+			`{"verdict": "approved", "critical": 0, "Warnings": 0}`,
+		} {
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(data)})
+			wantKind(t, err, core.KindInvalid, "review data "+data)
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_data_extra_key_refused", func(t T, s core.Service) {
+		// CONTRACT §4: review data holds exactly the three keys. An extra key is
+		// invalid and names itself, so a summary put in data is not dropped silently.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x",
+			Data: json.RawMessage(`{"verdict": "approved", "critical": 0, "warnings": 0, "summary": "ok"}`)})
+		wantKind(t, err, core.KindInvalid, "review data with an extra key")
+		if err != nil && !strings.Contains(err.Error(), `"summary"`) {
+			t.Errorf("the message %q does not name the extra key", err)
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_data_null_refused", func(t T, s core.Service) {
+		// CONTRACT §4: null is no value. Null data, and a null in any of the three
+		// fields, is invalid, as a missing field is.
+		res := startTask(t, s, mainCtx(), "t")
+		for _, data := range []string{
+			`null`,
+			`{"verdict": null, "critical": 0, "warnings": 0}`,
+			`{"verdict": "approved", "critical": null, "warnings": 0}`,
+			`{"verdict": "approved", "critical": 0, "warnings": null}`,
+		} {
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(data)})
+			wantKind(t, err, core.KindInvalid, "review data "+data)
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_data_repeated_key_refused", func(t T, s core.Service) {
+		// CONTRACT §4: a key given twice is invalid. encoding/json keeps the last
+		// of two, so the repeat is checked on its own.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x",
+			Data: json.RawMessage(`{"verdict": "not-approved", "verdict": "approved", "critical": 1, "warnings": 0}`)})
+		wantKind(t, err, core.KindInvalid, "review data with a repeated verdict")
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_wrong_verdict_refused", func(t T, s core.Service) {
+		// CONTRACT §4: the verdict is approved or not-approved, exactly.
+		res := startTask(t, s, mainCtx(), "t")
+		for _, v := range []string{"meh", "Approved", "", "passed"} {
+			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData(v, 0, 0)})
+			wantKind(t, err, core.KindInvalid, "review verdict "+v)
+		}
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_negative_count_refused", func(t T, s core.Service) {
+		// CONTRACT §4: each count is 0 or more. A negative critical or warnings
+		// count is invalid, and writes nothing.
+		res := startTask(t, s, mainCtx(), "t")
+		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData("approved", -1, 0)})
+		wantKind(t, err, core.KindInvalid, "negative critical")
+		_, err = s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData("approved", 0, -1)})
+		wantKind(t, err, core.KindInvalid, "negative warnings")
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_on_terminal_task_refused", func(t T, s core.Service) {
+		// CONTRACT §1.5: every write to a terminal task is refused. A review with
+		// valid data is a write, so it is refused on an abandoned task and writes
+		// no row. The data check runs first, so only valid data reaches this rule.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		abandoned := core.TaskAbandoned
+		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: &abandoned, Reason: "superseded"}))(t)
+		step := core.NumberRef(1)
+		_, err := s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventReview, Text: "Late review.", Data: reviewData("approved", 0, 0)})
+		wantKind(t, err, core.KindRefused, "valid review on an abandoned task")
+		assertNoReviewEvents(t, s, res.ID)
+	}},
+	{"event/review_on_each_step_status", func(t T, s core.Service) {
+		// CONTRACT §9 item 39: a review is accepted on a step in any of its five
+		// statuses. Step 1 is reviewed while pending, active and done, step 2
+		// once failed, and step 3 once skipped. Each review names its step.
+		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
+		reviewer := as(projA, "reviewer")
+		var got []int64
+		review := func(ref core.StepRef) {
+			e := must(s.EventLog(reviewer, core.EventLogRequest{TaskID: res.ID, Step: &ref, Kind: core.EventReview, Text: "Reviewed.", Data: reviewData("approved", 0, 0)}))(t)
+			if e.StepID == nil {
+				t.Fatalf("review event has no step")
+			}
+			got = append(got, *e.StepID)
+		}
+		step1, step2, step3 := core.NumberRef(1), core.NumberRef(2), core.NumberRef(3)
+		review(step1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step1, Action: core.StepStart}))(t)
+		review(step1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step1, Action: core.StepFinish, Summary: "Built it."}))(t)
+		review(step1)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step2, Action: core.StepStart}))(t)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step2, Action: core.StepFail, Summary: "Broke."}))(t)
+		review(step2)
+		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step3, Action: core.StepSkip, Summary: "Not needed."}))(t)
+		review(step3)
+
+		// The reviews were taken while the steps stood in the statuses the case
+		// names, so the steps are read back to confirm the setup.
+		steps := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionSteps}))(t).Steps
+		var statuses []core.StepStatus
+		for _, st := range steps {
+			statuses = append(statuses, st.Status)
+		}
+		if want := []core.StepStatus{core.StepDone, core.StepFailed, core.StepSkipped}; !slices.Equal(statuses, want) {
+			t.Errorf("steps read back as %v, want %v", statuses, want)
+		}
+
+		want := []int64{res.Steps[0].ID, res.Steps[0].ID, res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
+		if !slices.Equal(got, want) {
+			t.Errorf("reviews name steps %v, want %v", got, want)
+		}
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Limit: core.MaxLimit}))(t)
+		reviews := 0
+		for _, e := range d.Events {
+			if e.Kind == core.EventReview {
+				reviews++
+			}
+		}
+		if reviews != 5 {
+			t.Errorf("review events in the journal = %d, want 5", reviews)
+		}
+	}},
+	{"event/empty_page_has_events_list", func(t T, s core.Service) {
+		// CONTRACT §2: a task_get of section events always carries an events list.
+		// A page with no events is an empty list, not an absent one, so a client
+		// can tell no events from no section. Step 1 has no events here.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Step: &step}))(t)
+		if d.Events == nil || len(d.Events) != 0 {
+			t.Errorf("events of a step with none = %v, want an empty list", d.Events)
+		}
+		if d.Next != "" {
+			t.Errorf("next = %q on the last page, want none", d.Next)
+		}
+	}},
+	{"task_get/paging_fields_need_events", func(t T, s core.Service) {
+		// CONTRACT §2: limit, cursor and step apply to section events only. With
+		// any other section, and with no section, each one is invalid.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		step := core.NumberRef(1)
+		for _, section := range []core.TaskSection{core.SectionAll, core.SectionBrief, core.SectionSteps, core.SectionClose} {
+			_, err := s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: section, Limit: 5})
+			wantKind(t, err, core.KindInvalid, "task_get section "+string(section)+" with limit")
+			_, err = s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: section, Cursor: "x"})
+			wantKind(t, err, core.KindInvalid, "task_get section "+string(section)+" with cursor")
+			_, err = s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: section, Step: &step})
+			wantKind(t, err, core.KindInvalid, "task_get section "+string(section)+" with step")
+		}
+	}},
+	{"task_get/bad_paging_refused", func(t T, s core.Service) {
+		// CONTRACT §1.3, §2: for section events a limit is 0 to 100, a cursor must
+		// decode, and a step ref must name exactly one step. Each fault is invalid.
+		res := startTask(t, s, mainCtx(), "t", "one")
+		for _, c := range []struct {
+			what string
+			req  core.TaskGetRequest
+		}{
+			{"a negative limit", core.TaskGetRequest{Limit: -1}},
+			{"a limit above the maximum", core.TaskGetRequest{Limit: core.MaxLimit + 1}},
+			{"a cursor that does not decode", core.TaskGetRequest{Cursor: "!!!"}},
+			{"an empty step ref", core.TaskGetRequest{Step: &core.StepRef{}}},
+		} {
+			req := c.req
+			req.ID, req.Section = res.ID, core.SectionEvents
+			_, err := s.TaskGet(mainCtx(), req)
+			wantKind(t, err, core.KindInvalid, "task_get events with "+c.what)
+		}
+		if _, err := s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Limit: core.MaxLimit}); err != nil {
+			t.Errorf("task_get events with the maximum limit: %v", err)
+		}
+	}},
 }
 
 // policySwitchCase is the case for one close-policy switch (CONTRACT §9 item 27).
@@ -203,7 +446,7 @@ var closeCases = []Case{
 		}
 		must(s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventDecision, Text: "Allow only same-origin paths."}))(t)
 		must(s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(3), Action: core.StepStart}))(t)
-		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: ptr(core.NumberRef(2)), Kind: core.EventNote, Text: "Step 2 looked at by the reviewer."}))(t)
+		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: ptr(core.NumberRef(2)), Kind: core.EventReview, Text: "Step 2 looked at by the reviewer.", Data: reviewData("approved", 0, 0)}))(t)
 		l := must(s.LearningAdd(ctx, core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "Check redirects", Body: "Every redirect needs an origin check.", Target: "reviewer"}))(t)
 		if l.Status != core.LearningProposed || l.TaskID != res.ID {
 			t.Errorf("learning = %+v", l)
@@ -394,125 +637,6 @@ var closeCases = []Case{
 		must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "two", Goal: "g"}))(t)
 		_, err = s.TaskClose(mainCtx(), core.TaskCloseRequest{ID: one.ID, Outcome: core.TaskDone})
 		wantKind(t, err, core.KindRefused, "bare close after refused partial settings")
-	}},
-	{"event/pending_step_takes_review_and_event", func(t T, s core.Service) {
-		// CONTRACT §9 items 33 and 39: event_log accepts a review of a step in any
-		// status, and the step here is still pending.
-		res := startTask(t, s, mainCtx(), "t", "one")
-		step := core.NumberRef(1)
-		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventNote, Text: "Before the work starts."}))(t)
-		rv := must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventReview, Text: "Plan read.", Data: reviewData("approved", 0, 0)}))(t)
-		if rv.StepID == nil || *rv.StepID != res.Steps[0].ID {
-			t.Errorf("review of a pending step names step %v, want %d", rv.StepID, res.Steps[0].ID)
-		}
-	}},
-	{"event/review_data_is_recorded", func(t T, s core.Service) {
-		// CONTRACT §4, §9 item 39: a review event keeps its verdict and counts in
-		// data, names its agent as the reviewer, and is read back through task_get.
-		res := startTask(t, s, mainCtx(), "t", "build")
-		step := core.NumberRef(1)
-		rv := must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &step, Kind: core.EventReview, Text: "Missing test.", Data: reviewData("not-approved", 1, 2)}))(t)
-		if rv.Kind != core.EventReview || rv.Agent != "reviewer" || rv.StepID == nil || *rv.StepID != res.Steps[0].ID {
-			t.Errorf("review event = %+v", rv)
-		}
-		var got map[string]any
-		if err := json.Unmarshal(rv.Data, &got); err != nil || got["verdict"] != "not-approved" || got["critical"] != float64(1) || got["warnings"] != float64(2) {
-			t.Errorf("review data = %s (%v)", rv.Data, err)
-		}
-		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
-		found := false
-		for _, e := range d.Events {
-			found = found || (e.Kind == core.EventReview && e.ID == rv.ID)
-		}
-		if !found {
-			t.Errorf("review %d is not in the journal: %+v", rv.ID, d.Events)
-		}
-	}},
-	{"event/review_data_missing_field_refused", func(t T, s core.Service) {
-		// CONTRACT §4: a review needs data with a verdict and two counts. A missing
-		// or malformed field is invalid, the message names the fix, and no row is
-		// written.
-		res := startTask(t, s, mainCtx(), "t")
-		for _, c := range []struct{ what, data string }{
-			{"no data", ""},
-			{"no verdict", `{"critical": 0, "warnings": 0}`},
-			{"no critical", `{"verdict": "approved", "warnings": 0}`},
-			{"no warnings", `{"verdict": "approved", "critical": 0}`},
-			{"a count as text", `{"verdict": "approved", "critical": "0", "warnings": 0}`},
-			{"a count as a fraction", `{"verdict": "approved", "critical": 0.5, "warnings": 0}`},
-			{"data as an array", `[1, 2, 3]`},
-		} {
-			var data json.RawMessage
-			if c.data != "" {
-				data = json.RawMessage(c.data)
-			}
-			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: data})
-			wantKind(t, err, core.KindInvalid, "review with "+c.what)
-			if err != nil && !strings.Contains(err.Error(), `"not-approved"`) {
-				t.Errorf("review with %s: the message %q does not name the fix", c.what, err)
-			}
-		}
-		assertNoReviewEvents(t, s, res.ID)
-	}},
-	{"event/review_wrong_verdict_refused", func(t T, s core.Service) {
-		// CONTRACT §4: the verdict is approved or not-approved, exactly.
-		res := startTask(t, s, mainCtx(), "t")
-		for _, v := range []string{"meh", "Approved", "", "passed"} {
-			_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData(v, 0, 0)})
-			wantKind(t, err, core.KindInvalid, "review verdict "+v)
-		}
-		assertNoReviewEvents(t, s, res.ID)
-	}},
-	{"event/review_negative_count_refused", func(t T, s core.Service) {
-		// CONTRACT §4: each count is 0 or more. A negative critical or warnings
-		// count is invalid, and writes nothing.
-		res := startTask(t, s, mainCtx(), "t")
-		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData("approved", -1, 0)})
-		wantKind(t, err, core.KindInvalid, "negative critical")
-		_, err = s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: reviewData("approved", 0, -1)})
-		wantKind(t, err, core.KindInvalid, "negative warnings")
-		assertNoReviewEvents(t, s, res.ID)
-	}},
-	{"event/review_on_each_step_status", func(t T, s core.Service) {
-		// CONTRACT §9 item 39: a review is accepted on a step in any of its five
-		// statuses. Step 1 is reviewed while pending, active and done, step 2
-		// once failed, and step 3 once skipped. Each review names its step.
-		res := startTask(t, s, mainCtx(), "t", "one", "two", "three")
-		reviewer := as(projA, "reviewer")
-		var got []int64
-		review := func(ref core.StepRef) {
-			e := must(s.EventLog(reviewer, core.EventLogRequest{TaskID: res.ID, Step: &ref, Kind: core.EventReview, Text: "Reviewed.", Data: reviewData("approved", 0, 0)}))(t)
-			if e.StepID == nil {
-				t.Fatalf("review event has no step")
-			}
-			got = append(got, *e.StepID)
-		}
-		step1, step2, step3 := core.NumberRef(1), core.NumberRef(2), core.NumberRef(3)
-		review(step1)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step1, Action: core.StepStart}))(t)
-		review(step1)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step1, Action: core.StepFinish, Summary: "Built it."}))(t)
-		review(step1)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step2, Action: core.StepStart}))(t)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step2, Action: core.StepFail, Summary: "Broke."}))(t)
-		review(step2)
-		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: step3, Action: core.StepSkip, Summary: "Not needed."}))(t)
-		review(step3)
-
-		want := []int64{res.Steps[0].ID, res.Steps[0].ID, res.Steps[0].ID, res.Steps[1].ID, res.Steps[2].ID}
-		if !slices.Equal(got, want) {
-			t.Errorf("reviews name steps %v, want %v", got, want)
-		}
-		d := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Limit: core.MaxLimit}))(t)
-		reviews := 0
-		for _, e := range d.Events {
-			if e.Kind == core.EventReview {
-				reviews++
-			}
-		}
-		if reviews != 5 {
-			t.Errorf("review events in the journal = %d, want 5", reviews)
-		}
 	}},
 }
 
