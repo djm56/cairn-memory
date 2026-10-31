@@ -36,8 +36,8 @@ var keyNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 // pasted in the name position), or when a key of that name exists, active or revoked:
 // the store keeps a revoked row, so its name stays taken.
 func AddKey(ctx context.Context, db, name string, scope auth.Scope) (string, error) {
-	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) {
-		return "", errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairn_")
+	if err := checkKeyName(name); err != nil {
+		return "", err
 	}
 	if !auth.ValidScope(scope) {
 		return "", fmt.Errorf("the scope %q is none of agent, operator or viewer", scope)
@@ -70,6 +70,18 @@ func AddKey(ctx context.Context, db, name string, scope auth.Scope) (string, err
 		return "", fmt.Errorf("add the key: %w", err)
 	}
 	return key, nil
+}
+
+// checkKeyName refuses a name that is not a key name: one of the shape keyNamePattern gives,
+// or one that begins with the key prefix, which is a key pasted into the name position. The
+// message gives the rule and never the name, so a key given as a name is not printed back
+// (step 8 review W6). AddKey and RevokeKey both check the name here, before any database
+// lookup, so the two cannot disagree about what a name is.
+func checkKeyName(name string) error {
+	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) {
+		return errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairn_")
+	}
+	return nil
 }
 
 // ListKeys returns every key of the database at db, revoked ones included, in the order
@@ -105,8 +117,13 @@ func ListKeys(ctx context.Context, db string) ([]KeyInfo, error) {
 // RevokeKey revokes the active key named name in the database at db. The first
 // revocation stands; a second one, or a name with no key, is an error that says so. The
 // database must exist. A running server reads the key table on every call, so the key
-// stops working at once.
+// stops working at once. The name is checked as AddKey checks it, before the database is
+// opened, so a name that is not a key name, a key pasted into it for one, is refused with
+// the rule and is never echoed.
 func RevokeKey(ctx context.Context, db, name string) error {
+	if err := checkKeyName(name); err != nil {
+		return err
+	}
 	st, err := openDatabase(db, false)
 	if err != nil {
 		return err
