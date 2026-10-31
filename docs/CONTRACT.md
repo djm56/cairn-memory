@@ -1,6 +1,6 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-30.** Items 1–11 of §9 are operator-approved (2026-10-28,
+**Status as of 2026-10-31.** Items 1–11 of §9 are operator-approved (2026-10-28,
 phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
@@ -68,6 +68,8 @@ A failure the caller can act on has a kind and a message:
 | `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role. |
+| `no_route` | Wire form only (DESIGN §5.4): the path is not a call. The message says to check the server base URL. Answered `404`. Core never returns it. |
+| `unsupported_media_type` | Wire form only (DESIGN §5.4): the body is not `application/json`. Answered `415`. Core never returns it. |
 
 Checks run in this order, so a request with several faults gets the first
 one: caller → request shape (`invalid`) → existence (`not_found`) → rules
@@ -533,3 +535,22 @@ only a core test checks it. An item with no check of its own is marked
     the only record of a review. A review event recorded before M1 has no
     `data`, since it was written by `review_record`. A reader of review events
     must tolerate one with no data. *Bishop default, pending operator approval.*
+40. **Request keys are exact, and none is repeated (2026-10-31).** A request
+    key must be written as its field is named, in the same case: `{"Title": "x"}`
+    is `invalid`, and so is a key given twice, at any level. An unknown key stays
+    `invalid` too. Free-form event data takes any key case, but a repeated key in
+    it is `invalid`. A review's data keeps its own rule (§4, item 39). The check
+    is on the wire, where `encoding/json` would otherwise accept both (DESIGN
+    §5.4). *Bishop default, pending operator approval.* (api test only)
+41. **A body is `application/json` (2026-10-31).** A request with content must
+    carry `Content-Type: application/json`. A parameter such as `charset` is
+    accepted. Any other type, or none, is refused with the kind
+    `unsupported_media_type` (`415`), a wire kind (§1.2). A body that is empty or
+    only white space needs no type. *Bishop default, pending operator approval.*
+    (api test only)
+42. **An unknown path is `no_route` (2026-10-31).** A path that is no call is
+    `404` with the kind `no_route`, and its message names the server base URL to
+    check. A missing task or step stays `not_found`. The client returns
+    `no_route` as a `core.Error` whose message names the base URL it was given
+    (DESIGN §5.4). *Bishop default, pending operator approval.* (api and client
+    tests only)

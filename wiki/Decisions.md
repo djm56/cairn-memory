@@ -1,8 +1,8 @@
 # Decisions
 
-_Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-31: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-D1 to D10 were adopted on 2026-10-27, and D11 to D19 on 2026-10-30 (D19 from issue #71). The wording of each decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions). The lines below only name each one. Reopening a decision needs the operator.
+D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). The wording of each decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions). The lines below only name each one. Reopening a decision needs the operator.
 
 ## Adopted decisions
 
@@ -28,6 +28,8 @@ D1 to D10 were adopted on 2026-10-27, and D11 to D19 on 2026-10-30 (D19 from iss
 - **D17. No scheduled review agents in v1.** The review loop moves to Later, and the operator reviews proposed findings daily from the UI. Replaces D8. [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D18. The repository, binary and plugin are named `cairn`,** and the category line is "operating record for coding agents". Replaces "cairn-memory". The rename is deferred: its timing is still to be decided. [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D19. M1 builds no network listener in the shipped binary.** `internal/api` lands in M1 as handlers only. `internal/client` is tested against an in-process `httptest` server, bound to loopback for the life of the test; the shipped binary has no listener. `cairn serve` is M2, and the live Claude Code run against it is M2's exit check (issue #71). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
+- **D20. TLS is optional in `cairn serve`.** It takes optional `--tls-cert` and `--tls-key`, and binds loopback by default. It refuses a non-loopback bind without TLS unless `--behind-proxy` is given. DEPLOY.md will document both setups. Operator decision, 2026-10-31 (issue #78). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
+- **D21. The HTTP wire form is strict, and its versions are defined.** A request key must match its field name in case, and a key given twice is refused. A body must be `application/json`. An unknown path is `no_route`, and a missing entity stays `not_found`. DESIGN §5.4 has the versioning rule: upgrade servers before clients, and which changes break a client. `step_add` and `step_update` keep their assignee field on the MCP surface. Chosen by Bishop under the operator's veto, 2026-10-31 (issue #109). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 
 To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/issues/new?template=decision.yml). The form asks which decision it touches, the options with their costs, and a recommendation.
 

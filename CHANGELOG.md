@@ -233,3 +233,17 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Phase 2 docs, follow-up to issue #52 (CONTRACT §9 layout and markers):
   CONTRACT §9 item 15 is reflowed, and item 35's `(not tested)` marker sits on
   its own line, as item 18 places its `(core test only)` marker ([PR #63](https://github.com/djm56/cairn-memory/pull/63)).
+- M2 toolchain: `go.mod` pins `toolchain go1.26.10` and keeps `go 1.26.0`, so
+  local builds and CI, which reads `go.mod`, use the same Go release ([PR #120](https://github.com/djm56/cairn-memory/pull/120)).
+- M2 wire form, issue #109: a request key must be written as its field is named,
+  in the same case, and a key given twice is refused at any level (`400`). A
+  body with content must be `application/json`, or it is refused (`415`, kind
+  `unsupported_media_type`). A path that is no call is `404` with the kind
+  `no_route`, and its message names the server base URL to check. A missing
+  entity stays `not_found`. DESIGN §5.4 states the versioning rule, and
+  CONTRACT §1.2 and §9 items 40 to 42 record the changes ([PR #120](https://github.com/djm56/cairn-memory/pull/120)).
+- M2 decisions, issues #78 and #109: D20 (`cairn serve` carries optional TLS
+  certificates, and refuses a non-loopback bind without TLS unless
+  `--behind-proxy` is given) and D21 (the wire form above, and `step_add` and
+  `step_update` keep their assignee field) are recorded in the wiki and in
+  PLAN §8 ([PR #120](https://github.com/djm56/cairn-memory/pull/120)).
