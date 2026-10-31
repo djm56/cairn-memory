@@ -266,9 +266,9 @@ directives
   title, applies_when, rule, rationale, reviewer_check, example
   status   TEXT NOT NULL    active | retired
   source_learning INTEGER   the finding it came from, if any
-  review_by TEXT            planned: the date the rule is due for reaffirming or retiring;
-                            90 days after ratification by default (decision D16). The column
-                            lands with the directive cap in M2; the UI edits it in M3.
+  review_by TEXT           the time the rule is due for reaffirming or retiring; 90 days
+                            after ratification by default, or the day the operator names
+                            (decision D16). Built in M2; the UI edits it in M3.
   ratified_by, ratified_at, retired_at
 ```
 
@@ -279,9 +279,13 @@ CLI, never MCP tools.
 Global directives let one lesson apply to every project, which is how a
 learning in one codebase reaches the next.
 
-Planned (decision D16, M2): each directive has a `review_by` date, 90 days from
-ratification by default. A directive past its date is left out of the capped
-set and flagged on the UI.
+Built (decision D16, M2): each directive has a `review_by` date, 90 days from
+ratification by default. Directives returned by `task_current`, `directive_list`
+and `recall` are ranked and capped at 12 per call: agent-scoped first, then
+project, then global, and newest first within each. A directive past its
+`review_by` is expired: it is left out of those calls and counted in `expired`.
+The directives beyond the cap are counted in `omitted`. The UI flags expired
+directives in M3.
 
 ### 3.5 Notes and search
 
@@ -357,7 +361,7 @@ differs from it only there).
 
 | Tool | Purpose |
 |---|---|
-| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply. The first call of a session. Planned: directives capped at 12, ranked (D16). |
+| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply. The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
 | `task_start` | Create a task with its brief (title, goal, context, constraints, criteria, key files) and, optionally, its plan. Returns the id. |
 | `task_get` | One task in full, or one section of it (`brief`, `steps`, `events`, `close`). `section: events` is the journal, paged; it replaces `event_list` in M1. |
 | `task_list` | Recent tasks in this project, filtered by status. |
@@ -369,8 +373,8 @@ differs from it only there).
 | `event_log` | Append a journal event. |
 | `learning_add` | Propose a finding, pattern or agent note. |
 | `learning_list` | Learnings by status, kind, project or target. |
-| `directive_list` | Directives that apply to this project, optionally to one agent role. Planned: capped at 12, ranked (D16). |
-| `recall` | Given a goal, return the directives, lessons, mistakes and similar past tasks that apply, across projects. Planned: directives capped at 12, ranked (D16). |
+| `directive_list` | Directives that apply to this project, optionally to one agent role. Capped at 12, ranked, with `expired` and `omitted` counts (D16). |
+| `recall` | Given a goal, return the directives, lessons, mistakes and similar past tasks that apply, across projects. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
 | `search` | Full-text search across everything above. |
 
 Tools that do not exist on purpose: anything that changes a learning's
