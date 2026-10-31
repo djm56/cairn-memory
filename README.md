@@ -89,6 +89,24 @@ The repository and the Go module still carry the name `cairn-memory`.
 Renaming them to `cairn` is planned (decision D18), and the rename has not
 been done.
 
+### Running the server
+
+`cairn serve` is the server, and the only listener in the binary. It keeps its
+data in the SQLite file named by `--db`, which is created if it does not exist.
+It listens on loopback at `127.0.0.1:8787` unless `--addr` says otherwise:
+
+```bash
+cairn serve --db ./cairn.db
+```
+
+An address other than loopback needs TLS, by `--tls-cert` and `--tls-key`, or
+`--behind-proxy` when a proxy in front of the server terminates TLS. It also
+needs at least one active API key. Creating keys with `cairn key add` is not
+built yet, so a server with no key refuses every call, and a non-loopback server
+cannot start until keys can be made. `GET /healthz` answers a liveness check
+without a key. The bind rules and the limits are in
+[DESIGN.md §5.3](docs/DESIGN.md#53-the-server).
+
 ## Documentation
 
 | Document | What it covers |
