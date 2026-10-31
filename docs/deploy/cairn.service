@@ -1,0 +1,50 @@
+# Cairn server. Install as /etc/systemd/system/cairn.service.
+# See docs/DEPLOY.md. This file holds no secrets: API keys live in the database, and
+# clients send them. It listens on loopback, so a reverse proxy must front it (setup b).
+# For setup (a), TLS on a non-loopback address, see DEPLOY.md, "Setup (a)".
+
+[Unit]
+Description=Cairn memory server
+Documentation=https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# A dedicated system user. Create it first: see DEPLOY.md, "Users and the state directory".
+User=cairn
+Group=cairn
+ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788
+Restart=on-failure
+RestartSec=5
+
+# The state directory: /var/lib/cairn, owner-only. The database and its -wal and -shm live here.
+StateDirectory=cairn
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/cairn
+UMask=0077
+
+# Hardening. Each setting removes something the server does not use: no privilege gain, no
+# write outside the state directory, no kernel or device access, no extra address families.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/cairn
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
