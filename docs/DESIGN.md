@@ -125,9 +125,10 @@ the key is never sent to a second address. A `client.env` that is a symbolic
 link is judged by the file it names, and one that is not a regular file is
 refused. A line may begin with `export `. `cairn doctor` warns when a key would
 go over `http` to a host that is not loopback. The plugin's secure option (M5) will set
-`CAIRN_API_KEY`. Nor does a user name or a
-password in the server URL: `cairn init` refuses one, and no command prints a URL
-with them.
+`CAIRN_API_KEY`.
+
+A user name or a password in the server URL stays out of output too: `cairn init`
+refuses one, and no command prints a URL with them.
 
 `cairn init` writes the file in `CLAUDE_PROJECT_DIR` when Claude Code sets it,
 else in the working directory. Where `CLAUDE_PROJECT_DIR` is set, it refuses to
