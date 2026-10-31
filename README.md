@@ -131,10 +131,18 @@ A client sends its key with every call. Give it in one of two places:
 # Either, in the environment of the client:
 export CAIRN_API_KEY=cairn_...
 
-# Or, in a file only you can read. The directory is 0700, and the subshell's
-# umask makes the file 0600 from the moment it exists:
-mkdir -p -m 700 ~/.config/cairn
+# Or, in a file only you can read. Make the directory owner-only, even if it existed,
+# and an existing file owner-only before the key is written to it:
+mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
+[ -e ~/.config/cairn/client.env ] && chmod 600 ~/.config/cairn/client.env
 (umask 077 && printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env)
+```
+
+The `printf` line puts the key in your shell history. To keep it out, write the file
+in an editor, or read the key without echo and write it from a variable:
+
+```bash
+read -rs -p 'API key: ' K && (umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
 ```
 
 `CAIRN_API_KEY` is read first. A `client.env` that any other user can read or

@@ -17,6 +17,11 @@ import (
 // those two files. The rule is a denylist of one package's names, so the guard's own
 // file set is what it reads (nonTestGoFiles), and a file added to cmd/cairn is checked
 // from its first commit.
+//
+// The dispatch identifiers of main.go are guarded too (step 10 review 10-W1). run and
+// commands are how main.go reaches the two files: a call to run with a subcommand's
+// name starts that subcommand, and names no guarded identifier. main.go may name them
+// anywhere in the file. No other non-test file in cmd/cairn may.
 
 // subcommandFiles are the files of cmd/cairn whose top-level names are reachable only
 // from the dispatch table. serve.go starts the listener through server.Run, and key.go
@@ -29,6 +34,12 @@ var subcommandFiles = map[string]bool{
 // dispatchFile is the one file that names the subcommand functions outside the two files:
 // the table that maps each sub-command name to its run function.
 const dispatchFile = "cmd/cairn/main.go"
+
+// dispatchNames are the identifiers main.go declares that route to a subcommand: the
+// dispatch function, the table, and the table's entry type. The rule guards them as it
+// guards the subcommand names, so no file but main.go may name them. The test fails if
+// main.go stops declaring one, so the list cannot go stale unnoticed.
+var dispatchNames = []string{"run", "commands", "command"}
 
 // declaredNames returns the top-level names f declares: its functions that are not
 // methods, and its types, variables and constants. init and blank names are left out.
@@ -80,7 +91,7 @@ func dispatchFaults(fset *token.FileSet, f *ast.File, names map[string]bool, all
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		if id, ok := n.(*ast.Ident); ok && names[id.Name] && !selected[id] {
-			out = append(out, fmt.Sprintf("%s: %s is declared in a subcommand file, and only the dispatch table in main.go may name it", fset.Position(id.Pos()), id.Name))
+			out = append(out, fmt.Sprintf("%s: %s is a subcommand name or a dispatch identifier, and only main.go may name it", fset.Position(id.Pos()), id.Name))
 		}
 		return true
 	})
@@ -104,6 +115,13 @@ func TestSubcommandsAreReachedOnlyFromDispatch(t *testing.T) {
 	if len(names) == 0 {
 		t.Fatal("the subcommand files declare no names: the rule would check nothing")
 	}
+	mainNames := declaredNames(parseFile(t, token.NewFileSet(), filepath.Join(repoRoot, dispatchFile)))
+	for _, name := range dispatchNames {
+		if !mainNames[name] {
+			t.Fatalf("%s no longer declares %s: update dispatchNames", dispatchFile, name)
+		}
+		names[name] = true
+	}
 	for _, file := range nonTestGoFiles(t, dir) {
 		rel := moduleRel(file)
 		allowed := rel == dispatchFile || subcommandFiles[rel]
@@ -118,7 +136,7 @@ func TestSubcommandsAreReachedOnlyFromDispatch(t *testing.T) {
 // must count, or one it must not, and the count is what the rule must answer. With the rule
 // disabled, the faults are zero and the snippets that name a subcommand fail.
 func TestSubcommandRuleCanFail(t *testing.T) {
-	names := map[string]bool{"runServe": true, "keyFlags": true}
+	names := map[string]bool{"runServe": true, "keyFlags": true, "run": true}
 	cases := []struct {
 		name    string
 		src     string
@@ -128,6 +146,7 @@ func TestSubcommandRuleCanFail(t *testing.T) {
 		{"cairn mcp calling runServe, in another file", "package main\nfunc serveMCP() { runServe(nil, nil, nil) }\n", false, 1},
 		{"a key helper called from another file", "package main\nfunc f() { keyFlags(\"add\", nil, nil, nil, nil) }\n", false, 1},
 		{"a subcommand function used as a value", "package main\nvar h = runServe\n", false, 1},
+		{"cairn mcp calling run with serve, in another file", "package main\nfunc serveMCP() { run([]string{\"serve\"}, nil, nil) }\n", false, 1},
 		{"a field of the same name, which is no reference", "package main\nfunc f(x T) { x.runServe() }\n", false, 0},
 		{"the dispatch table in main.go", "package main\nvar h = runServe\n", true, 0},
 	}
