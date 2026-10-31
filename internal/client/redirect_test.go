@@ -83,7 +83,7 @@ func tlsOrigin(t *testing.T, h http.Handler) *httptest.Server {
 // other-port case is the one net/http would follow with the header, so it is the case that
 // shows the refusal is what holds.
 func TestTheKeyIsNeverSentAfterARedirect(t *testing.T) {
-	const key = "cairn_KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK"
+	key := newKey(t)
 	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
 		target := &recorder{}
 		tgt := httptest.NewServer(target)
