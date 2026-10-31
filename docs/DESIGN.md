@@ -286,8 +286,9 @@ and `recall` are ranked and capped at 12 per call: agent-scoped first, then
 project, then global, and newest first within each. `task_current` and `recall`
 give the agent-scoped directives of the caller's own role only, so another role's
 cannot fill the cap; `directive_list` lists every role when no agent is named
-(CONTRACT §9 item 49). A directive past its
-`review_by` is expired: it is left out of those calls and counted in `expired`.
+(CONTRACT §9 item 49). A directive is expired from 00:00 UTC of its
+`review_by` day, the day being the point it is due: it is left out of those calls
+and counted in `expired`.
 The directives beyond the cap are counted in `omitted`. The UI flags expired
 directives in M3.
 

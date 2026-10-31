@@ -91,7 +91,7 @@ func dispatchFaults(fset *token.FileSet, f *ast.File, names map[string]bool, all
 	var out []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		if id, ok := n.(*ast.Ident); ok && names[id.Name] && !selected[id] {
-			out = append(out, fmt.Sprintf("%s: %s is a subcommand name or a dispatch identifier, and only main.go may name it", fset.Position(id.Pos()), id.Name))
+			out = append(out, fmt.Sprintf("%s: %s is a subcommand name or a dispatch identifier, and only main.go may name it: a local, parameter or key of that name is refused too, so rename it", fset.Position(id.Pos()), id.Name))
 		}
 		return true
 	})

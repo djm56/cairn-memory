@@ -89,7 +89,9 @@ type directiveSet struct {
 // §9 item 49).
 //
 // A directive whose review_by is before now is expired: it is left out and
-// counted. A retired directive is never listed and is not counted as expired.
+// counted. A review_by is stored as 00:00 UTC of its day, so the directive is
+// expired from the start of that day (CONTRACT §8), and one whose review_by is
+// equal to now is still live. A retired directive is never listed and is not counted as expired.
 // The rest are ranked (rankDirectives) and capped at DirectiveCap; the number
 // beyond the cap is omitted.
 //

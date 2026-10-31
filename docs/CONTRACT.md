@@ -395,7 +395,7 @@ refuse a nameless call all the same.
 | Call | In | Does |
 |---|---|---|
 | `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
-| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC, after which the directive is expired; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
+| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC. The directive is expired from 00:00 UTC of that day, so it is due at the start of the named day, not after it; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
 | `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
 
@@ -621,8 +621,11 @@ only a core test checks it. An item with no check of its own is marked
     (core test only: the conformance suite cannot move the clock.)
 47. **review_by on ratify (2026-10-31).** `DirectiveRatify` takes an optional
     `review_by`, a `YYYY-MM-DD` calendar day in UTC that must be after today,
-    else `invalid`. Without it, the directive is due 90 days after ratification
-    (§8). Decision D16. *Bishop default, pending operator approval.*
+    else `invalid`. The directive expires at 00:00 UTC of that day: the day is
+    the point it is due, not the end of it. So a `review_by` of tomorrow is live
+    until tomorrow's midnight, and today is refused. Without it, the directive is
+    due 90 days after ratification (§8). Decision D16. *Bishop default, pending
+    operator approval.*
 48. **Directive counts are always present (2026-10-31).** The `expired` and
     `omitted` fields are in every result of the three reads, at 0 when there is
     nothing to count, so a reader never has to tell absent from zero (§5).
