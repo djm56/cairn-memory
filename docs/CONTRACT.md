@@ -41,7 +41,9 @@ client, and a role. The adapter sets it; request types do not carry it.
   letters and digits in hyphen-separated groups, at most 64 characters
   (`acme-api`). A project row is created on its first call. Each write call
   moves the project's `last_seen_at` on to the server's time. A read does not,
-  and creates the row only when the project has none (§9 item 38).
+  and creates the row only when the project has none, and only for an agent: a
+  viewer's read of such a project is `not_found` and writes no row (§9 items 38
+  and 44).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
   of only spaces counts as no name, and is `invalid`. A name with a control
@@ -78,8 +80,10 @@ A failure the caller can act on has a kind and a message:
 Checks run in this order, so a request with several faults gets the first
 one: caller → request shape (`invalid`) → existence (`not_found`) → rules
 (`refused`). Any other error is an internal failure. On the wire, the key
-comes first (`unauthenticated`), then a viewer's write (`read_only`), and then
-the request shape.
+comes first (`unauthenticated`), then a viewer's write (`read_only`), then an
+agent's call on an operator route (`operator_only`), and then the request shape.
+The role gates are answered before the body is read, so a body of the wrong
+shape from a lower role gets the role's refusal, not `400` or `415`.
 
 ### 1.3 Time, ids, lists
 
@@ -568,8 +572,10 @@ only a core test checks it. An item with no check of its own is marked
 44. **A viewer key does not write (2026-10-31).** A write route answers `403`,
     kind `read_only`, for a viewer key, before the body is read. Operator routes
     are write routes, so a viewer on one gets `read_only`. An agent key on an
-    operator route still gets `operator_only` (§8). No operator route is a read,
-    so no viewer read of an operator route arises. One write can still come from
-    a viewer's read: the first read of a project that does not exist creates its
-    row (§1.1, item 38). That is left as it is, and it is an open question for the
-    operator. *Bishop default, pending operator approval.* (api test only)
+    operator route still gets `operator_only` (§8), also before the body is read.
+    No operator route is a read, so no viewer read of an operator route arises.
+    A viewer's read of a project that has no row is `not_found`, and writes no
+    row, so a viewer key cannot create a project. An agent's first read of the
+    project still creates it (§1.1). *Decided 2026-10-31: the Bishop default,
+    which the operator may veto (step 4 review, finding 4-W1).* Tests: api, core
+    and conformance.

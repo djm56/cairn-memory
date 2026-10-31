@@ -47,7 +47,7 @@ func (l *Local) DirectiveList(ctx context.Context, req DirectiveListRequest) (*D
 	if err != nil {
 		return nil, err
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	ds, err := directivesFor(ctx, l.st, c.Project, req.Agent)

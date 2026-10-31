@@ -149,6 +149,33 @@ func accessOf(route string) access {
 	return a
 }
 
+// operatorRoutes are the calls that only an operator key may make (CONTRACT §8).
+// Each is also a write route in routeAccess. A wire call refuses any other role
+// before it reads the body, so a request of the wrong shape from an agent key is
+// still operator_only (CONTRACT §1.2). Core checks the role again on its side.
+var operatorRoutes = map[string]bool{
+	RouteLearningDecide:     true,
+	RouteDirectiveRatify:    true,
+	RouteDirectiveRetire:    true,
+	RouteProjectSettingsSet: true,
+}
+
+// routeSpec is what call needs to know about a route before it reads a request.
+type routeSpec struct {
+	access   access
+	operator bool
+}
+
+// specOf returns the spec of route. It panics on a route with no read or write
+// mark, as accessOf does, so a route is never mounted without its gates.
+func specOf(route string) routeSpec {
+	return routeSpec{access: accessOf(route), operator: operatorRoutes[route]}
+}
+
+// operatorOnlyMessage is the message of an agent key's refused operator call. It is
+// the message core gives for the same refusal, so the two answers read the same.
+const operatorOnlyMessage = "this call is an operator decision, and only an operator may make it"
+
 // CallerFunc derives the caller of a request. The role must come from the
 // server's own knowledge of the request, never from what the client sends: the
 // key resolver (KeyCaller) takes it from the API key's scope (CONTRACT §1.1). A
@@ -170,8 +197,13 @@ type FailureHook func(r *http.Request, err error)
 // is an agent. It never returns an error.
 func UnauthenticatedHeaderCaller(r *http.Request) (core.Caller, error) {
 	role := core.RoleAgent
-	if r.Header.Get(HeaderRole) == string(core.RoleOperator) {
+	switch r.Header.Get(HeaderRole) {
+	case string(core.RoleOperator):
 		role = core.RoleOperator
+	case string(core.RoleViewer):
+		// A viewer role is honoured so the conformance suite can express a viewer over
+		// the client (CONTRACT §9 item 44). The key resolver takes the role from the key.
+		role = core.RoleViewer
 	}
 	return core.Caller{
 		Project: r.Header.Get(HeaderProject),
@@ -193,28 +225,28 @@ func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Ha
 	mux := http.NewServeMux()
 	handle := func(route string, h http.Handler) { mux.Handle(Prefix+route, h) }
 
-	handle(RouteTaskCurrent, call(caller, onFailure, accessOf(RouteTaskCurrent), func(ctx context.Context, _ struct{}) (*core.TaskCurrent, error) {
+	handle(RouteTaskCurrent, call(caller, onFailure, specOf(RouteTaskCurrent), func(ctx context.Context, _ struct{}) (*core.TaskCurrent, error) {
 		return svc.TaskCurrent(ctx)
 	}))
-	handle(RouteTaskStart, call(caller, onFailure, accessOf(RouteTaskStart), svc.TaskStart))
-	handle(RouteTaskGet, call(caller, onFailure, accessOf(RouteTaskGet), svc.TaskGet))
-	handle(RouteTaskList, call(caller, onFailure, accessOf(RouteTaskList), svc.TaskList))
-	handle(RouteTaskUpdate, call(caller, onFailure, accessOf(RouteTaskUpdate), svc.TaskUpdate))
-	handle(RouteTaskClose, call(caller, onFailure, accessOf(RouteTaskClose), svc.TaskClose))
-	handle(RouteStepPlan, call(caller, onFailure, accessOf(RouteStepPlan), svc.StepPlan))
-	handle(RouteStepAdd, call(caller, onFailure, accessOf(RouteStepAdd), svc.StepAdd))
-	handle(RouteStepUpdate, call(caller, onFailure, accessOf(RouteStepUpdate), svc.StepUpdate))
-	handle(RouteEventLog, call(caller, onFailure, accessOf(RouteEventLog), svc.EventLog))
-	handle(RouteLearningAdd, call(caller, onFailure, accessOf(RouteLearningAdd), svc.LearningAdd))
-	handle(RouteLearningList, call(caller, onFailure, accessOf(RouteLearningList), svc.LearningList))
-	handle(RouteDirectiveList, call(caller, onFailure, accessOf(RouteDirectiveList), svc.DirectiveList))
-	handle(RouteRecall, call(caller, onFailure, accessOf(RouteRecall), svc.Recall))
-	handle(RouteSearch, call(caller, onFailure, accessOf(RouteSearch), svc.Search))
+	handle(RouteTaskStart, call(caller, onFailure, specOf(RouteTaskStart), svc.TaskStart))
+	handle(RouteTaskGet, call(caller, onFailure, specOf(RouteTaskGet), svc.TaskGet))
+	handle(RouteTaskList, call(caller, onFailure, specOf(RouteTaskList), svc.TaskList))
+	handle(RouteTaskUpdate, call(caller, onFailure, specOf(RouteTaskUpdate), svc.TaskUpdate))
+	handle(RouteTaskClose, call(caller, onFailure, specOf(RouteTaskClose), svc.TaskClose))
+	handle(RouteStepPlan, call(caller, onFailure, specOf(RouteStepPlan), svc.StepPlan))
+	handle(RouteStepAdd, call(caller, onFailure, specOf(RouteStepAdd), svc.StepAdd))
+	handle(RouteStepUpdate, call(caller, onFailure, specOf(RouteStepUpdate), svc.StepUpdate))
+	handle(RouteEventLog, call(caller, onFailure, specOf(RouteEventLog), svc.EventLog))
+	handle(RouteLearningAdd, call(caller, onFailure, specOf(RouteLearningAdd), svc.LearningAdd))
+	handle(RouteLearningList, call(caller, onFailure, specOf(RouteLearningList), svc.LearningList))
+	handle(RouteDirectiveList, call(caller, onFailure, specOf(RouteDirectiveList), svc.DirectiveList))
+	handle(RouteRecall, call(caller, onFailure, specOf(RouteRecall), svc.Recall))
+	handle(RouteSearch, call(caller, onFailure, specOf(RouteSearch), svc.Search))
 
-	handle(RouteLearningDecide, call(caller, onFailure, accessOf(RouteLearningDecide), svc.LearningDecide))
-	handle(RouteDirectiveRatify, call(caller, onFailure, accessOf(RouteDirectiveRatify), svc.DirectiveRatify))
-	handle(RouteDirectiveRetire, call(caller, onFailure, accessOf(RouteDirectiveRetire), svc.DirectiveRetire))
-	handle(RouteProjectSettingsSet, call(caller, onFailure, accessOf(RouteProjectSettingsSet), svc.ProjectSettingsSet))
+	handle(RouteLearningDecide, call(caller, onFailure, specOf(RouteLearningDecide), svc.LearningDecide))
+	handle(RouteDirectiveRatify, call(caller, onFailure, specOf(RouteDirectiveRatify), svc.DirectiveRatify))
+	handle(RouteDirectiveRetire, call(caller, onFailure, specOf(RouteDirectiveRetire), svc.DirectiveRetire))
+	handle(RouteProjectSettingsSet, call(caller, onFailure, specOf(RouteProjectSettingsSet), svc.ProjectSettingsSet))
 
 	mux.Handle("/", http.HandlerFunc(notFound))
 	return mux
@@ -226,10 +258,12 @@ func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Ha
 // and answered as an internal failure.
 //
 // The order is the one CONTRACT §1.2 gives: the method, then the caller, then the
-// request shape. So a request with no valid key is refused before its body is read.
-// A viewer's write is refused after the caller and before the body, with
-// KindReadOnly.
-func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, acc access, fn func(context.Context, Req) (*Res, error)) http.Handler {
+// role gates, then the request shape. So a request with no valid key is refused
+// before its body is read. A viewer's write is refused after the caller, with
+// KindReadOnly. On an operator route, a caller that is not an operator is refused
+// with KindOperatorOnly. Both are answered before the body is read, so a request of
+// the wrong shape from a lower role gets the role's refusal, not a 400 or 415.
+func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, spec routeSpec, fn func(context.Context, Req) (*Res, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverInternal(w, r, onFailure)
 		if r.Method != http.MethodPost {
@@ -242,8 +276,12 @@ func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, acc access
 			writeFailure(w, r, onFailure, err)
 			return
 		}
-		if acc == accessWrite && c.Role == core.RoleViewer {
+		if spec.access == accessWrite && c.Role == core.RoleViewer {
 			writeError(w, http.StatusForbidden, &core.Error{Kind: KindReadOnly, Message: readOnlyMessage})
+			return
+		}
+		if spec.operator && c.Role != core.RoleOperator {
+			writeError(w, http.StatusForbidden, &core.Error{Kind: core.KindOperatorOnly, Message: operatorOnlyMessage})
 			return
 		}
 		var req Req
@@ -373,8 +411,13 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// writeError writes e as the error body of an answer with status.
+// writeError writes e as the error body of an answer with status. A 401 names the
+// scheme the server takes, as RFC 7235 §3.1 requires, so a client knows to send a
+// Bearer key.
 func writeError(w http.ResponseWriter, status int, e *core.Error) {
+	if status == http.StatusUnauthorized {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+	}
 	writeJSON(w, status, ErrorBody{Error: e})
 }
 

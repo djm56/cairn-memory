@@ -210,8 +210,10 @@ func TestAPIKeyMigrationRefusesARow(t *testing.T) {
 		t.Fatalf("insert v1 key: %v", err)
 	}
 	err = migrate(db, list)
-	if err == nil || !strings.Contains(err.Error(), "api_keys") {
-		t.Fatalf("migrate with a key row: err = %v, want a failure of migration 0004", err)
+	// The refusal is the CHECK of the assert, and its column names the cause. A
+	// failure of any other kind, such as a syntax error, must not pass this test.
+	if err == nil || !strings.Contains(err.Error(), "CHECK constraint failed: api_keys_must_be_empty") {
+		t.Fatalf("migrate with a key row: err = %v, want the assert's CHECK failure from migration 0004", err)
 	}
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM api_keys WHERE name = 'old'`).Scan(&n); err != nil || n != 1 {
