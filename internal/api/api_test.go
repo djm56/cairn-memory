@@ -43,9 +43,12 @@ func (f *fake) TaskCurrent(ctx context.Context) (*core.TaskCurrent, error) {
 	return &core.TaskCurrent{}, nil
 }
 
-// serve sends one request to h, in process, and returns what it answered.
+// serve sends one request to h, in process, and returns what it answered. The
+// request is application/json, as a client sends it, unless headers names another
+// Content-Type.
 func serve(h http.Handler, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	for name, value := range headers {
 		req.Header.Set(name, value)
 	}

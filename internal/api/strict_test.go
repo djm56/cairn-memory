@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -60,6 +61,64 @@ func TestRepeatedKeyIsRefused(t *testing.T) {
 		got := errorBody(t, rec)
 		if got.Kind != core.KindInvalid || !strings.Contains(got.Message, "repeats the key") {
 			t.Errorf("%s: body = %+v, want invalid and a message that says repeats the key", c.what, got)
+		}
+	}
+}
+
+// postWithType sends a POST of body to path with the Content-Type given. An empty
+// contentType sends no Content-Type header at all.
+func postWithType(h http.Handler, path, body, contentType string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	for name, value := range agentHeaders {
+		req.Header.Set(name, value)
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// TestBodyNeedsJSONContentType checks that a body with content is refused with 415
+// and kind unsupported_media_type unless its Content-Type is application/json. A
+// parameter such as charset is accepted, and so is any letter case of the type. The
+// accepted requests reach the service, which answers 500 from core.Unimplemented.
+func TestBodyNeedsJSONContentType(t *testing.T) {
+	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
+	const body = `{"title":"t","goal":"g"}`
+	refused := []struct{ what, contentType string }{
+		{"text/plain", "text/plain"},
+		{"a form post", "application/x-www-form-urlencoded"},
+		{"no Content-Type", ""},
+	}
+	for _, c := range refused {
+		rec := postWithType(h, api.Prefix+api.RouteTaskStart, body, c.contentType)
+		if rec.Code != http.StatusUnsupportedMediaType {
+			t.Errorf("%s: status %d, want 415", c.what, rec.Code)
+			continue
+		}
+		if got := errorBody(t, rec); got.Kind != api.KindUnsupportedMediaType {
+			t.Errorf("%s: kind %q, want unsupported_media_type", c.what, got.Kind)
+		}
+	}
+	accepted := []string{"application/json", "application/json; charset=utf-8", "Application/JSON"}
+	for _, contentType := range accepted {
+		rec := postWithType(h, api.Prefix+api.RouteTaskStart, body, contentType)
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("Content-Type %q: status %d, want 500 from the service", contentType, rec.Code)
+		}
+	}
+}
+
+// TestNoBodyNeedsNoContentType checks that a call with no body, or only JSON white
+// space, is the zero request and needs no Content-Type: task_current takes none.
+func TestNoBodyNeedsNoContentType(t *testing.T) {
+	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
+	for _, body := range []string{"", " \r\n"} {
+		rec := postWithType(h, api.Prefix+api.RouteTaskCurrent, body, "")
+		if rec.Code != http.StatusInternalServerError {
+			t.Errorf("body %q with no Content-Type: status %d, want 500 from the service", body, rec.Code)
 		}
 	}
 }

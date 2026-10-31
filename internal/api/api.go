@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -65,6 +66,11 @@ const MaxBodyBytes = 1 << 20
 // message is always internalMessage, so the caller never sees the cause. The
 // cause goes to the FailureHook that Handler was given (DESIGN.md §5.4).
 const KindInternal core.Kind = "internal"
+
+// KindUnsupportedMediaType is the error kind of a body whose Content-Type is not
+// application/json. It is answered 415, and is a wire kind like KindInternal: no
+// core call returns it (CONTRACT §1.2).
+const KindUnsupportedMediaType core.Kind = "unsupported_media_type"
 
 const internalMessage = "internal error"
 
@@ -187,10 +193,12 @@ func recoverInternal(w http.ResponseWriter, r *http.Request, onFailure FailureHo
 }
 
 // decode reads the one JSON object of a request body into v. An empty body is
-// the zero request. A key written in the wrong case or given twice is refused
-// (checkKeys). An unknown field, a value of the wrong type, a second value and a
-// body over MaxBodyBytes are refused too, each with the status it earns. The
-// status is returned with the error, and is zero when the body is read.
+// the zero request, and needs no Content-Type. A body with content must be
+// application/json (checkMediaType). A key written in the wrong case or given
+// twice is refused (checkKeys). An unknown field, a value of the wrong type, a
+// second value and a body over MaxBodyBytes are refused too, each with the status
+// it earns. The status is returned with the error, and is zero when the body is
+// read.
 func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	var tooLarge *http.MaxBytesError
@@ -204,6 +212,9 @@ func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
 	if len(bytes.Trim(body, " \t\r\n")) == 0 {
 		return 0, nil
 	}
+	if bad := checkMediaType(r); bad != nil {
+		return http.StatusUnsupportedMediaType, bad
+	}
 	if bad := checkKeys(body, v); bad != nil {
 		return http.StatusBadRequest, bad
 	}
@@ -216,6 +227,17 @@ func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
 		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body holds one JSON object: remove what follows it"}
 	}
 	return 0, nil
+}
+
+// checkMediaType refuses a request whose Content-Type is not application/json, or
+// that has none. Parameters such as charset are accepted. Refusing a missing type
+// as well keeps a form post sent as text/plain out of the decoder (issue #109).
+func checkMediaType(r *http.Request) *core.Error {
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err == nil && media == "application/json" {
+		return nil
+	}
+	return &core.Error{Kind: KindUnsupportedMediaType, Message: "the body must be JSON: send the header Content-Type: application/json"}
 }
 
 // writeFailure writes err as the answer to a call. A core.Error keeps its kind
