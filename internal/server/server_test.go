@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -535,33 +536,64 @@ func TestRunPrintsTheNoKeyLineOnLoopback(t *testing.T) {
 // address as well cannot widen the bind (6-S5). It binds loopback only, and stops at the
 // deadline.
 func TestRunListensAtTheCheckedAddress(t *testing.T) {
-	ctx := context.Background()
-	ips, err := ResolveHost(ctx, "localhost")
+	ips, err := ResolveHost(context.Background(), "localhost")
 	if err != nil || len(ips) == 0 {
 		t.Fatalf("resolve localhost: %v, %v", ips, err)
 	}
-	var out syncBuffer
-	deadline, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+	var logs syncBuffer
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := Run(deadline, Options{Addr: "localhost:0", DB: filepath.Join(t.TempDir(), "cairn.db"), Log: &out}); err != nil {
-		t.Fatalf("Run on localhost: %v", err)
-	}
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, Options{Addr: "localhost:0", DB: filepath.Join(t.TempDir(), "cairn.db"), Log: &logs})
+	}()
+
+	// The test waits for the listening line, not for a deadline: the bind rule, the store and
+	// the migrations all run before the listener, and a clock that starts before them fails on
+	// a slow machine (8-W5). A Run that returns first has refused the bind.
 	var addr string
-	for _, line := range strings.Split(out.String(), "\n") {
-		if strings.Contains(line, `msg=listening`) {
-			for _, field := range strings.Fields(line) {
-				if v, ok := strings.CutPrefix(field, "addr="); ok {
-					addr = strings.Trim(v, `"`)
-				}
+	deadline := time.Now().Add(10 * time.Second)
+	for addr == "" {
+		select {
+		case err := <-done:
+			if err != nil && ips[0].Is6() && strings.Contains(err.Error(), "listen on") {
+				t.Skipf("localhost resolves to %s first, and this machine cannot listen there: %v", ips[0], err)
 			}
+			t.Fatalf("Run returned before it listened: %v; log %q", err, logs.String())
+		default:
+		}
+		if m := listeningAddr.FindStringSubmatch(logs.String()); m != nil {
+			addr = m[1]
+		}
+		if addr == "" {
+			if time.Now().After(deadline) {
+				t.Fatalf("no listening line within 10s; log %q", logs.String())
+			}
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
+
+	// Stop the server before the check, so no test leaves a listener behind when it fails.
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Run returned %v after the stop, want nil", err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Error("Run did not return within 15s of the stop")
+	}
+
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		t.Fatalf("no listening line with an address: %q", out.String())
+		t.Fatalf("the listening address %q: %v", addr, err)
 	}
-	if host != ips[0].String() {
-		t.Errorf("listened on %s, want the first checked address %s", host, ips[0])
+	got, err := netip.ParseAddr(host)
+	if err != nil {
+		t.Fatalf("the listening host %q: %v", host, err)
+	}
+	if got != ips[0] {
+		t.Errorf("listened on %s, want the first checked address %s", got, ips[0])
 	}
 }
 

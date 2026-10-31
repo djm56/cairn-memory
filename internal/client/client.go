@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -45,7 +46,8 @@ var _ core.Service = (*Client)(nil)
 // server uses NewWithKey. base must be an absolute http or https URL with a host, and no
 // query or fragment. hc is the HTTP client the calls use. nil means a client with
 // DefaultTimeout, not http.DefaultClient, which has no timeout. A caller that passes its
-// own client should give it a timeout too.
+// own client should give it a timeout too. Redirects are never followed, whatever hc is:
+// the client copies hc and refuses them (refuseRedirects).
 func New(base string, hc *http.Client) (*Client, error) {
 	return NewWithKey(base, "", hc)
 }
@@ -62,10 +64,27 @@ func NewWithKey(base, key string, hc *http.Client) (*Client, error) {
 	if strings.ContainsFunc(key, func(r rune) bool { return r <= ' ' || r > '~' }) {
 		return nil, errors.New("client: the API key holds a character a request header cannot carry: check CAIRN_API_KEY or the client.env file for a space or a line break")
 	}
+	return &Client{base: strings.TrimRight(base, "/"), key: key, hc: keyedClient(hc)}, nil
+}
+
+// refuseRedirects is the CheckRedirect of every client this package builds. A redirect is an
+// answer and is not followed. net/http keeps the Authorization header across a redirect to the
+// same host on another port or scheme, so following one would send the key to wherever the
+// server pointed. The API never redirects, so refusing costs nothing.
+func refuseRedirects(*http.Request, []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
+// keyedClient returns the HTTP client a Client calls with: hc with redirects refused, or a
+// client with DefaultTimeout when hc is nil. A caller's client is copied, not changed, so its
+// transport and timeout are kept as the caller set them.
+func keyedClient(hc *http.Client) *http.Client {
 	if hc == nil {
-		hc = &http.Client{Timeout: DefaultTimeout}
+		return &http.Client{Timeout: DefaultTimeout, CheckRedirect: refuseRedirects}
 	}
-	return &Client{base: strings.TrimRight(base, "/"), key: key, hc: hc}, nil
+	c := *hc
+	c.CheckRedirect = refuseRedirects
+	return &c
 }
 
 // DisplayURL returns a server URL as it may be printed: with its user name and
@@ -80,6 +99,25 @@ func DisplayURL(base string) string {
 	}
 	u.User = nil
 	return u.String()
+}
+
+// SendsKeyInClear reports whether a key sent to base would cross the network in clear text: base
+// is http, and its host is not on loopback. localhost and an IP address in a loopback range are
+// on loopback. The host is judged by its name and is not resolved, so a name that resolves to a
+// loopback or a LAN address is judged as the name reads (step 8 review S9).
+func SendsKeyInClear(base string) bool {
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return false
+	}
+	if ip, err := netip.ParseAddr(host); err == nil && ip.IsLoopback() {
+		return false
+	}
+	return true
 }
 
 // TaskCurrent sends the task_current call.
@@ -267,6 +305,11 @@ func setCaller(ctx context.Context, h http.Header) error {
 // not the wire form, is a plain error that names the route and the status, and is
 // not a core.Error.
 func failure(base, route string, resp *http.Response) error {
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		// The redirect is not followed, and its Location is not printed: it may carry what the
+		// server should not show. A Cairn server does not redirect a call.
+		return fmt.Errorf("client: %s: the server answered HTTP %d with a redirect, which a call does not follow: check the server URL", route, resp.StatusCode)
+	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		// The server answers 401 for a key that is missing, malformed, unknown or revoked, and
 		// says nothing finer, so the message says only that. It names no key.
