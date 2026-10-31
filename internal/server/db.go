@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/store"
@@ -67,8 +68,10 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 // refuseNewOverRestore refuses to create a database at path when a restore moved one aside and
 // the path is now empty: a file named <path>.pre-restore-* is beside it. Creating then would make
 // an empty server where the restore was interrupted, and the database that was there would look
-// lost. Nothing is created and nothing is moved; the error names the file and the recovery step.
-// A path that exists is not refused here.
+// lost. The same files are kept for good after a restore that succeeded, so the refusal can be
+// stale. The error therefore says "may", names the newest stamp (the database it moved aside
+// last), and lists every stamp found, so an old copy is not taken for the current one (14b-W3).
+// Nothing is created and nothing is moved. A path that exists is not refused here.
 func refuseNewOverRestore(path string) error {
 	if _, err := os.Lstat(path); err == nil || !errors.Is(err, fs.ErrNotExist) {
 		return nil
@@ -82,13 +85,59 @@ func refuseNewOverRestore(path string) error {
 		return fmt.Errorf("look for the files of an interrupted restore beside %s: %w", path, err)
 	}
 	prefix := base + ".pre-restore-"
+	var found []string // names, sorted by os.ReadDir, so the main file of a stamp sorts first
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), prefix) {
-			return fmt.Errorf("no database is at %s, but %s is beside it: a restore was interrupted, and that file is the database it moved aside. Nothing was created. To put the database back, stop cairn serve and move the pre-restore files to their names (README, If a restore fails)",
-				path, filepath.Join(dir, e.Name()))
+			found = append(found, e.Name())
 		}
 	}
-	return nil
+	if len(found) == 0 {
+		return nil
+	}
+	newest, stamps := newestPreRestore(found, prefix)
+	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairn serve, move any file now at %s aside, then run: mv -- %s %s (README, If a restore fails)",
+		path, filepath.Join(dir, newest.name), newest.stamp, strings.Join(stamps, ", "), joinNames(dir, found), path, shellQuote(filepath.Join(dir, newest.name)), shellQuote(path))
+}
+
+// preRestoreFile is a file beside a database that a restore moved aside: its name and the UTC
+// stamp in that name.
+type preRestoreFile struct {
+	name, stamp string
+}
+
+// newestPreRestore returns the pre-restore file with the newest stamp among names, which all begin
+// with prefix, and every distinct stamp found, oldest first. A stamp is fixed-width UTC, so string
+// order is time order. The newest name is the main file of its stamp when that exists, since
+// found is sorted and the main file's name is the shorter.
+func newestPreRestore(found []string, prefix string) (preRestoreFile, []string) {
+	var best preRestoreFile
+	seen := map[string]bool{}
+	var stamps []string
+	for _, name := range found {
+		rest := strings.TrimPrefix(name, prefix)
+		stamp := rest
+		if len(rest) >= len(preRestoreStamp) {
+			stamp = rest[:len(preRestoreStamp)]
+		}
+		if !seen[stamp] {
+			seen[stamp] = true
+			stamps = append(stamps, stamp)
+		}
+		if best.name == "" || stamp > best.stamp {
+			best = preRestoreFile{name: name, stamp: stamp}
+		}
+	}
+	slices.Sort(stamps)
+	return best, stamps
+}
+
+// joinNames returns the names, each joined to dir, in one comma-separated list.
+func joinNames(dir string, names []string) string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = filepath.Join(dir, n)
+	}
+	return strings.Join(out, ", ")
 }
 
 // createDatabaseFile makes the file at path with dbFileMode when it does not exist. An
