@@ -1,6 +1,6 @@
 # Decisions
 
-_Status as of 2026-10-31: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). The wording of each decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions). The lines below only name each one. Reopening a decision needs the operator.
 

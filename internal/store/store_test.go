@@ -283,12 +283,12 @@ func TestMigration0002IndexesAndGuard(t *testing.T) {
 	}
 }
 
-// TestMigrationsRecordVersions checks that a fresh database ends at version 3,
+// TestMigrationsRecordVersions checks that a fresh database ends at version 4,
 // with one row per migration, each recorded by its number and name.
 func TestMigrationsRecordVersions(t *testing.T) {
 	s := openTemp(t)
 	rows := migrationRows(t, s.db)
-	want := []string{"1|schema_v1|", "2|indexes_and_guards|", "3|events_project_guard|"}
+	want := []string{"1|schema_v1|", "2|indexes_and_guards|", "3|events_project_guard|", "4|api_keys|"}
 	if len(rows) != len(want) {
 		t.Fatalf("migration rows = %v, want %d", rows, len(want))
 	}
@@ -460,7 +460,7 @@ func TestLoadMigrationsEmbedsAll(t *testing.T) {
 	want := []struct {
 		version int
 		name    string
-	}{{1, "schema_v1"}, {2, "indexes_and_guards"}, {3, "events_project_guard"}}
+	}{{1, "schema_v1"}, {2, "indexes_and_guards"}, {3, "events_project_guard"}, {4, "api_keys"}}
 	if len(list) != len(want) {
 		t.Fatalf("embedded migrations = %d, want %d", len(list), len(want))
 	}
