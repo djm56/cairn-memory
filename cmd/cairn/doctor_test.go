@@ -130,3 +130,26 @@ func TestDoctorDoesNotFollowARedirect(t *testing.T) {
 		t.Errorf("doctor printed the key")
 	}
 }
+
+// TestDoctorWarnsAboutAKeyInClearText checks 8-S9 at the command: a key found for an http server
+// on a host that is not loopback is warned about, on a transport line that does not fail the
+// check; a loopback server gets no such line. The host here does not resolve, so reach fails on
+// its own and the warning is read from the output beside it. The output holds no key.
+func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://cairn.example.invalid:8788\"\n")
+	code, out, _ := runCmd(t, "doctor")
+	if code != 1 || !strings.Contains(out, "transport warn") || !strings.Contains(out, "in clear text") {
+		t.Errorf("a LAN-style http server: exit %d, output:\n%s; want the transport warning", code, out)
+	}
+	if key := os.Getenv("CAIRN_API_KEY"); strings.Contains(out, key) {
+		t.Errorf("doctor printed the key")
+	}
+
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://127.0.0.1:1\"\n")
+	_, out, _ = runCmd(t, "doctor")
+	if strings.Contains(out, "transport") {
+		t.Errorf("a loopback server got a transport line:\n%s", out)
+	}
+}

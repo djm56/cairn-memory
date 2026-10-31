@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -98,6 +99,25 @@ func DisplayURL(base string) string {
 	}
 	u.User = nil
 	return u.String()
+}
+
+// SendsKeyInClear reports whether a key sent to base would cross the network in clear text: base
+// is http, and its host is not on loopback. localhost and an IP address in a loopback range are
+// on loopback. The host is judged by its name and is not resolved, so a name that resolves to a
+// loopback or a LAN address is judged as the name reads (step 8 review S9).
+func SendsKeyInClear(base string) bool {
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme != "http" {
+		return false
+	}
+	host := u.Hostname()
+	if host == "localhost" {
+		return false
+	}
+	if ip, err := netip.ParseAddr(host); err == nil && ip.IsLoopback() {
+		return false
+	}
+	return true
 }
 
 // TaskCurrent sends the task_current call.

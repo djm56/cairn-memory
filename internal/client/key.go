@@ -92,17 +92,31 @@ func NoKeyMessage() string {
 // names no key. The mode is checked on the open file, so the check and the read are of the
 // same file. Any group or other permission is refused.
 func readKeyFile(path string) (string, error) {
-	f, err := os.Open(path)
+	// Stat follows a symbolic link, so a link is judged by its target, as the open below reads
+	// it. A file that is not regular, such as a named pipe, is refused before the open: opening
+	// a named pipe waits for a writer, and a key file has no business being one (8-S1).
+	info, err := os.Stat(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("read the API key file %s: %w", path, err)
 	}
-	defer f.Close()
-	info, err := f.Stat()
+	if !info.Mode().IsRegular() {
+		return "", notRegular(path)
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("read the API key file %s: %w", path, err)
+	}
+	defer f.Close()
+	// The mode and the kind are checked on the open file, so they are those of the file read.
+	info, err = f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("read the API key file %s: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", notRegular(path)
 	}
 	if mode := info.Mode().Perm(); mode&0o077 != 0 {
 		return "", fmt.Errorf("the API key file %s is open to other users (mode %04o): run chmod 600 %s, then try again", path, mode, path)
@@ -114,16 +128,25 @@ func readKeyFile(path string) (string, error) {
 	return v, nil
 }
 
+// notRegular is the refusal of a key file that is not a regular file. It names the file and the
+// fix, and never a key.
+func notRegular(path string) error {
+	return fmt.Errorf("the API key file %s is not a regular file: replace it with a file that holds the key, as the README shows", path)
+}
+
 // parseKeyFile returns the value of the last CAIRN_API_KEY line in r, or "" when there is
 // none or its value is empty. The file is read as shell-style lines: a blank line or one
-// that starts with # is skipped, a value may be wrapped in one pair of quotes, and any other
-// name is ignored. A line with no '=' is refused by its number and not its text, since it
-// may be a key pasted without its name.
+// that starts with # is skipped, a line may begin with "export ", as a shell's does, a value may
+// be wrapped in one pair of quotes, and any other name is ignored. A line with no '=' is
+// refused by its number and not its text, since it may be a key pasted without its name.
 func parseKeyFile(r io.Reader) (string, error) {
 	var value string
 	sc := bufio.NewScanner(r)
 	for n := 1; sc.Scan(); n++ {
 		line := strings.TrimSpace(sc.Text())
+		if rest, ok := strings.CutPrefix(line, "export "); ok {
+			line = strings.TrimSpace(rest)
+		}
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
