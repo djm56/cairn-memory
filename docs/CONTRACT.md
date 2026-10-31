@@ -388,7 +388,7 @@ refuse a nameless call all the same.
 | Call | In | Does |
 |---|---|---|
 | `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
-| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC, after which the directive is expired; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 42). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
+| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC, after which the directive is expired; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
 | `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
 
@@ -591,21 +591,21 @@ only a core test checks it. An item with no check of its own is marked
     review, finding 4-W1).* Tests: api, core
     and conformance.
 
-40. **Directive cap and ranking (2026-10-31).** `task_current`, `directive_list`
+45. **Directive cap and ranking (2026-10-31).** `task_current`, `directive_list`
     and `recall` return at most 12 directives each (`DirectiveCap`). They are
     ranked: agent-scoped first, then project, then global, and newest first by
     `ratified_at` within each scope, the id breaking a tie (§2, §5, §6). Decision
     D16. *Bishop default, pending operator approval.*
-41. **Expired directives are left out and counted (2026-10-31).** A directive
+46. **Expired directives are left out and counted (2026-10-31).** A directive
     whose `review_by` is before now is not returned by the three reads. Each
     read counts such directives in `expired`. A retired directive is neither
     returned nor counted (§5). *Bishop default, pending operator approval.*
     (core test only: the conformance suite cannot move the clock.)
-42. **review_by on ratify (2026-10-31).** `DirectiveRatify` takes an optional
+47. **review_by on ratify (2026-10-31).** `DirectiveRatify` takes an optional
     `review_by`, a `YYYY-MM-DD` calendar day in UTC that must be after today,
     else `invalid`. Without it, the directive is due 90 days after ratification
     (§8). Decision D16. *Bishop default, pending operator approval.*
-43. **Directive counts are always present (2026-10-31).** The `expired` and
+48. **Directive counts are always present (2026-10-31).** The `expired` and
     `omitted` fields are in every result of the three reads, at 0 when there is
     nothing to count, so a reader never has to tell absent from zero (§5).
     *Bishop default, pending operator approval.*
