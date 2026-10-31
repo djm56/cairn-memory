@@ -138,7 +138,10 @@ func TestDoctorDoesNotFollowARedirect(t *testing.T) {
 func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 	dir := t.TempDir()
 	useDir(t, dir)
-	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://cairn.example.invalid:8788\"\n")
+	// 192.0.2.1 is reserved for documentation (RFC 5737), so no real host answers it. It is not a
+	// name, so no resolver can send the test key to a host of its own choosing (10-S7). Doctor's
+	// reach call gives up after its 5 s timeout, and the warning is read from the output beside it.
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://192.0.2.1:8788\"\n")
 	code, out, _ := runCmd(t, "doctor")
 	if code != 1 || !strings.Contains(out, "transport warn") || !strings.Contains(out, "in clear text") {
 		t.Errorf("a LAN-style http server: exit %d, output:\n%s; want the transport warning", code, out)
@@ -151,5 +154,26 @@ func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 	_, out, _ = runCmd(t, "doctor")
 	if strings.Contains(out, "transport") {
 		t.Errorf("a loopback server got a transport line:\n%s", out)
+	}
+}
+
+// TestAWarningDoesNotFailTheCheck checks the exit rule of cairn doctor: a warn line is printed
+// and leaves the exit code at 0, and only a fail line makes it 1 (10-S6).
+func TestAWarningDoesNotFailTheCheck(t *testing.T) {
+	cases := []struct {
+		name   string
+		checks []check
+		failed bool
+	}{
+		{"all ok", []check{{name: "a", status: "ok"}, {name: "b", status: "ok"}}, false},
+		{"a warning only", []check{{name: "a", status: "ok"}, {name: "transport", status: "warn"}}, false},
+		{"a skip only", []check{{name: "reach", status: "skip"}}, false},
+		{"a fail", []check{{name: "a", status: "ok"}, {name: "key", status: "fail"}}, true},
+		{"a warning and a fail", []check{{name: "transport", status: "warn"}, {name: "key", status: "fail"}}, true},
+	}
+	for _, c := range cases {
+		if got := anyFailed(c.checks); got != c.failed {
+			t.Errorf("%s: anyFailed = %v, want %v", c.name, got, c.failed)
+		}
 	}
 }

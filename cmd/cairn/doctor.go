@@ -20,7 +20,7 @@ const doctorTimeout = 5 * time.Second
 // check is one line of cairn doctor: what was checked, its status and the detail.
 type check struct {
 	name   string
-	status string // "ok", "fail", or "skip" when an earlier check left nothing to check
+	status string // "ok"; "warn" for a finding that does not fail the check; "fail"; or "skip" when an earlier check left nothing to check
 	detail string
 }
 
@@ -68,19 +68,28 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 
 	if serverErr == nil && keyChk.status == "ok" && client.SendsKeyInClear(url) {
 		checks = append(checks, check{name: "transport", status: "warn", detail: fmt.Sprintf(
-			"the API key goes to %s over http, in clear text, to a host that is not loopback: use https, or --behind-proxy with TLS in front",
+			"the API key goes to %s over http, in clear text, to a host that is not loopback: give the server an https address",
 			client.DisplayURL(url))})
 	}
 
-	failed := false
 	for _, c := range checks {
 		fmt.Fprintf(stdout, "%-8s %-5s %s\n", c.name, c.status, c.detail)
-		failed = failed || c.status == "fail"
 	}
-	if failed {
+	if anyFailed(checks) {
 		return 1
 	}
 	return 0
+}
+
+// anyFailed reports whether a check failed. Only "fail" fails the command: "warn" is printed
+// and does not change the exit code (10-S6).
+func anyFailed(checks []check) bool {
+	for _, c := range checks {
+		if c.status == "fail" {
+			return true
+		}
+	}
+	return false
 }
 
 // keyCheck is the key line: where the key was found, and never the key. A key found in either

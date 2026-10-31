@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // EnvKey is the environment variable that holds the API key a client sends (DESIGN.md
@@ -95,23 +96,20 @@ func readKeyFile(path string) (string, error) {
 	// Stat follows a symbolic link, so a link is judged by its target, as the open below reads
 	// it. A file that is not regular, such as a named pipe, is refused before the open: opening
 	// a named pipe waits for a writer, and a key file has no business being one (8-S1).
-	info, err := os.Stat(path)
+	// The open is non-blocking (8-S1, step 10 review 10-S3). Opening a named pipe for reading
+	// waits for a writer, so a FIFO swapped in for the file would hang the open. Non-blocking,
+	// the open returns at once, and the kind check on the descriptor refuses the FIFO. A
+	// regular file reads the same either way, so the flag changes nothing else.
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
 	if err != nil {
 		return "", fmt.Errorf("read the API key file %s: %w", path, err)
 	}
-	if !info.Mode().IsRegular() {
-		return "", notRegular(path)
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("read the API key file %s: %w", path, err)
-	}
 	defer f.Close()
 	// The mode and the kind are checked on the open file, so they are those of the file read.
-	info, err = f.Stat()
+	info, err := f.Stat()
 	if err != nil {
 		return "", fmt.Errorf("read the API key file %s: %w", path, err)
 	}

@@ -48,11 +48,15 @@ func realListener(t *testing.T, db string) string {
 		defer close(done)
 		runErr = Run(ctx, Options{Addr: "127.0.0.1:0", DB: db, Log: &logs})
 	}()
+	// ready is set once the listener has logged its address. Before that, a Run that ended
+	// has already been reported by the t.Fatalf below, so the cleanup must not report it again
+	// (10-S7).
+	ready := false
 	t.Cleanup(func() {
 		cancel()
 		select {
 		case <-done:
-			if runErr != nil {
+			if ready && runErr != nil {
 				t.Errorf("Run returned %v after the stop, want nil", runErr)
 			}
 		case <-time.After(15 * time.Second):
@@ -62,6 +66,7 @@ func realListener(t *testing.T, db string) string {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if m := listeningAddr.FindStringSubmatch(logs.String()); m != nil {
+			ready = true
 			return "http://" + m[1]
 		}
 		select {
