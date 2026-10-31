@@ -12,17 +12,34 @@ import (
 // The caller names the database and the fix; the store only reports the fact.
 var ErrInUse = errors.New("the database is in use")
 
+// ErrNotDatabase is returned by AcquireExclusive when the file cannot be read as an SQLite
+// database at all: its header is not SQLite's, or its schema is damaged past reading. Nothing
+// can have it open as a database, so the caller may treat it as a file, not as a database.
+var ErrNotDatabase = errors.New("the file is not a readable SQLite database")
+
 // exclusiveBusyTimeout is how long AcquireExclusive waits for a connection that holds the
 // database. It is short: a busy database is refused at once, and the caller says so.
 const exclusiveBusyTimeout = "250"
+
+// sqliteNotADB and sqliteCorrupt are the primary result codes SQLITE_NOTADB (a file that is not
+// a database) and SQLITE_CORRUPT (a database image that is malformed).
+const (
+	sqliteNotADB   = 26
+	sqliteCorrupt  = 11
+	readDSNOptions = "_busy_timeout=5000&_foreign_keys=1"
+)
 
 // OpenExisting opens the database at path without applying migrations. The file must
 // exist and hold a Cairn schema: a file with no schema version is refused as not a Cairn
 // database, and one whose version is newer than this build's migrations is refused as
 // the schema of a newer build. The backup and restore paths use it, so a backup is never
 // changed to a newer schema on the way out, and a backup is verified without being
-// migrated. It writes nothing that a read would not, apart from the journal mode the
-// connection sets, which a Cairn database already has.
+// migrated.
+//
+// The connection does not set a journal mode. A file keeps the mode it has, so a refused
+// file is not changed at all: it is not switched to WAL on the way to the refusal. Opening
+// a WAL database creates its -wal and -shm, as any open does, and the close removes them
+// again when this is the last connection.
 //
 // Read function: call it on the returned Store, outside a transaction.
 func OpenExisting(path string) (*Store, error) {
@@ -31,7 +48,7 @@ func OpenExisting(path string) (*Store, error) {
 		return nil, fmt.Errorf("store: load migrations: %w", err)
 	}
 	latest := migrations[len(migrations)-1].version
-	db, err := sql.Open("sqlite", path+"?"+dsnOptions)
+	db, err := sql.Open("sqlite", path+"?"+readDSNOptions)
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
 	}
@@ -124,14 +141,43 @@ type ExclusiveLock struct {
 	conn *sql.Conn
 }
 
+// CheckReadable reports whether the file at path can be read as an SQLite database with a schema.
+// It returns an error wrapping ErrNotDatabase when it cannot, and nil when it can. The file is
+// opened read-only, and that matters: on the close of a read-write open of a file it cannot read,
+// SQLite deletes the -wal beside it, and a restore must never be the one that deletes a -wal. A
+// read-only open leaves the -wal as it is, and it may create an empty -shm beside an unreadable
+// file.
+func CheckReadable(ctx context.Context, path string) error {
+	db, err := sql.Open("sqlite", "file:"+uriPath(path)+"?mode=ro&_busy_timeout="+exclusiveBusyTimeout)
+	if err != nil {
+		return fmt.Errorf("store: open %s: %w", path, err)
+	}
+	var n int
+	qerr := db.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master").Scan(&n)
+	cerr := db.Close()
+	if qerr != nil {
+		return errors.Join(probeError(qerr, path), cerr)
+	}
+	return cerr
+}
+
+// uriPath escapes the characters of a file path that a file: URI reads as its own syntax, so the
+// path is opened as it is written.
+func uriPath(path string) string {
+	return strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(path)
+}
+
 // AcquireExclusive takes the exclusive lock on the database at path, which must exist. It
-// returns ErrInUse when another connection has the database open, an idle server included.
+// returns ErrInUse when another connection has the database open: an idle server holds it
+// too, and so does a server that is writing. It returns ErrNotDatabase when the file cannot
+// be read as a database at all.
 //
 // The lock is taken with locking_mode=EXCLUSIVE and a read, not with BEGIN EXCLUSIVE alone.
 // In WAL mode BEGIN EXCLUSIVE is the same as BEGIN IMMEDIATE, which an idle reader does not
 // block, so it would let a running server through. The exclusive locking mode needs every
 // other connection to have released the database's shared memory, and the read is what
-// asks for it. The probe is checked against an open, idle server in internal/store's tests.
+// asks for it. internal/store's tests check the probe against an open idle store, against
+// a store with a writer running, and against a closed one.
 func AcquireExclusive(ctx context.Context, path string) (*ExclusiveLock, error) {
 	db, err := sql.Open("sqlite", path+"?_busy_timeout="+exclusiveBusyTimeout)
 	if err != nil {
@@ -140,36 +186,65 @@ func AcquireExclusive(ctx context.Context, path string) (*ExclusiveLock, error) 
 	db.SetMaxOpenConns(1)
 	conn, err := db.Conn(ctx)
 	if err != nil {
-		return nil, errors.Join(busyOr(err, path), db.Close())
+		return nil, errors.Join(probeError(err, path), db.Close())
 	}
 	steps := []string{"PRAGMA locking_mode=EXCLUSIVE", "BEGIN EXCLUSIVE"}
 	for _, q := range steps {
 		if _, err := conn.ExecContext(ctx, q); err != nil {
-			return nil, errors.Join(busyOr(err, path), conn.Close(), db.Close())
+			return nil, errors.Join(probeError(err, path), conn.Close(), db.Close())
 		}
 	}
 	var n int
 	if err := conn.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master").Scan(&n); err != nil {
-		return nil, errors.Join(busyOr(err, path), rollbackAndClose(ctx, conn), db.Close())
+		return nil, errors.Join(probeError(err, path), rollbackAndClose(ctx, conn), db.Close())
 	}
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
-		return nil, errors.Join(busyOr(err, path), conn.Close(), db.Close())
+		return nil, errors.Join(probeError(err, path), conn.Close(), db.Close())
 	}
 	return &ExclusiveLock{db: db, conn: conn}, nil
 }
 
-// Release gives the lock up by closing the probe connection. Closing the last connection
-// lets SQLite checkpoint and remove the database's -wal and -shm, so the lock and the
-// files' state are released together.
+// Consolidate makes the database file hold every commit on its own. It folds the -wal into
+// the file with a full checkpoint, then switches the database to the DELETE journal mode,
+// which removes the -wal and -shm. It must run while the lock is held and before the file
+// is moved. A checkpoint that is not complete is an error: busy must be 0, and the frames
+// logged must equal the frames checkpointed. A database that is not in WAL mode reports
+// -1 for both, which is complete, as there is nothing to fold.
+//
+// It changes the file's contents only by writing the -wal's commits into it, which makes no
+// difference to any reader.
+func (l *ExclusiveLock) Consolidate(ctx context.Context) error {
+	var busy, logged, done int
+	if err := l.conn.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)").Scan(&busy, &logged, &done); err != nil {
+		return fmt.Errorf("store: checkpoint: %w", err)
+	}
+	if busy != 0 || logged != done {
+		return fmt.Errorf("store: checkpoint incomplete: busy %d, %d frames logged, %d checkpointed", busy, logged, done)
+	}
+	var mode string
+	if err := l.conn.QueryRowContext(ctx, "PRAGMA journal_mode=DELETE").Scan(&mode); err != nil {
+		return fmt.Errorf("store: switch the journal mode to DELETE: %w", err)
+	}
+	if mode != "delete" {
+		return fmt.Errorf("store: switch the journal mode to DELETE: the database reports %q", mode)
+	}
+	return nil
+}
+
+// Release gives the lock up by closing the probe connection. The database is not written
+// by the close: Consolidate has already left it in the DELETE mode, with no -wal to fold.
 func (l *ExclusiveLock) Release() error {
 	return errors.Join(l.conn.Close(), l.db.Close())
 }
 
-// busyOr returns ErrInUse, wrapped with the path, when err is SQLITE_BUSY; any other error is
-// returned as it is, with the path.
-func busyOr(err error, path string) error {
-	if isBusy(err) {
+// probeError classifies an error from the probe: SQLITE_BUSY is ErrInUse, a file that is not a
+// database or is malformed is ErrNotDatabase, and any other error is returned with the path.
+func probeError(err error, path string) error {
+	switch {
+	case isBusy(err):
 		return fmt.Errorf("%s: %w", path, ErrInUse)
+	case resultCode(err, sqliteNotADB), resultCode(err, sqliteCorrupt):
+		return fmt.Errorf("%s: %w: %v", path, ErrNotDatabase, err)
 	}
 	return fmt.Errorf("store: lock %s: %w", path, err)
 }

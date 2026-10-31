@@ -108,7 +108,7 @@ func register(s *Server, svc core.Service) {
 		})
 
 	addTool(s, "directive_list",
-		"Directives for this project, ranked agent, project, global; at most 12. expired: past review_by, left out. omitted: beyond the 12. agent narrows to one role.", false,
+		"Directives for this project, ranked agent, project, global; at most 12. expired: past review_by, left out. omitted: beyond the 12. agent: one role, or empty for every role.", false,
 		func(ctx context.Context, in directiveListIn) (any, error) {
 			return svc.DirectiveList(ctx, core.DirectiveListRequest{Agent: in.Agent})
 		})

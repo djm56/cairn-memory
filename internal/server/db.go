@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/store"
@@ -44,6 +45,9 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 		return nil, err
 	}
 	if create {
+		if err := refuseNewOverRestore(path); err != nil {
+			return nil, err
+		}
 		if err := createDatabaseFile(path); err != nil {
 			return nil, err
 		}
@@ -58,6 +62,33 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 		return nil, fmt.Errorf("open the database: %w", err)
 	}
 	return st, nil
+}
+
+// refuseNewOverRestore refuses to create a database at path when a restore moved one aside and
+// the path is now empty: a file named <path>.pre-restore-* is beside it. Creating then would make
+// an empty server where the restore was interrupted, and the database that was there would look
+// lost. Nothing is created and nothing is moved; the error names the file and the recovery step.
+// A path that exists is not refused here.
+func refuseNewOverRestore(path string) error {
+	if _, err := os.Lstat(path); err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	dir, base := filepath.Split(path)
+	if dir == "" {
+		dir = "."
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("look for the files of an interrupted restore beside %s: %w", path, err)
+	}
+	prefix := base + ".pre-restore-"
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), prefix) {
+			return fmt.Errorf("no database is at %s, but %s is beside it: a restore was interrupted, and that file is the database it moved aside. Nothing was created. To put the database back, stop cairn serve and move the pre-restore files to their names (README, If a restore fails)",
+				path, filepath.Join(dir, e.Name()))
+		}
+	}
+	return nil
 }
 
 // createDatabaseFile makes the file at path with dbFileMode when it does not exist. An

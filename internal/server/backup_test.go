@@ -88,6 +88,7 @@ func TestBackupWhileWritesRun(t *testing.T) {
 	}
 	defer st.Close()
 
+	const txRows = 3
 	var committed atomic.Int64
 	stop := make(chan struct{})
 	writerDone := make(chan error, 1)
@@ -99,12 +100,18 @@ func TestBackupWhileWritesRun(t *testing.T) {
 				return
 			default:
 			}
-			name := fmt.Sprintf("w%06d", i)
+			// Each transaction writes txRows rows that belong together. A copy holding part of one
+			// would show a group of fewer than txRows, which the check below refuses.
 			err := st.WithTx(context.Background(), func(q store.Querier) error {
-				_, err := store.AddAPIKey(context.Background(), q, store.APIKeyNew{
-					Name: name, Hash: "hash-" + name, Scope: "agent", CreatedAt: time.Now().UTC(),
-				})
-				return err
+				for j := 0; j < txRows; j++ {
+					name := fmt.Sprintf("w%06d-%d", i, j)
+					if _, err := store.AddAPIKey(context.Background(), q, store.APIKeyNew{
+						Name: name, Hash: "hash-" + name, Scope: "agent", CreatedAt: time.Now().UTC(),
+					}); err != nil {
+						return err
+					}
+				}
+				return nil
 			})
 			if err != nil {
 				writerDone <- err
@@ -139,14 +146,22 @@ func TestBackupWhileWritesRun(t *testing.T) {
 	}
 
 	assertIntegrityOK(t, out)
-	got := 0
+	// Group the writer's rows by transaction. Each group must be whole in the copy: all txRows
+	// rows or none, never a part (14-S9). Every transaction committed before Backup began must be
+	// in the copy.
+	groups := map[string]int{}
 	for _, name := range keyNames(t, out) {
 		if strings.HasPrefix(name, "w") {
-			got++
+			groups[name[:strings.LastIndex(name, "-")]]++
 		}
 	}
-	if int64(got) < before {
-		t.Errorf("the backup holds %d writer rows, want at least the %d committed before it started", got, before)
+	for tx, n := range groups {
+		if n != txRows {
+			t.Errorf("transaction %s is partly in the backup: %d of %d rows", tx, n, txRows)
+		}
+	}
+	if int64(len(groups)) < before {
+		t.Errorf("the backup holds %d writer transactions, want at least the %d committed before it started", len(groups), before)
 	}
 }
 

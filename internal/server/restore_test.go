@@ -346,9 +346,10 @@ func TestRestoreReplacesAndKeepsTheOldFiles(t *testing.T) {
 			t.Errorf("%s is still at the database name after the restore", target+suffix)
 		}
 	}
-	// The -wal and -shm are not kept as files. SQLite folds the -wal into the database it is
-	// closing and removes both on its clean close. The state they held is in the kept database,
-	// as the keys above show. Only the database file is asserted kept.
+	// The -wal is folded into the database before the move, and the switch to DELETE removes it,
+	// so no pre-restore -wal is kept. The -shm may be moved beside the database. The state the
+	// -wal held is in the kept database, as the keys above show. The exact listing and the report
+	// are asserted in TestRestoreFoldsTheWALIntoTheKeptDatabase.
 	info, err := os.Stat(target)
 	if err != nil {
 		t.Fatal(err)

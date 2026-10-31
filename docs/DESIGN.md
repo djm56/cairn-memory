@@ -499,31 +499,58 @@ API restarts when its source changes under it, which a busy server does
 constantly.
 
 **Restore.** The steps run in this order and stop at the first refusal, with
-nothing changed:
+nothing changed unless the step says otherwise:
 
-1. The backup is copied beside the database, and the copy is checked there: it
+1. Stdin must be a terminal. This is checked first, so nothing is read, locked or
+   copied before it. The operator types the database path exactly as given, at
+   step 4. There is no `--yes` flag in M2.
+2. The backup is copied beside the database, and the copy is checked there: it
    opens, `PRAGMA integrity_check` returns `ok`, and its schema is not newer than
    this build. The checked copy is the one put in place, so the bytes verified
-   are the bytes restored.
-2. If the database exists, it must not be in use. An exclusive lock is taken with
-   `locking_mode=EXCLUSIVE` and a read, and an idle open server holds the lock
-   against it. `BEGIN EXCLUSIVE` alone does not do this in WAL mode, where it
-   behaves as `BEGIN IMMEDIATE` and an idle reader is not blocked. The lock is
-   held through the moves.
-3. Stdin must be a terminal, and the operator types the database path exactly as
-   given. There is no `--yes` flag in M2.
-4. The database, with its `-wal` and `-shm`, is moved to `<db>.pre-restore-<UTC>`
-   (`20261031T101112Z`). Each target name must be free before the first move, and
-   a move that fails undoes the ones before it. Nothing is deleted.
-5. The checked copy is renamed to the database path, and the database is opened,
+   are the bytes restored. A refused copy is removed with any `-wal` or `-shm`
+   beside it, after the copy is closed.
+3. If the database exists, it is first checked with a read-only open. A file that
+   cannot be read as SQLite is not opened for writing at all: it takes no lock,
+   and it is moved as it is at step 5. A readable database must not be in use. An
+   exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
+   or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
+   do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is
+   not blocked. The lock is held through the moves.
+4. The operator types the database path. A prompt for an absent database says so.
+5. For a readable database, under the lock and before any move, its `-wal` is
+   folded in with `PRAGMA wal_checkpoint(TRUNCATE)`, which must report no busy
+   frames and every logged frame checkpointed, and the database is switched to
+   `journal_mode=DELETE`, which removes the `-wal` and `-shm`. A failure here stops
+   the restore before anything moves. Then the files of the set that exist are
+   moved to `<db>.pre-restore-<UTC>` (`20261031T101112Z`), in this order: the
+   database file first, then its `-wal`, then its `-shm`. Each target name must be
+   free before the first change, and a move that fails undoes the ones before it.
+   Any file of the set still there after the moves is moved too. Each move is
+   reported, and the directory is synced. An unreadable file is moved as it is,
+   with no checkpoint, and the output says it was not a readable database.
+   An absent database with a stray `-wal` or `-shm` beside its path has those
+   moved to `<db>.pre-restore-<UTC>-wal` and `-shm` first, and reported.
+6. The checked copy is renamed to the database path, and the database is opened,
    which migrates it to this build's schema.
 
-The `-wal` and `-shm` are moved first, but they are not kept as files. Closing the
-probe's connection after the moves makes SQLite fold the `-wal` into the database it
-is closing and remove both files. So the pre-restore database alone holds the state
-the server last saw, including what was only in its `-wal`. That is tested
-(`TestRestoreReplacesAndKeepsTheOldFiles`). Keeping the raw `-wal` bytes too would
-need a copy taken before the probe closes; M2 does not do that.
+Nothing is deleted at any step. The move order is database, `-wal`, `-shm`, the
+order the code uses. Once the checkpoint has run, the `-wal` is gone and the
+database file alone holds the state, including what was only in its `-wal`. That
+is tested by the directory listing and by reading a copy of the pre-restore
+database file alone (`TestRestoreFoldsTheWALIntoTheKeptDatabase`). The `-shm` is
+not removed by the switch, so it is kept and moved with the database, as the
+report shows.
+
+**If a restore fails.** Every error after the first move names the pre-restore
+path and the step that puts the database back. That step is: stop `cairn serve`,
+move any file now at `<db>` aside, then move each pre-restore file back to its
+name with `mv`. The files are the ones the restore printed as moved: normally
+`<db>.pre-restore-<UTC>`, and `<db>.pre-restore-<UTC>-shm` if it printed that one.
+A restore that stopped before its first move changed nothing to undo. While a
+`<db>.pre-restore-*` file sits beside an absent database path, `cairn serve` and
+`cairn key add` refuse to create a database there, and name the file, so an
+interrupted restore does not become an empty server. The same steps are in the
+README under "If a restore fails".
 
 ### 5.3 The server
 

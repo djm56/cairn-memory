@@ -27,8 +27,9 @@ var stdinIsTerminal = func() bool {
 // after a usage error.
 const restoreUsage = "Usage: cairn restore --db <file> <backup>\n\n" +
 	"Replaces the server's database at <file> with the backup. The backup is checked first. The\n" +
-	"database there now is moved, with its -wal and -shm, to <file>.pre-restore-<UTC time>, and\n" +
-	"is never deleted. You confirm by typing <file> at a terminal. There is no flag to skip it.\n"
+	"database there now has its -wal folded in, then is moved to <file>.pre-restore-<UTC time>,\n" +
+	"and is never deleted. You confirm by typing <file> at a terminal. There is no flag to skip it.\n" +
+	"If a restore fails, the message says which files to move back: see README, If a restore fails.\n"
 
 // runRestore is the sub-command `cairn restore` (DESIGN.md §5.2, M2 #74): it names the database
 // and the backup, and hands them to server.Restore, which checks the backup, takes the lock,

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/store"
@@ -66,13 +67,39 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	}
 	// VACUUM INTO writes into the empty file just made, and keeps its mode. A file it
 	// could not finish is removed, so no partial copy is left under the name.
-	if err := st.Backup(ctx, out); err != nil {
+	if err := copyBackup(ctx, st, out); err != nil {
 		_ = os.Remove(out)
 		return 0, err
+	}
+	// The copy and its name are on disk before the backup is reported made (14-S7). A copy that
+	// cannot be flushed is removed, so a retry is not refused by a file that is not whole.
+	if err := syncPath(out); err != nil {
+		_ = os.Remove(out)
+		return 0, fmt.Errorf("flush the backup file %s: %w", out, err)
+	}
+	if err := syncPath(filepath.Dir(out)); err != nil {
+		_ = os.Remove(out)
+		return 0, fmt.Errorf("flush the directory of the backup file %s: %w", out, err)
 	}
 	info, err := os.Stat(out)
 	if err != nil {
 		return 0, fmt.Errorf("read the backup file %s: %w", out, err)
 	}
 	return info.Size(), nil
+}
+
+// copyBackup writes the copy of st to out. It is st.Backup, and a test replaces it to make the
+// copy fail part way, so the removal of a partial out can be checked.
+var copyBackup = func(ctx context.Context, st *store.Store, out string) error {
+	return st.Backup(ctx, out)
+}
+
+// syncPath flushes the file or directory at p to stable storage. A directory is opened read-only
+// and synced, which makes the names in it durable.
+func syncPath(p string) error {
+	f, err := os.Open(p)
+	if err != nil {
+		return err
+	}
+	return errors.Join(f.Sync(), f.Close())
 }

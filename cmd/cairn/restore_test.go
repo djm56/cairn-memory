@@ -68,17 +68,45 @@ func TestRestoreCommandRestoresAtATerminal(t *testing.T) {
 	if !strings.Contains(stdout, "moved "+db+" to "+db+".pre-restore-") || !strings.Contains(stdout, "restored "+db) {
 		t.Errorf("the report %q does not say what moved where", stdout)
 	}
-	// The database's -wal and -shm are kept beside it under the same stamp, so the count is of
-	// the database files only.
+	// The -wal is folded into the database before the move, so no pre-restore -wal is kept. A -shm
+	// may be moved beside the database, and the report must name it. The count is of the database
+	// files, and each one must be named as a move.
 	matches, err := filepath.Glob(db + ".pre-restore-*")
 	var main []string
 	for _, m := range matches {
-		if !strings.HasSuffix(m, "-wal") && !strings.HasSuffix(m, "-shm") {
+		if strings.HasSuffix(m, "-wal") {
+			t.Errorf("a pre-restore -wal was kept: %s", m)
+		}
+		if !strings.HasSuffix(m, "-shm") {
 			main = append(main, m)
+		}
+		if !strings.Contains(stdout, " to "+m+"\n") {
+			t.Errorf("the report %q does not name the move to %s", stdout, m)
 		}
 	}
 	if err != nil || len(main) != 1 {
 		t.Errorf("pre-restore database files = %v (%v), want exactly one", main, err)
+	}
+}
+
+// TestRestoreCommandNamesTheNoDatabasePrompt checks 14-S3: restoring into a path with no database
+// says so in the prompt, and does not say a database is moved.
+func TestRestoreCommandNamesTheNoDatabasePrompt(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "fresh.db")
+	makeServerDB(t, filepath.Join(dir, "src.db"))
+	backup := filepath.Join(dir, "backup.db")
+	if code, _, stderr := runCmd(t, "backup", "--db", filepath.Join(dir, "src.db"), backup); code != 0 {
+		t.Fatalf("make the backup: exit %d, %q", code, stderr)
+	}
+
+	restoreSeams(t, strings.NewReader(db+"\n"), true)
+	code, stdout, stderr := runCmd(t, "restore", "--db", db, backup)
+	if code != 0 {
+		t.Fatalf("restore into an absent path: exit %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "No database is at "+db) || strings.Contains(stdout, "The database there now is moved") {
+		t.Errorf("the prompt for an absent database = %q, want it to say no database is there", stdout)
 	}
 }
 
