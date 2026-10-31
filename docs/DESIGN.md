@@ -52,7 +52,8 @@ Cairn has four jobs:
   D11)*. `cairn mcp` and the CLI require `server` in `.cairn.toml` or
   `CAIRN_SERVER`. The local database path that D2 designed (the MCP adapter
   opening a database when no server is set) was cut by D11 before it was built.
-  M1 builds the server-only adapter *(decision D2, superseded by D11)*.
+  M1 builds the server-only adapter *(decision D2, superseded by D11)*, and the
+  `internal/api` handlers with no network listener (decision D19).
 - **The operator decides.** Agents propose findings and directives. Only the
   operator accepts them. No tool lets an agent change a finding's status or
   ratify a rule.
@@ -357,7 +358,9 @@ Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 
 The target after M1: one server, no local backend. D2 designed a local backend,
 and D11 cut it before it was built; §5.3, "The server", says what replaces it.
-M1 builds the server-only adapter.
+M1 builds the server-only adapter and the `internal/api` handlers. It builds no
+network listener and no `cairn serve`: `cairn serve` is M2, and M1's tests run
+against an in-process server (D19).
 
 ```
             ┌──────────── project ─────────────┐
@@ -388,8 +391,8 @@ M1 builds the server-only adapter.
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. |
-| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Planned, M1: handlers only, with no listener (D19). The `cairn serve` listener that mounts them is M2. |
+| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Planned, M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. |
 | `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
 | `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
@@ -408,7 +411,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 |---|---|
 | `cairn init` | Writes `.cairn.toml` in the current project and registers the project. Planned, M1. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). |
-| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2; the web UI is M3. |
+| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is planned, M1; `pre-compact` and `stop` are planned, M4. |
 | `cairn status` | The active task and the server in use, for a terminal. Planned, M1. |
 | `cairn export <task>` | A task as Markdown (`export task`, planned, M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
@@ -424,7 +427,8 @@ any other backend. A behaviour exists when the conformance suite says so.
 Clients open no database. `cairn mcp` and the CLI send each call to
 `cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
 without a `server` (M1). The store stays inside `cairn serve`, and the web UI
-is served by the same process.
+is served by the same process. Until M2 there is no listener to send to, so
+M1's flow runs against an in-process server (D19).
 
 D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend

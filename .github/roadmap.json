@@ -18,12 +18,12 @@
     {
       "key": "M1",
       "title": "M1 Server-mode MCP",
-      "description": "Exit: A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M2",
       "title": "M2 Server",
-      "description": "Exit: Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M3",
@@ -151,7 +151,7 @@
       "title": "M1 Server-mode MCP",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:epic", "m1", "area:mcp"],
-      "body": "**Work.** `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, and `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine; `cairn export task` prints it.\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,p3-live-flow-check,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision,m1-export-project-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
+      "body": "**Work.** `internal/mcp` over `internal/client`; `internal/api` handlers over `core`, with no network listener (D19); `cairn mcp` refuses to start without a server; 13 tools plus recall and search; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, and `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` is M2's exit check (#19).\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision,m1-export-project-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
     },
     {
       "key": "p3-mcp-tools",
@@ -201,17 +201,17 @@
       "title": "MCP-level test of the task flow over stdio",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Exit.** An MCP-level test drives the same flow through stdio. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-stdio-flow-test -->"
+      "body": "**Exit.** An MCP stdio test drives a small task flow through `cairn mcp`, `internal/client`, `internal/api` and `core` against the in-process server. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-stdio-flow-test -->"
     },
     {
       "key": "p3-live-flow-check",
       "phase": 3,
-      "mkey": "M1",
+      "mkey": "M2",
       "area": "area:mcp",
       "title": "Live Claude Code run of a small task against cairn serve",
-      "milestone": "M1 Server-mode MCP",
-      "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine, and `cairn export task` prints it. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
+      "milestone": "M2 Server",
+      "labels": ["type:task", "m2", "area:mcp"],
+      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine, and `cairn export task` prints it. Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
     },
     {
       "key": "m1-requires-server",
@@ -361,7 +361,7 @@
       "title": "M2 Server",
       "milestone": "M2 Server",
       "labels": ["type:epic", "m2", "area:server"],
-      "body": "**Work.** `cairn serve`: the HTTP API over `core`, TLS by files or behind a proxy, loopback default, body caps, `/healthz`. Keys with `agent`, `operator` and `viewer` scopes (D13). `cairn key add/list/revoke`. `cairn backup <path>` using SQLite online backup. A systemd unit in `docs/`. The directive cap (12 per call, ranked, D16) and `review_by` on directives.\n\n**Exit check.** Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set.\n\n**Guided by.** bishop-memory, for reference: `internal/auth/keys.go`, `internal/middleware`, `internal/config`, the TLS and key handling in `cmd/memoryd`, and the network tests (`internal/api/network_test.go`).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m2-viewer-scope,m2-backup-restore,m2-deploy-docs,m2-directive-cap,m2-review-by,m2-tls-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p5-epic -->"
+      "body": "**Work.** `cairn serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or behind a proxy, loopback default, body caps, `/healthz`. Keys with `agent`, `operator` and `viewer` scopes (D13). `cairn key add/list/revoke`. `cairn backup <path>` using SQLite online backup. A systemd unit in `docs/`. The directive cap (12 per call, ranked, D16) and `review_by` on directives.\n\n**Exit check.** Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it.\n\n**Guided by.** bishop-memory, for reference: `internal/auth/keys.go`, `internal/middleware`, `internal/config`, the TLS and key handling in `cmd/memoryd`, and the network tests (`internal/api/network_test.go`).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m2-viewer-scope,m2-backup-restore,m2-deploy-docs,m2-directive-cap,m2-review-by,m2-tls-decision,p3-live-flow-check -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p5-epic -->"
     },
     {
       "key": "m2-viewer-scope",
