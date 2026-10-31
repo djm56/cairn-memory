@@ -10,7 +10,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// operatorRoutes are the four calls of CONTRACT §8, by their route constants.
+// operatorRouteList is the four calls of CONTRACT §8, by their route constants.
 var operatorRouteList = []string{
 	api.RouteLearningDecide,
 	api.RouteDirectiveRatify,
