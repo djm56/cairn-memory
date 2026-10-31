@@ -12,7 +12,7 @@ import (
 // sequence, a bell, a carriage return and a bidi override, so every print path has
 // something to remove. Its one-line form is serverErrorLine.
 const (
-	serverErrorMessage = "boom\x1b[2J one‮ two​\a\rthree"
+	serverErrorMessage = "boom\x1b[2J one\u202e two\u200b\a\rthree"
 	serverErrorLine    = "boom one two three"
 )
 
@@ -85,7 +85,7 @@ func TestServerErrorTextIsOneLineOnEveryPath(t *testing.T) {
 		if !strings.Contains(stdout, "reach    fail  "+serverErrorLine+"\n") {
 			t.Errorf("doctor lacks the one-line detail:\n%s", stdout)
 		}
-		if strings.ContainsAny(stdout+stderr, "\x1b\a\r‮​") {
+		if strings.ContainsAny(stdout+stderr, "\x1b\a\r\u202e\u200b") {
 			t.Errorf("doctor prints a control or format character: stdout %q, stderr %q", stdout, stderr)
 		}
 	})
