@@ -95,6 +95,13 @@ func refuseNewOverRestore(path string) error {
 		return nil
 	}
 	newest, stamps := newestPreRestore(found, prefix)
+	if newest.name == "" {
+		// Only -wal or -shm files are beside the path (a restore with the database absent moves
+		// just those). None is a database, so no mv is offered: putting one at the database path
+		// would be wrong (16-S2).
+		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere, and move these files aside before you start cairn serve here (README, If a restore fails)",
+			path, strings.Join(stamps, ", "), joinNames(dir, found), base)
+	}
 	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairn serve, move any file now at %s aside, then run: mv -- %s %s (README, If a restore fails)",
 		path, filepath.Join(dir, newest.name), newest.stamp, strings.Join(stamps, ", "), joinNames(dir, found), path, shellQuote(filepath.Join(dir, newest.name)), shellQuote(path))
 }
@@ -107,8 +114,9 @@ type preRestoreFile struct {
 
 // newestPreRestore returns the pre-restore file with the newest stamp among names, which all begin
 // with prefix, and every distinct stamp found, oldest first. A stamp is fixed-width UTC, so string
-// order is time order. The newest name is the main file of its stamp when that exists, since
-// found is sorted and the main file's name is the shorter.
+// order is time order. The file returned is the main file (no -wal or -shm suffix) of the newest
+// stamp that has one: a -wal or -shm is never the file to put back at the database path. When no
+// stamp has a main file, the returned file is the zero value (16-S2).
 func newestPreRestore(found []string, prefix string) (preRestoreFile, []string) {
 	var best preRestoreFile
 	seen := map[string]bool{}
@@ -122,6 +130,9 @@ func newestPreRestore(found []string, prefix string) (preRestoreFile, []string) 
 		if !seen[stamp] {
 			seen[stamp] = true
 			stamps = append(stamps, stamp)
+		}
+		if rest != stamp || len(rest) != len(preRestoreStamp) {
+			continue // a -wal, -shm or other suffix: counted as a stamp, never chosen
 		}
 		if best.name == "" || stamp > best.stamp {
 			best = preRestoreFile{name: name, stamp: stamp}

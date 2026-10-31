@@ -158,7 +158,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 			case errors.Is(err, store.ErrNotDatabase):
 				// The file read as a database a moment ago and does not now: it changed under the
 				// check, or it is damaged in a way the lock finds and the check did not (14b-S2).
-				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairn serve if it runs, check the file with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
+				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairn serve if it runs, check the file as the user that owns it, the service user for a service (the sqlite3 command-line tool may need installing) with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
 			case err != nil:
 				return err
 			}
@@ -471,7 +471,7 @@ func unchanged(locked bool) string {
 // it (14b-S3).
 func checkFailure(db string, err error) error {
 	if _, serr := os.Lstat(db + "-journal"); serr == nil {
-		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairn serve, open the database once with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",
+		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairn serve, then open the database once as the user that owns it (for the service, sudo -u cairn; the sqlite3 command-line tool may need installing) with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",
 			err, db+"-journal", shellQuote(db))
 	}
 	return fmt.Errorf("%w; nothing was moved or deleted", err)
