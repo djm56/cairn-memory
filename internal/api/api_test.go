@@ -226,8 +226,9 @@ func TestMalformedRequestsAreInvalid(t *testing.T) {
 }
 
 // TestUnknownPathIsNotACall checks that a path which is no call is answered 404
-// with the kind invalid, and names where the calls are. A missing trailing
-// slash and a missing prefix both count.
+// with the kind no_route, and that its message points at the server base URL and
+// names where the calls are. A missing trailing slash and a missing prefix both
+// count.
 func TestUnknownPathIsNotACall(t *testing.T) {
 	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
 	for _, path := range []string{
@@ -241,9 +242,23 @@ func TestUnknownPathIsNotACall(t *testing.T) {
 			continue
 		}
 		got := errorBody(t, rec)
-		if got.Kind != core.KindInvalid || !strings.Contains(got.Message, "/v1/agent") {
+		if got.Kind != api.KindNoRoute || !strings.Contains(got.Message, "check the server base URL") || !strings.Contains(got.Message, "/v1/agent") {
 			t.Errorf("%s: body = %+v", path, got)
 		}
+	}
+}
+
+// TestMissingTaskIsNotFound checks that a call for a task that does not exist is
+// answered 404 with the kind not_found, not no_route: the route is a call, and
+// the entity is missing. It runs over a real Local.
+func TestMissingTaskIsNotFound(t *testing.T) {
+	h := api.Handler(openLocal(t), api.UnauthenticatedHeaderCaller, nil)
+	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskGet, `{"id":"task-20261031-99"}`, agentHeaders)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+	if got := errorBody(t, rec); got.Kind != core.KindNotFound {
+		t.Errorf("kind %q, want not_found", got.Kind)
 	}
 }
 

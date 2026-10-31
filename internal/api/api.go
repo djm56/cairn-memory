@@ -72,6 +72,10 @@ const KindInternal core.Kind = "internal"
 // core call returns it (CONTRACT §1.2).
 const KindUnsupportedMediaType core.Kind = "unsupported_media_type"
 
+// KindNoRoute is the error kind of a path that is no call. It is answered 404. A
+// missing entity is not_found, and a method other than POST is 405 (DESIGN §5.4).
+const KindNoRoute core.Kind = "no_route"
+
 const internalMessage = "internal error"
 
 // ErrorBody is the body of every error answer:
@@ -277,11 +281,13 @@ func statusOf(kind core.Kind) int {
 }
 
 // notFound answers a path that is no call. A call of the wrong method is not a
-// missing call, and is answered by call.
+// missing call, and is answered by call. The message points at the base URL,
+// since a mis-set base is the usual reason for a path to miss.
 func notFound(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusNotFound, &core.Error{
-		Kind:    core.KindInvalid,
-		Message: "no call at " + r.URL.Path + ": agent calls are under " + Prefix + "/agent, operator calls under " + Prefix + "/operator",
+		Kind: KindNoRoute,
+		Message: "no call at " + r.URL.Path + ": check the server base URL. Calls are POST to " +
+			Prefix + "/agent/<call> and " + Prefix + "/operator/<call>",
 	})
 }
 
