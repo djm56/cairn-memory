@@ -120,7 +120,11 @@ when that is set and not blank. Otherwise it takes it from the
 when no other user can read or write it (mode 0600 or stricter, else the client
 refuses it and says `chmod 600`). The path is fixed, not taken from
 `XDG_CONFIG_HOME`. The client sends the key as `Authorization: Bearer <key>` on
-every call, and no command prints it. The plugin's secure option (M5) will set
+every call, and no command prints it. The client does not follow a redirect, so
+the key is never sent to a second address. A `client.env` that is a symbolic
+link is judged by the file it names, and one that is not a regular file is
+refused. A line may begin with `export `. `cairn doctor` warns when a key would
+go over `http` to a host that is not loopback. The plugin's secure option (M5) will set
 `CAIRN_API_KEY`. Nor does a user name or a
 password in the server URL: `cairn init` refuses one, and no command prints a URL
 with them.
@@ -486,7 +490,9 @@ an existing SQLite file to make it the server's own database.
   so no other user reads it. SQLite gives the `-wal` and `-shm` files beside it
   the mode of the database file, so they are 0600 too, and the umask can only
   narrow that. A file that already exists keeps its mode. A `:memory:` name or a
-  `file:` URI is refused, since its data is gone when the process exits.
+  `file:` URI is refused, since its data is gone when the process exits. A
+  symbolic link to a file that does not exist is refused by name, so nothing is
+  made at its target at the wrong mode.
 - `--tls-cert` and `--tls-key` are PEM files. Give both or neither.
 - `--behind-proxy` says a proxy in front of the server terminates TLS.
 
@@ -514,8 +520,8 @@ each, and `IdleTimeout` 120 seconds. TLS is at least 1.2. On SIGINT or SIGTERM
 the server stops taking calls, and gives calls in flight 10 seconds to finish.
 
 `GET /healthz` answers `200` with a fixed body, needs no key, and reveals no
-version or configuration. Any other method on it is `405`, `HEAD` included, as
-decision 7 sets. The server has no connection cap and no request-rate cap. A flood
+version or configuration. Any other method on it is `405`, `HEAD` included. The
+server has no connection cap and no request-rate cap. A flood
 of calls with bad keys costs one indexed lookup each, so a cap belongs to the
 proxy or the firewall in front, not to the server.
 
@@ -741,8 +747,13 @@ status; they only recommend.
   hash or the key. `cairn key revoke` ends a key at its next call, since the server
   reads the key table on every call. A revoked key keeps its name, so a name is
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
-  and may not begin with `cairn_`. The 256 random bits are what make a fast hash enough: a guess of the key
-  is not the attack a slow hash defends against. Each key has one scope:
+  and may not begin with `cairn_`. `cairn key revoke` checks the name the same
+  way, before it looks anything up, so a key pasted as a name is refused and is
+  not echoed. If `cairn key add` cannot write the key to stdout, the key was made
+  and nobody has seen it, so `add` revokes it and exits 1.
+
+  The 256 random bits are what make a fast hash enough: a guess of the key is
+  not the attack a slow hash defends against. Each key has one scope:
   `agent` (the MCP tools), `operator` (decisions and ratification), or `viewer`
   (read-only: the read routes pass, and every write route answers `403`
   `read_only`). Plan v1 (decision D13) drops the `admin` scope from the design.

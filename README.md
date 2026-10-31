@@ -118,8 +118,10 @@ cairn key revoke --db ./cairn.db --name ci
 `--scope` is `agent` for the MCP tools, `operator` for decisions and
 ratification, or `viewer` for read-only access. `key add` prints the key once,
 on stdout. Store it then: nothing shows it again. The database keeps only its
-hash. `key revoke` ends the key at its next call, and a revoked name is not
-reused. `key list` and `key revoke` need a database that exists.
+hash. `key add` creates the database when it does not exist, owner-only, and
+says so on stderr. `key revoke` ends the key at its next call, and a revoked
+name is not reused. `key list` and `key revoke` need a database that exists.
+If `key add` cannot write the key to stdout, it revokes the key and exits 1.
 
 ### Setting up a client
 
@@ -129,15 +131,18 @@ A client sends its key with every call. Give it in one of two places:
 # Either, in the environment of the client:
 export CAIRN_API_KEY=cairn_...
 
-# Or, in a file only you can read:
-mkdir -p ~/.config/cairn
-printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env
-chmod 600 ~/.config/cairn/client.env
+# Or, in a file only you can read. The directory is 0700, and the subshell's
+# umask makes the file 0600 from the moment it exists:
+mkdir -p -m 700 ~/.config/cairn
+(umask 077 && printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env)
 ```
 
 `CAIRN_API_KEY` is read first. A `client.env` that any other user can read or
-write is refused, and the client says `chmod 600`. `cairn doctor` reports where
-the key was found, and whether the server accepted it. It never prints the key.
+write is refused, and the client says `chmod 600`. A line may also read
+`export CAIRN_API_KEY=...`. The client does not follow a redirect, so the key
+is never sent to a second address. `cairn doctor` reports where the key was
+found, and whether the server accepted it. It warns when a key would go over
+plain `http` to a host that is not loopback, and it never prints the key.
 
 ## Documentation
 
