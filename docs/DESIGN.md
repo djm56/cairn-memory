@@ -472,7 +472,9 @@ an existing SQLite file to make it the server's own database.
 ### 5.4 The HTTP wire form
 
 `internal/api` serves the `Service` over HTTP, and `internal/client` is a
-`Service` that calls it. Defined in M1 (2026-10-30). M2 serves this form on
+`Service` that calls it. Defined in M1 (2026-10-30), and tightened in M2
+(2026-10-31) before any listener existed: the request rules and the versioning
+rule below are the M2 text. M2 serves this form on
 `cairn serve`, and from then on it is public API. It is written here rather
 than in CONTRACT.md because CONTRACT says what each call does for an MCP
 client and the CLI. This section is how the adapter reaches the server.
@@ -481,13 +483,21 @@ client and the CLI. This section is how the adapter reaches the server.
   for the 15 calls of §4. Operator calls (CONTRACT §8) go to
   `/v1/operator/<call>`. The names are the snake_case tool names: `task_current`,
   `task_start` … `search`, and `learning_decide`, `directive_ratify`,
-  `directive_retire`, `project_settings_set`. A path that is no call is `404`.
-  A method other than `POST` is `405`, with `Allow: POST`.
+  `directive_retire`, `project_settings_set`. A path that is no call is `404`,
+  with the kind `no_route` and a message that names the server base URL to
+  check. A method other than `POST` is `405`, with `Allow: POST`.
 - **Request.** A JSON object with the call's fields, as the request types in
   `internal/core` name them. `task_current` takes none: an empty body or `{}`.
-  An unknown field, a value of the wrong type, a second JSON value, and a body
-  over 1 MiB are refused: `400`, or `413` for the size. The server refuses
-  unknown fields, so a misspelt field is not dropped.
+  A body with content must be sent as `application/json`. A parameter such as
+  `charset` is accepted. A missing or other type is `415`, with the kind
+  `unsupported_media_type`. A body that is empty, or only white space, is the
+  zero request and needs no type. Each key must be written as its field is
+  named, in the same case (`"title"`, not `"Title"`). A key given twice is
+  refused at any level, so `400`. Event data has no field names, so it takes
+  any key case, but a repeated key in it is still refused. An unknown field, a
+  value of the wrong type, a second JSON value, and a body over 1 MiB are
+  refused too: `400`, or `413` for the size. The server refuses unknown fields,
+  so a misspelt field is not dropped.
 - **Caller.** The headers `X-Cairn-Project`, `X-Cairn-Agent`,
   `X-Cairn-Session`, `X-Cairn-Client` and `X-Cairn-Role` carry the caller
   (CONTRACT §1.1). A call with no project is `invalid`. `X-Cairn-Role` is
@@ -505,10 +515,12 @@ client and the CLI. This section is how the adapter reaches the server.
 
   | Kind | Status |
   |---|---|
-  | `invalid` (including a malformed request, a bad path or a bad method) | 400, or 404 for a bad path, 405 for a bad method, 413 for a body over the cap |
-  | `operator_only` | 403 |
-  | `not_found` | 404 |
+  | `invalid` (a malformed request, including a key in the wrong case or given twice) | 400, 405 for a bad method, 413 for a body over the cap |
+  | `no_route` (a path that is no call) | 404 |
+  | `not_found` (a missing task, step, learning or directive) | 404 |
+  | `unsupported_media_type` (a body that is not `application/json`) | 415 |
   | `refused` | 409 |
+  | `operator_only` | 403 |
   | `internal` | 500 |
 
   `internal` is a wire kind, not a core kind. It is the answer to any error
@@ -516,10 +528,15 @@ client and the CLI. This section is how the adapter reaches the server.
   recovers. Its message is always `internal error`, so the caller never sees
   the cause. The cause goes to the failure hook that `api.Handler` is given
   (`FailureHook`, nil discards it), so the server can keep it for its own
-  record. A `http.ErrAbortHandler` panic is not recovered.
+  record. A `http.ErrAbortHandler` panic is not recovered. `no_route` and
+  `unsupported_media_type` are wire kinds too, for the two request faults that
+  core never sees (CONTRACT §1.2).
 - **The client.** It returns the `core.Error` the server named, with the same
-  kind, message and missing list. Any other failure is a plain error that names
-  the route and the status, and it is not a `core.Error`. The client ignores
+  kind, message and missing list. A `no_route` answer is the exception: its
+  message names the base URL the client was given, since the server cannot know
+  it. Every body the client sends is `application/json`. Any other failure is a
+  plain error that names the route and the status, and it is not a `core.Error`.
+  The client ignores
   unknown response fields, so the server can add a field without a new prefix.
   Event data that is not JSON cannot be sent in a request body, so the client
   refuses that call before it is sent, with the message core gives for the
@@ -533,12 +550,31 @@ client and the CLI. This section is how the adapter reaches the server.
   With no HTTP client given, `client.New` uses one with a 30-second timeout. A
   successful answer over 16 MiB is an error. The server does not cap its
   answers, so the cap is the client's guard.
-- **Versions.** A breaking change takes a new prefix (`/v2`).
+- **Versions.** The form stays at `/v1` until a breaking change, which takes a
+  new prefix (`/v2`). A breaking change is one of these:
+  - removing or renaming a field or a route;
+  - changing the type or the meaning of a field;
+  - adding a required request field;
+  - refusing a request the server accepted before.
+
+  Anything else is compatible, under two rules. Upgrade the server before its
+  clients: always. Adding an optional request field is compatible only once the
+  servers are upgraded, since an older server refuses the new field as unknown
+  (`400`). Adding a response field is compatible, because the client ignores
+  unknown response fields (pinned by a client test).
+
+  The request rules above (exact keys, no repeated keys, `application/json`, and
+  `no_route`) were settled on 2026-10-31, before any listener existed. No client
+  was written against the form they refuse, so they are not a break of a served
+  form. They apply from the first release of `cairn serve`.
 
 Tests: `internal/client` runs the whole conformance suite over an `httptest`
 server on loopback that wraps the handlers over a real `core` (D19).
 `internal/api` tests the statuses, the error body, malformed requests, the
-headers and the events key.
+headers and the events key, and the key-case, repeated-key, Content-Type and
+route rules (`strict_test.go`, `api_test.go`). `internal/client` tests the
+no_route message, the Content-Type it sends and its tolerance of extra response
+fields (`wire_test.go`).
 
 ## 6. Clients
 
