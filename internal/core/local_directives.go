@@ -82,8 +82,11 @@ type directiveSet struct {
 }
 
 // directivesFor returns the directives that apply to a caller in project, as the
-// three directive reads give them. agent narrows the agent-scoped ones to that
-// role, and an empty agent includes all of them (CONTRACT §5).
+// three directive reads give them. The agent-scoped ones are those of agent, the
+// caller's role. With allAgents set, every role's agent-scoped directives are
+// included instead, which only directive_list with no agent asks for. With it
+// unset and agent empty, no agent-scoped directive is included (CONTRACT §5,
+// §9 item 49).
 //
 // A directive whose review_by is before now is expired: it is left out and
 // counted. A retired directive is never listed and is not counted as expired.
@@ -91,8 +94,8 @@ type directiveSet struct {
 // beyond the cap is omitted.
 //
 // Read function: call it on the store or inside a transaction.
-func directivesFor(ctx context.Context, q store.Querier, project, agent string, now time.Time) (directiveSet, error) {
-	rows, err := store.ListActiveDirectives(ctx, q, project, agent)
+func directivesFor(ctx context.Context, q store.Querier, project, agent string, allAgents bool, now time.Time) (directiveSet, error) {
+	rows, err := store.ListActiveDirectives(ctx, q, project, agent, allAgents)
 	if err != nil {
 		return directiveSet{}, err
 	}
@@ -116,9 +119,10 @@ func directivesFor(ctx context.Context, q store.Querier, project, agent string, 
 }
 
 // DirectiveList returns the active directives the caller's project applies:
-// every global one, the project's own, and the agent-scoped ones (narrowed to
-// req.Agent when it is set). Retired directives are never listed. The list is
-// ranked and capped at DirectiveCap; expired and omitted directives are counted.
+// every global one, the project's own, and the agent-scoped ones. req.Agent
+// narrows the agent-scoped ones to that role; with it empty, every role's are
+// included. Retired directives are never listed. The list is ranked and capped at
+// DirectiveCap; expired and omitted directives are counted.
 func (l *Local) DirectiveList(ctx context.Context, req DirectiveListRequest) (*DirectiveList, error) {
 	c, err := callerFor(ctx, false)
 	if err != nil {
@@ -127,7 +131,8 @@ func (l *Local) DirectiveList(ctx context.Context, req DirectiveListRequest) (*D
 	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
-	set, err := directivesFor(ctx, l.st, c.Project, req.Agent, l.now())
+	// An empty agent asks for every role: that is the explicit listing (CONTRACT §5).
+	set, err := directivesFor(ctx, l.st, c.Project, req.Agent, req.Agent == "", l.now())
 	if err != nil {
 		return nil, err
 	}

@@ -283,7 +283,10 @@ learning in one codebase reaches the next.
 Built (decision D16, M2): each directive has a `review_by` date, 90 days from
 ratification by default. Directives returned by `task_current`, `directive_list`
 and `recall` are ranked and capped at 12 per call: agent-scoped first, then
-project, then global, and newest first within each. A directive past its
+project, then global, and newest first within each. `task_current` and `recall`
+give the agent-scoped directives of the caller's own role only, so another role's
+cannot fill the cap; `directive_list` lists every role when no agent is named
+(CONTRACT §9 item 49). A directive past its
 `review_by` is expired: it is left out of those calls and counted in `expired`.
 The directives beyond the cap are counted in `omitted`. The UI flags expired
 directives in M3.
@@ -369,7 +372,7 @@ differs from it only there).
 
 | Tool | Purpose |
 |---|---|
-| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply. The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
+| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply: those of the project and of the caller's role (`agent`, optional; CONTRACT §9 item 49). The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
 | `task_start` | Create a task with its brief (title, goal, context, constraints, criteria, key files) and, optionally, its plan. Returns the id. |
 | `task_get` | One task in full, or one section of it (`brief`, `steps`, `events`, `close`). `section: events` is the journal, paged; it replaces `event_list` in M1. |
 | `task_list` | Recent tasks in this project, filtered by status. |

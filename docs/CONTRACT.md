@@ -45,7 +45,9 @@ client, and a role. The adapter sets it; request types do not carry it.
   viewer's read of such a project is `not_found` and writes no row (§9 items 38
   and 44).
 - **Agent.** Required for every write (each tool marked *write* below). It is
-  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
+  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. The
+  reads `task_current` and `recall` take it too, as the caller's role, which names
+  its agent-scoped directives (§2, §6, §9 item 49). A name
   of only spaces counts as no name, and is `invalid`. A name with a control
   character, or a space at either end, is `invalid` on every call, reads
   included. A client name and a session name of that kind are `invalid` too, on
@@ -140,11 +142,12 @@ task_start (queue)                  task_start
 
 The first call of a session.
 
-**In:** nothing.
+**In:** `agent` (optional): the caller's role, which names its agent-scoped
+directives (§9 item 49). Without it, no agent-scoped directive is listed.
 **Out:** `task` (null when no task is active), `criteria`, `steps`,
 `recent_events` (newest first, at most 5), `directives` (those that apply
-to the project, as `directive_list` with no agent, ranked and capped at 12),
-`expired` and `omitted` (the directive counts, §5), and `other_active`
+to the project and to the caller's role, ranked and capped at 12, as §5
+gives them for that role), `expired` and `omitted` (the directive counts, §5), and `other_active`
 (when parallel tasks are on and more than one is active, `task` is the one
 started last). The answer is one consistent snapshot: every part is read from
 the same state of the project (§9 item 35).
@@ -334,7 +337,8 @@ default only the caller's project); `target`; `limit` (default 20); `cursor`.
 **Out:** `directives`, `expired` and `omitted`. The list holds active
 directives only: every `global` one, the `project` ones for the caller's
 project, and `agent` ones. With `agent` set, the `agent` ones are limited to
-that role. With `agent` empty, all of them are included.
+that role. With `agent` empty, all of them are included: this is the explicit
+listing of every role, and it is the one read that asks for it (§9 item 49).
 
 The list is ranked: `agent` directives first, then `project`, then `global`,
 and newest first by `ratified_at` within each scope. The id breaks a tie. At
@@ -348,10 +352,13 @@ Retired directives are neither listed nor counted.
 
 ### `recall` — read
 
-**In:** `goal` (required); `agent` (narrows directives, as in
-`directive_list`); `limit` per list (default 5).
-**Out:** `directives` (those that apply to the caller's project, ranked and
-capped as in `directive_list`, with the same `expired` and `omitted` counts),
+**In:** `goal` (required); `agent` (the caller's role: its agent-scoped
+directives are the ones listed, §9 item 49; with it empty the caller's own
+agent is used, and with neither, no agent-scoped directive is listed); `limit`
+per list (default 5).
+**Out:** `directives` (those that apply to the caller's project and role,
+ranked and capped as in `directive_list`, with the same `expired` and `omitted`
+counts),
 plus `lessons`, `mistakes` and `tasks` from **every project**, best match to
 the goal first. Each lesson and mistake carries its `task_id` and `project`.
 
@@ -620,3 +627,12 @@ only a core test checks it. An item with no check of its own is marked
     `omitted` fields are in every result of the three reads, at 0 when there is
     nothing to count, so a reader never has to tell absent from zero (§5).
     *Bishop default, pending operator approval.*
+49. **Agent-scoped directives count for the caller's own role (2026-10-31).**
+    `task_current` and `recall` list the agent-scoped directives of the caller's
+    role only: the `agent` the call names (`recall` falls back to the caller's
+    own), and none when there is no role. An empty role is no role, not every
+    role. A reviewer's directives therefore cannot fill the cap of a main
+    session. `directive_list` is the one read that lists every role when `agent`
+    is empty, and that stays so: it is the explicit listing. Found in the step 12
+    review (12-W1). *Bishop default, pending operator approval.* (core and
+    conformance tests)
