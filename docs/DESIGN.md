@@ -53,7 +53,8 @@ Cairn has four jobs:
   `CAIRN_SERVER`. The local database path that D2 designed (the MCP adapter
   opening a database when no server is set) was cut by D11 before it was built.
   M1 builds the server-only adapter *(decision D2, superseded by D11)*, and the
-  `internal/api` handlers with no network listener in the shipped binary (decision D19).
+  `internal/api` handlers, with no network listener in the M1 binary (decision D19).
+  M2 adds `cairn serve`, the binary's one listener (decision D20).
 - **The operator decides.** Agents propose findings and directives. Only the
   operator accepts them. No tool lets an agent change a finding's status or
   ratify a rule.
@@ -113,8 +114,14 @@ project = "acme-api"          # required; lowercase letters, digits, hyphens
 server = "https://cairn.lan:8788"   # required from M1 (decision D11); D2's local database was never built
 ```
 
-The API key never goes in this file. It comes from the plugin's secure option,
-`CAIRN_API_KEY`, or `~/.config/cairn/client.env`. Nor does a user name or a
+The API key never goes in this file. A client takes it from `CAIRN_API_KEY`
+when that is set and not blank. Otherwise it takes it from the
+`CAIRN_API_KEY=<key>` line of `~/.config/cairn/client.env`, which is read only
+when no other user can read or write it (mode 0600 or stricter, else the client
+refuses it and says `chmod 600`). The path is fixed, not taken from
+`XDG_CONFIG_HOME`. The client sends the key as `Authorization: Bearer <key>` on
+every call, and no command prints it. The plugin's secure option (M5) will set
+`CAIRN_API_KEY`. Nor does a user name or a
 password in the server URL: `cairn init` refuses one, and no command prints a URL
 with them.
 
@@ -390,9 +397,9 @@ planned for M4.
 
 The target after M2: one server, no local backend. D2 designed a local backend,
 and D11 cut it before it was built; §5.3, "The server", says what replaces it.
-M1 builds the server-only adapter and the `internal/api` handlers. It builds no
-network listener in the shipped binary and no `cairn serve`: `cairn serve` is M2, and M1's tests run
-against an in-process server (D19).
+M1 builds the server-only adapter and the `internal/api` handlers. In M1 the
+shipped binary had no network listener and no `cairn serve`: `cairn serve` came
+in M2, and M1's tests ran against an in-process server (D19).
 
 ```
             ┌──────────── project ─────────────┐
@@ -423,7 +430,7 @@ against an in-process server (D19).
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The shipped binary has no network listener (D19). The `cairn serve` listener that mounts them is M2. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The M1 binary had no network listener (D19). The `cairn serve` listener of M2 mounts them (D20). |
 | `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
 | `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. Built in M1. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
@@ -443,11 +450,11 @@ any other backend. A behaviour exists when the conformance suite says so.
 |---|---|
 | `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
-| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
+| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
-| `cairn key add/list/revoke` | API keys for server mode. Planned, M2. |
+| `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
 | `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
 | `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
@@ -475,7 +482,11 @@ an existing SQLite file to make it the server's own database.
 - `--addr` is the address to listen on. It defaults to `127.0.0.1:8788`, which
   is the port of the server example in §2.1.
 - `--db` is the SQLite file the server keeps its data in. It has no default: the
-  operator names the file. It is created when it does not exist.
+  operator names the file. It is created when it does not exist, with mode 0600,
+  so no other user reads it. SQLite gives the `-wal` and `-shm` files beside it
+  the mode of the database file, so they are 0600 too, and the umask can only
+  narrow that. A file that already exists keeps its mode. A `:memory:` name or a
+  `file:` URI is refused, since its data is gone when the process exits.
 - `--tls-cert` and `--tls-key` are PEM files. Give both or neither.
 - `--behind-proxy` says a proxy in front of the server terminates TLS.
 
@@ -490,6 +501,11 @@ listens:
 - A non-loopback bind also needs at least one active API key (§8).
 - A loopback server with no active key starts. It prints one line on stderr
   saying every call is refused with `401` until a key exists.
+- `--behind-proxy` with no TLS files, on a non-loopback address, prints one line
+  on stderr. It says the server serves plain HTTP and that the proxy in front must
+  terminate TLS, and that the port must be reachable only from that proxy. Without
+  that, a client that can reach the port can go round the proxy and send its key
+  in the clear.
 
 The listener has these limits. Each call's body is capped at 1 MiB (§5.4), and
 the server as a whole at 1 MiB plus 64 KiB. The header block is capped at 64 KiB.
@@ -498,7 +514,10 @@ each, and `IdleTimeout` 120 seconds. TLS is at least 1.2. On SIGINT or SIGTERM
 the server stops taking calls, and gives calls in flight 10 seconds to finish.
 
 `GET /healthz` answers `200` with a fixed body, needs no key, and reveals no
-version or configuration. Any other method on it is `405`.
+version or configuration. Any other method on it is `405`, `HEAD` included, as
+decision 7 sets. The server has no connection cap and no request-rate cap. A flood
+of calls with bad keys costs one indexed lookup each, so a cap belongs to the
+proxy or the firewall in front, not to the server.
 
 The server logs the method, the route path and the cause of each internal
 failure, and the cause of each failed `last_used_at` write. It never logs a
@@ -716,7 +735,13 @@ status; they only recommend.
   bind rules and the limits are in §5.3.
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
   `cairn_` and 32 random bytes in unpadded base64url, shown once when it is
-  made. The 256 random bits are what make a fast hash enough: a guess of the key
+  made. `cairn key add` makes one in the server's database and prints it once on
+  stdout, with a warning on stderr. The database keeps only the hash, and nothing
+  logs the key. `cairn key list` shows each key's name, scope and times, never the
+  hash or the key. `cairn key revoke` ends a key at its next call, since the server
+  reads the key table on every call. A revoked key keeps its name, so a name is
+  never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
+  and may not begin with `cairn_`. The 256 random bits are what make a fast hash enough: a guess of the key
   is not the attack a slow hash defends against. Each key has one scope:
   `agent` (the MCP tools), `operator` (decisions and ratification), or `viewer`
   (read-only: the read routes pass, and every write route answers `403`

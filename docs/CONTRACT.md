@@ -576,6 +576,6 @@ only a core test checks it. An item with no check of its own is marked
     No operator route is a read, so no viewer read of an operator route arises.
     A viewer's read of a project that has no row is `not_found`, and writes no
     row, so a viewer key cannot create a project. An agent's first read of the
-    project still creates it (§1.1). *Decided 2026-10-31: the Bishop default,
-    which the operator may veto (step 4 review, finding 4-W1).* Tests: api, core
+    project still creates it (§1.1). *Bishop default, operator veto open (step 4
+    review, finding 4-W1).* Tests: api, core
     and conformance.
