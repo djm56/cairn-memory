@@ -14,6 +14,8 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
@@ -137,6 +139,26 @@ var routeAccess = map[string]access{
 	RouteDirectiveRatify:    accessWrite,
 	RouteDirectiveRetire:    accessWrite,
 	RouteProjectSettingsSet: accessWrite,
+}
+
+// RouteInfo is one route of the table, as a caller outside this package reads it. The
+// server's exit tests walk Routes, so a route added to the table is tested without a
+// list of its own.
+type RouteInfo struct {
+	Route    string // the route, relative to Prefix: the call's path is Prefix+Route
+	Write    bool   // a viewer key is refused on a write route (DESIGN.md §5.4)
+	Operator bool   // only an operator key may make the call (CONTRACT §8)
+}
+
+// Routes returns every route of the table, sorted by path. It reads the same marks
+// Handler mounts from, so a route that is in the table is one the handler serves.
+func Routes() []RouteInfo {
+	out := make([]RouteInfo, 0, len(routeAccess))
+	for route, a := range routeAccess {
+		out = append(out, RouteInfo{Route: route, Write: a == accessWrite, Operator: operatorRoutes[route]})
+	}
+	slices.SortFunc(out, func(a, b RouteInfo) int { return strings.Compare(a.Route, b.Route) })
+	return out
 }
 
 // accessOf returns the mark of route. A route with no mark is a fault in the
