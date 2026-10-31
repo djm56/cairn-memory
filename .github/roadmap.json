@@ -18,7 +18,7 @@
     {
       "key": "M1",
       "title": "M1 Server-mode MCP",
-      "description": "Exit: An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` on another machine is M2's exit check (#19), since M1 builds no listener and no `cairn serve` (D19).\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` on another machine is M2's exit check (#19), since M1 builds no network listener in the shipped binary and no `cairn serve` (D19).\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M2",
