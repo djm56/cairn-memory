@@ -77,3 +77,29 @@ func TestClientIgnoresExtraResponseFields(t *testing.T) {
 		t.Errorf("result %+v, want the known task id", res)
 	}
 }
+
+// TestUnknownWireKindIsAPlainError checks that a wire kind this client does not
+// know reaches it as a plain error, not a core.Error, so adding a wire kind is a
+// compatible change (DESIGN §5.4). The error names the route and the status.
+func TestUnknownWireKindIsAPlainError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"error":{"kind":"quota_exceeded","message":"a kind this client was not written for"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := client.New(srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.TaskCurrent(agentCtx())
+	if err == nil {
+		t.Fatal("no error from a failed call")
+	}
+	if kind := core.KindOf(err); kind != "" {
+		t.Errorf("an unknown kind read as kind %q, want none", kind)
+	}
+	if !strings.Contains(err.Error(), "HTTP 422") || !strings.Contains(err.Error(), api.RouteTaskCurrent) {
+		t.Errorf("error %q does not name the route and the status", err)
+	}
+}

@@ -561,7 +561,10 @@ client and the CLI. This section is how the adapter reaches the server.
   clients: always. Adding an optional request field is compatible only once the
   servers are upgraded, since an older server refuses the new field as unknown
   (`400`). Adding a response field is compatible, because the client ignores
-  unknown response fields (pinned by a client test).
+  unknown response fields (pinned by a client test). Adding a wire error kind
+  is compatible too: a client reads a kind it does not know as a plain error,
+  which names the route and the status and is not a `core.Error`, so the caller
+  gets the failure without its kind or message (pinned by a client test).
 
   The request rules above (exact keys, no repeated keys, `application/json`, and
   `no_route`) were settled on 2026-10-31, before any listener existed. No client

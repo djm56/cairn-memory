@@ -396,7 +396,7 @@ that is not a numbered decision here, and the table says what.
   `--tls-cert` and `--tls-key`. It binds loopback by default. It refuses a
   non-loopback bind without TLS unless `--behind-proxy` is given, so a proxy
   that terminates TLS is a choice the operator makes, not a default. DEPLOY.md
-  documents both setups. *Answers the open question in §10 on TLS.*
+  will document both setups. *Answers the open question in §10 on TLS.*
 
 **Chosen by Bishop under the operator's veto, 2026-10-31 (issue #109): D21.**
 
