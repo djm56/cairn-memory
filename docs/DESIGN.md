@@ -118,6 +118,18 @@ The API key never goes in this file. It comes from the plugin's secure option,
 password in the server URL: `cairn init` refuses one, and no command prints a URL
 with them.
 
+`cairn init` writes the file in `CLAUDE_PROJECT_DIR` when Claude Code sets it,
+else in the working directory. Where `CLAUDE_PROJECT_DIR` is set, it refuses to
+run from a working directory outside it (exit 1): the variable is inherited by
+the shells Claude Code starts, and a `cd` into another project would otherwise
+write that project's file into the first one's root. Both directories are
+resolved through their symlinks before they are compared. It never overwrites a
+file. Where the filesystem has hard links it writes the file whole or not at all
+(a temporary file, then a link). On a filesystem without them it writes the file
+directly, with `O_EXCL`, which still refuses an existing name, but a crash can
+leave the file partly written. The file is created with mode 0644 before the
+umask.
+
 The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
 key of the nearest `.cairn.toml`, found by the same walk (M1). `CAIRN_SERVER`
 is read first, and an empty value counts as unset. A call with neither is

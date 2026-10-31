@@ -140,6 +140,8 @@ func writeInitHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: cairn init --project <name> --server <url>")
 	fmt.Fprintln(w, "Writes .cairn.toml in the project directory: CLAUDE_PROJECT_DIR when it is set, else the working directory.")
 	fmt.Fprintln(w, "It changes nothing that is already there.")
+	fmt.Fprintln(w, "It refuses to run from a working directory outside CLAUDE_PROJECT_DIR, when that is set.")
+	fmt.Fprintln(w, "It writes the file whole or not at all where the filesystem has hard links. On one without them it writes the file directly, and a crash can leave it partly written.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
 }
