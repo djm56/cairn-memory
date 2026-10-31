@@ -89,18 +89,25 @@ func ensureProject(ctx context.Context, q store.Querier, project string, now tim
 }
 
 // ensureReadProject makes sure the caller's project exists before a read. A
-// read usually finds the row and writes nothing. Only the first call of a new
-// project opens a write transaction.
-func (l *Local) ensureReadProject(ctx context.Context, project string) error {
-	_, err := store.GetProject(ctx, l.st, project)
+// read usually finds the row and writes nothing. Only the first read of a new
+// project by an agent opens a write transaction. A viewer may not create the
+// row: its read of a project no agent has written to is not_found, and writes
+// nothing (CONTRACT §1.1, §9 item 44). The viewer is the least-trusted scope,
+// and the project name comes from the client, so the viewer must not be able to
+// mint project rows.
+func (l *Local) ensureReadProject(ctx context.Context, c Caller) error {
+	_, err := store.GetProject(ctx, l.st, c.Project)
 	if err == nil {
 		return nil
 	}
 	if !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
+	if c.Role == RoleViewer {
+		return NotFound("project %s does not exist yet: a viewer reads a project after an agent has written to it", c.Project)
+	}
 	return l.st.WithTx(ctx, func(q store.Querier) error {
-		_, err := ensureProject(ctx, q, project, l.now())
+		_, err := ensureProject(ctx, q, c.Project, l.now())
 		return err
 	})
 }

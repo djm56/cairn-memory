@@ -98,6 +98,17 @@ var identityCases = []Case{
 			t.Errorf("learnings after refused calls = %+v, want the one still proposed", got.Learnings)
 		}
 	}},
+	{"identity/viewer_first_read_is_not_found", func(t T, s core.Service) {
+		// CONTRACT §1.1 and §9 item 44: a viewer's read of a project that no agent has
+		// written to is not_found. The viewer does not create the row; the agent's read
+		// after it does, and then the viewer reads the project.
+		const project = "viewer-first-read"
+		viewer := core.WithCaller(context.Background(), core.Caller{Project: project, Role: core.RoleViewer})
+		_, err := s.TaskCurrent(viewer)
+		wantKind(t, err, core.KindNotFound, "TaskCurrent by a viewer on a project with no row")
+		must(s.TaskCurrent(as(project, "main")))(t)
+		must(s.TaskCurrent(viewer))(t)
+	}},
 	{"identity/calls_cover_interface", casesCoverInterface},
 	{"identity/no_project_refused", func(t T, s core.Service) {
 		noProject := core.WithCaller(context.Background(), core.Caller{Agent: "main", Role: core.RoleAgent})

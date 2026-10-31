@@ -61,7 +61,7 @@ func (l *Local) Search(ctx context.Context, req SearchRequest) (*SearchResult, e
 	if offset != nil {
 		from = *offset
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	rows, more, err := store.Search(ctx, l.st, store.SearchFilter{
@@ -199,7 +199,7 @@ func (l *Local) Recall(ctx context.Context, req RecallRequest) (*RecallResult, e
 	if err != nil {
 		return nil, err
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	out := &RecallResult{Lessons: []LessonHit{}, Mistakes: []MistakeHit{}, Tasks: []TaskSummary{}}
