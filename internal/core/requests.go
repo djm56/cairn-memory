@@ -42,7 +42,9 @@ type TaskCurrent struct {
 	Criteria     []Criterion `json:"criteria,omitempty"`
 	Steps        []Step      `json:"steps,omitempty"`
 	RecentEvents []Event     `json:"recent_events,omitempty"` // newest first, at most 5
-	Directives   []Directive `json:"directives,omitempty"`    // that apply to the project
+	Directives   []Directive `json:"directives,omitempty"`    // that apply to the project, ranked, at most DirectiveCap
+	Expired      int         `json:"expired"`                 // applicable directives past review_by, left out
+	Omitted      int         `json:"omitted"`                 // applicable directives beyond the cap, left out
 	// OtherActive counts further active tasks when the project allows
 	// parallel tasks. Task is then the one started most recently.
 	OtherActive int `json:"other_active,omitempty"`
@@ -273,7 +275,9 @@ type DirectiveListRequest struct {
 }
 
 type DirectiveList struct {
-	Directives []Directive `json:"directives"` // by code
+	Directives []Directive `json:"directives"` // ranked: agent, project, global; newest first; at most DirectiveCap
+	Expired    int         `json:"expired"`    // applicable directives past review_by, left out
+	Omitted    int         `json:"omitted"`    // applicable directives beyond the cap, left out
 }
 
 // ---- recall ----
@@ -300,7 +304,9 @@ type MistakeHit struct {
 // are those that apply to the caller's project; lessons, mistakes and tasks
 // come from every project, best match first.
 type RecallResult struct {
-	Directives []Directive   `json:"directives"`
+	Directives []Directive   `json:"directives"` // ranked and capped as directive_list
+	Expired    int           `json:"expired"`    // applicable directives past review_by, left out
+	Omitted    int           `json:"omitted"`    // applicable directives beyond the cap, left out
 	Lessons    []LessonHit   `json:"lessons"`
 	Mistakes   []MistakeHit  `json:"mistakes"`
 	Tasks      []TaskSummary `json:"tasks"`
@@ -364,6 +370,9 @@ type DirectiveRatifyRequest struct {
 	Rationale     string         `json:"rationale,omitempty"`
 	ReviewerCheck string         `json:"reviewer_check,omitempty"`
 	Example       string         `json:"example,omitempty"`
+	// ReviewBy is a calendar day, YYYY-MM-DD in UTC, after which the directive is
+	// due for review. It must be after today. Empty means 90 days from ratification.
+	ReviewBy string `json:"review_by,omitempty"`
 }
 
 type DirectiveRetireRequest struct {

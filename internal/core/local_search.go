@@ -203,9 +203,11 @@ func (l *Local) Recall(ctx context.Context, req RecallRequest) (*RecallResult, e
 		return nil, err
 	}
 	out := &RecallResult{Lessons: []LessonHit{}, Mistakes: []MistakeHit{}, Tasks: []TaskSummary{}}
-	if out.Directives, err = directivesFor(ctx, l.st, c.Project, req.Agent); err != nil {
+	set, err := directivesFor(ctx, l.st, c.Project, req.Agent, l.now())
+	if err != nil {
 		return nil, err
 	}
+	out.Directives, out.Expired, out.Omitted = set.Directives, set.Expired, set.Omitted
 	words := goalWords(req.Goal)
 	if len(words) == 0 {
 		return out, nil
