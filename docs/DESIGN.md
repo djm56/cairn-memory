@@ -288,6 +288,13 @@ project, then global, and newest first within each. A directive past its
 The directives beyond the cap are counted in `omitted`. The UI flags expired
 directives in M3.
 
+The upgrade to schema 5 gives every active directive a `review_by` 90 days after
+the upgrade runs, whatever its `ratified_at`, so no directive is expired by the
+upgrade itself. M2 has no call that changes the `review_by` of an active
+directive: `DirectiveRatify` always makes a new code. To extend a directive, retire
+it and ratify it again with the `review_by` you want (CONTRACT §8). The new
+directive has a new code, and it does not keep the old one's link to its learning.
+
 ### 3.5 Notes and search
 
 ```

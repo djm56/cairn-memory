@@ -392,6 +392,17 @@ refuse a nameless call all the same.
 | `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
 
+**Extending a directive in M2.** `DirectiveRatify` on an active directive is not a
+call: every ratify makes a new directive with the next code. There is no call that
+changes the `review_by` of an active directive. The route is `DirectiveRetire` of
+the old code, then `DirectiveRatify` with the `review_by` wanted. The new code
+does not keep the old one's `source_learning`. The M3 UI may edit `review_by`
+(DESIGN §3.4).
+
+**Upgrade to schema 5.** Migration 0005 gives every active directive a `review_by`
+90 days after the upgrade runs, whatever its `ratified_at`. No directive is
+expired by the upgrade. Retired directives keep no `review_by`.
+
 ## 9. Settled here, for review
 
 Each item answers a question that DESIGN.md left open. Items 1–11 are

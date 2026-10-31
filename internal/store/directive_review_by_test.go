@@ -10,10 +10,9 @@ import (
 )
 
 // TestMigration0005ReviewByBackfill upgrades a database at version 4 that holds
-// directives, and checks the backfill of schema v5. An active directive with a
-// ratified_at is due 90 days after it. An active one with no ratified_at is due
-// 90 days after the upgrade, so the upgrade alone never expires it. A retired
-// directive keeps NULL.
+// directives, and checks the backfill of schema v5 (12-W3). Every active directive
+// is due 90 days after the upgrade runs, whatever its ratified_at: one ratified
+// long before the upgrade is not expired by it. A retired directive keeps NULL.
 func TestMigration0005ReviewByBackfill(t *testing.T) {
 	ctx := context.Background()
 	list, err := loadMigrations(migrationFiles)
@@ -58,29 +57,27 @@ func TestMigration0005ReviewByBackfill(t *testing.T) {
 		return v
 	}
 
-	// 2026-01-01 plus 90 days is 2026-04-01, in the stored form.
-	if got := reviewBy("D-0001"); got.String != "2026-04-01T00:00:00.000000000Z" {
-		t.Errorf("D-0001 review_by = %q, want 2026-04-01T00:00:00.000000000Z (ratified_at + 90 days)", got.String)
-	}
-
-	// No ratified_at: due 90 days after the upgrade ran.
-	got := reviewBy("D-0002")
-	if !got.Valid {
-		t.Fatalf("D-0002 review_by is NULL, want the upgrade time plus 90 days")
-	}
-	due, err := parseTime(got.String)
-	if err != nil {
-		t.Fatalf("D-0002 review_by %q is not in the stored form: %v", got.String, err)
-	}
+	// D-0001 was ratified on 2026-01-01, long before the upgrade. Its review_by is
+	// still 90 days after the upgrade, not 2026-04-01, which is in the past.
 	lo, hi := before.AddDate(0, 0, 90).Add(-time.Second), after.AddDate(0, 0, 90).Add(time.Second)
-	if due.Before(lo) || due.After(hi) {
-		t.Errorf("D-0002 review_by = %v, want between %v and %v", due, lo, hi)
+	for _, code := range []string{"D-0001", "D-0002"} {
+		got := reviewBy(code)
+		if !got.Valid {
+			t.Fatalf("%s review_by is NULL, want the upgrade time plus 90 days", code)
+		}
+		due, err := parseTime(got.String)
+		if err != nil {
+			t.Fatalf("%s review_by %q is not in the stored form: %v", code, got.String, err)
+		}
+		if due.Before(lo) || due.After(hi) {
+			t.Errorf("%s review_by = %v, want between %v and %v (the upgrade time plus 90 days)", code, due, lo, hi)
+		}
+		if !strings.HasSuffix(got.String, ".000000000Z") {
+			t.Errorf("%s review_by is not fixed width: %q", code, got.String)
+		}
 	}
 
 	if got := reviewBy("D-0003"); got.Valid {
 		t.Errorf("retired D-0003 review_by = %q, want NULL", got.String)
-	}
-	if !strings.HasSuffix(reviewBy("D-0001").String, ".000000000Z") {
-		t.Errorf("D-0001 review_by is not fixed width: %q", reviewBy("D-0001").String)
 	}
 }
