@@ -71,3 +71,15 @@ func RequireKeys(loopback bool, activeKeys int) error {
 	}
 	return errors.New("the address is not loopback, so it needs at least one active API key (DESIGN §8)")
 }
+
+// CleartextLine is the warning printed when --behind-proxy lets a non-loopback server
+// run without TLS files. The server then speaks plain HTTP on that address, and only
+// the proxy keeps the keys off the wire, and nothing stops a client that can reach the
+// port from going round the proxy (DESIGN §5.3, D20). It returns "" when the bind has
+// TLS of its own, or is loopback, where there is nothing to warn of.
+func CleartextLine(loopback, tls, behindProxy bool) string {
+	if loopback || tls || !behindProxy {
+		return ""
+	}
+	return "cairn serve: warning: this server serves plain HTTP on a non-loopback address, with no TLS of its own: the proxy in front must terminate TLS, and the port must be reachable only from that proxy"
+}

@@ -334,6 +334,35 @@ func TestRedactRemovesKeysAndBearerCredentials(t *testing.T) {
 	}
 }
 
+// TestRedactRemovesTruncatedKeys checks the pattern does not need a whole key. A key cut
+// short in a cause, or one with extra characters, still leaves no fragment of the key in
+// the logged text (6-S8). The text around it stays.
+func TestRedactRemovesTruncatedKeys(t *testing.T) {
+	key, err := auth.NewKey()
+	if err != nil {
+		t.Fatalf("NewKey: %v", err)
+	}
+	// A fragment with no prefix is not a key the pattern can name, so the cases are a key
+	// that keeps its prefix and is cut short, and a key with characters after its 43.
+	cases := []struct {
+		what string
+		in   string
+		gone string // text that must not survive
+	}{
+		{"a key cut to its first 20 characters", "cause: " + key[:20] + " end", key[:20]},
+		{"a key with characters added", "cause: " + key + "ZZZ end", "ZZZ"},
+	}
+	for _, c := range cases {
+		out := redact(c.in)
+		if strings.Contains(out, c.gone) || strings.Contains(out, key[:20]) {
+			t.Errorf("%s: redact left part of the key: %q", c.what, out)
+		}
+		if !strings.Contains(out, "cause: ") || !strings.HasSuffix(out, " end") {
+			t.Errorf("%s: redact changed the text around the key: %q", c.what, out)
+		}
+	}
+}
+
 // selfSigned writes a self-signed certificate and its key to dir, as PEM, and returns the
 // file names and the certificate PEM. Nothing is committed; the files are in the test's
 // temporary directory.
@@ -374,9 +403,18 @@ func selfSigned(t *testing.T, dir string) (certFile, keyFile string, certPEM []b
 	return certFile, keyFile, certPEM
 }
 
+// oldClientTLS is the TLS config of a client that offers only TLS 1.0 and 1.1. Its
+// minimum is set, since Go's client default is 1.2, which would refuse the handshake
+// before any server saw it.
+func oldClientTLS(pool *x509.CertPool) *tls.Config {
+	return &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS10, MaxVersion: tls.VersionTLS11}
+}
+
 // TestTLSServesWithACertificateAndRefusesTLS11 serves over TLS from certificate files, and
 // checks two things: a client that trusts the certificate gets an answer, and a client that
-// offers only TLS 1.1 gets no connection, since the server's minimum is 1.2 (D20).
+// offers only TLS 1.0 or 1.1 gets no connection, since the server's minimum is 1.2 (D20).
+// The control for the refusal is TestTLS11ControlConnects: the same old client connects to
+// a server that allows 1.1, so the refusal here is the server's and not the client's.
 func TestTLSServesWithACertificateAndRefusesTLS11(t *testing.T) {
 	certFile, keyFile, certPEM := selfSigned(t, t.TempDir())
 	cfg, err := LoadTLS(certFile, keyFile)
@@ -402,9 +440,67 @@ func TestTLSServesWithACertificateAndRefusesTLS11(t *testing.T) {
 		t.Errorf("the connection is not TLS 1.2 or later: %+v", resp.TLS)
 	}
 
-	old := client(&http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MaxVersion: tls.VersionTLS11}})
+	old := client(&http.Transport{TLSClientConfig: oldClientTLS(pool)})
 	if _, err := old.Get(base + "/healthz"); err == nil {
 		t.Error("a TLS 1.1 client connected: the minimum version is not enforced")
+	}
+}
+
+// TestTLS11ControlConnects is the control for the refusal above. A listener that allows
+// TLS 1.0 and 1.1 accepts the same old client, so that client can speak 1.1 and the
+// refusal is the server's doing. It serves the handler directly, not through Serve,
+// because Serve raises any lower minimum to 1.2 (TestServeRaisesALowerMinimum).
+func TestTLS11ControlConnects(t *testing.T) {
+	certFile, keyFile, certPEM := selfSigned(t, t.TempDir())
+	pair, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		t.Fatalf("load the pair: %v", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(certPEM) {
+		t.Fatal("the certificate PEM did not load")
+	}
+	raw, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	ln := tls.NewListener(raw, &tls.Config{
+		Certificates: []tls.Certificate{pair},
+		MinVersion:   tls.VersionTLS10,
+		MaxVersion:   tls.VersionTLS11,
+	})
+	srv := &http.Server{Handler: Handler(openStore(t), testLogger(io.Discard))}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	resp, body := send(t, client(&http.Transport{TLSClientConfig: oldClientTLS(pool)}),
+		http.MethodGet, "https://"+raw.Addr().String()+"/healthz", "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the control: status %d: %s; the client cannot speak 1.1, so the refusal proves nothing", resp.StatusCode, body)
+	}
+	if resp.TLS == nil || resp.TLS.Version != tls.VersionTLS11 {
+		t.Errorf("the control negotiated %+v, want TLS 1.1", resp.TLS)
+	}
+}
+
+// TestServeRaisesALowerMinimum is the can-fail for the refusal above. Serve raises a
+// configuration's minimum to TLS 1.2, so a configuration that asks for 1.0 still refuses
+// the 1.1 client. Removing that raise in Serve lets the client in, and this test fails.
+func TestServeRaisesALowerMinimum(t *testing.T) {
+	certFile, keyFile, certPEM := selfSigned(t, t.TempDir())
+	pair, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		t.Fatalf("load the pair: %v", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(certPEM) {
+		t.Fatal("the certificate PEM did not load")
+	}
+	low := &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS10}
+	base := startServer(t, Handler(openStore(t), testLogger(io.Discard)), low)
+	old := client(&http.Transport{TLSClientConfig: oldClientTLS(pool)})
+	if _, err := old.Get(base + "/healthz"); err == nil {
+		t.Error("a TLS 1.1 client connected to a server configured for 1.0: Serve did not raise the minimum")
 	}
 }
 
@@ -433,6 +529,42 @@ func TestRunPrintsTheNoKeyLineOnLoopback(t *testing.T) {
 	}
 }
 
+// TestRunListensAtTheCheckedAddress starts a server on "localhost", which resolves to
+// loopback addresses, and checks that it listens at the first one the bind rule read. The
+// rule and the listener then agree on the address, so a name that resolves to a LAN
+// address as well cannot widen the bind (6-S5). It binds loopback only, and stops at the
+// deadline.
+func TestRunListensAtTheCheckedAddress(t *testing.T) {
+	ctx := context.Background()
+	ips, err := ResolveHost(ctx, "localhost")
+	if err != nil || len(ips) == 0 {
+		t.Fatalf("resolve localhost: %v, %v", ips, err)
+	}
+	var out syncBuffer
+	deadline, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+	defer cancel()
+	if err := Run(deadline, Options{Addr: "localhost:0", DB: filepath.Join(t.TempDir(), "cairn.db"), Log: &out}); err != nil {
+		t.Fatalf("Run on localhost: %v", err)
+	}
+	var addr string
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.Contains(line, `msg=listening`) {
+			for _, field := range strings.Fields(line) {
+				if v, ok := strings.CutPrefix(field, "addr="); ok {
+					addr = strings.Trim(v, `"`)
+				}
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("no listening line with an address: %q", out.String())
+	}
+	if host != ips[0].String() {
+		t.Errorf("listened on %s, want the first checked address %s", host, ips[0])
+	}
+}
+
 // TestRunRefusesBeforeItListens checks the refusals that Run makes before it listens.
 // None of these cases binds: each is refused, and the refusal is the test's assertion.
 func TestRunRefusesBeforeItListens(t *testing.T) {
@@ -450,7 +582,10 @@ func TestRunRefusesBeforeItListens(t *testing.T) {
 		{"a certificate without a key", Options{Addr: "127.0.0.1:0", DB: db, TLSCert: certFile}, "go together"},
 		{"a key without a certificate", Options{Addr: "127.0.0.1:0", DB: db, TLSKey: keyFile}, "go together"},
 		{"an address with no port", Options{Addr: "127.0.0.1", DB: db}, "--addr"},
+		{"an empty host, which is every interface", Options{Addr: ":0", DB: db}, "needs TLS"},
 		{"all interfaces, no TLS, no proxy", Options{Addr: "0.0.0.0:0", DB: db}, "needs TLS"},
+		{"a memory database", Options{Addr: "127.0.0.1:0", DB: ":memory:"}, "must be a file path"},
+		{"a file URI", Options{Addr: "127.0.0.1:0", DB: "file::memory:"}, "must be a file path"},
 		{"IPv6 all interfaces, no TLS", Options{Addr: "[::]:0", DB: db}, "needs TLS"},
 		{"a LAN address, no TLS, behind a proxy but no key", Options{Addr: "192.168.1.5:0", DB: db, BehindProxy: true}, "at least one active API key"},
 		{"all interfaces with TLS and no key", Options{Addr: "0.0.0.0:0", DB: db, TLSCert: certFile, TLSKey: keyFile}, "at least one active API key"},

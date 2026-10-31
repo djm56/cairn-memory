@@ -13,7 +13,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// The limits and timeouts of the listener (DESIGN §8, D20). They are fixed rather than
+// The limits and timeouts of the listener (DESIGN §5.3, D20). They are fixed rather than
 // flags, so every server runs with the same bounds.
 const (
 	readHeaderTimeout = 10 * time.Second
@@ -41,7 +41,7 @@ func Handler(st *store.Store, logger *slog.Logger) http.Handler {
 func handler(lookup auth.Lookup, svc core.Service, logger *slog.Logger) http.Handler {
 	resolver := auth.NewResolver(lookup, func(err error) {
 		// A failed last_used_at write does not refuse the call that used the key, but it
-		// is logged, never dropped (DESIGN §8).
+		// is logged, never dropped (DESIGN §5.3).
 		logger.Error("last_used_at was not written", "cause", redact(err.Error()))
 	})
 	calls := api.Handler(svc, api.KeyCaller(resolver), failureHook(logger))
@@ -73,8 +73,10 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, "{\"status\":\"ok\"}\n")
 }
 
-// keyPattern matches an API key in text: the key prefix and its 43 base64url characters.
-var keyPattern = regexp.MustCompile(regexp.QuoteMeta(auth.KeyPrefix) + `[A-Za-z0-9_-]{43}`)
+// keyPattern matches an API key in text: the key prefix and the base64url characters
+// after it. The count is not fixed at 43, so a key cut short, or one with characters
+// added, is still removed: a fragment of a key in a cause is still a key in the log.
+var keyPattern = regexp.MustCompile(regexp.QuoteMeta(auth.KeyPrefix) + `[A-Za-z0-9_-]+`)
 
 // bearerPattern matches a bearer credential in text, in case one reaches a cause.
 var bearerPattern = regexp.MustCompile(`(?i)bearer\s+\S+`)
