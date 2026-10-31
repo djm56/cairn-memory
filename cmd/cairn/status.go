@@ -63,6 +63,14 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)
 	}
 	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
+	// The two counts are shown only when there is one, so a clean project reads as before
+	// (step 12 review 12-W2). A directive left out is named, not dropped without a word.
+	if cur.Expired > 0 {
+		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)
+	}
+	if cur.Omitted > 0 {
+		fmt.Fprintf(w, "omitted     %d beyond the cap of %d\n", cur.Omitted, core.DirectiveCap)
+	}
 }
 
 // currentStep returns the step to work on: the active one, else the first pending
