@@ -476,10 +476,54 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
-| `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
-| `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
+| `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
+| `cairn restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
 | `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1; `--agent` is planned, M4. |
+
+#### 5.2.1 Backup and restore (M2, #74)
+
+`cairn backup` and `cairn restore` open the server's database, so the logic is in
+`internal/server` and the commands in `cmd/cairn` only parse flags and call it. The
+reach guard names those two command files as the only ones that may import the
+server package, beside `serve` and `key`.
+
+**Backup.** The copy is made by `VACUUM INTO` into an empty file made with
+`O_EXCL` at mode 0600. An existing `<out>` is refused, and so are `:memory:`, a
+`file:` name and a name with `?`. The database is opened without migrating, so a
+backup never changes the database it copies, and a file with no Cairn schema, or
+a schema newer than this build, is refused. `VACUUM INTO` is one read transaction.
+In WAL mode the copy holds every commit that finished before it began and no part
+of a later one, and it does not block a writer or wait for one. The online backup
+API restarts when its source changes under it, which a busy server does
+constantly.
+
+**Restore.** The steps run in this order and stop at the first refusal, with
+nothing changed:
+
+1. The backup is copied beside the database, and the copy is checked there: it
+   opens, `PRAGMA integrity_check` returns `ok`, and its schema is not newer than
+   this build. The checked copy is the one put in place, so the bytes verified
+   are the bytes restored.
+2. If the database exists, it must not be in use. An exclusive lock is taken with
+   `locking_mode=EXCLUSIVE` and a read, and an idle open server holds the lock
+   against it. `BEGIN EXCLUSIVE` alone does not do this in WAL mode, where it
+   behaves as `BEGIN IMMEDIATE` and an idle reader is not blocked. The lock is
+   held through the moves.
+3. Stdin must be a terminal, and the operator types the database path exactly as
+   given. There is no `--yes` flag in M2.
+4. The database, with its `-wal` and `-shm`, is moved to `<db>.pre-restore-<UTC>`
+   (`20261031T101112Z`). Each target name must be free before the first move, and
+   a move that fails undoes the ones before it. Nothing is deleted.
+5. The checked copy is renamed to the database path, and the database is opened,
+   which migrates it to this build's schema.
+
+The `-wal` and `-shm` are moved first, but they are not kept as files. Closing the
+probe's connection after the moves makes SQLite fold the `-wal` into the database it
+is closing and remove both files. So the pre-restore database alone holds the state
+the server last saw, including what was only in its `-wal`. That is tested
+(`TestRestoreReplacesAndKeepsTheOldFiles`). Keeping the raw `-wal` bytes too would
+need a copy taken before the probe closes; M2 does not do that.
 
 ### 5.3 The server
 
