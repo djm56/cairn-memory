@@ -202,13 +202,13 @@ func TestNonJSONDataIsRefusedBeforeTheCall(t *testing.T) {
 // http or https URL with a host, or that carries a query or fragment.
 func TestNewRejectsBadBase(t *testing.T) {
 	for _, base := range []string{
-		"", "127.0.0.1:8787", "ftp://host", "http://", "http://host/?x=1", "http://host/#frag",
+		"", "127.0.0.1:8788", "ftp://host", "http://", "http://host/?x=1", "http://host/#frag",
 	} {
 		if _, err := client.New(base, nil); err == nil {
 			t.Errorf("New(%q) accepted a base that is not an http URL with a host", base)
 		}
 	}
-	if _, err := client.New("http://127.0.0.1:8787/", nil); err != nil {
+	if _, err := client.New("http://127.0.0.1:8788/", nil); err != nil {
 		t.Errorf("New with a trailing slash: %v", err)
 	}
 }

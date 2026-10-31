@@ -12,9 +12,9 @@ import (
 // name and no password, and keeps the rest of it.
 func TestDisplayURLRemovesCredentials(t *testing.T) {
 	cases := map[string]string{
-		"https://keeper:secret@cairn.lan:8787": "https://cairn.lan:8787",
+		"https://keeper:secret@cairn.lan:8788": "https://cairn.lan:8788",
 		"https://keeper@cairn.lan":             "https://cairn.lan",
-		"http://127.0.0.1:8787/":               "http://127.0.0.1:8787/",
+		"http://127.0.0.1:8788/":               "http://127.0.0.1:8788/",
 	}
 	for in, want := range cases {
 		if got := DisplayURL(in); got != want {

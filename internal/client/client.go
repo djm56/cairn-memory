@@ -40,7 +40,7 @@ type Client struct {
 
 var _ core.Service = (*Client)(nil)
 
-// New returns a Client for the server at base, such as http://127.0.0.1:8787, that sends
+// New returns a Client for the server at base, such as http://127.0.0.1:8788, that sends
 // no API key. A server that keeps keys refuses its calls with 401; a caller of such a
 // server uses NewWithKey. base must be an absolute http or https URL with a host, and no
 // query or fragment. hc is the HTTP client the calls use. nil means a client with

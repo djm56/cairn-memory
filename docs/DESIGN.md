@@ -110,7 +110,7 @@ under the same name. Its full contents:
 
 ```toml
 project = "acme-api"          # required; lowercase letters, digits, hyphens
-server = "https://cairn.lan:8787"   # required from M1 (decision D11); D2's local database was never built
+server = "https://cairn.lan:8788"   # required from M1 (decision D11); D2's local database was never built
 ```
 
 The API key never goes in this file. It comes from the plugin's secure option,
@@ -472,7 +472,7 @@ an existing SQLite file to make it the server's own database.
 
 **`cairn serve` (M2, D20).** Its flags:
 
-- `--addr` is the address to listen on. It defaults to `127.0.0.1:8787`, which
+- `--addr` is the address to listen on. It defaults to `127.0.0.1:8788`, which
   is the port of the server example in §2.1.
 - `--db` is the SQLite file the server keeps its data in. It has no default: the
   operator names the file. It is created when it does not exist.

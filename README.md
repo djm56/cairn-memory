@@ -82,7 +82,7 @@ the server URL.
 
 ```toml
 project = "acme-api"
-server = "https://cairn.lan:8787"
+server = "https://cairn.lan:8788"
 ```
 
 The repository and the Go module still carry the name `cairn-memory`.
@@ -93,7 +93,7 @@ been done.
 
 `cairn serve` is the server, and the only listener in the binary. It keeps its
 data in the SQLite file named by `--db`, which is created if it does not exist.
-It listens on loopback at `127.0.0.1:8787` unless `--addr` says otherwise:
+It listens on loopback at `127.0.0.1:8788` unless `--addr` says otherwise:
 
 ```bash
 cairn serve --db ./cairn.db
