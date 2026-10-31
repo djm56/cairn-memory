@@ -285,6 +285,17 @@ func TestConformanceOverRealListener(t *testing.T) {
 	conformance.Run(t, listenerService)
 }
 
+// forged returns the call headers with X-Cairn-Role set to role, as a client sends when it
+// claims a role its key does not hold (10-W2). The server must take the role from the key,
+// so a forged header changes nothing. The header is set on a copy, so h is not changed.
+func forged(h map[string]string, role string) map[string]string {
+	out := map[string]string{api.HeaderRole: role}
+	for k, v := range h {
+		out[k] = v
+	}
+	return out
+}
+
 // TestAgentKeyIsRefusedOnEveryOperatorRoute is the exit check that an agent key is refused on
 // operator routes. The routes come from the route table, through api.Routes, not from a list
 // here. Each operator route must answer 403 operator_only to an agent key, with a body that
@@ -304,6 +315,11 @@ func TestAgentKeyIsRefusedOnEveryOperatorRoute(t *testing.T) {
 		}
 		if strings.Contains(string(body), agent) {
 			t.Errorf("%s: the refusal to an agent key holds the key", r.Route)
+		}
+		// The same agent key, claiming the operator role in a header: still refused.
+		resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, forged(callHeaders(agent), "operator"))
+		if resp.StatusCode != http.StatusForbidden || errorKind(body) != core.KindOperatorOnly {
+			t.Errorf("%s with an agent key and X-Cairn-Role: operator: status %d, body %s; want 403 operator_only", r.Route, resp.StatusCode, body)
 		}
 		resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, callHeaders(operator))
 		if resp.StatusCode == http.StatusForbidden && errorKind(body) == core.KindOperatorOnly {
@@ -336,11 +352,23 @@ func TestViewerKeyIsRefusedOnEveryWriteRoute(t *testing.T) {
 		if strings.Contains(string(body), viewer) {
 			t.Errorf("%s: the refusal to a viewer key holds the key", r.Route)
 		}
+		// The viewer key claiming the operator, then the agent role in a header: both refused.
+		for _, role := range []string{"operator", "agent"} {
+			resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, forged(callHeaders(viewer), role))
+			if resp.StatusCode != http.StatusForbidden || errorKind(body) != api.KindReadOnly {
+				t.Errorf("%s (write) with a viewer key and X-Cairn-Role: %s: status %d, body %s; want 403 read_only", r.Route, role, resp.StatusCode, body)
+			}
+		}
 	}
 	for _, r := range reads {
 		resp, body := send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, callHeaders(viewer))
 		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
 			t.Errorf("%s (read) with a viewer key: status %d, body %s; a read route must not refuse a viewer for its scope", r.Route, resp.StatusCode, body)
+		}
+		// A read that reaches its handler answers with its own result or a refusal of its
+		// body, never no_route (the path is in the table) or internal (the handler failed).
+		if kind := errorKind(body); kind == api.KindNoRoute || kind == api.KindInternal {
+			t.Errorf("%s (read) with a viewer key: kind %q; a read route must reach its handler", r.Route, kind)
 		}
 		if strings.Contains(string(body), viewer) {
 			t.Errorf("%s: the answer to a viewer key holds the key", r.Route)
