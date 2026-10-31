@@ -179,11 +179,13 @@ mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
 (umask 077 && printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env)
 ```
 
-The `printf` line puts the key in your shell history. To keep it out, write the file
-in an editor, or read the key without echo and write it from a variable:
+Do not use the `printf` line above with a real key: it puts the key in your shell
+history. Write the file in an editor, or use this form, which works in bash and zsh,
+reads the key without echo, and keeps it out of history:
 
 ```bash
-read -rs -p 'API key: ' K && (umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
+printf 'API key: ' >&2; read -rs K; echo >&2
+(umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
 ```
 
 `CAIRN_API_KEY` is read first. A `client.env` that any other user can read or

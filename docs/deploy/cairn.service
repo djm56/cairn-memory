@@ -1,7 +1,8 @@
 # Cairn server. Install as /etc/systemd/system/cairn.service.
 # See docs/DEPLOY.md. This file holds no secrets: API keys live in the database, and
 # clients send them. It listens on loopback, so a reverse proxy must front it (setup b).
-# For setup (a), TLS on a non-loopback address, see DEPLOY.md, "Setup (a)".
+# For setup (a), TLS on a non-loopback address, see DEPLOY.md, "Setup (a)": the service
+# user, the state directory and the first key come before this unit is started.
 
 [Unit]
 Description=Cairn memory server
@@ -24,11 +25,15 @@ StateDirectoryMode=0700
 WorkingDirectory=/var/lib/cairn
 UMask=0077
 
-# Hardening. Each setting removes something the server does not use: no privilege gain, no
-# write outside the state directory, no kernel or device access, no extra address families.
+# Hardening. Chosen by reading what the server does: no privilege gain, no write outside
+# the state directory, no kernel or device access, no extra address families. This unit
+# has NOT been run under systemd yet. The M2 live run is its first start, so check it
+# there (DEPLOY.md, "The systemd unit"): systemd-analyze verify, then systemctl status.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
+# StateDirectory= already makes /var/lib/cairn writable under ProtectSystem=strict. This
+# line repeats it on purpose, so the unit still works if StateDirectory= is ever removed.
 ReadWritePaths=/var/lib/cairn
 PrivateTmp=yes
 PrivateDevices=yes
