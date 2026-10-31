@@ -3,7 +3,9 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -89,5 +91,42 @@ func TestDoctorTakesNoArguments(t *testing.T) {
 	code, _, stderr := runCmd(t, "doctor", "--agent", "claude-code")
 	if code != 2 || !strings.Contains(stderr, "takes no arguments yet") {
 		t.Errorf("exit %d, stderr %q: want 2 and the usage error", code, stderr)
+	}
+}
+
+// TestDoctorDoesNotFollowARedirect checks the redirect rule (step 8 review W3) at the command: a
+// server that redirects the reach call to another server makes reach fail, and the other server
+// receives no request, so the key is not sent there. The output holds no key.
+func TestDoctorDoesNotFollowARedirect(t *testing.T) {
+	var mu sync.Mutex
+	var reached []string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reached = append(reached, r.Header.Get("Authorization"))
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", target.URL+r.URL.Path)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(origin.Close)
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+origin.URL+"\"\n")
+
+	code, out, _ := runCmd(t, "doctor")
+	if code != 1 || !strings.Contains(out, "reach    fail") || !strings.Contains(out, "redirect") {
+		t.Errorf("a redirecting server: exit %d, output:\n%s; want 1, a failing reach that names the redirect", code, out)
+	}
+	mu.Lock()
+	n := len(reached)
+	mu.Unlock()
+	if n != 0 {
+		t.Errorf("the redirect target received %d requests; want none", n)
+	}
+	if key := os.Getenv("CAIRN_API_KEY"); strings.Contains(out, key) {
+		t.Errorf("doctor printed the key")
 	}
 }
