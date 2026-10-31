@@ -68,7 +68,7 @@ A failure the caller can act on has a kind and a message:
 | `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role. |
-| `no_route` | Wire form only (DESIGN §5.4): the path is not a call, so the server base URL is wrong. Answered `404`. Core never returns it. |
+| `no_route` | Wire form only (DESIGN §5.4): the path is not a call. The message says to check the server base URL. Answered `404`. Core never returns it. |
 | `unsupported_media_type` | Wire form only (DESIGN §5.4): the body is not `application/json`. Answered `415`. Core never returns it. |
 
 Checks run in this order, so a request with several faults gets the first
