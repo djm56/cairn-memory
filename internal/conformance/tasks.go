@@ -237,11 +237,11 @@ var taskCases = []Case{
 	}},
 	{"task/unblocked_event_on_reactivate", func(t T, s core.Service) {
 		// CONTRACT §1.5, §9 item 36: a move from blocked to active writes an
-		// unblocked event. The event is read back through event_list.
+		// unblocked event. The event is read back through task_get (section events).
 		res := startTask(t, s, mainCtx(), "t")
 		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskBlocked), Reason: "waiting on review"}))(t)
 		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskActive)}))(t)
-		list := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID}))(t)
+		list := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents}))(t)
 		var blocked, unblocked int
 		for _, e := range list.Events {
 			switch e.Kind {
@@ -422,7 +422,7 @@ var stepCases = []Case{
 			t.Errorf("skipped step = %+v", skipped)
 		}
 		// Each change wrote its event.
-		evs := must(s.EventList(mainCtx(), core.EventListRequest{TaskID: res.ID, Step: &one}))(t)
+		evs := must(s.TaskGet(mainCtx(), core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Step: &one}))(t)
 		var kinds []core.EventKind
 		for _, e := range evs.Events {
 			kinds = append(kinds, e.Kind)
@@ -471,7 +471,8 @@ var stepCases = []Case{
 		// A review counts as a record too: a pending step with only a review is refused.
 		// Queued, so it does not clash with the active task above.
 		other := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "queued", Goal: "g", Queue: true, Steps: []core.StepInput{{Title: "alpha"}, {Title: "beta"}}}))(t)
-		must(s.ReviewRecord(as(projA, "reviewer"), core.ReviewRecordRequest{TaskID: other.ID, Step: core.NumberRef(1), Verdict: core.VerdictApproved}))(t)
+		alpha := core.NumberRef(1)
+		must(s.EventLog(as(projA, "reviewer"), core.EventLogRequest{TaskID: other.ID, Step: &alpha, Kind: core.EventReview, Text: "Alpha read.", Data: reviewData("approved", 0, 0)}))(t)
 		_, err = s.StepPlan(mainCtx(), core.StepPlanRequest{TaskID: other.ID, Steps: []core.StepInput{{Title: "new"}}})
 		wantKind(t, err, core.KindRefused, "step_plan over a pending step with a review")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: other.ID, Step: core.NumberRef(1), Action: core.StepSkip, Summary: "not needed"}))(t)

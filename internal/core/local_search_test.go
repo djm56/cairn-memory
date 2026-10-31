@@ -88,7 +88,6 @@ func TestSearchFindsEachKind(t *testing.T) {
 	res := must(s.TaskStart(ctx, core.TaskStartRequest{Title: "Tune the zeppelin cache", Goal: "Cache hit rate over 90%."}))(t)
 	must(s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "The quokka endpoint is slow."}))(t)
 	must(s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningPattern, Title: "Narwhal batching", Body: "Batch writes."}))(t)
-	must(s.NotePut(ctx, core.NotePutRequest{TaskID: res.ID, Title: "Design", Body: "The axolotl layer sits in front."}))(t)
 	insertDirective(t, st, "global", "", "", "Pangolin rule", "active")
 	seedLesson(t, st, res.ID, "Reuse the otter parser.")
 	seedMistake(t, st, res.ID, "Ignored the wombat timeout.")
@@ -100,7 +99,6 @@ func TestSearchFindsEachKind(t *testing.T) {
 		"zeppelin": {core.HitTask, res.ID},
 		"quokka":   {core.HitEvent, ""},
 		"narwhal":  {core.HitLearning, ""},
-		"axolotl":  {core.HitNote, ""},
 		"pangolin": {core.HitDirective, "D-0001"},
 		"otter":    {core.HitLesson, res.ID + "/1"},
 		"wombat":   {core.HitMistake, res.ID + "/1"},

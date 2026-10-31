@@ -5,21 +5,20 @@ phase 1 exit). Item 12 is deferred by the operator. Items 13 and
 later are Bishop defaults, pending operator approval: each is marked *Bishop
 default, pending operator approval.* where it is written. None of them is
 approved.
-`core.Local` passes all 70 cases in `internal/conformance` (count as of
+`core.Local` passes all 82 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
 request and result types, errors). The conformance suite checks the behaviour
 described here.
 
-> **Plan v1 (2026-10-30): planned, not yet made.** The agent tool surface
-> narrows as Plan v1 sets it out: 13 tools plus the read tools `recall` and
-> `search` (15 names; see [DESIGN.md](DESIGN.md) §4). In M1, `note_put`,
-> `note_get`, `review_record` and `event_list` are removed, and `event_list`
-> folds into `task_get` with `section=events`. CLI equivalents per tool come
-> with `internal/cli` in M4. The M1 changes land with the code, because this
-> contract, `internal/core` and `internal/conformance` change together. In M2,
-> the directive cap (12 per call, ranked, decision D16) and `review_by` arrive,
-> and are then documented on `task_current` and `recall`. The sections below
-> still describe the surface as it stands.
+> **Plan v1 (2026-10-30).** The agent tool surface is 13 tools plus the read
+> tools `recall` and `search` (15 names; see [DESIGN.md](DESIGN.md) §4). M1
+> removes `note_put`, `note_get`, `review_record` and `event_list` from this
+> contract, `internal/core` and `internal/conformance`, in one change: `event_list`
+> folds into `task_get` with `section=events`, and a review is recorded as a
+> `review` event through `event_log` (§4, §9 item 39). CLI equivalents per tool come
+> with `internal/cli` in M4. In M2, the directive cap (12 per call, ranked,
+> decision D16) and `review_by` arrive, and are then documented on `task_current`
+> and `recall`.
 
 This document covers every tool in [DESIGN.md](DESIGN.md) §4, plus the
 operator calls behind the web UI and the CLI. Field names are the JSON names
@@ -45,10 +44,19 @@ client, and a role. The adapter sets it; request types do not carry it.
   and creates the row only when the project has none (§9 item 38).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
-  of only spaces counts as no name, and is `invalid`.
+  of only spaces counts as no name, and is `invalid`. A name with a control
+  character, or a space at either end, is `invalid` on every call, reads
+  included. A client name and a session name of that kind are `invalid` too, on
+  every call: the HTTP form cannot carry any of them unchanged, so each is refused,
+  not trimmed. The message names the field. On the MCP surface the adapter
+  takes it from the `agent` argument of each write tool (DESIGN §4).
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.
+  *M1 exception (2026-10-30):* `internal/api` has no API key yet, so its
+  `UnauthenticatedHeaderCaller` takes the role from the `X-Cairn-Role` header.
+  That is safe only while no listener exists (D19). M2 replaces it with the
+  key-scope resolver before `cairn serve` listens (DESIGN §5.4, M2 exit check).
 
 ### 1.2 Errors
 
@@ -57,7 +65,7 @@ A failure the caller can act on has a kind and a message:
 | Kind | Meaning |
 |---|---|
 | `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
-| `not_found` | The task, step, learning, directive or note does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
+| `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role. |
 
@@ -109,7 +117,7 @@ task_start (queue)                  task_start
   `active` writes an `unblocked` event. Each is written in the same transaction
   as its move (§9 item 36).
 - `done`, `failed` and `abandoned` are terminal. After them, every write to
-  the task is `refused`: update, steps, events, reviews and close.
+  the task is `refused`: update, steps, events and close.
 - **One active task per project**, unless the project's settings allow
   parallel tasks. Making a second task active (`task_start` or `task_update`)
   is `refused`. `blocked` does not count as active.
@@ -158,12 +166,16 @@ numbered 1…n); `key_files` (`[{path, note}]`); `steps` (`[{title, agent}]`);
 ### `task_get` — read
 
 **In:** `id`; `section`: `brief`, `steps`, `events` or `close`. Empty
-returns all of them.
+returns all of them. For `events` only, `limit` (default 20, maximum 100),
+`cursor` and `step` (a ref, to keep one step's events) page and filter the
+journal, as `event_list` did.
 **Out:** `task`, always. `brief` adds `criteria` and `key_files`. `steps`
-adds `steps` and `reviews`. `events` adds the last 20 `events`. `close`
-adds `criteria` with results, `lessons`, `no_lessons_reason`, `mistakes` and
-`deliverables`.
-**Errors:** `not_found`.
+adds `steps`. `events` adds `events`, newest first, one page, and `next` when
+more follow. Empty adds every section, with `events` as the last 20 and no
+`next`. `close` adds `criteria` with results, `lessons`, `no_lessons_reason`,
+`mistakes` and `deliverables`.
+**Errors:** `not_found`. `invalid` for a bad `limit`, `cursor` or `step`, or
+for any of those three with a section other than `events`.
 
 ### `task_list` — read, paged
 
@@ -232,22 +244,25 @@ All three are writes, and are `refused` on a terminal task.
 Every `pending` step is removed. Steps in any other status are kept in
 their order, and the new steps follow the last kept step.
 
-A `pending` step that an event or a review refers to cannot be removed, so
+A `pending` step that an event (a review is one) refers to cannot be removed, so
 the call is `refused` and changes nothing. The refusal names each such step.
 The way out: skip each such step with `step_update` (`skip`, with a summary),
 then plan again. A skipped step is kept.
 
 ### `step_add`
 
-**In:** `task_id`, `title`, `agent`; `after`, a step ref. Left out, the step
-goes at the end. `{"number": 0}` puts it before the first step.
+**In:** `task_id`, `title`, `agent`; `after`, a step ref. On the MCP surface the
+step's `agent` is `assignee`, since `agent` there is the caller (DESIGN §4).
+Left out, the step goes at the end. `{"number": 0}` puts it before the first
+step.
 **Out:** the step, with its number.
 No other step's id changes. Display numbers after it move up by one.
 
 ### `step_update`
 
 **In:** `task_id`, `step` (a ref), `action`, `summary`, `agent`
-(reassigns the step).
+(reassigns the step). On the MCP surface the reassigning field is `assignee`,
+since `agent` there is the caller (DESIGN §4).
 
 | Action | From | To | Also |
 |---|---|---|---|
@@ -266,25 +281,22 @@ the task is not `active`.
 
 **In:** `task_id`; `step` (a ref, optional); `kind`; `text` (required);
 `data` (a JSON object, optional).
-An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision` and
-`custom`. `started`, `finished`, `review` and `close` are written by the
+An agent may log `note`, `blocked`, `unblocked`, `handoff`, `decision`,
+`review` and `custom`. `started`, `finished` and `close` are written by the
 calls they record, and are `invalid` here. `unblocked` is also written by
 `task_update` (§1.5), and an agent may log it too.
+
+A `review` needs `data`, a JSON object of the form
+`{"verdict": "approved" | "not-approved", "critical": n, "warnings": n}`,
+where each count is 0 or more (§9 item 39). The three keys are matched
+exactly, in lower case, and the object has no other key: a key in another
+case, an extra key (such as `summary`), a key given twice, a `null` in place
+of the object or of any of the three values, a missing field, a malformed
+value, a verdict outside those two, or a negative count is `invalid`, and the
+message names the fix. Extra keys are refused, not kept, so nothing rides
+along unread. The step is optional, and may be in any status.
 **Out:** the event, with `occurred_at` set by the server.
 There is no call that edits or deletes an event.
-
-### `event_list` — read, paged
-
-**In:** `task_id`; `step` (a ref, to filter); `limit` (default 20);
-`cursor`.
-**Out:** `events`, newest first, and `next`.
-
-### `review_record` — write
-
-**In:** `task_id`, `step` (a ref), `verdict` (`approved|not-approved`),
-`critical`, `warnings` (counts, ≥ 0), `summary`.
-**Out:** the review. `reviewer` is the calling agent. A `review` event is
-written.
 
 ## 5. Learnings and directives
 
@@ -330,19 +342,14 @@ all); `all_projects`; `limit` (default 10); `cursor`.
 match first), and `next`. Global directives are found from every project.
 A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
-either.
+either. A `note` hit comes only from a row written before the M1 change that
+removed notes.
+No call reads a note, so such a hit has its snippet and no call to open it.
 
 ## 7. Notes
 
-### `note_put` — write
-
-**In:** `title`, `body` (Markdown); `task_id` (only when creating); `id`
-(to replace an existing note's title and body).
-**Out:** the note.
-
-### `note_get` — read
-
-**In:** `id`. **Out:** the note. **Errors:** `not_found`.
+Cut from v1: `note_put` and `note_get` are removed. A long brief goes in the
+task's `context`.
 
 ## 8. Operator calls
 
@@ -370,7 +377,7 @@ is a Bishop default, pending operator approval, and is marked so; a marked item
 is not approved until the operator says it is. From item 13 on, an item is
 checked by a conformance case unless it is marked `(core test only)`, where
 only a core test checks it. An item with no check of its own is marked
-`(not tested)`. Item 35 is the one such item today (see its entry).
+`(not tested)`. No item is marked so today.
 
 1. **Operator calls are part of `Service`** (§8), refused unless the role is
    operator. Without them, the suite could not test the rule "agents cannot
@@ -409,7 +416,7 @@ only a core test checks it. An item with no check of its own is marked
     where it means before the first step (§1.4, §3). *Bishop default, pending
     operator approval.*
 15. **A recorded pending step blocks `step_plan` (2026-10-29).** A
-    pending step with an event or a review is not removed. The call is
+    pending step with an event (a review is one) is not removed. The call is
     `refused` and changes nothing. The refusal names each such step, in
     display order, and the way out is to skip each of them and plan again
     (§3). *Bishop default, pending operator approval.*
@@ -477,16 +484,14 @@ only a core test checks it. An item with no check of its own is marked
     approval.* (core test only)
 29. **Skip sets `ended_at` (2026-10-29).** A `skip` step update sets the step's
     `ended_at` (§3). *Bishop default, pending operator approval.*
-30. **Learnings and notes on a terminal task (2026-10-29).** `learning_add` and
-    `note_put` are allowed on a `done`, `failed` or `abandoned` task. §1.5
-    refuses the task's own writes (update, steps, events, reviews and close),
-    and these are not among them. *Bishop default, pending operator approval.*
-31. **`note_put` shape (2026-10-29).** Giving `id` with `task_id` is `invalid`,
-    and so is a blank title or body (§7). *Bishop default, pending operator
-    approval.* (core test only)
-32. **`review_record` on any step (2026-10-29).** `review_record` accepts a step
-    in any status. The contract names none (§4). *Bishop default, pending
-    operator approval.*
+30. **Learnings on a terminal task (2026-10-29).** `learning_add` is
+    allowed on a `done`, `failed` or `abandoned` task. §1.5 refuses the task's
+    own writes (update, steps, events and close), and it is not among them. *Bishop default, pending operator approval.*
+31. **`note_put` shape (2026-10-29), withdrawn 2026-10-30.** `note_put` is cut
+    from v1 (§7), so this item no longer applies. Giving `id` with `task_id` was
+    to be `invalid`, and so was a blank title or body.
+32. **`review_record` on any step (2026-10-29), withdrawn 2026-10-30.**
+    `review_record` is cut from v1 (§4), so this item no longer applies.
 33. **Event on a pending step (2026-10-29).** `event_log` may name a pending
     step (§4). *Bishop default, pending operator approval.*
 34. **A name of only spaces is no name (2026-10-29).** An agent write whose
@@ -500,10 +505,9 @@ only a core test checks it. An item with no check of its own is marked
     the project's directives) run in one read transaction. The answer is one
     consistent state of the project: a write that lands during the call is seen
     by all of it or by none (§2). *Bishop default, pending operator approval.*
-    (not tested)
-    The store test `TestWithReadTxIsSnapshot` pins the snapshot
-    that a read transaction gives, but no test checks that `task_current` reads
-    through one, so no check of this item exists.
+    (core test only)
+    `TestTaskCurrentReadsOneSnapshot` in `internal/core` checks it. The store
+    test `TestWithReadTxIsSnapshot` pins what a read transaction gives.
 36. **A move out of `blocked` writes `unblocked` (2026-10-30).** A
     `task_update` from `blocked` to `active` writes an `unblocked` event, in
     the same transaction as the move. A move to `blocked` writes its `blocked`
@@ -518,3 +522,14 @@ only a core test checks it. An item with no check of its own is marked
     the project's `last_seen_at` on, and a read leaves it where the last write
     put it. A read creates the project only when the project does not yet exist
     (§1.1). *Bishop default, pending operator approval.* (core test only)
+39. **A review is an `event_log` entry (2026-10-30).** An agent records a review
+    with `event_log` of kind `review`, and the event's `data` holds the verdict
+    and counts: `{"verdict": "approved" | "not-approved", "critical": n,
+    "warnings": n}`, each count 0 or more (§4). A missing or malformed field, a
+    verdict outside the two values, or a negative count is `invalid`, and the
+    message names the fix. The step is optional and may be in any status
+    (item 33). The reviewer is the calling agent. This amends item 6 for
+    `review` only: `review_record` is cut from v1 (§4), so the review event is
+    the only record of a review. A review event recorded before M1 has no
+    `data`, since it was written by `review_record`. A reader of review events
+    must tolerate one with no data. *Bishop default, pending operator approval.*

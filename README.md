@@ -43,14 +43,18 @@ in Cairn leaves the same kind of marker.
   framework, a crew or a file layout.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
-- **One binary, `cairn`.** It is the MCP server (`cairn mcp`, planned for M1),
+- **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
   the HTTP server and web UI (`cairn serve`, planned for M2), the hook helper
-  and the admin tool. The CLI is planned for M4. Go and SQLite with full-text
-  search; no C toolchain.
+  and the admin tool. The M1 commands are `init`, `status`, `doctor`,
+  `export task` and `hook session-start`; the CLI proper is planned for M4. Go
+  and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn serve` is planned for M2. `cairn mcp` (planned for M1) and the
-  CLI (planned for M4) need `server` in `.cairn.toml` or `CAIRN_SERVER`.
+  D11). `cairn serve` is planned for M2. `cairn mcp` and the M1 commands need
+  `server` in `.cairn.toml` or `CAIRN_SERVER`, and `cairn mcp` refuses to start
+  without one. `cairn init` writes that file in the project directory, and does
+  not contact the server: `cairn init --project <name> --server <url>`. The
+  server URL may not carry a user name or password, since the file is committed.
 - **The operator decides.** Agents can only propose. Accepting a finding or
   ratifying a directive is an operator action.
 
@@ -73,7 +77,8 @@ From then on, each session starts with the active task in context, and the
 `cairn` skill tells the agent how to start, step through and close a task.
 
 `.cairn.toml` is committed to the project. `server` is required (D11); the
-API key does not go in this file.
+API key does not go in this file, and neither does a user name or password in
+the server URL.
 
 ```toml
 project = "acme-api"

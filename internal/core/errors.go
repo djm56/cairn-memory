@@ -10,8 +10,8 @@ import (
 type Kind string
 
 const (
-	// KindNotFound: the task, step, learning, directive or note does not exist
-	// in the caller's project.
+	// KindNotFound: the task, step, learning or directive does not exist in the
+	// caller's project.
 	KindNotFound Kind = "not_found"
 	// KindInvalid: the request is malformed: a required field is empty, an
 	// enum value is unknown, or the caller has no project or agent.

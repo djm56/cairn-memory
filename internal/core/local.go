@@ -20,6 +20,11 @@ import (
 // compile-time check below covers the whole interface.
 type Local struct {
 	st *store.Store
+
+	// betweenReads is a test seam. When it is set, TaskCurrent calls it inside
+	// its read transaction, after the active task is read and before its steps
+	// and events are. It is nil in production (CONTRACT §9 item 35).
+	betweenReads func()
 }
 
 var _ Service = (*Local)(nil)
@@ -48,6 +53,9 @@ func callerFor(ctx context.Context, write bool) (Caller, error) {
 	}
 	if write && blank(c.Agent) {
 		return c, Invalid("this call writes, so the caller needs an agent name")
+	}
+	if err := CheckCaller(c); err != nil {
+		return c, err
 	}
 	return c, nil
 }
@@ -240,15 +248,6 @@ func stepsFromRows(rows []store.StepRow) []Step {
 		out = append(out, stepFromRow(r))
 	}
 	return out
-}
-
-// reviewFromRow converts a stored review.
-func reviewFromRow(r store.ReviewRow) Review {
-	return Review{
-		ID: r.ID, TaskID: r.TaskID, StepID: r.StepID, Reviewer: r.Reviewer,
-		Verdict: Verdict(r.Verdict), Critical: r.Critical, Warnings: r.Warnings,
-		Summary: r.Summary, CreatedAt: r.CreatedAt,
-	}
 }
 
 // eventFromRow converts a stored event. An empty data column is no data.

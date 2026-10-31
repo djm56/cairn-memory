@@ -164,10 +164,11 @@ const (
 )
 
 // AgentLoggable reports whether an agent may log this kind with event_log.
-// started, finished, review and close are written by the calls they record.
+// started, finished and close are written by the calls they record. A review
+// is logged by an agent with its verdict and counts in data (CONTRACT §4).
 func (k EventKind) AgentLoggable() bool {
 	switch k {
-	case EventNote, EventBlocked, EventUnblocked, EventHandoff, EventDecision, EventCustom:
+	case EventNote, EventBlocked, EventUnblocked, EventHandoff, EventDecision, EventReview, EventCustom:
 		return true
 	}
 	return false
@@ -192,18 +193,6 @@ const (
 	VerdictApproved    Verdict = "approved"
 	VerdictNotApproved Verdict = "not-approved"
 )
-
-type Review struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id"`
-	StepID    int64     `json:"step_id"`
-	Reviewer  string    `json:"reviewer"`
-	Verdict   Verdict   `json:"verdict"`
-	Critical  int       `json:"critical"`
-	Warnings  int       `json:"warnings"`
-	Summary   string    `json:"summary,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
 
 type LearningKind string
 
@@ -275,16 +264,6 @@ type Directive struct {
 	RatifiedBy     string          `json:"ratified_by"`
 	RatifiedAt     time.Time       `json:"ratified_at"`
 	RetiredAt      *time.Time      `json:"retired_at,omitempty"`
-}
-
-type Note struct {
-	ID        int64     `json:"id"`
-	TaskID    string    `json:"task_id,omitempty"`
-	Project   string    `json:"project"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	CreatedBy string    `json:"created_by"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ClosePolicy is what task_close requires (DESIGN.md §3.7). Each field turns

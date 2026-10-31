@@ -81,9 +81,15 @@ const (
 	SectionClose  TaskSection = "close"
 )
 
+// TaskGetRequest asks for one task, or one section of it. Limit, Cursor and
+// Step page and filter the events section only. With any other section they
+// are invalid (CONTRACT §2).
 type TaskGetRequest struct {
 	ID      string      `json:"id"`
 	Section TaskSection `json:"section,omitempty"`
+	Limit   int         `json:"limit,omitempty"`  // section events: default 20
+	Cursor  string      `json:"cursor,omitempty"` // section events
+	Step    *StepRef    `json:"step,omitempty"`   // section events: one step's events
 }
 
 // TaskDetail is one task. Task is always set; the other fields are filled
@@ -93,12 +99,28 @@ type TaskDetail struct {
 	Criteria        []Criterion `json:"criteria,omitempty"`  // brief, close
 	KeyFiles        []TaskFile  `json:"key_files,omitempty"` // brief
 	Steps           []Step      `json:"steps,omitempty"`     // steps
-	Reviews         []Review    `json:"reviews,omitempty"`   // steps
-	Events          []Event     `json:"events,omitempty"`    // events: newest first, at most 20
+	Events          []Event     `json:"events,omitempty"`    // events: newest first; 20 unless paged
+	Next            string      `json:"next,omitempty"`      // events: cursor of the next page
 	Lessons         []Lesson    `json:"lessons,omitempty"`   // close
 	NoLessonsReason string      `json:"no_lessons_reason,omitempty"`
 	Mistakes        []Mistake   `json:"mistakes,omitempty"`     // close
 	Deliverables    []TaskFile  `json:"deliverables,omitempty"` // close
+}
+
+// MarshalJSON writes a TaskDetail with the tags above, except for events. The
+// events key is written whenever the call read the events section, even as [],
+// because omitempty would drop an empty list. The other sections keep omitempty,
+// so a brief has no events key. A nil Events is not read, and is left out.
+func (d TaskDetail) MarshalJSON() ([]byte, error) {
+	type plain TaskDetail // the same fields, without this method
+	var events *[]Event
+	if d.Events != nil {
+		events = &d.Events
+	}
+	return json.Marshal(struct {
+		plain
+		Events *[]Event `json:"events,omitempty"`
+	}{plain: plain(d), Events: events})
 }
 
 // ---- task_list ----
@@ -203,7 +225,7 @@ type StepUpdateRequest struct {
 	Agent   *string    `json:"agent,omitempty"`   // reassign the step
 }
 
-// ---- event_log, event_list ----
+// ---- event_log ----
 
 type EventLogRequest struct {
 	TaskID string          `json:"task_id"`
@@ -211,29 +233,6 @@ type EventLogRequest struct {
 	Kind   EventKind       `json:"kind"`
 	Text   string          `json:"text"`
 	Data   json.RawMessage `json:"data,omitempty"` // a JSON object, if set
-}
-
-type EventListRequest struct {
-	TaskID string   `json:"task_id"`
-	Step   *StepRef `json:"step,omitempty"`
-	Limit  int      `json:"limit,omitempty"` // default 20
-	Cursor string   `json:"cursor,omitempty"`
-}
-
-type EventList struct {
-	Events []Event `json:"events"` // newest first
-	Next   string  `json:"next,omitempty"`
-}
-
-// ---- review_record ----
-
-type ReviewRecordRequest struct {
-	TaskID   string  `json:"task_id"`
-	Step     StepRef `json:"step"`
-	Verdict  Verdict `json:"verdict"`
-	Critical int     `json:"critical"`
-	Warnings int     `json:"warnings"`
-	Summary  string  `json:"summary,omitempty"`
 }
 
 // ---- learning_add, learning_list ----
@@ -341,20 +340,6 @@ type SearchHit struct {
 type SearchResult struct {
 	Hits []SearchHit `json:"hits"` // best match first
 	Next string      `json:"next,omitempty"`
-}
-
-// ---- note_put, note_get ----
-
-// NotePutRequest creates a note, or replaces note ID's title and body.
-type NotePutRequest struct {
-	ID     int64  `json:"id,omitempty"`
-	TaskID string `json:"task_id,omitempty"` // only when creating
-	Title  string `json:"title"`
-	Body   string `json:"body"`
-}
-
-type NoteGetRequest struct {
-	ID int64 `json:"id"`
 }
 
 // ---- operator calls ----

@@ -50,12 +50,6 @@ var agentCalls = []call{
 	{"EventLog", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.EventLog(ctx, core.EventLogRequest{TaskID: "task-20260101-01", Kind: core.EventNote, Text: "x"}))
 	}},
-	{"EventList", false, func(ctx context.Context, s core.Service) error {
-		return ignore(s.EventList(ctx, core.EventListRequest{TaskID: "task-20260101-01"}))
-	}},
-	{"ReviewRecord", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: "task-20260101-01", Step: core.NumberRef(1), Verdict: core.VerdictApproved}))
-	}},
 	{"LearningAdd", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))
 	}},
@@ -70,12 +64,6 @@ var agentCalls = []call{
 	}},
 	{"Search", false, func(ctx context.Context, s core.Service) error {
 		return ignore(s.Search(ctx, core.SearchRequest{Query: "q"}))
-	}},
-	{"NotePut", true, func(ctx context.Context, s core.Service) error {
-		return ignore(s.NotePut(ctx, core.NotePutRequest{Title: "t", Body: "b"}))
-	}},
-	{"NoteGet", false, func(ctx context.Context, s core.Service) error {
-		return ignore(s.NoteGet(ctx, core.NoteGetRequest{ID: 1}))
 	}},
 }
 
@@ -215,6 +203,66 @@ var identityCases = []Case{
 			if c.write {
 				wantKind(t, c.do(spaces, s), core.KindInvalid, c.name+" with a blank agent")
 			}
+		}
+	}},
+	{"identity/agent_name_control_character_refused", func(t T, s core.Service) {
+		// CONTRACT §1.1, step 8 review W3: a name the wire form cannot carry is
+		// refused on every agent call, reads included, and the message names the
+		// field. The client refuses it before it sends, so it answers the same.
+		for _, c := range agentCalls {
+			err := c.do(as(projA, "ma\nin"), s)
+			wantKind(t, err, core.KindInvalid, c.name+" with a control character in the agent name")
+			if err != nil && !strings.Contains(err.Error(), "agent name") {
+				t.Errorf("%s: error %q does not name the agent name", c.name, err)
+			}
+		}
+	}},
+	{"identity/agent_name_edge_space_refused", func(t T, s core.Service) {
+		// A space at either end is not kept by the header form, so it is refused
+		// rather than trimmed. A space between words is fine (the next case).
+		for _, name := range []string{" main", "main "} {
+			for _, c := range agentCalls {
+				err := c.do(as(projA, name), s)
+				wantKind(t, err, core.KindInvalid, c.name+" with the agent name "+name)
+			}
+		}
+	}},
+	{"identity/client_name_refused", func(t T, s core.Service) {
+		// The client name comes from the MCP client, and the same rule applies
+		// to it: a control character or an edge space is refused, and the
+		// message names the client name.
+		for _, client := range []string{"claude\tcode", " claude-code"} {
+			ctx := core.WithCaller(context.Background(), core.Caller{Project: projA, Agent: "main", Client: client, Role: core.RoleAgent})
+			_, err := s.TaskCurrent(ctx)
+			wantKind(t, err, core.KindInvalid, "TaskCurrent with the client name "+client)
+			if err != nil && !strings.Contains(err.Error(), "client name") {
+				t.Errorf("TaskCurrent: error %q does not name the client name", err)
+			}
+			_, err = s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"})
+			wantKind(t, err, core.KindInvalid, "LearningAdd with the client name "+client)
+		}
+	}},
+	{"identity/session_name_refused", func(t T, s core.Service) {
+		// The session is optional, and the header carries it on the wire, so the
+		// same rule applies to it (step 10 review S4): a control character or an
+		// edge space is refused, on a read and a write, and the message names it.
+		for _, session := range []string{"sess\nion", " session"} {
+			ctx := core.WithCaller(context.Background(), core.Caller{Project: projA, Agent: "main", Session: session, Client: "conformance", Role: core.RoleAgent})
+			_, err := s.TaskCurrent(ctx)
+			wantKind(t, err, core.KindInvalid, "TaskCurrent with the session "+session)
+			if err != nil && !strings.Contains(err.Error(), "session") {
+				t.Errorf("TaskCurrent: error %q does not name the session", err)
+			}
+			_, err = s.LearningAdd(ctx, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"})
+			wantKind(t, err, core.KindInvalid, "LearningAdd with the session "+session)
+		}
+	}},
+	{"identity/agent_name_inner_space_accepted", func(t T, s core.Service) {
+		// Only the edges and the control characters are refused: a name may
+		// hold a space between its words, and it is kept as given.
+		l := must(s.LearningAdd(as(projA, "code reviewer"), core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
+		if l.Agent != "code reviewer" {
+			t.Errorf("agent = %q, want %q", l.Agent, "code reviewer")
 		}
 	}},
 }

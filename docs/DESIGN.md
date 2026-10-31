@@ -53,7 +53,7 @@ Cairn has four jobs:
   `CAIRN_SERVER`. The local database path that D2 designed (the MCP adapter
   opening a database when no server is set) was cut by D11 before it was built.
   M1 builds the server-only adapter *(decision D2, superseded by D11)*, and the
-  `internal/api` handlers with no network listener (decision D19).
+  `internal/api` handlers with no network listener in the shipped binary (decision D19).
 - **The operator decides.** Agents propose findings and directives. Only the
   operator accepts them. No tool lets an agent change a finding's status or
   ratify a rule.
@@ -114,7 +114,27 @@ server = "https://cairn.lan:8787"   # required from M1 (decision D11); D2's loca
 ```
 
 The API key never goes in this file. It comes from the plugin's secure option,
-`CAIRN_API_KEY`, or `~/.config/cairn/client.env`.
+`CAIRN_API_KEY`, or `~/.config/cairn/client.env`. Nor does a user name or a
+password in the server URL: `cairn init` refuses one, and no command prints a URL
+with them.
+
+`cairn init` writes the file in `CLAUDE_PROJECT_DIR` when Claude Code sets it,
+else in the working directory. Where `CLAUDE_PROJECT_DIR` is set, it refuses to
+run from a working directory outside it (exit 1): the variable is inherited by
+the shells Claude Code starts, and a `cd` into another project would otherwise
+write that project's file into the first one's root. Both directories are
+resolved through their symlinks before they are compared. It never overwrites a
+file. Where the filesystem has hard links it writes the file whole or not at all
+(a temporary file, then a link). On a filesystem without them it writes the file
+directly, with `O_EXCL`, which still refuses an existing name, but a crash can
+leave the file partly written. The file is created with mode 0644 before the
+umask.
+
+The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
+key of the nearest `.cairn.toml`, found by the same walk (M1). `CAIRN_SERVER`
+is read first, and an empty value counts as unset. A call with neither is
+refused with an error that names `cairn init`, and there is no default server.
+`cairn mcp` refuses to start without one.
 
 ## 3. Data model
 
@@ -310,11 +330,18 @@ Tool names are short and unprefixed; the client adds the server prefix
 
 Plan v1 (decisions D11 and D14) sets the agent surface for M1: 13 tools plus
 the read tools `recall` and `search` (15 names). The table below lists all 15.
-Until M1, the contract and `internal/core` still carry `event_list`,
-`review_record`, `note_put` and `note_get`, and no MCP tool wraps them yet. M1
+Until M1, the contract and `internal/core` still carried `event_list`,
+`review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
 removes them, and `event_list` folds into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
 is how every harness other than Claude Code reaches Cairn.
+
+In M1, `internal/mcp` registers the fifteen tools of the table below, each one
+call of the service. Each write tool takes `agent`, which is the caller's agent
+(CONTRACT §1.1). The two step tools that also name a step's assignee take it as
+`assignee` instead, because there `agent` is the caller: `step_add` and
+`step_update` (CONTRACT §3 names the field `agent` for both, and the MCP surface
+differs from it only there).
 
 | Tool | Purpose |
 |---|---|
@@ -342,11 +369,15 @@ status, ratifies or retires a directive, deletes a task, or edits an event.
 `cairn hook session-start` prints, for a SessionStart hook, a short block of
 context: the active task (title, next action, current step), the count of
 directives that apply, and one line telling the agent to call `task_current`.
-When no task is active it says so in one line. It writes nothing.
+When no task is active it says so in one line. It writes no task, step, event or
+learning. Its one call is a read, and the first call of a project creates the
+project's row on the server, as every first call does (CONTRACT §9 item 38). With
+no project, no server, or a server that does not answer in 5 seconds, it prints
+nothing on stdout, says why on stderr, and exits 0, so the session starts.
 
 Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
-`stop`. `session-start` is planned, M1, and not yet built; issue #16 carries it.
-`pre-compact` and `stop` are planned for M4.
+`stop`. `session-start` is built in M1 (issue #16). `pre-compact` and `stop` are
+planned for M4.
 `cairn enable --agent` installs all three.
 
 - `pre-compact` (planned, M4) prints the active task, the current step, the
@@ -356,10 +387,10 @@ Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 
 ## 5. Architecture
 
-The target after M1: one server, no local backend. D2 designed a local backend,
+The target after M2: one server, no local backend. D2 designed a local backend,
 and D11 cut it before it was built; §5.3, "The server", says what replaces it.
 M1 builds the server-only adapter and the `internal/api` handlers. It builds no
-network listener and no `cairn serve`: `cairn serve` is M2, and M1's tests run
+network listener in the shipped binary and no `cairn serve`: `cairn serve` is M2, and M1's tests run
 against an in-process server (D19).
 
 ```
@@ -391,9 +422,9 @@ against an in-process server (D19).
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Planned, M1: handlers only, with no listener (D19). The `cairn serve` listener that mounts them is M2. |
-| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Planned, M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. |
-| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The shipped binary has no network listener (D19). The `cairn serve` listener that mounts them is M2. |
+| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
+| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. Built in M1. |
 | `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
 | `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
 | `internal/auth` | API keys and scopes (server mode). |
@@ -409,26 +440,27 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairn init` | Writes `.cairn.toml` in the current project and registers the project. Planned, M1. |
-| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). |
+| `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
+| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
-| `cairn hook <event>` | Output for client hooks. `session-start` is planned, M1; `pre-compact` and `stop` are planned, M4. |
-| `cairn status` | The active task and the server in use, for a terminal. Planned, M1. |
-| `cairn export <task>` | A task as Markdown (`export task`, planned, M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
+| `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
+| `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
+| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
 | `cairn key add/list/revoke` | API keys for server mode. Planned, M2. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
 | `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
 | `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
-| `cairn doctor` | Checks the binary, the config, the database or server, and the project file. Planned, M1; `--agent` is planned, M4. |
+| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1; `--agent` is planned, M4. |
 
 ### 5.3 The server
 
 Clients open no database. `cairn mcp` and the CLI send each call to
 `cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
 without a `server` (M1). The store stays inside `cairn serve`, and the web UI
-is served by the same process. Until M2 there is no listener to send to, so
-M1's flow runs against an in-process server (D19).
+is served by the same process. Until M2 the shipped binary has no network
+listener, so M1's flow runs against an in-process server bound to loopback
+(D19).
 
 D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend
@@ -436,6 +468,77 @@ and no switch in `.cairn.toml`.
 
 A project's data does not move automatically. `cairn serve` can be pointed at
 an existing SQLite file to make it the server's own database.
+
+### 5.4 The HTTP wire form
+
+`internal/api` serves the `Service` over HTTP, and `internal/client` is a
+`Service` that calls it. Defined in M1 (2026-10-30). M2 serves this form on
+`cairn serve`, and from then on it is public API. It is written here rather
+than in CONTRACT.md because CONTRACT says what each call does for an MCP
+client and the CLI. This section is how the adapter reaches the server.
+
+- **Routes.** Every call is a `POST`. Agent calls go to `/v1/agent/<call>`,
+  for the 15 calls of §4. Operator calls (CONTRACT §8) go to
+  `/v1/operator/<call>`. The names are the snake_case tool names: `task_current`,
+  `task_start` … `search`, and `learning_decide`, `directive_ratify`,
+  `directive_retire`, `project_settings_set`. A path that is no call is `404`.
+  A method other than `POST` is `405`, with `Allow: POST`.
+- **Request.** A JSON object with the call's fields, as the request types in
+  `internal/core` name them. `task_current` takes none: an empty body or `{}`.
+  An unknown field, a value of the wrong type, a second JSON value, and a body
+  over 1 MiB are refused: `400`, or `413` for the size. The server refuses
+  unknown fields, so a misspelt field is not dropped.
+- **Caller.** The headers `X-Cairn-Project`, `X-Cairn-Agent`,
+  `X-Cairn-Session`, `X-Cairn-Client` and `X-Cairn-Role` carry the caller
+  (CONTRACT §1.1). A call with no project is `invalid`. `X-Cairn-Role` is
+  `operator` for an operator call and is an agent otherwise. M1's
+  `api.UnauthenticatedHeaderCaller` trusts that header, with no key behind
+  it. That is safe only while nothing listens. M2 replaces it with a resolver
+  that takes the role from the API key's scope, so a client never sets its own
+  role, and it does so before any listener exists (CONTRACT §1.1, M1 exception).
+- **Success.** `200`, with the result as JSON, in the field names of the core
+  types. Empty optional fields are left out (CONTRACT §1.3). A read of section
+  `events` always carries `events`, as `[]` when the page is empty (CONTRACT §2).
+- **Errors.** The status follows the kind, and the body is
+  `{"error": {"kind": ..., "message": ..., "missing": [...]}}`, the same
+  `core.Error` the call returned.
+
+  | Kind | Status |
+  |---|---|
+  | `invalid` (including a malformed request, a bad path or a bad method) | 400, or 404 for a bad path, 405 for a bad method, 413 for a body over the cap |
+  | `operator_only` | 403 |
+  | `not_found` | 404 |
+  | `refused` | 409 |
+  | `internal` | 500 |
+
+  `internal` is a wire kind, not a core kind. It is the answer to any error
+  that is not a `core.Error`, and to a panic in a call, which the handler
+  recovers. Its message is always `internal error`, so the caller never sees
+  the cause. The cause goes to the failure hook that `api.Handler` is given
+  (`FailureHook`, nil discards it), so the server can keep it for its own
+  record. A `http.ErrAbortHandler` panic is not recovered.
+- **The client.** It returns the `core.Error` the server named, with the same
+  kind, message and missing list. Any other failure is a plain error that names
+  the route and the status, and it is not a `core.Error`. The client ignores
+  unknown response fields, so the server can add a field without a new prefix.
+  Event data that is not JSON cannot be sent in a request body, so the client
+  refuses that call before it is sent, with the message core gives for the
+  same data in process (`core.CheckEventData`). The message is the same for the
+  same data fault. With several faults the order differs: in process, a missing
+  task id, an unknown kind or empty text is reported before the data; over the
+  client, the data is checked first. A caller name that the headers cannot carry
+  (a control character, or a space at either end) is refused by the client the
+  same way, with core's message (`core.CheckCaller`), and is not sent. The names
+  checked are the agent, the client and the session, as CONTRACT §1.1 says.
+  With no HTTP client given, `client.New` uses one with a 30-second timeout. A
+  successful answer over 16 MiB is an error. The server does not cap its
+  answers, so the cap is the client's guard.
+- **Versions.** A breaking change takes a new prefix (`/v2`).
+
+Tests: `internal/client` runs the whole conformance suite over an `httptest`
+server on loopback that wraps the handlers over a real `core` (D19).
+`internal/api` tests the statuses, the error body, malformed requests, the
+headers and the events key.
 
 ## 6. Clients
 
@@ -452,7 +555,7 @@ plugins/claude-code/
   bin/cairn-launch             finds the cairn binary; if missing, exits
                                with the one-line install command
   hooks/hooks.json             SessionStart → cairn hook session-start
-                               (planned, M1, not yet built; issue #16);
+                               (built in M1; issue #16);
                                PreCompact and Stop → cairn hook pre-compact
                                and stop (planned, M4, D15)
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below

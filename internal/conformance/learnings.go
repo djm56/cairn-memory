@@ -35,9 +35,9 @@ var learningCases = []Case{
 			t.Errorf("learning moved back from rejected = %+v", back)
 		}
 	}},
-	{"learning/add_and_note_on_done_and_failed_task", func(t T, s core.Service) {
-		// CONTRACT §9 item 30: learning_add and note_put are allowed on a done
-		// or failed task, as on an abandoned one (see the case above).
+	{"learning/add_on_done_and_failed_task", func(t T, s core.Service) {
+		// CONTRACT §9 item 30: learning_add is allowed on a done or failed task,
+		// as on an abandoned one.
 		for _, outcome := range []core.TaskStatus{core.TaskDone, core.TaskFailed} {
 			res := startTask(t, s, mainCtx(), "t-"+string(outcome))
 			req := fullClose(res.ID, 0)
@@ -47,24 +47,16 @@ var learningCases = []Case{
 			if l.TaskID != res.ID {
 				t.Errorf("%s task: learning task = %q, want %s", outcome, l.TaskID, res.ID)
 			}
-			n := must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Post-mortem", Body: "b"}))(t)
-			if n.TaskID != res.ID {
-				t.Errorf("%s task: note task = %q, want %s", outcome, n.TaskID, res.ID)
-			}
 		}
 	}},
-	{"learning/add_and_note_on_terminal_task", func(t T, s core.Service) {
-		// CONTRACT §9 item 30: learning_add and note_put are allowed on an
+	{"learning/add_on_terminal_task", func(t T, s core.Service) {
+		// CONTRACT §9 item 30: learning_add is allowed on an
 		// abandoned task. The task's own writes, here an event, are refused.
 		res := startTask(t, s, mainCtx(), "t")
 		must(s.TaskUpdate(mainCtx(), core.TaskUpdateRequest{ID: res.ID, Status: ptr(core.TaskAbandoned), Reason: "stopped"}))(t)
 		l := must(s.LearningAdd(mainCtx(), core.LearningAddRequest{TaskID: res.ID, Kind: core.LearningFinding, Title: "t", Body: "b"}))(t)
 		if l.TaskID != res.ID {
 			t.Errorf("learning task = %q, want %s", l.TaskID, res.ID)
-		}
-		n := must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Post-mortem", Body: "b"}))(t)
-		if n.TaskID != res.ID {
-			t.Errorf("note task = %q, want %s", n.TaskID, res.ID)
 		}
 		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "late"})
 		wantKind(t, err, core.KindRefused, "event on an abandoned task")
@@ -312,12 +304,11 @@ var searchCases = []Case{
 		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{Title: "Tune the zeppelin cache", Goal: "Cache hit rate over 90%."}))(t)
 		must(s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "The quokka endpoint is slow."}))(t)
 		must(s.LearningAdd(mainCtx(), core.LearningAddRequest{Kind: core.LearningPattern, Title: "Narwhal batching", Body: "Batch writes."}))(t)
-		must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Design", Body: "The axolotl layer sits in front."}))(t)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "Pangolin rule", Rule: "Never skip the pangolin check."}))(t)
 
 		for word, kind := range map[string]core.HitKind{
 			"zeppelin": core.HitTask, "quokka": core.HitEvent, "narwhal": core.HitLearning,
-			"axolotl": core.HitNote, "pangolin": core.HitDirective,
+			"pangolin": core.HitDirective,
 		} {
 			got := must(s.Search(mainCtx(), core.SearchRequest{Query: word}))(t)
 			if len(got.Hits) == 0 || got.Hits[0].Kind != kind {
@@ -345,24 +336,5 @@ var searchCases = []Case{
 		must(s.Search(mainCtx(), core.SearchRequest{Query: `"unbalanced AND (OR* -`}))(t)
 		_, err := s.Search(mainCtx(), core.SearchRequest{})
 		wantKind(t, err, core.KindInvalid, "empty query")
-	}},
-	{"note/put_and_get", func(t T, s core.Service) {
-		res := startTask(t, s, mainCtx(), "t")
-		n := must(s.NotePut(mainCtx(), core.NotePutRequest{TaskID: res.ID, Title: "Design", Body: "# Design\n\nv1"}))(t)
-		if n.ID == 0 || n.TaskID != res.ID || n.CreatedBy != "main" {
-			t.Errorf("new note = %+v", n)
-		}
-		n2 := must(s.NotePut(mainCtx(), core.NotePutRequest{ID: n.ID, Title: "Design", Body: "# Design\n\nv2"}))(t)
-		if n2.ID != n.ID {
-			t.Errorf("update created note %d, want %d", n2.ID, n.ID)
-		}
-		got := must(s.NoteGet(mainCtx(), core.NoteGetRequest{ID: n.ID}))(t)
-		if got.Body != "# Design\n\nv2" {
-			t.Errorf("note body = %q", got.Body)
-		}
-		_, err := s.NoteGet(as(projB, "main"), core.NoteGetRequest{ID: n.ID})
-		wantKind(t, err, core.KindNotFound, "note from another project")
-		_, err = s.NotePut(mainCtx(), core.NotePutRequest{Title: "t", Body: "b", TaskID: "task-19990101-01"})
-		wantKind(t, err, core.KindNotFound, "note on an unknown task")
 	}},
 }

@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,7 +43,7 @@ func TestConformance(t *testing.T) {
 }
 
 // TestStepStartAndFinishWriteEvents checks the journal rows that step_update
-// writes, read back through event_list.
+// writes, read back through task_get (section events).
 func TestStepStartAndFinishWriteEvents(t *testing.T) {
 	s, _ := openLocal(t)
 	ctx := agent("acme-api", "main")
@@ -56,11 +57,11 @@ func TestStepStartAndFinishWriteEvents(t *testing.T) {
 	if _, err := s.StepUpdate(ctx, core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepFinish, Summary: "ok"}); err != nil {
 		t.Fatal(err)
 	}
-	list, err := s.EventList(ctx, core.EventListRequest{TaskID: res.ID, Limit: 10})
+	list, err := s.TaskGet(ctx, core.TaskGetRequest{ID: res.ID, Section: core.SectionEvents, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// event_list is newest first.
+	// The journal is newest first.
 	var kinds []string
 	for _, e := range list.Events {
 		kinds = append(kinds, string(e.Kind))
@@ -85,7 +86,7 @@ func TestStepPlanRefusesPendingStepWithRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	three := core.NumberRef(3)
-	if _, err := s.ReviewRecord(agent("acme-api", "reviewer"), core.ReviewRecordRequest{TaskID: res.ID, Step: three, Verdict: core.VerdictApproved}); err != nil {
+	if _, err := s.EventLog(agent("acme-api", "reviewer"), core.EventLogRequest{TaskID: res.ID, Step: &three, Kind: core.EventReview, Text: "about three", Data: json.RawMessage(`{"verdict":"approved","critical":0,"warnings":0}`)}); err != nil {
 		t.Fatal(err)
 	}
 	_, err = s.StepPlan(ctx, core.StepPlanRequest{TaskID: res.ID, Steps: []core.StepInput{{Title: "new"}}})

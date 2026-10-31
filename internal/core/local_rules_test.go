@@ -53,10 +53,6 @@ func TestTerminalTaskRefusesEveryWrite(t *testing.T) {
 			_, err := s.EventLog(ctx, core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "late"})
 			return err
 		},
-		"ReviewRecord": func() error {
-			_, err := s.ReviewRecord(ctx, core.ReviewRecordRequest{TaskID: res.ID, Step: one, Verdict: core.VerdictApproved})
-			return err
-		},
 	}
 	for name, do := range attempts {
 		if err := do(); core.KindOf(err) != core.KindRefused {
