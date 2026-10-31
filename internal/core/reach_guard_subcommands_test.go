@@ -27,8 +27,10 @@ import (
 // from the dispatch table. serve.go starts the listener through server.Run, and key.go
 // makes and revokes keys in the server's database.
 var subcommandFiles = map[string]bool{
-	"cmd/cairn/serve.go": true,
-	"cmd/cairn/key.go":   true,
+	"cmd/cairn/serve.go":   true,
+	"cmd/cairn/key.go":     true,
+	"cmd/cairn/backup.go":  true,
+	"cmd/cairn/restore.go": true,
 }
 
 // dispatchFile is the one file that names the subcommand functions outside the two files:
@@ -136,7 +138,7 @@ func TestSubcommandsAreReachedOnlyFromDispatch(t *testing.T) {
 // must count, or one it must not, and the count is what the rule must answer. With the rule
 // disabled, the faults are zero and the snippets that name a subcommand fail.
 func TestSubcommandRuleCanFail(t *testing.T) {
-	names := map[string]bool{"runServe": true, "keyFlags": true, "run": true}
+	names := map[string]bool{"runServe": true, "keyFlags": true, "run": true, "runBackup": true, "runRestore": true}
 	cases := []struct {
 		name    string
 		src     string
@@ -148,6 +150,8 @@ func TestSubcommandRuleCanFail(t *testing.T) {
 		{"a subcommand function used as a value", "package main\nvar h = runServe\n", false, 1},
 		{"cairn mcp calling run with serve, in another file", "package main\nfunc serveMCP() { run([]string{\"serve\"}, nil, nil) }\n", false, 1},
 		{"a field of the same name, which is no reference", "package main\nfunc f(x T) { x.runServe() }\n", false, 0},
+		{"cairn mcp calling runBackup, in another file", "package main\nfunc serveMCP() { runBackup(nil, nil, nil) }\n", false, 1},
+		{"cairn mcp calling runRestore, in another file", "package main\nvar h = runRestore\n", false, 1},
 		{"the dispatch table in main.go", "package main\nvar h = runServe\n", true, 0},
 	}
 	for _, c := range cases {
