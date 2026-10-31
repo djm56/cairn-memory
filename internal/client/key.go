@@ -77,14 +77,15 @@ func LoadKey() (Key, error) {
 	return Key{Value: v, Source: SourceFile}, nil
 }
 
-// NoKeyMessage is what a command says when LoadKey finds no key. It names both places a key
-// can be given, and it never names a key.
+// NoKeyMessage is the instruction a command gives when LoadKey finds no key: the two places a
+// key can be given. The caller frames it, as "no API key: " or "missing: ". It never names a
+// key.
 func NoKeyMessage() string {
 	path, err := ClientEnvPath()
 	if err != nil {
-		return fmt.Sprintf("no API key: set %s, or write %s=<key> to the client.env file under ~/.config/cairn", EnvKey, EnvKey)
+		return fmt.Sprintf("set %s, or write %s=<key> to the client.env file under ~/.config/cairn", EnvKey, EnvKey)
 	}
-	return fmt.Sprintf("no API key: set %s, or write %s=<key> to %s", EnvKey, EnvKey, path)
+	return fmt.Sprintf("set %s, or write %s=<key> to %s", EnvKey, EnvKey, path)
 }
 
 // readKeyFile returns the key in the file at path, or "" when the file does not exist or
