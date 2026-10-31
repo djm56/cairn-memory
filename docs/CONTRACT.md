@@ -44,8 +44,12 @@ client, and a role. The adapter sets it; request types do not carry it.
   and creates the row only when the project has none (§9 item 38).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
-  of only spaces counts as no name, and is `invalid`. On the MCP surface the
-  adapter takes it from the `agent` argument of each write tool (DESIGN §4).
+  of only spaces counts as no name, and is `invalid`. A name with a control
+  character, or a space at either end, is `invalid` on every call, reads
+  included, and so is a client name of that kind: the HTTP form cannot carry
+  either unchanged, so the name is refused, not trimmed. The message names the
+  field. On the MCP surface the adapter takes it from the `agent` argument of
+  each write tool (DESIGN §4).
 - **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
   server derives the role from the API key's scope, never from the request.
   Operator calls (§8) refuse any other role.
@@ -248,8 +252,9 @@ then plan again. A skipped step is kept.
 ### `step_add`
 
 **In:** `task_id`, `title`, `agent`; `after`, a step ref. On the MCP surface the
-step's `agent` is `assignee`, since `agent` there is the caller (DESIGN §4). Left out, the step
-goes at the end. `{"number": 0}` puts it before the first step.
+step's `agent` is `assignee`, since `agent` there is the caller (DESIGN §4).
+Left out, the step goes at the end. `{"number": 0}` puts it before the first
+step.
 **Out:** the step, with its number.
 No other step's id changes. Display numbers after it move up by one.
 

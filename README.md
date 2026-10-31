@@ -45,13 +45,15 @@ in Cairn leaves the same kind of marker.
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
   the HTTP server and web UI (`cairn serve`, planned for M2), the hook helper
-  and the admin tool. The CLI is planned for M4. Go and SQLite with full-text
-  search; no C toolchain.
+  and the admin tool. The M1 commands are `init`, `status`, `doctor`,
+  `export task` and `hook session-start`; the CLI proper is planned for M4. Go
+  and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn serve` is planned for M2. `cairn mcp` (built in M1) and the
-  CLI (planned for M4) need `server` in `.cairn.toml` or `CAIRN_SERVER`, and
-  `cairn mcp` refuses to start without one.
+  D11). `cairn serve` is planned for M2. `cairn mcp` and the M1 commands need
+  `server` in `.cairn.toml` or `CAIRN_SERVER`, and `cairn mcp` refuses to start
+  without one. `cairn init` writes that file: `cairn init --project <name>
+  --server <url>`.
 - **The operator decides.** Agents can only propose. Accepting a finding or
   ratifying a directive is an operator action.
 

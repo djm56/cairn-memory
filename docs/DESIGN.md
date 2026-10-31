@@ -355,11 +355,15 @@ status, ratifies or retires a directive, deletes a task, or edits an event.
 `cairn hook session-start` prints, for a SessionStart hook, a short block of
 context: the active task (title, next action, current step), the count of
 directives that apply, and one line telling the agent to call `task_current`.
-When no task is active it says so in one line. It writes nothing.
+When no task is active it says so in one line. It writes no task, step, event or
+learning. Its one call is a read, and the first call of a project creates the
+project's row on the server, as every first call does (CONTRACT §9 item 38). With
+no project, no server, or a server that does not answer in 5 seconds, it prints
+nothing on stdout, says why on stderr, and exits 0, so the session starts.
 
 Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
-`stop`. `session-start` is planned, M1, and not yet built; issue #16 carries it.
-`pre-compact` and `stop` are planned for M4.
+`stop`. `session-start` is built in M1 (issue #16). `pre-compact` and `stop` are
+planned for M4.
 `cairn enable --agent` installs all three.
 
 - `pre-compact` (planned, M4) prints the active task, the current step, the
@@ -422,18 +426,18 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairn init` | Writes `.cairn.toml` in the current project and registers the project. Planned, M1. |
+| `cairn init` | Writes `.cairn.toml` in the current project, with `--project` and `--server`. Built in M1. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, and never changes a value the file has. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Planned, M2 (its handlers land in M1, D19); the web UI is M3. |
-| `cairn hook <event>` | Output for client hooks. `session-start` is planned, M1; `pre-compact` and `stop` are planned, M4. |
-| `cairn status` | The active task and the server in use, for a terminal. Planned, M1. |
-| `cairn export <task>` | A task as Markdown (`export task`, planned, M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
+| `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
+| `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
+| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
 | `cairn key add/list/revoke` | API keys for server mode. Planned, M2. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
 | `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
 | `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
-| `cairn doctor` | Checks the binary, the config, the database or server, and the project file. Planned, M1; `--agent` is planned, M4. |
+| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1; `--agent` is planned, M4. |
 
 ### 5.3 The server
 
@@ -505,8 +509,12 @@ client and the CLI. This section is how the adapter reaches the server.
   unknown response fields, so the server can add a field without a new prefix.
   Event data that is not JSON cannot be sent in a request body, so the client
   refuses that call before it is sent, with the message core gives for the
-  same data in process (`core.CheckEventData`). The answer is the same on both
-  paths. A request with another fault as well gets the data fault first.
+  same data in process (`core.CheckEventData`). The message is the same for the
+  same data fault. With several faults the order differs: in process, a missing
+  task id, an unknown kind or empty text is reported before the data; over the
+  client, the data is checked first. A caller name that the headers cannot carry
+  (a control character, or a space at either end) is refused by the client the
+  same way, with core's message (`core.CheckCaller`), and is not sent.
   With no HTTP client given, `client.New` uses one with a 30-second timeout. A
   successful answer over 16 MiB is an error. The server does not cap its
   answers, so the cap is the client's guard.
@@ -532,7 +540,7 @@ plugins/claude-code/
   bin/cairn-launch             finds the cairn binary; if missing, exits
                                with the one-line install command
   hooks/hooks.json             SessionStart → cairn hook session-start
-                               (planned, M1, not yet built; issue #16);
+                               (built in M1; issue #16);
                                PreCompact and Stop → cairn hook pre-compact
                                and stop (planned, M4, D15)
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below

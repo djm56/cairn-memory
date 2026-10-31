@@ -101,8 +101,9 @@ func (c *Client) StepUpdate(ctx context.Context, req core.StepUpdateRequest) (*c
 
 // EventLog sends the event_log call. Data that is not JSON cannot be written into
 // a request body, so the client does not send it. It refuses the call with the
-// message core gives for that data in process, so the answer is the same on both
-// paths (W1). A request with other faults as well gets the data fault first.
+// message core gives for that data in process, so the message is the same on both
+// paths (step 6 W1). With several faults the order differs: in process a missing
+// task id, an unknown kind or empty text comes first; here the data does.
 func (c *Client) EventLog(ctx context.Context, req core.EventLogRequest) (*core.Event, error) {
 	if len(req.Data) > 0 && !json.Valid(req.Data) {
 		if err := core.CheckEventData(req.Kind, req.Data); err != nil {
@@ -171,7 +172,9 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 		return nil, fmt.Errorf("client: %s: %w", route, err)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	setCaller(ctx, hreq.Header)
+	if err := setCaller(ctx, hreq.Header); err != nil {
+		return nil, err
+	}
 	resp, err := c.hc.Do(hreq)
 	if err != nil {
 		return nil, fmt.Errorf("client: %s: %w", route, err)
@@ -197,10 +200,15 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 // setCaller writes the caller that ctx carries into h, as the Cairn headers. A
 // field the caller leaves empty is not sent, so the server sees it as absent. A
 // context with no caller sends no headers, and the server then finds no project.
-func setCaller(ctx context.Context, h http.Header) {
+// A name the headers cannot carry unchanged is refused here, with core's message
+// (core.CheckCaller), and nothing is sent (step 8 review W3).
+func setCaller(ctx context.Context, h http.Header) error {
 	caller, ok := core.CallerFrom(ctx)
 	if !ok {
-		return
+		return nil
+	}
+	if err := core.CheckCaller(caller); err != nil {
+		return err
 	}
 	set := func(name, value string) {
 		if value != "" {
@@ -212,6 +220,7 @@ func setCaller(ctx context.Context, h http.Header) {
 	set(api.HeaderSession, caller.Session)
 	set(api.HeaderClient, caller.Client)
 	set(api.HeaderRole, string(caller.Role))
+	return nil
 }
 
 // failure reads the error of an answer that is not a success. When the answer
