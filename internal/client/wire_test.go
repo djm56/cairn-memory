@@ -30,6 +30,9 @@ func TestUnknownRouteIsNoRoute(t *testing.T) {
 	if !strings.Contains(err.Error(), "check the server base URL") || !strings.Contains(err.Error(), base) {
 		t.Errorf("error %q does not name the base URL %s and tell the caller to check it", err, base)
 	}
+	if want := base + api.Prefix + api.RouteTaskCurrent; !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not name the path the client sent, %s", err, want)
+	}
 }
 
 // TestCallSendsJSONContentType checks that a call sends its body as

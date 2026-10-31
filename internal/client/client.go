@@ -255,8 +255,9 @@ func failure(base, route string, resp *http.Response) error {
 	if err := json.NewDecoder(io.LimitReader(resp.Body, api.MaxBodyBytes)).Decode(&body); err == nil && body.Error != nil {
 		switch {
 		case body.Error.Kind == api.KindNoRoute:
+			// The path is the one the client sent: the base URL, then the prefix and the route.
 			return &core.Error{Kind: api.KindNoRoute, Message: fmt.Sprintf(
-				"no call at %s on %s: check the server base URL", route, DisplayURL(base))}
+				"no call at %s%s%s: check the server base URL", DisplayURL(base), api.Prefix, route)}
 		case isCoreKind(body.Error.Kind):
 			return body.Error
 		}
