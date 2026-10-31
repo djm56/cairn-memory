@@ -12,8 +12,12 @@ import (
 // tools name the step's assignee "assignee", since "agent" is the caller there.
 func register(s *Server, svc core.Service) {
 	addTool(s, "task_current",
-		"The active task, with its steps, the last events and the directives that apply. Call it first in a session.", false,
-		func(ctx context.Context, _ noInput) (any, error) { return svc.TaskCurrent(ctx) })
+		"The active task, steps, events, and the directives for this project and your agent (agent arg). Ranked, at most 12; expired and omitted count the rest.", false,
+		func(ctx context.Context, in taskCurrentIn) (any, error) {
+			c, _ := core.CallerFrom(ctx)
+			c.Agent = in.Agent
+			return svc.TaskCurrent(core.WithCaller(ctx, c))
+		})
 
 	addTool(s, "task_start",
 		"Start a task with its brief and an optional plan. Returns its id. Refused while another task is active, unless the project allows parallel tasks.", true,
@@ -104,13 +108,13 @@ func register(s *Server, svc core.Service) {
 		})
 
 	addTool(s, "directive_list",
-		"The active directives that apply to this project. Pass agent to narrow the agent-scoped ones to one role.", false,
+		"Directives for this project, ranked agent, project, global; at most 12. expired: past review_by, left out. omitted: beyond the 12. agent: one role, or empty for every role.", false,
 		func(ctx context.Context, in directiveListIn) (any, error) {
 			return svc.DirectiveList(ctx, core.DirectiveListRequest{Agent: in.Agent})
 		})
 
 	addTool(s, "recall",
-		"Before a task: the directives, lessons, mistakes and similar tasks for a goal, from every project. Pass agent to narrow directives to one role.", false,
+		"For a goal: directives, lessons, mistakes and similar tasks, from all projects. Directives: this project and your agent (agent arg), ranked, at most 12; expired, omitted count the rest.", false,
 		func(ctx context.Context, in recallIn) (any, error) {
 			return svc.Recall(ctx, core.RecallRequest{Goal: in.Goal, Agent: in.Agent, Limit: in.Limit})
 		})
@@ -140,6 +144,12 @@ type taskStartIn struct {
 	KeyFiles    []core.TaskFile  `json:"key_files,omitempty" jsonschema:"files the brief names: path and note"`
 	Steps       []core.StepInput `json:"steps,omitempty" jsonschema:"the plan: each step has a title and an optional agent"`
 	Queue       bool             `json:"queue,omitempty" jsonschema:"true creates the task open instead of active"`
+}
+
+// taskCurrentIn is the input of task_current. The agent is the caller's role, which
+// names its agent-scoped directives (CONTRACT §2, §9 item 49). It is optional.
+type taskCurrentIn struct {
+	Agent string `json:"agent,omitempty" jsonschema:"the calling agent's role, such as main or reviewer; names its agent-scoped directives"`
 }
 
 type taskGetIn struct {
@@ -243,7 +253,7 @@ type directiveListIn struct {
 
 type recallIn struct {
 	Goal  string `json:"goal" jsonschema:"what the task is for, in a sentence"`
-	Agent string `json:"agent,omitempty" jsonschema:"a role name; narrows the directives as directive_list does"`
+	Agent string `json:"agent,omitempty" jsonschema:"the caller's role; names its agent-scoped directives. Without it, none are listed"`
 	Limit int    `json:"limit,omitempty" jsonschema:"items per list, 5 by default"`
 }
 

@@ -370,8 +370,9 @@ type DirectiveRatifyRequest struct {
 	Rationale     string         `json:"rationale,omitempty"`
 	ReviewerCheck string         `json:"reviewer_check,omitempty"`
 	Example       string         `json:"example,omitempty"`
-	// ReviewBy is a calendar day, YYYY-MM-DD in UTC, after which the directive is
-	// due for review. It must be after today. Empty means 90 days from ratification.
+	// ReviewBy is a calendar day, YYYY-MM-DD in UTC. The directive is expired from
+	// 00:00 UTC of that day, so it is due at the start of the day, not after it. It
+	// must be after today. Empty means 90 days from ratification.
 	ReviewBy string `json:"review_by,omitempty"`
 }
 

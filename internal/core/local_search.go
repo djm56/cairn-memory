@@ -183,7 +183,9 @@ func keepGoalWord(tok string, capitals bool) bool {
 }
 
 // Recall answers what a caller should know before a goal. Directives are those
-// that apply to the caller's project, narrowed by agent as directive_list does.
+// that apply to the caller's project and to its role: req.Agent when it is set,
+// else the caller's own agent (CONTRACT §6, §9 item 49). A role with no name gets
+// no agent-scoped directive.
 // Lessons, mistakes and tasks come from every project, best match to the goal
 // first, at most limit of each (default 5). A goal with no word that can match
 // (see goalWords) gives directives only.
@@ -203,7 +205,11 @@ func (l *Local) Recall(ctx context.Context, req RecallRequest) (*RecallResult, e
 		return nil, err
 	}
 	out := &RecallResult{Lessons: []LessonHit{}, Mistakes: []MistakeHit{}, Tasks: []TaskSummary{}}
-	set, err := directivesFor(ctx, l.st, c.Project, req.Agent, l.now())
+	role := req.Agent
+	if role == "" {
+		role = c.Agent
+	}
+	set, err := directivesFor(ctx, l.st, c.Project, role, false, l.now())
 	if err != nil {
 		return nil, err
 	}

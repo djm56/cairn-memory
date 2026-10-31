@@ -102,5 +102,15 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "Other active tasks: %d.\n", cur.OtherActive)
 	}
 	fmt.Fprintf(w, "Directives that apply: %d.\n", len(cur.Directives))
+	// The same note as cairn status: the CLI names no role, so no agent-scoped directive is
+	// counted (14-W4).
+	fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
+	// The agent reads this block, so a directive left out is said so, with the reason (12-W2).
+	if cur.Expired > 0 {
+		fmt.Fprintf(w, "Directives expired and left out (past review_by): %d.\n", cur.Expired)
+	}
+	if cur.Omitted > 0 {
+		fmt.Fprintf(w, "Directives omitted (beyond the cap of %d): %d. Call directive_list for all.\n", core.DirectiveCap, cur.Omitted)
+	}
 	fmt.Fprintln(w, "Call task_current for the brief, the steps and recent events.")
 }

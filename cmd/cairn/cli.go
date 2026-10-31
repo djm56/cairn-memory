@@ -20,6 +20,12 @@ var workDir = os.Getwd
 // server can tell its calls from an MCP client's.
 const cliClient = "cairn-cli"
 
+// noRoleNote is the line status prints under its directive count. The CLI's caller names no
+// agent role, and nothing supplies one: identity reads no CAIRN_AGENT and no .cairn.toml key
+// for it. So the server counts only directives not scoped to a role, and the line says so
+// (14-W4). It goes away only when a role source is added to the CLI.
+const noRoleNote = "agent-scoped directives not counted: no agent role is set"
+
 // target is what a command needs to call the server for the project it runs in.
 type target struct {
 	project identity.Project

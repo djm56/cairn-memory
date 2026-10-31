@@ -60,6 +60,34 @@ var directiveCapCases = []Case{
 			t.Errorf("task_current order = %v, want [a1 p2 p1 g2 g1]", got)
 		}
 	}},
+	{"directive/other_role_does_not_crowd_the_cap", func(t T, s core.Service) {
+		// CONTRACT §2, §5, §9 item 49 (12-W1): task_current and recall give the agent
+		// scope of the caller's own role. Twelve reviewer directives do not push out
+		// the project and global ones of a main session, and a caller with no role
+		// gets none of them.
+		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "g1", Rule: "r"}))(t)
+		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p1", Rule: "r"}))(t)
+		for i := 1; i <= 12; i++ {
+			must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeAgent, Agent: "reviewer", Title: fmt.Sprintf("r%02d", i), Rule: "r"}))(t)
+		}
+		want := []string{"p1", "g1"}
+		cur := must(s.TaskCurrent(mainCtx()))(t)
+		if got := directiveTitles(cur.Directives); !slices.Equal(got, want) || cur.Omitted != 0 {
+			t.Errorf("task_current for main = %v omitted %d, want %v and omitted 0", got, cur.Omitted, want)
+		}
+		rec := must(s.Recall(mainCtx(), core.RecallRequest{Goal: "anything"}))(t)
+		if got := directiveTitles(rec.Directives); !slices.Equal(got, want) || rec.Omitted != 0 {
+			t.Errorf("recall for main = %v omitted %d, want %v and omitted 0", got, rec.Omitted, want)
+		}
+		none := must(s.TaskCurrent(as(projA, "")))(t)
+		if got := directiveTitles(none.Directives); !slices.Equal(got, want) {
+			t.Errorf("task_current with no role = %v, want %v", got, want)
+		}
+		list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{Agent: "main"}))(t)
+		if got := directiveTitles(list.Directives); !slices.Equal(got, want) {
+			t.Errorf("directive_list agent=main = %v, want %v", got, want)
+		}
+	}},
 	{"directive/review_by_defaults_ninety_days", func(t T, s core.Service) {
 		// CONTRACT §8, decision D16: with no review_by, the directive is due 90
 		// days after ratification. The window allows for the time the call took.

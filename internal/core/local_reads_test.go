@@ -63,7 +63,8 @@ func directiveTitles(ds []core.Directive) []string {
 // TestDirectiveReadsByScope checks directive_list and task_current's directives
 // against the scopes CONTRACT §5 names. The list is ranked (agent, project, then
 // global, newest first), holds only active directives, and with an agent set
-// narrows the agent-scoped ones to that role. task_current gives the project's directives with no task active too.
+// narrows the agent-scoped ones to that role. task_current gives the project's
+// directives with no task active too, and the agent scope of the caller's role.
 func TestDirectiveReadsByScope(t *testing.T) {
 	s, st := openLocal(t)
 	seedProject(t, st, "acme-api")
@@ -97,7 +98,8 @@ func TestDirectiveReadsByScope(t *testing.T) {
 	}
 
 	// With no task active, task_current still answers with the project's
-	// directives: no agent is set, so every agent scope is included.
+	// directives. It gives the caller's own role's agent scope only (12-W1): main's,
+	// so the reviewer's directive is not listed for a main session.
 	cur, err := s.TaskCurrent(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +107,7 @@ func TestDirectiveReadsByScope(t *testing.T) {
 	if cur.Task != nil {
 		t.Fatalf("TaskCurrent with no task = %s", cur.Task.ID)
 	}
-	if want := []string{"reviewer-only", "project-a", "global"}; !slices.Equal(directiveTitles(cur.Directives), want) {
+	if want := []string{"project-a", "global"}; !slices.Equal(directiveTitles(cur.Directives), want) {
 		t.Errorf("TaskCurrent directives = %v, want %v", directiveTitles(cur.Directives), want)
 	}
 }

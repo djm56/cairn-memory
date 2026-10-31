@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"runtime/pprof"
 	"slices"
 	"testing"
 	"time"
@@ -12,21 +13,53 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// stdioConnectTimeout bounds the client's connect over the pipes. A connect that does not
+// finish is a fault to report, with the cause, not a hang of the whole package (step 12
+// review 12-W4).
+const stdioConnectTimeout = 10 * time.Second
+
+// goroutineDump returns the stacks of every goroutine, for a connect that timed out.
+func goroutineDump() string {
+	var b bytes.Buffer
+	_ = pprof.Lookup("goroutine").WriteTo(&b, 2)
+	return b.String()
+}
+
 // stdioSession runs cairn mcp over pipes, as a client starts it, and returns the
-// client's session with it. The returned finish closes the session, and checks that
-// cairn mcp returned 0 once the client went away and wrote nothing to stderr.
+// client's session with it. The connect selects on the process exit as well as its own
+// result, so a serveMCP that returns early is reported with its exit code and stderr, not
+// as a connect that hung. On timeout it reports stderr and a goroutine dump. The returned
+// finish closes the session, and checks that cairn mcp returned 0 once the client went away
+// and wrote nothing to stderr.
 func stdioSession(t *testing.T) (*mcpsdk.ClientSession, func()) {
 	t.Helper()
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
-	var stderr bytes.Buffer
+	stderr := &syncWriter{}
 	done := make(chan int, 1)
-	go func() { done <- serveMCP(nil, inR, outW, &stderr) }()
+	go func() { done <- serveMCP(nil, inR, outW, stderr) }()
 
 	mc := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "stdio-flow", Version: "0"}, nil)
-	cs, err := mc.Connect(context.Background(), &mcpsdk.IOTransport{Reader: outR, Writer: inW}, nil)
-	if err != nil {
-		t.Fatalf("connect over stdio: %v", err)
+	type connected struct {
+		cs  *mcpsdk.ClientSession
+		err error
+	}
+	ready := make(chan connected, 1)
+	go func() {
+		cs, err := mc.Connect(context.Background(), &mcpsdk.IOTransport{Reader: outR, Writer: inW}, nil)
+		ready <- connected{cs: cs, err: err}
+	}()
+	var cs *mcpsdk.ClientSession
+	select {
+	case c := <-ready:
+		if c.err != nil {
+			t.Fatalf("connect over stdio: %v (stderr %q)", c.err, stderr.String())
+		}
+		cs = c.cs
+	case code := <-done:
+		t.Fatalf("cairn mcp returned %d before the client connected (stderr %q)", code, stderr.String())
+	case <-time.After(stdioConnectTimeout):
+		t.Fatalf("connect over stdio timed out after %s (stderr %q)\ngoroutines:\n%s", stdioConnectTimeout, stderr.String(), goroutineDump())
 	}
 	finish := func() {
 		if err := cs.Close(); err != nil {
@@ -41,8 +74,8 @@ func stdioSession(t *testing.T) (*mcpsdk.ClientSession, func()) {
 		case <-time.After(10 * time.Second):
 			t.Error("serveMCP did not return after the client closed")
 		}
-		if stderr.Len() != 0 {
-			t.Errorf("serveMCP wrote to stderr: %q", stderr.String())
+		if out := stderr.String(); out != "" {
+			t.Errorf("serveMCP wrote to stderr: %q", out)
 		}
 	}
 	return cs, finish
@@ -115,13 +148,32 @@ func fieldOf(t *testing.T, obj map[string]any, key string) map[string]any {
 // and a close. tools/list names the fifteen tools of DESIGN §4, and no other. Every call's
 // result is read and asserted, not only the fact that it succeeded (step 8 review S4; step
 // 12 review W1).
+//
+// It runs twice: "env", with the server and project in the environment, and "toml", with
+// them in .cairn.toml (12-W4: the toml form was never in the suite; the stdio hang of step
+// 12 was seen on it).
 func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
-	_, url := newServer(t, nil)
-	useDir(t, t.TempDir())
-	t.Setenv("CAIRN_SERVER", url)
-	t.Setenv("CAIRN_PROJECT", "acme-api")
-	t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
+	t.Run("env", func(t *testing.T) {
+		_, url := newServer(t, nil)
+		useDir(t, t.TempDir())
+		t.Setenv("CAIRN_SERVER", url)
+		t.Setenv("CAIRN_PROJECT", "acme-api")
+		t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
+		runStdioFlow(t)
+	})
+	t.Run("toml", func(t *testing.T) {
+		_, url := newServer(t, nil)
+		dir := t.TempDir()
+		useDir(t, dir)
+		writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+url+"\"\n")
+		t.Setenv("CLAUDE_PROJECT_DIR", dir)
+		runStdioFlow(t)
+	})
+}
 
+// runStdioFlow drives the whole flow over stdio, asserting each result. The caller has set
+// where the server and the project come from.
+func runStdioFlow(t *testing.T) {
 	cs, finish := stdioSession(t)
 	defer finish()
 
