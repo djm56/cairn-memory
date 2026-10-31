@@ -29,6 +29,7 @@ import (
 
 const (
 	storePath    = "github.com/djm56/cairn-memory/internal/store"
+	serverPath   = "github.com/djm56/cairn-memory/internal/server"
 	corePath     = "github.com/djm56/cairn-memory/internal/core"
 	netPath      = "net"
 	netHTTPPath  = "net/http"
@@ -113,9 +114,22 @@ func contains(list []string, s string) bool {
 
 // bannedImports are packages a guarded non-test file must not import at all, with the
 // reason. Importing one is a fault on its own, since it is the way to reach the call.
+// internal/server is the exemption by package (serverSide), and that exemption is not a
+// licence for a guarded file to import it: it opens the server's database and starts its
+// listener, so only the files in serverImportAllowed may import it (6-W1).
 var bannedImports = map[string]string{
 	storePath:    "opens a database",
 	httptestPath: "starts an in-process HTTP listener",
+	serverPath:   "opens the server's database and starts its listener: only cairn serve and cairn key may import it",
+}
+
+// serverImportAllowed are the only guarded files that may import internal/server, each with
+// the reason. The names are slash paths from the module root. The set is exact: a file
+// listed here that no longer imports the package, or a file that imports it and is not
+// listed, fails TestServerImportIsOnlyInTheNamedFiles.
+var serverImportAllowed = map[string]string{
+	"cmd/cairn/serve.go": "cairn serve: parses the flags and calls server.Run, which opens the store and listens",
+	"cmd/cairn/key.go":   "cairn key: parses the flags and calls server.AddKey, ListKeys and RevokeKey, which open the store",
 }
 
 // listenerPkgs are the standard packages whose functions and types start or configure
@@ -145,8 +159,9 @@ func listenerMethod(name string) bool {
 }
 
 // reachFaults returns one description for each banned import, call or reference in f,
-// with its position. An empty result means the file is clean. The rules are:
-//   - a banned import (bannedImports);
+// with its position. An empty result means the file is clean. serverOK says the file is
+// one of serverImportAllowed, so its import of internal/server is not a fault. The rules are:
+//   - a banned import (bannedImports), except internal/server in a serverOK file;
 //   - a dot import, in any file: a name it brings in cannot be resolved to its package
 //     by reading the call, so it is refused;
 //   - a listener function or method (listenerName for a listener package; listenerMethod
@@ -155,7 +170,7 @@ func listenerMethod(name string) bool {
 //   - a reference to the net/http Server type (a literal, a var, new(http.Server), a
 //     field), since a Server is the configuration of a listener;
 //   - store.Open and core.NewLocal, which open a store or build a Service over one.
-func reachFaults(fset *token.FileSet, f *ast.File) []string {
+func reachFaults(fset *token.FileSet, f *ast.File, serverOK bool) []string {
 	names := importNames(f)
 	var out []string
 	report := func(n ast.Node, what string) {
@@ -166,7 +181,7 @@ func reachFaults(fset *token.FileSet, f *ast.File) []string {
 		if err != nil {
 			continue
 		}
-		if why, banned := bannedImports[p]; banned {
+		if why, banned := bannedImports[p]; banned && !(p == serverPath && serverOK) {
 			report(imp, fmt.Sprintf("imports %s, which %s", p, why))
 		}
 		if imp.Name != nil && imp.Name.Name == "." {
@@ -284,9 +299,58 @@ func TestGuardedPackagesNeverOpenStoreOrListen(t *testing.T) {
 	for _, dir := range guardedDirs(t) {
 		for _, file := range nonTestGoFiles(t, filepath.Join(repoRoot, dir)) {
 			fset := token.NewFileSet()
-			for _, fault := range reachFaults(fset, parseFile(t, fset, file)) {
+			serverOK := serverImportAllowed[moduleRel(file)] != ""
+			for _, fault := range reachFaults(fset, parseFile(t, fset, file), serverOK) {
 				t.Errorf("%s: the guarded package must not reach a store or a listener", fault)
 			}
+		}
+	}
+}
+
+// moduleRel is file as a slash path from the module root, the form serverImportAllowed uses.
+func moduleRel(file string) string {
+	rel, err := filepath.Rel(repoRoot, file)
+	if err != nil {
+		return file
+	}
+	return filepath.ToSlash(rel)
+}
+
+// importsPath reports whether f imports the package p.
+func importsPath(f *ast.File, p string) bool {
+	for _, imp := range f.Imports {
+		if v, err := strconv.Unquote(imp.Path.Value); err == nil && v == p {
+			return true
+		}
+	}
+	return false
+}
+
+// TestServerImportIsOnlyInTheNamedFiles is the exact-set half of 6-W1. The guarded packages
+// import internal/server in exactly the files serverImportAllowed names, and no others. The
+// set is two files; a third file that imports the server, or one of the two that stops
+// importing it, fails the test and names it.
+func TestServerImportIsOnlyInTheNamedFiles(t *testing.T) {
+	if len(serverImportAllowed) != 2 {
+		t.Errorf("serverImportAllowed names %d files, want exactly the two of the step 7 brief", len(serverImportAllowed))
+	}
+	importers := map[string]bool{}
+	for _, dir := range guardedDirs(t) {
+		for _, file := range nonTestGoFiles(t, filepath.Join(repoRoot, dir)) {
+			fset := token.NewFileSet()
+			if importsPath(parseFile(t, fset, file), serverPath) {
+				importers[moduleRel(file)] = true
+			}
+		}
+	}
+	for name, why := range serverImportAllowed {
+		if !importers[name] {
+			t.Errorf("%s is named as a server import (%s), but does not import internal/server: remove it from serverImportAllowed", name, why)
+		}
+	}
+	for name := range importers {
+		if _, ok := serverImportAllowed[name]; !ok {
+			t.Errorf("%s imports internal/server, and is not one of the named files", name)
 		}
 	}
 }
@@ -375,8 +439,36 @@ func TestReachGuardCanFail(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse snippet: %v", err)
 			}
-			got := reachFaults(fset, f)
+			got := reachFaults(fset, f, false)
 			if len(got) != c.faults {
+				t.Fatalf("reachFaults = %d faults %q, want %d", len(got), got, c.faults)
+			}
+		})
+	}
+
+	// internal/server (6-W1). A guarded file that imports it is a fault, whatever it calls with
+	// the import. Only a named file may import it, and the named file's own faults still count.
+	srvImp := `import srv "` + serverPath + `"` + "\n"
+	serverCases := []struct {
+		name     string
+		src      string
+		serverOK bool
+		faults   int
+	}{
+		{"an import of internal/server in a guarded file", pkg + srvImp + "var _ = srv.Run\n", false, 1},
+		{"a call through the import in cmd/cairn/mcp.go", pkg + srvImp + "func f() { srv.Run(nil, srv.Options{}) }\n", false, 1},
+		{"the import in a file of internal/mcp", pkg + srvImp + "func f() { srv.AddKey(nil, \"\", \"\", \"\") }\n", false, 1},
+		{"the same import in a named file", pkg + srvImp + "func f() { srv.Run(nil, srv.Options{}) }\n", true, 0},
+		{"a named file that also opens a store", pkg + srvImp + storeImp + "func f() { store.Open(\"x\") }\n", true, 2},
+	}
+	for _, c := range serverCases {
+		t.Run(c.name, func(t *testing.T) {
+			fset := token.NewFileSet()
+			f, err := parser.ParseFile(fset, "snippet.go", c.src, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatalf("parse snippet: %v", err)
+			}
+			if got := reachFaults(fset, f, c.serverOK); len(got) != c.faults {
 				t.Fatalf("reachFaults = %d faults %q, want %d", len(got), got, c.faults)
 			}
 		})
