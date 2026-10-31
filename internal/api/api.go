@@ -6,6 +6,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -186,20 +187,29 @@ func recoverInternal(w http.ResponseWriter, r *http.Request, onFailure FailureHo
 }
 
 // decode reads the one JSON object of a request body into v. An empty body is
-// the zero request. An unknown field, a value of the wrong type, a second value
-// and a body over MaxBodyBytes are refused, each with the status it earns. The
+// the zero request. A key written in the wrong case or given twice is refused
+// (checkKeys). An unknown field, a value of the wrong type, a second value and a
+// body over MaxBodyBytes are refused too, each with the status it earns. The
 // status is returned with the error, and is zero when the body is read.
 func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
-	dec.DisallowUnknownFields()
-	err := dec.Decode(v)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	var tooLarge *http.MaxBytesError
 	switch {
-	case errors.Is(err, io.EOF):
-		return 0, nil
 	case errors.As(err, &tooLarge):
 		return http.StatusRequestEntityTooLarge, &core.Error{Kind: core.KindInvalid, Message: fmt.Sprintf("the body is larger than %d bytes", MaxBodyBytes)}
 	case err != nil:
+		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body could not be read: " + err.Error()}
+	}
+	// Only the JSON white space counts as no body.
+	if len(bytes.Trim(body, " \t\r\n")) == 0 {
+		return 0, nil
+	}
+	if bad := checkKeys(body, v); bad != nil {
+		return http.StatusBadRequest, bad
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
 		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body is not the call's request: " + err.Error()}
 	}
 	if err := dec.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
