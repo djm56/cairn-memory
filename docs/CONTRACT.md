@@ -372,7 +372,10 @@ all); `all_projects`; `limit` (default 10); `cursor`.
 match first), and `next`. Global directives are found from every project.
 A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
-either. A `note` hit comes only from a row written before the M1 change that
+either. An **expired** directive (§5) is still a hit: search does not use the
+capped set, and it has no `expired` count. So a lapsed rule can be found, then
+reaffirmed by retiring it and ratifying it again (§8). Only the three reads leave
+it out (12-S2, pinned by `TestSearchStillFindsAnExpiredDirective`). A `note` hit comes only from a row written before the M1 change that
 removed notes.
 No call reads a note, so such a hit has its snippet and no call to open it.
 
