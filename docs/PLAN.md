@@ -2,9 +2,10 @@
 
 <!-- cairn-milestone: M1 -->
 
-**Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are
-done, and their exit checks passed. Plan v1 replaces phases 3 to 10 with the
-milestones in §3. Live progress is on the
+**Status as of 2026-10-31: M1 (Server-mode MCP) is current. M2 (Server) is built;
+its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are done, and
+their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
+§3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
@@ -395,8 +396,8 @@ that is not a numbered decision here, and the table says what.
 - **D20. TLS is optional in `cairn serve`.** `cairn serve` takes optional
   `--tls-cert` and `--tls-key`. It binds loopback by default. It refuses a
   non-loopback bind without TLS unless `--behind-proxy` is given, so a proxy
-  that terminates TLS is a choice the operator makes, not a default. DEPLOY.md
-  will document both setups. *Answers the open question in §10 on TLS.*
+  that terminates TLS is a choice the operator makes, not a default. [DEPLOY.md](DEPLOY.md)
+  documents both setups. *Answers the open question in §10 on TLS.*
 
 **Chosen by Bishop under the operator's veto, 2026-10-31 (issue #109): D21.**
 

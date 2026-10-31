@@ -10,8 +10,9 @@ in Cairn leaves the same kind of marker.
 
 <!-- cairn-milestone: M1 -->
 
-> **Status as of 2026-10-30:** M1 (Server-mode MCP) is current. Phases 0 to 2
-> are done, and their exit checks passed. Live progress is on the
+> **Status as of 2026-10-31:** M1 (Server-mode MCP) is current. M2 (Server) is
+> built; its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are
+> done, and their exit checks passed. Live progress is on the
 > [milestones](https://github.com/djm56/cairn-memory/milestones)
 > and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 >
@@ -44,14 +45,14 @@ in Cairn leaves the same kind of marker.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
-  the HTTP server (`cairn serve`, built in M2; the web UI is M3), the hook helper
-  and the admin tool. The M1 commands are `init`, `status`, `doctor`,
+  the HTTP server (`cairn serve`, built in M2, live run pending; the web UI is
+  M3), the hook helper and the admin tool. The M1 commands are `init`, `status`, `doctor`,
   `export task` and `hook session-start`; the CLI proper is planned for M4. Go
   and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn serve` is built in M2. `cairn mcp` and the M1 commands need
-  `server` in `.cairn.toml` or `CAIRN_SERVER`, and an API key in `CAIRN_API_KEY`
+  D11). `cairn serve` is built in M2, and its live run is pending. `cairn mcp`
+  and the M1 commands need `server` in `.cairn.toml` or `CAIRN_SERVER`, and an API key in `CAIRN_API_KEY`
   or `~/.config/cairn/client.env`. `cairn mcp` refuses to start without a server
   or a key. `cairn init` writes that file in the project directory, and does
   not contact the server: `cairn init --project <name> --server <url>`. The
@@ -105,7 +106,9 @@ An address other than loopback needs TLS, by `--tls-cert` and `--tls-key`, or
 needs at least one active API key. A loopback server with no key starts, and
 refuses every call until one exists. `GET /healthz` answers a liveness check
 without a key. The bind rules and the limits are in
-[DESIGN.md §5.3](docs/DESIGN.md#53-the-server).
+[DESIGN.md §5.3](docs/DESIGN.md#53-the-server). The setup for a server that other
+machines reach, with TLS or behind a proxy, the systemd unit, keys, backup and
+upgrade, is in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 #### Making keys
 
@@ -132,9 +135,11 @@ cairn restore --db ./cairn.db ./cairn-backup.db
 
 `backup` writes a consistent copy to a new file, owner-only, while the server
 runs. It refuses a file that already exists. `restore` checks the backup first
-(it opens, passes SQLite's integrity check, and is not from a newer build). It
-refuses while the database is open, so stop `cairn serve` first. It then asks
-you to type the database path at a terminal, and there is no flag to skip that.
+(it opens, passes SQLite's integrity check, and is not from a newer build). For a
+database it can read, it refuses while the database is open. For a file it cannot
+read, no check for a running server is possible, so stop `cairn serve` before you
+confirm, whichever path it takes. It then asks you to type the database path at a
+terminal, and there is no flag to skip that.
 A restore from a pipe or a script is refused.
 
 **Pre-restore files are kept.** A restore never deletes anything. Before it moves
@@ -174,11 +179,13 @@ mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
 (umask 077 && printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env)
 ```
 
-The `printf` line puts the key in your shell history. To keep it out, write the file
-in an editor, or read the key without echo and write it from a variable:
+Do not use the `printf` line above with a real key: it puts the key in your shell
+history. Write the file in an editor, or use this form, which works in bash and zsh,
+reads the key without echo, and keeps it out of history:
 
 ```bash
-read -rs -p 'API key: ' K && (umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
+printf 'API key: ' >&2; read -rs K; echo >&2
+(umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
 ```
 
 `CAIRN_API_KEY` is read first. A `client.env` that any other user can read or
@@ -193,6 +200,8 @@ plain `http` to a host that is not loopback, and it never prints the key.
 | Document | What it covers |
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Running `cairn serve` for other machines: TLS, a proxy, the systemd unit, keys, backup, upgrade |
+| [docs/M2-LIVE-RUN.md](docs/M2-LIVE-RUN.md) | The M2 live run on a second machine: the checklist and what to report back |
 | [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |
 | [docs/PLAN.md](docs/PLAN.md) | Build order: milestones M1 to M8 and Later with exit checks, what is guided by bishop-memory, migration, decisions |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, by pull request, under Unreleased |
