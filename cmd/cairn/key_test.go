@@ -243,11 +243,24 @@ func TestDoctorReportsWhereTheKeyCameFrom(t *testing.T) {
 	useDir(t, dir)
 	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+url+"\"\n")
 	envKey := os.Getenv("CAIRN_API_KEY")
+	if envKey == "" {
+		t.Fatal("the test key is empty: a search for it would match every output")
+	}
+	// noKey fails the case when the output holds the key. It runs after every invocation, so
+	// each case's output is checked, including the cases where the key is sent and the ones
+	// where it is refused (step 8 review W1).
+	noKey := func(what, out string) {
+		t.Helper()
+		if strings.Contains(out, envKey) {
+			t.Errorf("%s: doctor printed the key:\n%s", what, out)
+		}
+	}
 
 	code, out, _ := runCmd(t, "doctor")
 	if code != 0 || !strings.Contains(out, "key      ok    found (env)") {
 		t.Errorf("from the environment: exit %d, output:\n%s", code, out)
 	}
+	noKey("from the environment", out)
 
 	t.Setenv("CAIRN_API_KEY", "")
 	keyFileFor(t, 0o600, "CAIRN_API_KEY="+envKey+"\n")
@@ -255,22 +268,21 @@ func TestDoctorReportsWhereTheKeyCameFrom(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "key      ok    found (client.env)") {
 		t.Errorf("from client.env: exit %d, output:\n%s", code, out)
 	}
+	noKey("from client.env, sent", out)
 
 	keyFileFor(t, 0o644, "CAIRN_API_KEY="+envKey+"\n")
 	code, out, _ = runCmd(t, "doctor")
 	if code != 1 || !strings.Contains(out, "chmod 600") {
 		t.Errorf("client.env open to others: exit %d, output:\n%s", code, out)
 	}
+	noKey("client.env open to others", out)
 
 	keyFileFor(t, 0o600, "# no key here\n")
 	code, out, _ = runCmd(t, "doctor")
 	if code != 1 || !strings.Contains(out, "key      fail  missing:") || !strings.Contains(out, "reach    skip") {
 		t.Errorf("no key: exit %d, output:\n%s", code, out)
 	}
-
-	if strings.Contains(out, envKey) {
-		t.Errorf("doctor printed the key")
-	}
+	noKey("no key", out)
 }
 
 // TestDoctorSaysTheServerRefusedTheKey checks that a server which refuses the key fails the reach
