@@ -11,9 +11,9 @@ import (
 )
 
 // defaultServeAddr is what cairn serve listens on when --addr is not given: loopback, on
-// 8787, the port of the server example in DESIGN.md §2.1. Any other address needs TLS or
+// 8788, the port of the server example in DESIGN.md §2.1. Any other address needs TLS or
 // --behind-proxy, and at least one API key (D20, DESIGN §8).
-const defaultServeAddr = "127.0.0.1:8787"
+const defaultServeAddr = "127.0.0.1:8788"
 
 // runServe is the sub-command `cairn serve` (DESIGN.md §5.2, §5.3; D20). It reads the
 // flags and hands them to server.Run, which holds the bind rules, the store and the

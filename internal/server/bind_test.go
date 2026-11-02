@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -108,6 +109,32 @@ func TestRequireKeys(t *testing.T) {
 		err := RequireKeys(c.loopback, c.keys)
 		if (err == nil) != c.ok {
 			t.Errorf("RequireKeys(%s) = %v, want ok=%v", c.what, err, c.ok)
+		}
+	}
+}
+
+// TestCleartextLine checks when the proxy warning is printed (6-S2). It is printed only for
+// a non-loopback bind that has no TLS of its own and says a proxy terminates TLS. Every
+// other bind gets no line, so the warning means something when it appears.
+func TestCleartextLine(t *testing.T) {
+	cases := []struct {
+		what                       string
+		loopback, tls, behindProxy bool
+		warn                       bool
+	}{
+		{"a non-loopback bind behind a proxy, no TLS", false, false, true, true},
+		{"a non-loopback bind with TLS files and the proxy flag", false, true, true, false},
+		{"a non-loopback bind with TLS files", false, true, false, false},
+		{"loopback behind the proxy flag", true, false, true, false},
+		{"loopback with nothing", true, false, false, false},
+	}
+	for _, c := range cases {
+		line := CleartextLine(c.loopback, c.tls, c.behindProxy)
+		if got := line != ""; got != c.warn {
+			t.Errorf("%s: warned %v (%q), want %v", c.what, got, line, c.warn)
+		}
+		if c.warn && !strings.Contains(line, "plain HTTP") {
+			t.Errorf("%s: the line does not say the server serves plain HTTP: %q", c.what, line)
 		}
 	}
 }

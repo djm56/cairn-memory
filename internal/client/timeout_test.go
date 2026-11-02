@@ -10,7 +10,7 @@ import (
 // would otherwise hang the caller, and the net/http default client has no timeout.
 // It is an internal test, since the bound is a field of the client's own HTTP client.
 func TestDefaultClientHasTheDefaultTimeout(t *testing.T) {
-	c, err := New("http://127.0.0.1:8787", nil)
+	c, err := New("http://127.0.0.1:8788", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

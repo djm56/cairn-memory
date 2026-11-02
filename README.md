@@ -44,15 +44,16 @@ in Cairn leaves the same kind of marker.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
-  the HTTP server and web UI (`cairn serve`, planned for M2), the hook helper
+  the HTTP server (`cairn serve`, built in M2; the web UI is M3), the hook helper
   and the admin tool. The M1 commands are `init`, `status`, `doctor`,
   `export task` and `hook session-start`; the CLI proper is planned for M4. Go
   and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn serve` is planned for M2. `cairn mcp` and the M1 commands need
-  `server` in `.cairn.toml` or `CAIRN_SERVER`, and `cairn mcp` refuses to start
-  without one. `cairn init` writes that file in the project directory, and does
+  D11). `cairn serve` is built in M2. `cairn mcp` and the M1 commands need
+  `server` in `.cairn.toml` or `CAIRN_SERVER`, and an API key in `CAIRN_API_KEY`
+  or `~/.config/cairn/client.env`. `cairn mcp` refuses to start without a server
+  or a key. `cairn init` writes that file in the project directory, and does
   not contact the server: `cairn init --project <name> --server <url>`. The
   server URL may not carry a user name or password, since the file is committed.
 - **The operator decides.** Agents can only propose. Accepting a finding or
@@ -82,7 +83,7 @@ the server URL.
 
 ```toml
 project = "acme-api"
-server = "https://cairn.lan:8787"
+server = "https://cairn.lan:8788"
 ```
 
 The repository and the Go module still carry the name `cairn-memory`.
@@ -93,7 +94,7 @@ been done.
 
 `cairn serve` is the server, and the only listener in the binary. It keeps its
 data in the SQLite file named by `--db`, which is created if it does not exist.
-It listens on loopback at `127.0.0.1:8787` unless `--addr` says otherwise:
+It listens on loopback at `127.0.0.1:8788` unless `--addr` says otherwise:
 
 ```bash
 cairn serve --db ./cairn.db
@@ -101,11 +102,42 @@ cairn serve --db ./cairn.db
 
 An address other than loopback needs TLS, by `--tls-cert` and `--tls-key`, or
 `--behind-proxy` when a proxy in front of the server terminates TLS. It also
-needs at least one active API key. Creating keys with `cairn key add` is not
-built yet, so a server with no key refuses every call, and a non-loopback server
-cannot start until keys can be made. `GET /healthz` answers a liveness check
+needs at least one active API key. A loopback server with no key starts, and
+refuses every call until one exists. `GET /healthz` answers a liveness check
 without a key. The bind rules and the limits are in
 [DESIGN.md §5.3](docs/DESIGN.md#53-the-server).
+
+#### Making keys
+
+```bash
+cairn key add    --db ./cairn.db --name ci --scope agent
+cairn key list   --db ./cairn.db
+cairn key revoke --db ./cairn.db --name ci
+```
+
+`--scope` is `agent` for the MCP tools, `operator` for decisions and
+ratification, or `viewer` for read-only access. `key add` prints the key once,
+on stdout. Store it then: nothing shows it again. The database keeps only its
+hash. `key revoke` ends the key at its next call, and a revoked name is not
+reused. `key list` and `key revoke` need a database that exists.
+
+### Setting up a client
+
+A client sends its key with every call. Give it in one of two places:
+
+```bash
+# Either, in the environment of the client:
+export CAIRN_API_KEY=cairn_...
+
+# Or, in a file only you can read:
+mkdir -p ~/.config/cairn
+printf 'CAIRN_API_KEY=cairn_...\n' > ~/.config/cairn/client.env
+chmod 600 ~/.config/cairn/client.env
+```
+
+`CAIRN_API_KEY` is read first. A `client.env` that any other user can read or
+write is refused, and the client says `chmod 600`. `cairn doctor` reports where
+the key was found, and whether the server accepted it. It never prints the key.
 
 ## Documentation
 

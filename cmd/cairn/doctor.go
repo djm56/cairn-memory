@@ -48,12 +48,22 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	} else {
 		checks = append(checks, check{name: "project", status: "ok", detail: fmt.Sprintf("%s (from %s)", project.Name, projectSource(project))})
 	}
-	if url, err := identity.ResolveServer(wd); err != nil {
-		checks = append(checks, check{name: "server", status: "fail", detail: reason(err)})
-		checks = append(checks, check{name: "reach", status: "skip", detail: "no server to reach"})
+	url, serverErr := identity.ResolveServer(wd)
+	if serverErr != nil {
+		checks = append(checks, check{name: "server", status: "fail", detail: reason(serverErr)})
 	} else {
 		checks = append(checks, check{name: "server", status: "ok", detail: fmt.Sprintf("%s (from %s)", client.DisplayURL(url), serverSource())})
-		checks = append(checks, reachCheck(url))
+	}
+	key, keyErr := client.LoadKey()
+	keyChk := keyCheck(key, keyErr)
+	checks = append(checks, keyChk)
+	switch {
+	case serverErr != nil:
+		checks = append(checks, check{name: "reach", status: "skip", detail: "no server to reach"})
+	case keyChk.status != "ok":
+		checks = append(checks, check{name: "reach", status: "skip", detail: "no API key to send"})
+	default:
+		checks = append(checks, reachCheck(url, key.Value))
 	}
 
 	failed := false
@@ -67,12 +77,26 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// reachCheck asks the server a question that needs no project. A Cairn server
-// answers invalid, "no project", and that answer shows it speaks the wire form.
-// Any success, or any failure that is not a core error, is a fault: a server that
-// answers a call with no project is not the one this is meant to be.
-func reachCheck(url string) check {
-	svc, err := client.New(url, &http.Client{Timeout: doctorTimeout})
+// keyCheck is the key line: where the key was found, and never the key. A key found in either
+// place is ok. A key that is missing fails, and so does a key file the client refuses, with
+// the reason it gives.
+func keyCheck(key client.Key, err error) check {
+	if err != nil {
+		return check{name: "key", status: "fail", detail: reason(err)}
+	}
+	if key.Source == "" {
+		return check{name: "key", status: "fail", detail: "missing: " + client.NoKeyMessage()}
+	}
+	return check{name: "key", status: "ok", detail: "found (" + string(key.Source) + ")"}
+}
+
+// reachCheck asks the server a question that needs no project, with the key. A Cairn server
+// answers invalid, "no project", and that answer shows it speaks the wire form and accepted
+// the key. Any success, or any failure that is not a core error, is a fault: a server that
+// answers a call with no project is not the one this is meant to be. A refused key is a
+// fault, and its message says so.
+func reachCheck(url, key string) check {
+	svc, err := client.NewWithKey(url, key, &http.Client{Timeout: doctorTimeout})
 	if err != nil {
 		return check{name: "reach", status: "fail", detail: reason(err)}
 	}
@@ -82,7 +106,7 @@ func reachCheck(url string) check {
 	case err == nil:
 		return check{name: "reach", status: "fail", detail: "the server answered a call with no project, which a Cairn server refuses"}
 	case errors.As(err, &ce) && ce.Kind == core.KindInvalid:
-		return check{name: "reach", status: "ok", detail: "the server answers as a Cairn server; no project was sent, so nothing was read or written"}
+		return check{name: "reach", status: "ok", detail: "the server answers as a Cairn server and accepted the key; no project was sent, so nothing was read or written"}
 	default:
 		return check{name: "reach", status: "fail", detail: reason(err)}
 	}

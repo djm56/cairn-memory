@@ -36,6 +36,7 @@ func init() {
 		"status":  {summary: "Show the server, the project and the active task", run: runStatus},
 		"doctor":  {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
 		"serve":   {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
+		"key":     {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
 	}
 }
 

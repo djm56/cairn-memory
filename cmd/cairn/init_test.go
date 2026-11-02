@@ -17,7 +17,7 @@ import (
 
 const (
 	initProject = "acme-api"
-	initServer  = "https://cairn.lan:8787"
+	initServer  = "https://cairn.lan:8788"
 )
 
 // initArgs is the command line of cairn init for the test project and server.
@@ -87,7 +87,7 @@ func TestInitRefusesOtherValuesAndKeepsTheFile(t *testing.T) {
 
 	for _, args := range [][]string{
 		initArgs("other-project", initServer),
-		initArgs(initProject, "https://elsewhere.lan:8787"),
+		initArgs(initProject, "https://elsewhere.lan:8788"),
 	} {
 		code, stdout, stderr := runCmd(t, args...)
 		if code != 1 {
@@ -108,7 +108,7 @@ func TestInitRefusesOtherValuesAndKeepsTheFile(t *testing.T) {
 func TestInitKeepsOtherKeys(t *testing.T) {
 	dir := t.TempDir()
 	useDir(t, dir)
-	content := "project = \"acme-api\"\nserver = \"https://cairn.lan:8787\"\nnote = \"kept\"\n\n[extra]\nvalue = 1\n"
+	content := "project = \"acme-api\"\nserver = \"https://cairn.lan:8788\"\nnote = \"kept\"\n\n[extra]\nvalue = 1\n"
 	path := writeFile(t, dir, ".cairn.toml", content)
 
 	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
@@ -129,8 +129,8 @@ func TestInitKeepsOtherKeys(t *testing.T) {
 func TestInitRefusesFilesItCannotRead(t *testing.T) {
 	cases := map[string]string{
 		"broken TOML":       "project = [\n",
-		"project not text":  "project = 3\nserver = \"https://cairn.lan:8787\"\n",
-		"no project at all": "server = \"https://cairn.lan:8787\"\n",
+		"project not text":  "project = 3\nserver = \"https://cairn.lan:8788\"\n",
+		"no project at all": "server = \"https://cairn.lan:8788\"\n",
 	}
 	for name, content := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestInitRefusesADirectoryInTheWay(t *testing.T) {
 // file is refused: a second file there would shadow the project for its whole tree.
 func TestInitRefusesABelowAFileAbove(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \"https://cairn.lan:8787\"\n")
+	writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \"https://cairn.lan:8788\"\n")
 	sub := filepath.Join(root, "service")
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestInitRejectsBadArguments(t *testing.T) {
 		"no flags":        {"init"},
 		"no server":       {"init", "--project", initProject},
 		"bad name":        initArgs("Acme_API", initServer),
-		"bad server":      initArgs(initProject, "cairn.lan:8787"),
+		"bad server":      initArgs(initProject, "cairn.lan:8788"),
 		"server no host":  initArgs(initProject, "https://"),
 		"stray argument":  {"init", "--project", initProject, "--server", initServer, "extra"},
 		"unknown flag":    {"init", "--force"},
@@ -281,7 +281,7 @@ func TestInitLeavesOnlyTheFile(t *testing.T) {
 // in the server URL is refused, since the file is committed, and the refusal does not
 // print any part of the URL.
 func TestInitRefusesCredentialsInTheServerURL(t *testing.T) {
-	for _, server := range []string{"https://keeper:secret@cairn.lan:8787", "https://keeper@cairn.lan:8787"} {
+	for _, server := range []string{"https://keeper:secret@cairn.lan:8788", "https://keeper@cairn.lan:8788"} {
 		t.Run(server, func(t *testing.T) {
 			dir := t.TempDir()
 			useDir(t, dir)
@@ -592,14 +592,14 @@ func TestInitOutsideTheProjectDirectoryCompares(t *testing.T) {
 func TestInitDoesNotPrintACredentialFromAnExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	useDir(t, dir)
-	writeFile(t, dir, ".cairn.toml", "project = \""+initProject+"\"\nserver = \"https://keeper:secret@cairn.lan:8787\"\n")
+	writeFile(t, dir, ".cairn.toml", "project = \""+initProject+"\"\nserver = \"https://keeper:secret@cairn.lan:8788\"\n")
 
 	code, stdout, stderr := runCmd(t, initArgs("other-project", initServer)...)
 	if code != 1 {
 		t.Errorf("exit %d, want 1 (stdout %q, stderr %q)", code, stdout, stderr)
 	}
 	assertNoCredentials(t, stdout, stderr)
-	if !strings.Contains(stderr, `"https://cairn.lan:8787"`) {
+	if !strings.Contains(stderr, `"https://cairn.lan:8788"`) {
 		t.Errorf("stderr %q does not show the server without its credentials", stderr)
 	}
 }

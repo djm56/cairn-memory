@@ -166,7 +166,7 @@ func TestResolve(t *testing.T) {
 		{
 			name:     "file without a project key",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", "server = \"https://cairn.lan:8787\"\n"}},
+			files:    []file{{"app/.cairn.toml", "server = \"https://cairn.lan:8788\"\n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "has no project key",
 		},
@@ -194,7 +194,7 @@ func TestResolve(t *testing.T) {
 		{
 			name:       "file with extra keys reads the project",
 			work:       "app",
-			files:      []file{{"app/.cairn.toml", "project = \"acme-api\"\n# server = \"https://cairn.lan:8787\"\nserver = \"https://cairn.lan:8787\"\n"}},
+			files:      []file{{"app/.cairn.toml", "project = \"acme-api\"\n# server = \"https://cairn.lan:8788\"\nserver = \"https://cairn.lan:8788\"\n"}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
 			wantPath:   "app/.cairn.toml",
@@ -378,7 +378,7 @@ func TestNoProjectKeyNamesInit(t *testing.T) {
 		name string
 		body string
 	}{
-		{"missing key", "server = \"https://cairn.lan:8787\"\n"},
+		{"missing key", "server = \"https://cairn.lan:8788\"\n"},
 		{"empty key", "project = \"\"\n"},
 	}
 	for _, tc := range cases {

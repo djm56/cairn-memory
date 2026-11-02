@@ -30,29 +30,42 @@ const DefaultTimeout = 30 * time.Second
 // read into memory. A failed answer is capped by api.MaxBodyBytes.
 const MaxResponseBytes = 16 << 20
 
-// Client is a core.Service over HTTP. Build one with New; the zero value has no
-// server to call.
+// Client is a core.Service over HTTP. Build one with New or NewWithKey; the zero value
+// has no server to call.
 type Client struct {
 	base string
+	key  string // the API key, sent as the bearer on every call; "" sends none
 	hc   *http.Client
 }
 
 var _ core.Service = (*Client)(nil)
 
-// New returns a Client for the server at base, such as http://127.0.0.1:8787.
-// base must be an absolute http or https URL with a host, and no query or
-// fragment. hc is the HTTP client the calls use. nil means a client with
-// DefaultTimeout, not http.DefaultClient, which has no timeout. A caller that
-// passes its own client should give it a timeout too.
+// New returns a Client for the server at base, such as http://127.0.0.1:8788, that sends
+// no API key. A server that keeps keys refuses its calls with 401; a caller of such a
+// server uses NewWithKey. base must be an absolute http or https URL with a host, and no
+// query or fragment. hc is the HTTP client the calls use. nil means a client with
+// DefaultTimeout, not http.DefaultClient, which has no timeout. A caller that passes its
+// own client should give it a timeout too.
 func New(base string, hc *http.Client) (*Client, error) {
+	return NewWithKey(base, "", hc)
+}
+
+// NewWithKey is New for a client that sends key as Authorization: Bearer <key> on every
+// call. An empty key sends no header, as New does. A key that holds a character a header
+// cannot carry, a space or a control character, is refused, and the refusal does not
+// print it.
+func NewWithKey(base, key string, hc *http.Client) (*Client, error) {
 	u, err := url.Parse(base)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
 		return nil, fmt.Errorf("client: base %s is not an http or https URL with a host", DisplayURL(base))
 	}
+	if strings.ContainsFunc(key, func(r rune) bool { return r <= ' ' || r > '~' }) {
+		return nil, errors.New("client: the API key holds a character a request header cannot carry: check CAIRN_API_KEY or the client.env file for a space or a line break")
+	}
 	if hc == nil {
 		hc = &http.Client{Timeout: DefaultTimeout}
 	}
-	return &Client{base: strings.TrimRight(base, "/"), hc: hc}, nil
+	return &Client{base: strings.TrimRight(base, "/"), key: key, hc: hc}, nil
 }
 
 // DisplayURL returns a server URL as it may be printed: with its user name and
@@ -187,6 +200,9 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 		return nil, fmt.Errorf("client: %s: %w", route, err)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
+	if c.key != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.key)
+	}
 	if err := setCaller(ctx, hreq.Header); err != nil {
 		return nil, err
 	}
@@ -251,6 +267,11 @@ func setCaller(ctx context.Context, h http.Header) error {
 // not the wire form, is a plain error that names the route and the status, and is
 // not a core.Error.
 func failure(base, route string, resp *http.Response) error {
+	if resp.StatusCode == http.StatusUnauthorized {
+		// The server answers 401 for a key that is missing, malformed, unknown or revoked, and
+		// says nothing finer, so the message says only that. It names no key.
+		return fmt.Errorf("client: %s: the server refused the API key: check CAIRN_API_KEY or the client.env file", route)
+	}
 	var body api.ErrorBody
 	if err := json.NewDecoder(io.LimitReader(resp.Body, api.MaxBodyBytes)).Decode(&body); err == nil && body.Error != nil {
 		switch {

@@ -22,7 +22,8 @@ func runMCP(args []string, stdout, stderr io.Writer) int {
 // serveMCP serves the MCP tools over stdin and stdout until the client goes away.
 // It is the server-only adapter (D11, DESIGN §5.3): it never opens a database. Each
 // call goes to the server named by CAIRN_SERVER or the .cairn.toml server key, and
-// the server is required, so there is no local fallback. It listens on nothing (D19):
+// the server is required, so there is no local fallback. The call carries the API key
+// from CAIRN_API_KEY or client.env, and a process with no key refuses to start (DESIGN §2.1). It listens on nothing (D19):
 // the client dials the server, and this process only answers its own client.
 //
 // The project is resolved once, at start. When it does not resolve, the server still
@@ -46,7 +47,12 @@ func serveMCP(args []string, stdin io.ReadCloser, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "cairn mcp: %v\n", err)
 		return 1
 	}
-	svc, err := client.New(url, nil)
+	key, err := loadKey()
+	if err != nil {
+		fmt.Fprintf(stderr, "cairn mcp: %v\n", err)
+		return 1
+	}
+	svc, err := client.NewWithKey(url, key.Value, nil)
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn mcp: %v\n", err)
 		return 1

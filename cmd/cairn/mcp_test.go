@@ -67,6 +67,8 @@ func TestMCPStdioFlow(t *testing.T) {
 	t.Setenv("CAIRN_SERVER", srv.URL)
 	t.Setenv("CAIRN_PROJECT", "acme-api")
 	t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CAIRN_API_KEY", testAPIKey(t))
 
 	// The server reads what the client writes, and the client reads what it writes.
 	inR, inW := io.Pipe()
@@ -75,7 +77,10 @@ func TestMCPStdioFlow(t *testing.T) {
 	done := make(chan int, 1)
 	go func() { done <- serveMCP(nil, inR, outW, &stderr) }()
 
-	ctx := context.Background()
+	// The deadline is for a server that refuses to start: the client then waits on a pipe
+	// nothing writes, and the test fails here instead of hanging.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	mc := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "stdio-test", Version: "0"}, nil)
 	cs, err := mc.Connect(ctx, &mcpsdk.IOTransport{Reader: outR, Writer: inW}, nil)
 	if err != nil {

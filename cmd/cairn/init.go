@@ -61,7 +61,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairn init", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
 	project := fl.String("project", "", "the project name, such as acme-api")
-	server := fl.String("server", "", "the server URL, such as https://cairn.lan:8787")
+	server := fl.String("server", "", "the server URL, such as https://cairn.lan:8788")
 	if err := fl.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			writeInitHelp(stdout, fl)
@@ -89,7 +89,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if _, err := client.New(*server, nil); err != nil {
-		fmt.Fprintln(stderr, "cairn init: the server is not an http or https URL with a host, such as https://cairn.lan:8787")
+		fmt.Fprintln(stderr, "cairn init: the server is not an http or https URL with a host, such as https://cairn.lan:8788")
 		return 2
 	}
 

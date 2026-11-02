@@ -11,21 +11,37 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/api"
+	"github.com/djm56/cairn-memory/internal/auth"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
 // useDir runs the commands from dir, with no caller set in the environment: the
-// project and server come only from the files the test writes.
+// project and server come only from the files the test writes. The API key is the test
+// key from CAIRN_API_KEY, and the home directory is a fresh one, so no client.env of the
+// machine running the tests is read.
 func useDir(t *testing.T, dir string) {
 	t.Helper()
 	assertNoAncestorProjectFile(t)
 	t.Setenv("CAIRN_PROJECT", "")
 	t.Setenv("CAIRN_SERVER", "")
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CAIRN_API_KEY", testAPIKey(t))
 	prev := workDir
 	workDir = func() (string, error) { return dir, nil }
 	t.Cleanup(func() { workDir = prev })
+}
+
+// testAPIKey returns a fresh API key for a test to send. It is made by auth.NewKey, so no
+// test holds a key-shaped literal.
+func testAPIKey(t *testing.T) string {
+	t.Helper()
+	k, err := auth.NewKey()
+	if err != nil {
+		t.Fatalf("NewKey: %v", err)
+	}
+	return k
 }
 
 // assertNoAncestorProjectFile fails the test when a .cairn.toml sits above the temporary

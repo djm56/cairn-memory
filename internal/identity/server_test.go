@@ -16,7 +16,7 @@ import (
 // a stray .cairn.toml above it would change that result. The trade-off is recorded
 // there.
 func TestResolveServer(t *testing.T) {
-	const good = "project = \"acme-api\"\nserver = \"https://cairn.lan:8787\"\n"
+	const good = "project = \"acme-api\"\nserver = \"https://cairn.lan:8788\"\n"
 	cases := []struct {
 		name string
 		// env is CAIRN_SERVER. Empty means unset.
@@ -36,15 +36,15 @@ func TestResolveServer(t *testing.T) {
 			name: "env set beats the file", env: "http://127.0.0.1:9000", work: "app",
 			files: []file{{"app/.cairn.toml", good}}, want: "http://127.0.0.1:9000",
 		},
-		{name: "file server key", work: "app", files: []file{{"app/.cairn.toml", good}}, want: "https://cairn.lan:8787"},
+		{name: "file server key", work: "app", files: []file{{"app/.cairn.toml", good}}, want: "https://cairn.lan:8788"},
 		{
 			name: "file found by walking up", work: "app/src",
-			files: []file{{".cairn.toml", good}}, want: "https://cairn.lan:8787",
+			files: []file{{".cairn.toml", good}}, want: "https://cairn.lan:8788",
 		},
 		{
 			name: "claude project dir is the start of the walk", work: "elsewhere", claudeDir: "app",
 			files: []file{{"app/.cairn.toml", good}, {"elsewhere/.cairn.toml", "project = \"x\"\nserver = \"https://wrong\"\n"}},
-			want:  "https://cairn.lan:8787",
+			want:  "https://cairn.lan:8788",
 		},
 		{name: "no env and no file names cairn init", work: "app", wantErr: core.KindInvalid, wantText: "cairn init"},
 		{
@@ -59,7 +59,7 @@ func TestResolveServer(t *testing.T) {
 		},
 		{
 			name: "file with a server that is not a string", work: "app",
-			files:   []file{{"app/.cairn.toml", "project = \"acme-api\"\nserver = 8787\n"}},
+			files:   []file{{"app/.cairn.toml", "project = \"acme-api\"\nserver = 8788\n"}},
 			wantErr: core.KindInvalid, wantText: "wrong type for server",
 		},
 		{

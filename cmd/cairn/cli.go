@@ -43,11 +43,15 @@ func dial(wd string, timeout time.Duration) (*target, error) {
 	if err != nil {
 		return nil, err
 	}
+	key, err := loadKey()
+	if err != nil {
+		return nil, err
+	}
 	var hc *http.Client
 	if timeout > 0 {
 		hc = &http.Client{Timeout: timeout}
 	}
-	svc, err := client.New(url, hc)
+	svc, err := client.NewWithKey(url, key.Value, hc)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +61,21 @@ func dial(wd string, timeout time.Duration) (*target, error) {
 		Role:    core.RoleAgent,
 	})
 	return &target{project: project, url: url, svc: svc, ctx: ctx}, nil
+}
+
+// loadKey returns the API key the calls send (DESIGN.md §2.1). A key that is in neither
+// place is a core.Invalid whose text names both places, so every command that calls the
+// server gives the same instruction. A key file that is open to other users is an error
+// from the client, and it is returned as it is.
+func loadKey() (client.Key, error) {
+	key, err := client.LoadKey()
+	if err != nil {
+		return client.Key{}, err
+	}
+	if key.Source == "" {
+		return client.Key{}, core.Invalid("no API key: %s", client.NoKeyMessage())
+	}
+	return key, nil
 }
 
 // reason is the text of err for a person: the message of a core.Error, without its

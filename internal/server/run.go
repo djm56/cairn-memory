@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/djm56/cairn-memory/internal/store"
@@ -60,7 +59,7 @@ func Run(ctx context.Context, o Options) error {
 		}
 	}
 
-	st, err := store.Open(o.DB)
+	st, err := openDatabase(o.DB, true)
 	if err != nil {
 		return fmt.Errorf("cairn serve: %w", err)
 	}
@@ -74,6 +73,9 @@ func Run(ctx context.Context, o Options) error {
 	}
 	if loopback && keys == 0 {
 		fmt.Fprintln(o.Log, NoKeysLine)
+	}
+	if line := CleartextLine(loopback, tlsOn, o.BehindProxy); line != "" {
+		fmt.Fprintln(o.Log, line)
 	}
 
 	// A loopback host that resolved is listened on at the address that was checked, so
@@ -93,6 +95,12 @@ func Run(ctx context.Context, o Options) error {
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Once the stop has begun, the signal handling is released, so a second Ctrl-C during
+	// the drain ends the process at once instead of being swallowed until Run returns.
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
 	if err := Serve(ctx, ln, Handler(st, logger), tlsCfg, logger); err != nil {
 		return fmt.Errorf("cairn serve: %w", err)
 	}
@@ -107,11 +115,8 @@ func checkOptions(o Options) error {
 	if o.Addr == "" {
 		return errors.New("cairn serve: --addr is required")
 	}
-	if o.DB == "" {
-		return errors.New("cairn serve: --db is required: the path of the SQLite file the server keeps its data in")
-	}
-	if strings.Contains(o.DB, "?") {
-		return errors.New("cairn serve: --db must not contain '?': the driver reads it as the start of its options")
+	if err := checkDBPath(o.DB); err != nil {
+		return fmt.Errorf("cairn serve: %w", err)
 	}
 	if (o.TLSCert == "") != (o.TLSKey == "") {
 		return errors.New("cairn serve: --tls-cert and --tls-key go together: give both, or neither")
@@ -150,7 +155,7 @@ func LoadTLS(certFile, keyFile string) (*tls.Config, error) {
 // Serve serves h on ln until ctx is done, then shuts down. In-flight calls get
 // shutdownTimeout to finish; any still running after it are closed. tlsCfg, when set,
 // wraps ln in TLS at no less than TLS 1.2. The timeouts and the header cap are those of
-// DESIGN §8. The server's own log lines go to logger.
+// DESIGN §5.3. The server's own log lines go to logger.
 func Serve(ctx context.Context, ln net.Listener, h http.Handler, tlsCfg *tls.Config, logger *slog.Logger) error {
 	srv := &http.Server{
 		Handler:           h,
