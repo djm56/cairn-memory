@@ -129,19 +129,25 @@ func GetDirectiveByID(ctx context.Context, q Querier, id int64) (DirectiveRow, e
 // ordered by code (CONTRACT §5). It takes:
 //   - every global directive;
 //   - the project directives of project;
-//   - the agent directives for agent, or every agent directive when agent is "".
+//   - the agent directives for agent when allAgents is false, or every agent
+//     directive when allAgents is true.
+//
+// allAgents is a flag, not an empty agent, so an empty agent with allAgents false
+// gives no agent directive at all. That is what a caller with no role gets from
+// task_current and recall (CONTRACT §9 item 49). Only directive_list with no
+// agent asks for every role.
 //
 // Agent directives apply in every project (CONTRACT §9, item 11), so they are
 // not filtered by project. Retired directives are never returned.
 //
 // Read function: call it on s, outside a transaction.
-func ListActiveDirectives(ctx context.Context, q Querier, project, agent string) ([]DirectiveRow, error) {
+func ListActiveDirectives(ctx context.Context, q Querier, project, agent string, allAgents bool) ([]DirectiveRow, error) {
 	rows, err := q.QueryContext(ctx, `SELECT `+directiveColumns+` FROM directives
 		WHERE status = 'active' AND (
 			scope = 'global'
 			OR (scope = 'project' AND project = ?)
-			OR (scope = 'agent' AND (? = '' OR agent = ?)))
-		ORDER BY code`, project, agent, agent)
+			OR (scope = 'agent' AND (? OR agent = ?)))
+		ORDER BY code`, project, allAgents, agent)
 	if err != nil {
 		return nil, fmt.Errorf("store: list directives: %w", err)
 	}

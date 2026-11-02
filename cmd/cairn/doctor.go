@@ -14,8 +14,9 @@ import (
 )
 
 // doctorTimeout bounds the one reachability call of cairn doctor, so a server that
-// does not answer ends the check, not the command.
-const doctorTimeout = 5 * time.Second
+// does not answer ends the check, not the command. It is a variable so a test can wait
+// on a server that never answers for less than the real five seconds (step 12 review 12-S3).
+var doctorTimeout = 5 * time.Second
 
 // check is one line of cairn doctor: what was checked, its status and the detail.
 type check struct {

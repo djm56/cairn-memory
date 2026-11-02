@@ -120,7 +120,7 @@ func contains(list []string, s string) bool {
 var bannedImports = map[string]string{
 	storePath:    "opens a database",
 	httptestPath: "starts an in-process HTTP listener",
-	serverPath:   "opens the server's database and starts its listener: only cairn serve and cairn key may import it",
+	serverPath:   "opens the server's database and starts its listener: only cairn serve, key, backup and restore may import it",
 }
 
 // serverImportAllowed are the only guarded files that may import internal/server, each with
@@ -128,8 +128,10 @@ var bannedImports = map[string]string{
 // listed here that no longer imports the package, or a file that imports it and is not
 // listed, fails TestServerImportIsOnlyInTheNamedFiles.
 var serverImportAllowed = map[string]string{
-	"cmd/cairn/serve.go": "cairn serve: parses the flags and calls server.Run, which opens the store and listens",
-	"cmd/cairn/key.go":   "cairn key: parses the flags and calls server.AddKey, ListKeys and RevokeKey, which open the store",
+	"cmd/cairn/serve.go":   "cairn serve: parses the flags and calls server.Run, which opens the store and listens",
+	"cmd/cairn/key.go":     "cairn key: parses the flags and calls server.AddKey, ListKeys and RevokeKey, which open the store",
+	"cmd/cairn/backup.go":  "cairn backup: parses the flags and calls server.Backup, which opens the store to copy it",
+	"cmd/cairn/restore.go": "cairn restore: parses the flags and calls server.Restore, which opens the store to check, lock and migrate it",
 }
 
 // listenerPkgs are the standard packages whose functions and types start or configure
@@ -331,8 +333,8 @@ func importsPath(f *ast.File, p string) bool {
 // set is two files; a third file that imports the server, or one of the two that stops
 // importing it, fails the test and names it.
 func TestServerImportIsOnlyInTheNamedFiles(t *testing.T) {
-	if len(serverImportAllowed) != 2 {
-		t.Errorf("serverImportAllowed names %d files, want exactly the two of the step 7 brief", len(serverImportAllowed))
+	if len(serverImportAllowed) != 4 {
+		t.Errorf("serverImportAllowed names %d files, want exactly the four: serve, key, backup and restore (M2 #74)", len(serverImportAllowed))
 	}
 	importers := map[string]bool{}
 	for _, dir := range guardedDirs(t) {

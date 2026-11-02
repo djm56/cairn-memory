@@ -283,10 +283,21 @@ learning in one codebase reaches the next.
 Built (decision D16, M2): each directive has a `review_by` date, 90 days from
 ratification by default. Directives returned by `task_current`, `directive_list`
 and `recall` are ranked and capped at 12 per call: agent-scoped first, then
-project, then global, and newest first within each. A directive past its
-`review_by` is expired: it is left out of those calls and counted in `expired`.
+project, then global, and newest first within each. `task_current` and `recall`
+give the agent-scoped directives of the caller's own role only, so another role's
+cannot fill the cap; `directive_list` lists every role when no agent is named
+(CONTRACT §9 item 49). A directive is expired from 00:00 UTC of its
+`review_by` day, the day being the point it is due: it is left out of those calls
+and counted in `expired`.
 The directives beyond the cap are counted in `omitted`. The UI flags expired
 directives in M3.
+
+The upgrade to schema 5 gives every active directive a `review_by` 90 days after
+the upgrade runs, whatever its `ratified_at`, so no directive is expired by the
+upgrade itself. M2 has no call that changes the `review_by` of an active
+directive: `DirectiveRatify` always makes a new code. To extend a directive, retire
+it and ratify it again with the `review_by` you want (CONTRACT §8). The new
+directive has a new code, and it does not keep the old one's link to its learning.
 
 ### 3.5 Notes and search
 
@@ -362,7 +373,7 @@ differs from it only there).
 
 | Tool | Purpose |
 |---|---|
-| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply. The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
+| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply: those of the project and of the caller's role (`agent`, optional; CONTRACT §9 item 49). The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
 | `task_start` | Create a task with its brief (title, goal, context, constraints, criteria, key files) and, optionally, its plan. Returns the id. |
 | `task_get` | One task in full, or one section of it (`brief`, `steps`, `events`, `close`). `section: events` is the journal, paged; it replaces `event_list` in M1. |
 | `task_list` | Recent tasks in this project, filtered by status. |
@@ -465,10 +476,81 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
-| `cairn backup <path>` | Planned, M2. A SQLite online backup of the database to a path. |
-| `cairn restore <path>` | Planned, M2. Restores a backup, behind an interactive confirmation. |
+| `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
+| `cairn restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
 | `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1; `--agent` is planned, M4. |
+
+#### 5.2.1 Backup and restore (M2, #74)
+
+`cairn backup` and `cairn restore` open the server's database, so the logic is in
+`internal/server` and the commands in `cmd/cairn` only parse flags and call it. The
+reach guard names those two command files as the only ones that may import the
+server package, beside `serve` and `key`.
+
+**Backup.** The copy is made by `VACUUM INTO` into an empty file made with
+`O_EXCL` at mode 0600. An existing `<out>` is refused, and so are `:memory:`, a
+`file:` name and a name with `?`. The database is opened without migrating, so a
+backup never changes the database it copies, and a file with no Cairn schema, or
+a schema newer than this build, is refused. `VACUUM INTO` is one read transaction.
+In WAL mode the copy holds every commit that finished before it began and no part
+of a later one, and it does not block a writer or wait for one. The online backup
+API restarts when its source changes under it, which a busy server does
+constantly.
+
+**Restore.** The steps run in this order and stop at the first refusal, with
+nothing changed unless the step says otherwise:
+
+1. Stdin must be a terminal. This is checked first, so nothing is read, locked or
+   copied before it. The operator types the database path exactly as given, at
+   step 4. There is no `--yes` flag in M2.
+2. The backup is copied beside the database, and the copy is checked there: it
+   opens, `PRAGMA integrity_check` returns `ok`, and its schema is not newer than
+   this build. The checked copy is the one put in place, so the bytes verified
+   are the bytes restored. A refused copy is removed with any `-wal` or `-shm`
+   beside it, after the copy is closed.
+3. If the database exists, it is first checked with a read-only open. A file that
+   cannot be read as SQLite is not opened for writing at all: it takes no lock,
+   and it is moved as it is at step 5. A readable database must not be in use. An
+   exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
+   or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
+   do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is
+   not blocked. The lock is held through the moves.
+4. The operator types the database path. A prompt for an absent database says so.
+5. For a readable database, under the lock and before any move, its `-wal` is
+   folded in with `PRAGMA wal_checkpoint(TRUNCATE)`, which must report no busy
+   frames and every logged frame checkpointed, and the database is switched to
+   `journal_mode=DELETE`, which removes the `-wal` and `-shm`. A failure here stops
+   the restore before anything moves. Then the files of the set that exist are
+   moved to `<db>.pre-restore-<UTC>` (`20261031T101112Z`), in this order: the
+   database file first, then its `-wal`, then its `-shm`. Each target name must be
+   free before the first change, and a move that fails undoes the ones before it.
+   Any file of the set still there after the moves is moved too. Each move is
+   reported, and the directory is synced. An unreadable file is moved as it is,
+   with no checkpoint, and the output says it was not a readable database.
+   An absent database with a stray `-wal` or `-shm` beside its path has those
+   moved to `<db>.pre-restore-<UTC>-wal` and `-shm` first, and reported.
+6. The checked copy is renamed to the database path, and the database is opened,
+   which migrates it to this build's schema.
+
+Nothing is deleted at any step. The move order is database, `-wal`, `-shm`, the
+order the code uses. Once the checkpoint has run, the `-wal` is gone and the
+database file alone holds the state, including what was only in its `-wal`. That
+is tested by the directory listing and by reading a copy of the pre-restore
+database file alone (`TestRestoreFoldsTheWALIntoTheKeptDatabase`). The `-shm` is
+not removed by the switch, so it is kept and moved with the database, as the
+report shows.
+
+**If a restore fails.** Every error after the first move names the pre-restore
+path and the step that puts the database back. That step is: stop `cairn serve`,
+move any file now at `<db>` aside, then move each pre-restore file back to its
+name with `mv`. The files are the ones the restore printed as moved: normally
+`<db>.pre-restore-<UTC>`, and `<db>.pre-restore-<UTC>-shm` if it printed that one.
+A restore that stopped before its first move changed nothing to undo. While a
+`<db>.pre-restore-*` file sits beside an absent database path, `cairn serve` and
+`cairn key add` refuse to create a database there, and name the file, so an
+interrupted restore does not become an empty server. The same steps are in the
+README under "If a restore fails".
 
 ### 5.3 The server
 

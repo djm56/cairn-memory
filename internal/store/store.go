@@ -116,8 +116,14 @@ func connect(db *sql.DB) error {
 // The primary code is the low byte, so extended codes such as SQLITE_BUSY_SNAPSHOT
 // also count.
 func isBusy(err error) bool {
+	return resultCode(err, sqliteBusy)
+}
+
+// resultCode reports whether err carries the primary result code code. The driver's error
+// exposes its result code through Code, and the primary code is the low byte, as isBusy uses.
+func resultCode(err error, code int) bool {
 	var coded interface{ Code() int }
-	return errors.As(err, &coded) && coded.Code()&0xff == sqliteBusy
+	return errors.As(err, &coded) && coded.Code()&0xff == code
 }
 
 // Close releases the database and its connections. It writes nothing to the

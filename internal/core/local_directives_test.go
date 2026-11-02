@@ -1,12 +1,14 @@
 package core_test
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/store"
 )
 
 // t0 is the server's time at the start of each directive test. The clock seam
@@ -185,5 +187,156 @@ func TestRatifyRefusesBadReviewBy(t *testing.T) {
 	list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
 	if len(list.Directives) != 0 {
 		t.Errorf("refused review_by still wrote %d directives", len(list.Directives))
+	}
+}
+
+// ratifyAgent ratifies a directive scoped to role, with no review_by.
+func ratifyAgent(t *testing.T, s core.Service, role, title string) {
+	t.Helper()
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeAgent, Agent: role, Title: title, Rule: "r"}))(t)
+}
+
+// TestOtherRoleDirectivesDoNotCrowdTheCap is 12-W1. Twelve reviewer directives must not
+// push out the project and global directives of a main-session caller, from task_current
+// or recall. A caller with no role gets none of the reviewer's. The reviewer, asking for
+// its own, gets its twelve first. directive_list with no agent is the explicit listing of
+// every role, so there the reviewer's directives do fill the cap: that is pinned too.
+func TestOtherRoleDirectivesDoNotCrowdTheCap(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	ratifyGlobal(t, s, "g1")
+	ratifyGlobal(t, s, "g2")
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p1", Rule: "r"}))(t)
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p2", Rule: "r"}))(t)
+	for i := 1; i <= 12; i++ {
+		ratifyAgent(t, s, "reviewer", fmt.Sprintf("r%02d", i))
+	}
+	mine := []string{"p2", "p1", "g2", "g1"}
+
+	cur := must(s.TaskCurrent(mainCtx()))(t)
+	if got := directiveTitles(cur.Directives); !slices.Equal(got, mine) || cur.Omitted != 0 {
+		t.Errorf("task_current for main = %v omitted %d, want %v and omitted 0", got, cur.Omitted, mine)
+	}
+	rec := must(s.Recall(mainCtx(), core.RecallRequest{Goal: "anything"}))(t)
+	if got := directiveTitles(rec.Directives); !slices.Equal(got, mine) || rec.Omitted != 0 {
+		t.Errorf("recall for main = %v omitted %d, want %v and omitted 0", got, rec.Omitted, mine)
+	}
+	noRole := must(s.TaskCurrent(agent(projA, "")))(t)
+	if got := directiveTitles(noRole.Directives); !slices.Equal(got, mine) || noRole.Omitted != 0 {
+		t.Errorf("task_current with no role = %v omitted %d, want %v and omitted 0", got, noRole.Omitted, mine)
+	}
+
+	own := must(s.TaskCurrent(agent(projA, "reviewer")))(t)
+	if len(own.Directives) != 12 || own.Directives[0].Title != "r12" || own.Omitted != 4 {
+		t.Errorf("task_current for reviewer gave %d directives, first %q, omitted %d; want 12, r12 first, omitted 4",
+			len(own.Directives), own.Directives[0].Title, own.Omitted)
+	}
+
+	mineList := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{Agent: "main"}))(t)
+	if got := directiveTitles(mineList.Directives); !slices.Equal(got, mine) || mineList.Omitted != 0 {
+		t.Errorf("directive_list agent=main = %v omitted %d, want %v and omitted 0", got, mineList.Omitted, mine)
+	}
+	every := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if len(every.Directives) != 12 || every.Directives[0].Title != "r12" || every.Omitted != 4 {
+		t.Errorf("directive_list with no agent gave %d, first %q, omitted %d; want the explicit every-role listing: 12, r12 first, omitted 4",
+			len(every.Directives), every.Directives[0].Title, every.Omitted)
+	}
+}
+
+// TestDirectiveWithNoReviewByIsNeverExpired is 12-S1: an active directive with a NULL
+// review_by is live, however late the clock runs. No call writes one, so the row is
+// written through the store.
+func TestDirectiveWithNoReviewByIsNeverExpired(t *testing.T) {
+	s, st := openLocal(t)
+	ctx := context.Background()
+	at := t0
+	if err := st.WithTx(ctx, func(q store.Querier) error {
+		code, err := store.NextDirectiveCode(ctx, q)
+		if err != nil {
+			return err
+		}
+		_, err = store.InsertDirective(ctx, q, store.DirectiveRow{Code: code, Scope: "global", Title: "no-review",
+			Rule: "r", Status: "active", RatifiedBy: "operator", RatifiedAt: &at})
+		return err
+	}); err != nil {
+		t.Fatalf("insert a directive with no review_by: %v", err)
+	}
+	clockAt(s, time.Date(2300, 1, 1, 0, 0, 0, 0, time.UTC))
+	list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if got := directiveTitles(list.Directives); !slices.Equal(got, []string{"no-review"}) || list.Expired != 0 {
+		t.Errorf("directive with no review_by: listed %v, expired %d; want it listed and nothing expired", got, list.Expired)
+	}
+}
+
+// TestReviewByBoundary is 12-S1 at the edge. A directive whose review_by is 2026-11-05 is
+// live at 00:00:00 UTC that day, which is review_by == now, and expired one nanosecond
+// later (CONTRACT §8: it expires at 00:00 UTC of the named day).
+func TestReviewByBoundary(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{
+		Scope: core.ScopeGlobal, Title: "due", Rule: "r", ReviewBy: "2026-11-05"}))(t)
+	day := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+
+	clockAt(s, day)
+	live := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if got := directiveTitles(live.Directives); !slices.Equal(got, []string{"due"}) || live.Expired != 0 {
+		t.Errorf("at review_by == now: listed %v, expired %d; want it listed, expired 0", got, live.Expired)
+	}
+
+	clockAt(s, day.Add(time.Nanosecond))
+	gone := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if len(gone.Directives) != 0 || gone.Expired != 1 {
+		t.Errorf("one nanosecond past review_by: listed %d, expired %d; want 0 listed, 1 expired", len(gone.Directives), gone.Expired)
+	}
+}
+
+// TestExpiredDirectivesDoNotTakeCapSlots is 12-S1. Fourteen live and two expired global
+// directives: the expired two are left out before the cap, so twelve are listed, two are
+// omitted, and two are counted as expired, in every read.
+func TestExpiredDirectivesDoNotTakeCapSlots(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	for _, title := range []string{"old1", "old2"} {
+		must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{
+			Scope: core.ScopeGlobal, Title: title, Rule: "r", ReviewBy: "2026-11-05"}))(t)
+	}
+	for i := 1; i <= 14; i++ {
+		ratifyGlobal(t, s, fmt.Sprintf("g%02d", i))
+	}
+	clockAt(s, time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC))
+
+	// Ties on ratified_at give id order, newest first: g14 down to g03 are kept.
+	var want []string
+	for i := 14; i >= 3; i-- {
+		want = append(want, fmt.Sprintf("g%02d", i))
+	}
+	list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if got := directiveTitles(list.Directives); !slices.Equal(got, want) || list.Omitted != 2 || list.Expired != 2 {
+		t.Errorf("directive_list = %v omitted %d expired %d; want the twelve newest, omitted 2, expired 2", got, list.Omitted, list.Expired)
+	}
+	cur := must(s.TaskCurrent(mainCtx()))(t)
+	if got := directiveTitles(cur.Directives); !slices.Equal(got, want) || cur.Omitted != 2 || cur.Expired != 2 {
+		t.Errorf("task_current = %v omitted %d expired %d; want the twelve newest, omitted 2, expired 2", got, cur.Omitted, cur.Expired)
+	}
+}
+
+// TestSearchStillFindsAnExpiredDirective is 12-S2. search does not use the capped set, and
+// it still returns an expired directive, so a lapsed rule can be found and reaffirmed. The
+// directive is left out of the three reads, and search is the one read that finds it.
+func TestSearchStillFindsAnExpiredDirective(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{
+		Scope: core.ScopeGlobal, Title: "lapsed rule", Rule: "r", ReviewBy: "2026-11-05"}))(t)
+	clockAt(s, time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC))
+
+	list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+	if len(list.Directives) != 0 || list.Expired != 1 {
+		t.Fatalf("directive_list: listed %d, expired %d; want 0 and 1", len(list.Directives), list.Expired)
+	}
+	res := must(s.Search(mainCtx(), core.SearchRequest{Query: "lapsed", Kinds: []core.HitKind{core.HitDirective}}))(t)
+	if len(res.Hits) != 1 || res.Hits[0].Kind != core.HitDirective {
+		t.Errorf("search for an expired directive = %+v, want one directive hit", res.Hits)
 	}
 }

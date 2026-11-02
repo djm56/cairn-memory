@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestDoctorWithNothingConfigured checks that every check runs and reports, and the
@@ -140,7 +141,11 @@ func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 	useDir(t, dir)
 	// 192.0.2.1 is reserved for documentation (RFC 5737), so no real host answers it. It is not a
 	// name, so no resolver can send the test key to a host of its own choosing (10-S7). Doctor's
-	// reach call gives up after its 5 s timeout, and the warning is read from the output beside it.
+	// reach call gives up at its timeout, which this test shortens (12-S3): the warning is read
+	// from the output beside it, and the run does not wait out the real five seconds.
+	prevTimeout := doctorTimeout
+	doctorTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { doctorTimeout = prevTimeout })
 	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://192.0.2.1:8788\"\n")
 	code, out, _ := runCmd(t, "doctor")
 	if code != 1 || !strings.Contains(out, "transport warn") || !strings.Contains(out, "in clear text") {

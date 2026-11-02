@@ -37,6 +37,8 @@ func init() {
 		"doctor":  {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
 		"serve":   {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
 		"key":     {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
+		"backup":  {summary: "Copy the server's database to a new file: backup --db <file> <out>", run: runBackup},
+		"restore": {summary: "Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup>", run: runRestore},
 	}
 }
 

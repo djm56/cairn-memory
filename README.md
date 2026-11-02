@@ -123,6 +123,42 @@ says so on stderr. `key revoke` ends the key at its next call, and a revoked
 name is not reused. `key list` and `key revoke` need a database that exists.
 If `key add` cannot write the key to stdout, it revokes the key and exits 1.
 
+#### Backup and restore
+
+```bash
+cairn backup  --db ./cairn.db ./cairn-backup.db
+cairn restore --db ./cairn.db ./cairn-backup.db
+```
+
+`backup` writes a consistent copy to a new file, owner-only, while the server
+runs. It refuses a file that already exists. `restore` checks the backup first
+(it opens, passes SQLite's integrity check, and is not from a newer build). It
+refuses while the database is open, so stop `cairn serve` first. It then asks
+you to type the database path at a terminal, and there is no flag to skip that.
+A restore from a pipe or a script is refused.
+
+**Pre-restore files are kept.** A restore never deletes anything. Before it moves
+the database, it folds the database's `-wal` into the file and switches the file
+out of WAL mode, so the database file alone holds all the state the server last
+saw, including what was in its `-wal`. Then it moves the database to
+`<db>.pre-restore-<UTC time>`. A `-shm` beside it is moved too, to the same name
+with `-shm` added, and every move is printed. A file that cannot be read as a
+database is moved as it is, with no checkpoint, and the output says so. Keep the
+kept files until you have checked the restored server, and delete them yourself
+when you are sure.
+
+**If a restore fails.** A restore that stops after its first move says where the
+database before it is, and the steps that put it back. The files to put back are
+the ones the restore printed as moved. To put them back: stop `cairn serve`, move
+any file now at `<db>` aside, then run `mv <db>.pre-restore-<UTC time> <db>`, and
+for a `-shm` the same with `-shm` added to both names. A server that finds no
+database at its path, with a `<db>.pre-restore-*` file beside it, refuses to start
+and says so: that is an interrupted restore, and it does not create an empty
+database over it. Put the files back as above, then start the server.
+
+The rules and the order of the steps are in
+[DESIGN.md §5.2](docs/DESIGN.md#52-commands).
+
 ### Setting up a client
 
 A client sends its key with every call. Give it in one of two places:

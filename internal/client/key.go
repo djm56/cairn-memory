@@ -93,13 +93,14 @@ func NoKeyMessage() string {
 // names no key. The mode is checked on the open file, so the check and the read are of the
 // same file. Any group or other permission is refused.
 func readKeyFile(path string) (string, error) {
-	// Stat follows a symbolic link, so a link is judged by its target, as the open below reads
-	// it. A file that is not regular, such as a named pipe, is refused before the open: opening
-	// a named pipe waits for a writer, and a key file has no business being one (8-S1).
-	// The open is non-blocking (8-S1, step 10 review 10-S3). Opening a named pipe for reading
-	// waits for a writer, so a FIFO swapped in for the file would hang the open. Non-blocking,
-	// the open returns at once, and the kind check on the descriptor refuses the FIFO. A
-	// regular file reads the same either way, so the flag changes nothing else.
+	// The file is opened without a prior stat, and the kind is checked on the descriptor below.
+	// A named pipe is refused as not a regular file (8-S1). Opening a named pipe for reading
+	// waits for a writer, so the open is non-blocking (step 10 review 10-S3): a FIFO there
+	// returns at once, and the kind check refuses it. A regular file reads the same either way,
+	// so the flag changes nothing else. A symbolic link is followed by the open, so its target
+	// is what is checked.
+	// This does not close a race in which a regular file is swapped for a FIFO between two
+	// checks: no check precedes the open, so none can be raced. Only the descriptor's kind counts.
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil

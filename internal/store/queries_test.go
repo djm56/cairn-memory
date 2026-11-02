@@ -977,18 +977,22 @@ func TestDirectives(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	cases := []struct {
-		name, project, agent, want string
+		name, project, agent string
+		allAgents            bool
+		want                 string
 	}{
-		{"acme, no agent: global, its project, every agent", "acme-api", "",
+		{"acme, every agent: global, its project, every agent", "acme-api", "", true,
 			strings.Join([]string{global, acmeOnly, hicks, reviewer}, ",")},
-		{"acme, hicks: only hicks among agents", "acme-api", "hicks",
+		{"acme, hicks: only hicks among agents", "acme-api", "hicks", false,
 			strings.Join([]string{global, acmeOnly, hicks}, ",")},
-		{"other project does not see acme's project directive", "other", "",
+		{"acme, no role: an empty agent is no agent, not every agent (12-W1)", "acme-api", "", false,
+			strings.Join([]string{global, acmeOnly}, ",")},
+		{"other project does not see acme's project directive", "other", "", true,
 			strings.Join([]string{global, otherOnly, hicks, reviewer}, ",")},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rows, err := ListActiveDirectives(ctx, s, c.project, c.agent)
+			rows, err := ListActiveDirectives(ctx, s, c.project, c.agent, c.allAgents)
 			if err != nil {
 				t.Fatalf("ListActiveDirectives: %v", err)
 			}

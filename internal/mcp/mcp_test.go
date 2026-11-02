@@ -412,7 +412,8 @@ func TestRepeatedReviewKeyReachesCore(t *testing.T) {
 }
 
 // TestCallerCarriesProjectAgentAndClient checks identity (CONTRACT §1.1). A write
-// carries the agent argument as the caller's agent, a read carries none, every call
+// carries the agent argument as the caller's agent, a read carries none unless the
+// tool takes an agent (task_current does, §2), every call
 // is in the project, the role is agent, and the client is the one that initialised
 // the MCP session.
 func TestCallerCarriesProjectAgentAndClient(t *testing.T) {
@@ -428,6 +429,12 @@ func TestCallerCarriesProjectAgentAndClient(t *testing.T) {
 	mustCall(t, cs, "task_current", nil)
 	if got := rec.last; got.Project != "acme-api" || got.Agent != "" || got.Role != core.RoleAgent {
 		t.Errorf("read caller = %+v, want project acme-api, no agent, role agent", got)
+	}
+
+	// task_current's agent argument is the caller's role on a read (CONTRACT §2, §9 item 49).
+	mustCall(t, cs, "task_current", map[string]any{"agent": "reviewer"})
+	if got := rec.last; got.Project != "acme-api" || got.Agent != "reviewer" || got.Role != core.RoleAgent {
+		t.Errorf("task_current with agent reviewer: caller = %+v, want project acme-api, agent reviewer, role agent", got)
 	}
 }
 

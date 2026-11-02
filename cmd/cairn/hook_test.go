@@ -142,6 +142,7 @@ func TestSessionStartFoldsServerText(t *testing.T) {
 		"Next action: first Directives that apply: 0.",
 		`Current step: 1 of 2, "Read the schema" (active).`,
 		"Directives that apply: 0.",
+		"Agent-scoped directives were not counted: no agent role is set.",
 		"Call task_current for the brief, the steps and recent events.",
 	}
 	if got := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n"); !slices.Equal(got, want) {

@@ -14,8 +14,14 @@ import (
 )
 
 // TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking checks 8-S1: a client.env that is a named
-// pipe is refused as not a regular file. Opening a pipe waits for a writer, so the lookup must
-// refuse it before the open; the test fails rather than hangs if it does not.
+// pipe is refused as not a regular file, and the lookup does not block on it. The open is
+// non-blocking and the kind is checked on the descriptor (step 10 review 10-S3), so the test
+// fails rather than hangs if the open waits for a writer.
+//
+// This test does not prove the swap race (a regular file replaced by a FIFO between a check and
+// the open). The FIFO exists from the start, so it would pass against a stat-then-open lookup
+// too. Building the swap needs a hook between the two calls, which the code does not have; the
+// race is closed by the design (no check precedes the open), not by this test.
 func TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking(t *testing.T) {
 	home := keyEnv(t, "")
 	dir := filepath.Join(home, ".config", "cairn")
@@ -41,6 +47,6 @@ func TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking(t *testing.T) {
 			t.Errorf("a named pipe: err = %v, key %q; want the not-a-regular-file refusal", r.err, r.key)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("LoadKey blocked on a named pipe: it must refuse the file before it opens it")
+		t.Fatal("LoadKey blocked on a named pipe: the open must not wait for a writer")
 	}
 }

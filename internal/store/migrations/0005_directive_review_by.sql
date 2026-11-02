@@ -7,16 +7,13 @@
 -- Added with ALTER TABLE, so no row is dropped or rewritten beyond the backfill.
 ALTER TABLE directives ADD COLUMN review_by TEXT;
 
--- Backfill: each active directive is due 90 days after ratified_at, the column
--- every ratify sets. The stored form is fixed width (store/codec.go), so the
--- first 19 characters are the whole seconds and the rest is restored as a
--- zero-nanosecond suffix. A directive with no ratified_at has no time to count
--- from; it is due 90 days after this migration runs, so the upgrade itself never
--- expires it. Retired directives keep NULL.
+-- Backfill: every active directive is due 90 days after this migration runs, not
+-- after its ratified_at. A directive ratified long before the upgrade would
+-- otherwise be expired the moment this migration applied, and M2 has no in-place
+-- way to reaffirm one (CONTRACT §8: retire and ratify again). So the upgrade
+-- itself never expires a directive. The stored form is fixed width
+-- (store/codec.go): the zero-nanosecond suffix is written out. Retired directives
+-- keep NULL.
 UPDATE directives
-SET review_by = CASE
-        WHEN ratified_at IS NOT NULL
-            THEN strftime('%Y-%m-%dT%H:%M:%S', substr(ratified_at, 1, 19), '+90 days') || '.000000000Z'
-        ELSE strftime('%Y-%m-%dT%H:%M:%S', 'now', '+90 days') || '.000000000Z'
-    END
+SET review_by = strftime('%Y-%m-%dT%H:%M:%S', 'now', '+90 days') || '.000000000Z'
 WHERE status = 'active';

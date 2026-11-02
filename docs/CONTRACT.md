@@ -45,7 +45,9 @@ client, and a role. The adapter sets it; request types do not carry it.
   viewer's read of such a project is `not_found` and writes no row (§9 items 38
   and 44).
 - **Agent.** Required for every write (each tool marked *write* below). It is
-  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. A name
+  stored on the rows the call creates: `agent`, `reviewer`, `created_by`. The
+  reads `task_current` and `recall` take it too, as the caller's role, which names
+  its agent-scoped directives (§2, §6, §9 item 49). A name
   of only spaces counts as no name, and is `invalid`. A name with a control
   character, or a space at either end, is `invalid` on every call, reads
   included. A client name and a session name of that kind are `invalid` too, on
@@ -140,11 +142,12 @@ task_start (queue)                  task_start
 
 The first call of a session.
 
-**In:** nothing.
+**In:** `agent` (optional): the caller's role, which names its agent-scoped
+directives (§9 item 49). Without it, no agent-scoped directive is listed.
 **Out:** `task` (null when no task is active), `criteria`, `steps`,
 `recent_events` (newest first, at most 5), `directives` (those that apply
-to the project, as `directive_list` with no agent, ranked and capped at 12),
-`expired` and `omitted` (the directive counts, §5), and `other_active`
+to the project and to the caller's role, ranked and capped at 12, as §5
+gives them for that role), `expired` and `omitted` (the directive counts, §5), and `other_active`
 (when parallel tasks are on and more than one is active, `task` is the one
 started last). The answer is one consistent snapshot: every part is read from
 the same state of the project (§9 item 35).
@@ -334,7 +337,8 @@ default only the caller's project); `target`; `limit` (default 20); `cursor`.
 **Out:** `directives`, `expired` and `omitted`. The list holds active
 directives only: every `global` one, the `project` ones for the caller's
 project, and `agent` ones. With `agent` set, the `agent` ones are limited to
-that role. With `agent` empty, all of them are included.
+that role. With `agent` empty, all of them are included: this is the explicit
+listing of every role, and it is the one read that asks for it (§9 item 49).
 
 The list is ranked: `agent` directives first, then `project`, then `global`,
 and newest first by `ratified_at` within each scope. The id breaks a tie. At
@@ -348,10 +352,13 @@ Retired directives are neither listed nor counted.
 
 ### `recall` — read
 
-**In:** `goal` (required); `agent` (narrows directives, as in
-`directive_list`); `limit` per list (default 5).
-**Out:** `directives` (those that apply to the caller's project, ranked and
-capped as in `directive_list`, with the same `expired` and `omitted` counts),
+**In:** `goal` (required); `agent` (the caller's role: its agent-scoped
+directives are the ones listed, §9 item 49; with it empty the caller's own
+agent is used, and with neither, no agent-scoped directive is listed); `limit`
+per list (default 5).
+**Out:** `directives` (those that apply to the caller's project and role,
+ranked and capped as in `directive_list`, with the same `expired` and `omitted`
+counts),
 plus `lessons`, `mistakes` and `tasks` from **every project**, best match to
 the goal first. Each lesson and mistake carries its `task_id` and `project`.
 
@@ -365,7 +372,10 @@ all); `all_projects`; `limit` (default 10); `cursor`.
 match first), and `next`. Global directives are found from every project.
 A retired directive is not a hit: it is not listed by
 `directive_list`, `recall` or `task_current`, and search does not list it
-either. A `note` hit comes only from a row written before the M1 change that
+either. An **expired** directive (§5) is still a hit: search does not use the
+capped set, and it has no `expired` count. So a lapsed rule can be found, then
+reaffirmed by retiring it and ratifying it again (§8). Only the three reads leave
+it out (12-S2, pinned by `TestSearchStillFindsAnExpiredDirective`). A `note` hit comes only from a row written before the M1 change that
 removed notes.
 No call reads a note, so such a hit has its snippet and no call to open it.
 
@@ -388,9 +398,20 @@ refuse a nameless call all the same.
 | Call | In | Does |
 |---|---|---|
 | `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
-| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC, after which the directive is expired; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
+| `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC. The directive is expired from 00:00 UTC of that day, so it is due at the start of the named day, not after it; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
 | `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
+
+**Extending a directive in M2.** `DirectiveRatify` on an active directive is not a
+call: every ratify makes a new directive with the next code. There is no call that
+changes the `review_by` of an active directive. The route is `DirectiveRetire` of
+the old code, then `DirectiveRatify` with the `review_by` wanted. The new code
+does not keep the old one's `source_learning`. The M3 UI may edit `review_by`
+(DESIGN §3.4).
+
+**Upgrade to schema 5.** Migration 0005 gives every active directive a `review_by`
+90 days after the upgrade runs, whatever its `ratified_at`. No directive is
+expired by the upgrade. Retired directives keep no `review_by`.
 
 ## 9. Settled here, for review
 
@@ -603,9 +624,21 @@ only a core test checks it. An item with no check of its own is marked
     (core test only: the conformance suite cannot move the clock.)
 47. **review_by on ratify (2026-10-31).** `DirectiveRatify` takes an optional
     `review_by`, a `YYYY-MM-DD` calendar day in UTC that must be after today,
-    else `invalid`. Without it, the directive is due 90 days after ratification
-    (§8). Decision D16. *Bishop default, pending operator approval.*
+    else `invalid`. The directive expires at 00:00 UTC of that day: the day is
+    the point it is due, not the end of it. So a `review_by` of tomorrow is live
+    until tomorrow's midnight, and today is refused. Without it, the directive is
+    due 90 days after ratification (§8). Decision D16. *Bishop default, pending
+    operator approval.*
 48. **Directive counts are always present (2026-10-31).** The `expired` and
     `omitted` fields are in every result of the three reads, at 0 when there is
     nothing to count, so a reader never has to tell absent from zero (§5).
     *Bishop default, pending operator approval.*
+49. **Agent-scoped directives count for the caller's own role (2026-10-31).**
+    `task_current` and `recall` list the agent-scoped directives of the caller's
+    role only: the `agent` the call names (`recall` falls back to the caller's
+    own), and none when there is no role. An empty role is no role, not every
+    role. A reviewer's directives therefore cannot fill the cap of a main
+    session. `directive_list` is the one read that lists every role when `agent`
+    is empty, and that stays so: it is the explicit listing. Found in the step 12
+    review (12-W1). *Bishop default, pending operator approval.* (core and
+    conformance tests)
