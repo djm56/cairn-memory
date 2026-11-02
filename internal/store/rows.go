@@ -207,3 +207,26 @@ type SearchRow struct {
 	Title   string
 	Snippet string
 }
+
+// APIKeyNew is an API key to add (DESIGN §3.6, §8). Hash is the SHA-256 hex of
+// the key's plaintext, from auth.HashKey: the plaintext itself never reaches the
+// store. Scope is one of agent, operator or viewer, and the schema refuses any
+// other value.
+type APIKeyNew struct {
+	Name      string
+	Hash      string
+	Scope     string
+	CreatedAt time.Time
+}
+
+// APIKeyInfo is one row of api_keys as the store returns it. It carries no hash:
+// nothing outside the store reads one back (DESIGN §8). LastUsedAt and RevokedAt
+// are nil for NULL.
+type APIKeyInfo struct {
+	ID         int64
+	Name       string
+	Scope      string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+	RevokedAt  *time.Time
+}

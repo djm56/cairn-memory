@@ -300,7 +300,8 @@ projects
   settings TEXT    JSON: close policy, parallel tasks
 sessions
   id PK, project, client, agent, started_at, last_seen_at
-api_keys        (server mode) name, hash, scopes, created_at, last_used_at
+api_keys        (server mode) name, hash, scope (one per key), created_at,
+                last_used_at, revoked_at
   (surrogate key `id`; this table names no key of its own)
 ```
 
@@ -499,13 +500,18 @@ client and the CLI. This section is how the adapter reaches the server.
   refused too: `400`, or `413` for the size. The server refuses unknown fields,
   so a misspelt field is not dropped.
 - **Caller.** The headers `X-Cairn-Project`, `X-Cairn-Agent`,
-  `X-Cairn-Session`, `X-Cairn-Client` and `X-Cairn-Role` carry the caller
-  (CONTRACT §1.1). A call with no project is `invalid`. `X-Cairn-Role` is
-  `operator` for an operator call and is an agent otherwise. M1's
-  `api.UnauthenticatedHeaderCaller` trusts that header, with no key behind
-  it. That is safe only while nothing listens. M2 replaces it with a resolver
-  that takes the role from the API key's scope, so a client never sets its own
-  role, and it does so before any listener exists (CONTRACT §1.1, M1 exception).
+  `X-Cairn-Session` and `X-Cairn-Client` carry the caller (CONTRACT §1.1). The
+  role comes from the API key in `Authorization: Bearer <key>`, and only from
+  it: the key's scope is the role (`agent`, `operator` or `viewer`).
+  `X-Cairn-Role` is not read, so a client never sets its own role. A call with
+  no project is `invalid`. A key that is missing, malformed, unknown or revoked
+  is `unauthenticated`, answered `401` before the body is read. A `viewer` key
+  is refused on every write route with `read_only` (`403`), and core is not
+  reached. Operator routes are write routes. Each route is marked read or write
+  in the route table of `internal/api`, and a route with no mark is not mounted.
+  The resolver is `api.KeyCaller` over `internal/auth`. The header-trusting
+  `api.UnauthenticatedHeaderCaller` is for in-process tests only, and the reach
+  guard refuses it in non-test code (CONTRACT §1.1).
 - **Success.** `200`, with the result as JSON, in the field names of the core
   types. Empty optional fields are left out (CONTRACT §1.3). A read of section
   `events` always carries `events`, as `[]` when the page is empty (CONTRACT §2).
@@ -521,6 +527,8 @@ client and the CLI. This section is how the adapter reaches the server.
   | `unsupported_media_type` (a body that is not `application/json`) | 415 |
   | `refused` | 409 |
   | `operator_only` | 403 |
+  | `unauthenticated` (a missing, malformed, unknown or revoked API key) | 401 |
+  | `read_only` (a write made with a viewer key) | 403 |
   | `internal` | 500 |
 
   `internal` is a wire kind, not a core kind. It is the answer to any error
@@ -528,9 +536,9 @@ client and the CLI. This section is how the adapter reaches the server.
   recovers. Its message is always `internal error`, so the caller never sees
   the cause. The cause goes to the failure hook that `api.Handler` is given
   (`FailureHook`, nil discards it), so the server can keep it for its own
-  record. A `http.ErrAbortHandler` panic is not recovered. `no_route` and
-  `unsupported_media_type` are wire kinds too, for the two request faults that
-  core never sees (CONTRACT §1.2).
+  record. A `http.ErrAbortHandler` panic is not recovered. `no_route`,
+  `unsupported_media_type`, `unauthenticated` and `read_only` are wire kinds too,
+  for the request faults that core never sees (CONTRACT §1.2).
 - **The client.** It returns the `core.Error` the server named, with the same
   kind, message and missing list. A `no_route` answer is the exception: its
   message names the base URL the client was given, since the server cannot know
@@ -667,10 +675,18 @@ status; they only recommend.
   listened on nothing and kept the database file under the user's control.
 - `cairn serve` binds loopback by default and refuses to bind anything else
   without at least one API key. TLS by certificate files or behind a proxy.
-- API keys are stored hashed. Three scopes, none built yet: `agent` (the MCP
-  tools), `operator` (decisions and ratification), and `viewer` (read-only on
-  every route; planned for M2 with a test that a viewer key gets 403 on every
-  write). Plan v1 (decision D13) drops the `admin` scope from the design.
+- API keys are stored hashed, with SHA-256 and no password KDF. A key is
+  `cairn_` and 32 random bytes in unpadded base64url, shown once when it is
+  made. The 256 random bits are what make a fast hash enough: a guess of the key
+  is not the attack a slow hash defends against. Each key has one scope:
+  `agent` (the MCP tools), `operator` (decisions and ratification), or `viewer`
+  (read-only: the read routes pass, and every write route answers `403`
+  `read_only`). Plan v1 (decision D13) drops the `admin` scope from the design.
+- The role comes from the key's scope and from nothing else. The resolver never
+  reads `X-Cairn-Role`, so an agent key that claims the operator role is refused
+  on an operator route with `operator_only` (issue #110).
+- `last_used_at` is written at most once a minute per key, so a read does not
+  become a write on every call.
 - An agent key cannot reach operator routes. The web UI asks for an operator
   key. A viewer key sees every page and gets 403 on every action (planned, M3).
 - Request bodies are capped on every route.

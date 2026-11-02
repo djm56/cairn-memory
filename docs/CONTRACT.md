@@ -50,13 +50,15 @@ client, and a role. The adapter sets it; request types do not carry it.
   every call: the HTTP form cannot carry any of them unchanged, so each is refused,
   not trimmed. The message names the field. On the MCP surface the adapter
   takes it from the `agent` argument of each write tool (DESIGN §4).
-- **Role.** `agent` or `operator`. The MCP adapter always uses `agent`. The
-  server derives the role from the API key's scope, never from the request.
-  Operator calls (§8) refuse any other role.
-  *M1 exception (2026-10-30):* `internal/api` has no API key yet, so its
-  `UnauthenticatedHeaderCaller` takes the role from the `X-Cairn-Role` header.
-  That is safe only while no listener exists (D19). M2 replaces it with the
-  key-scope resolver before `cairn serve` listens (DESIGN §5.4, M2 exit check).
+- **Role.** `agent`, `operator` or `viewer`. The MCP adapter always uses
+  `agent`. The server derives the role from the API key's scope, never from the
+  request: `viewer` reads and does not write (§1.2, `read_only`). Operator calls
+  (§8) refuse any other role.
+  *M1 exception, replaced (2026-10-30; replaced 2026-10-31):* M1's
+  `api.UnauthenticatedHeaderCaller` took the role from the `X-Cairn-Role` header,
+  safe only while no listener existed (D19). The key-scope resolver
+  (`api.KeyCaller`) replaces it for every served call. The reach guard keeps the
+  header caller out of non-test code (DESIGN §5.4).
 
 ### 1.2 Errors
 
@@ -70,10 +72,14 @@ A failure the caller can act on has a kind and a message:
 | `operator_only` | An operator call made without the operator role. |
 | `no_route` | Wire form only (DESIGN §5.4): the path is not a call. The message says to check the server base URL. Answered `404`. Core never returns it. |
 | `unsupported_media_type` | Wire form only (DESIGN §5.4): the body is not `application/json`. Answered `415`. Core never returns it. |
+| `unauthenticated` | Wire form only (DESIGN §5.4): the API key is missing, malformed, unknown or revoked. Answered `401`, and the answer does not echo the header. Core never returns it. |
+| `read_only` | Wire form only (DESIGN §5.4): a write made with a viewer key. Answered `403`. Core never sees the write. |
 
 Checks run in this order, so a request with several faults gets the first
 one: caller → request shape (`invalid`) → existence (`not_found`) → rules
-(`refused`). Any other error is an internal failure.
+(`refused`). Any other error is an internal failure. On the wire, the key
+comes first (`unauthenticated`), then a viewer's write (`read_only`), and then
+the request shape.
 
 ### 1.3 Time, ids, lists
 
@@ -554,3 +560,16 @@ only a core test checks it. An item with no check of its own is marked
     `no_route` as a `core.Error` whose message names the base URL it was given
     (DESIGN §5.4). *Bishop default, pending operator approval.* (api and client
     tests only)
+43. **The key names the role (2026-10-31).** The role comes from the API key's
+    scope, and `X-Cairn-Role` is not read (DESIGN §5.4, issue #110). A key that
+    is missing, malformed, unknown or revoked is `401`, kind `unauthenticated`,
+    and the answer does not echo the header (§1.2). *Bishop default, pending
+    operator approval.* (api test only)
+44. **A viewer key does not write (2026-10-31).** A write route answers `403`,
+    kind `read_only`, for a viewer key, before the body is read. Operator routes
+    are write routes, so a viewer on one gets `read_only`. An agent key on an
+    operator route still gets `operator_only` (§8). No operator route is a read,
+    so no viewer read of an operator route arises. One write can still come from
+    a viewer's read: the first read of a project that does not exist creates its
+    row (§1.1, item 38). That is left as it is, and it is an open question for the
+    operator. *Bishop default, pending operator approval.* (api test only)

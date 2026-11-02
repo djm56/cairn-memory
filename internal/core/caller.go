@@ -15,6 +15,9 @@ type Role string
 const (
 	RoleAgent    Role = "agent"
 	RoleOperator Role = "operator"
+	// RoleViewer may read and not write. Core treats it as an agent for reads, and
+	// only the wire form refuses its writes (DESIGN.md §5.4, CONTRACT §1.2).
+	RoleViewer Role = "viewer"
 )
 
 // Caller identifies who makes a call (DESIGN.md §2.1). It travels in the

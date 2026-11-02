@@ -230,7 +230,9 @@ func TestDepthLimitMatchesDecoder(t *testing.T) {
 // second title is refused with 400.
 func TestEscapedDuplicateKeyIsRefused(t *testing.T) {
 	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
-	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, `{"title":"a","title":"b","goal":"g"}`, agentHeaders)
+	// An interpreted string, not a raw one: the doubled backslash puts a real
+	// backslash in the file, so the second key is \u0074itle, which decodes to title.
+	rec := serve(h, http.MethodPost, api.Prefix+api.RouteTaskStart, "{\"title\":\"a\",\"\\u0074itle\":\"b\",\"goal\":\"g\"}", agentHeaders)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400: %s", rec.Code, rec.Body.String())
 	}
@@ -319,16 +321,42 @@ func TestRefusedKeyIsTruncated(t *testing.T) {
 // call, and every type those reach. json.RawMessage is exempt: it is free-form,
 // and the walk reads event data that way.
 func TestRequestTypesHaveNoUnmarshaler(t *testing.T) {
+	svc := reflect.TypeOf((*core.Service)(nil)).Elem()
+	calls := 0
+	for i := range svc.NumMethod() {
+		m := svc.Method(i)
+		if m.Type.NumIn() < 2 {
+			continue
+		}
+		calls++
+		for _, bad := range unmarshalerTypes(m.Type.In(1)) {
+			t.Errorf("%s has an UnmarshalJSON: checkKeys would walk it as a struct", bad)
+		}
+	}
+	if calls == 0 {
+		t.Fatal("found no request types: the check would pass for nothing")
+	}
+}
+
+// unmarshalerTypes returns each type reachable from root that has an UnmarshalJSON,
+// json.RawMessage excepted. The check comes before the kind switch, so a named
+// slice, array or map with one is reported as well as a struct (step 2b review,
+// 2b-S1). The walk does not stop at a type it has seen in another call: each call
+// starts clean, so the answer depends on root alone.
+func unmarshalerTypes(root reflect.Type) []reflect.Type {
 	unmarshaler := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 	rawMessage := reflect.TypeOf(json.RawMessage(nil))
-	svc := reflect.TypeOf((*core.Service)(nil)).Elem()
 	seen := map[reflect.Type]bool{}
+	var out []reflect.Type
 	var visit func(rt reflect.Type)
 	visit = func(rt reflect.Type) {
 		if seen[rt] || rt == rawMessage {
 			return
 		}
 		seen[rt] = true
+		if reflect.PointerTo(rt).Implements(unmarshaler) {
+			out = append(out, rt)
+		}
 		switch rt.Kind() {
 		case reflect.Pointer, reflect.Slice, reflect.Array, reflect.Map:
 			visit(rt.Elem())
@@ -337,23 +365,51 @@ func TestRequestTypesHaveNoUnmarshaler(t *testing.T) {
 		default:
 			return
 		}
-		if reflect.PointerTo(rt).Implements(unmarshaler) {
-			t.Errorf("%s has an UnmarshalJSON: checkKeys would walk it as a struct", rt)
-		}
 		for i := range rt.NumField() {
 			visit(rt.Field(i).Type)
 		}
 	}
-	calls := 0
-	for i := range svc.NumMethod() {
-		m := svc.Method(i)
-		if m.Type.NumIn() < 2 {
-			continue
-		}
-		calls++
-		visit(m.Type.In(1))
+	visit(root)
+	return out
+}
+
+// Fixture types for TestUnmarshalerCheckCatchesCollections. Each named collection has
+// an UnmarshalJSON, and the holder has none, so the check must name the three.
+type testList []int
+
+func (*testList) UnmarshalJSON([]byte) error { return nil }
+
+type testArr [2]int
+
+func (*testArr) UnmarshalJSON([]byte) error { return nil }
+
+type testDict map[string]int
+
+func (*testDict) UnmarshalJSON([]byte) error { return nil }
+
+type testHolder struct {
+	L testList
+	A testArr
+	D testDict
+}
+
+// TestUnmarshalerCheckCatchesCollections proves TestRequestTypesHaveNoUnmarshaler can
+// fail on the case 2b-S1 names: a named slice, array or map with an UnmarshalJSON,
+// reached through a struct field, is reported. Before the check moved, these were
+// skipped.
+func TestUnmarshalerCheckCatchesCollections(t *testing.T) {
+	got := unmarshalerTypes(reflect.TypeOf(testHolder{}))
+	want := map[reflect.Type]bool{
+		reflect.TypeOf(testList{}): true,
+		reflect.TypeOf(testArr{}):  true,
+		reflect.TypeOf(testDict{}): true,
 	}
-	if calls == 0 {
-		t.Fatal("found no request types: the check would pass for nothing")
+	if len(got) != len(want) {
+		t.Fatalf("unmarshalerTypes = %v, want the three named collections", got)
+	}
+	for _, rt := range got {
+		if !want[rt] {
+			t.Errorf("unmarshalerTypes reported %s, which is not a named collection of the fixture", rt)
+		}
 	}
 }
