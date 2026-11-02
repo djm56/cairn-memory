@@ -8,6 +8,8 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/signal"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -116,7 +118,13 @@ func runKeyAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn key add: %v\n", err)
 		return 1
 	}
-	if _, werr := fmt.Fprintln(stdout, key); werr != nil {
+	// A write to a closed stdout pipe makes the Go runtime send SIGPIPE, which ends the
+	// process before the revoke below can run. Ignoring it for this one write makes the write
+	// return EPIPE instead, so the key is revoked (10-W3). The ignore is reset straight after.
+	signal.Ignore(syscall.SIGPIPE)
+	_, werr := fmt.Fprintln(stdout, key)
+	signal.Reset(syscall.SIGPIPE)
+	if werr != nil {
 		if rerr := server.RevokeKey(context.Background(), *db, *name); rerr != nil {
 			fmt.Fprintf(stderr, "cairn key add: the key named %s was made, but it could not be shown (%v) and could not be revoked (%v): revoke it with cairn key revoke --db %s --name %s\n",
 				*name, werr, rerr, *db, *name)

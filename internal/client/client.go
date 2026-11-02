@@ -110,8 +110,10 @@ func SendsKeyInClear(base string) bool {
 	if err != nil || u.Scheme != "http" {
 		return false
 	}
-	host := u.Hostname()
-	if host == "localhost" {
+	// Host names are case-insensitive, and a trailing dot names the same host. localhost and
+	// any name under it are loopback by RFC 6761 (10-S7).
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
 		return false
 	}
 	if ip, err := netip.ParseAddr(host); err == nil && ip.IsLoopback() {

@@ -184,10 +184,29 @@ func (l *Local) DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest)
 	if blank(req.Rule) {
 		return nil, Invalid("a directive needs a rule")
 	}
+	// An explicit review_by is a UTC calendar day. Its form is checked here; that
+	// it is still in the future is checked against the clock inside the transaction.
+	var explicitReviewBy *time.Time
+	if req.ReviewBy != "" {
+		day, err := time.Parse(reviewByLayout, req.ReviewBy)
+		if err != nil {
+			return nil, Invalid("review_by %q is not a date: give YYYY-MM-DD, a day in UTC", req.ReviewBy)
+		}
+		explicitReviewBy = &day
+	}
 
 	var out Directive
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
 		now := l.now()
+		// Default is DirectiveReviewDays after ratification (decision D16). An
+		// explicit day must be after now, so a past or same-day date is refused.
+		reviewBy := now.AddDate(0, 0, DirectiveReviewDays)
+		if explicitReviewBy != nil {
+			if !explicitReviewBy.After(now) {
+				return Invalid("review_by %s is not in the future: give a day after today", req.ReviewBy)
+			}
+			reviewBy = *explicitReviewBy
+		}
 		if req.Scope == ScopeProject {
 			if err := ensureOperatorProject(ctx, q, req.Project, now); err != nil {
 				return err
@@ -218,6 +237,7 @@ func (l *Local) DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest)
 			AppliesWhen: req.AppliesWhen, Rule: req.Rule, Rationale: req.Rationale,
 			ReviewerCheck: req.ReviewerCheck, Example: req.Example,
 			Status: string(DirectiveActive), RatifiedBy: c.Agent, RatifiedAt: &now,
+			ReviewBy: &reviewBy,
 		}
 		switch req.Scope {
 		case ScopeProject:

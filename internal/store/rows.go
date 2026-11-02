@@ -182,6 +182,7 @@ type DirectiveRow struct {
 	RatifiedBy     string
 	RatifiedAt     *time.Time
 	RetiredAt      *time.Time
+	ReviewBy       *time.Time // nil only on a retired row from before schema v5
 }
 
 // NoteRow is one row of notes (DESIGN §3.5). TaskID is "" for a note that is

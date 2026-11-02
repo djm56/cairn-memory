@@ -251,14 +251,14 @@ func fileLine(f core.TaskFile) string {
 // each side when s begins or ends with a backtick, which the fence would otherwise take
 // as its own (CommonMark, section 6.1).
 func codeSpan(s string) string {
-	longest, run := 0, 0
+	longest, ticks := 0, 0
 	for _, r := range s {
 		if r == '`' {
-			run++
-			longest = max(longest, run)
+			ticks++
+			longest = max(longest, ticks)
 			continue
 		}
-		run = 0
+		ticks = 0
 	}
 	fence := strings.Repeat("`", longest+1)
 	pad := ""

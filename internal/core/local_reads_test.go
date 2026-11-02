@@ -61,9 +61,9 @@ func directiveTitles(ds []core.Directive) []string {
 }
 
 // TestDirectiveReadsByScope checks directive_list and task_current's directives
-// against the scopes CONTRACT §5 names. The list is ordered by code, holds only
-// active directives, and with an agent set narrows the agent-scoped ones to that
-// role. task_current gives the project's directives with no task active too.
+// against the scopes CONTRACT §5 names. The list is ranked (agent, project, then
+// global, newest first), holds only active directives, and with an agent set
+// narrows the agent-scoped ones to that role. task_current gives the project's directives with no task active too.
 func TestDirectiveReadsByScope(t *testing.T) {
 	s, st := openLocal(t)
 	seedProject(t, st, "acme-api")
@@ -80,9 +80,9 @@ func TestDirectiveReadsByScope(t *testing.T) {
 		agent string
 		want  []string
 	}{
-		{"no agent: every agent scope", "", []string{"global", "project-a", "reviewer-only"}},
-		{"main: agent scopes narrowed away", "main", []string{"global", "project-a"}},
-		{"reviewer: its own agent scope", "reviewer", []string{"global", "project-a", "reviewer-only"}},
+		{"no agent: every agent scope", "", []string{"reviewer-only", "project-a", "global"}},
+		{"main: agent scopes narrowed away", "main", []string{"project-a", "global"}},
+		{"reviewer: its own agent scope", "reviewer", []string{"reviewer-only", "project-a", "global"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -105,7 +105,7 @@ func TestDirectiveReadsByScope(t *testing.T) {
 	if cur.Task != nil {
 		t.Fatalf("TaskCurrent with no task = %s", cur.Task.ID)
 	}
-	if want := []string{"global", "project-a", "reviewer-only"}; !slices.Equal(directiveTitles(cur.Directives), want) {
+	if want := []string{"reviewer-only", "project-a", "global"}; !slices.Equal(directiveTitles(cur.Directives), want) {
 		t.Errorf("TaskCurrent directives = %v, want %v", directiveTitles(cur.Directives), want)
 	}
 }
@@ -244,7 +244,7 @@ func TestTaskCurrentResultShape(t *testing.T) {
 	if want := []string{"note 6", "note 5", "note 4", "note 3", "note 2"}; !slices.Equal(texts, want) {
 		t.Errorf("recent events = %v, want %v", texts, want)
 	}
-	if want := []string{"global-rule", "project-rule"}; !slices.Equal(directiveTitles(cur.Directives), want) {
+	if want := []string{"project-rule", "global-rule"}; !slices.Equal(directiveTitles(cur.Directives), want) {
 		t.Errorf("directives = %v, want %v", directiveTitles(cur.Directives), want)
 	}
 }

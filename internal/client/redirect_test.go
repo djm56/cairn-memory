@@ -94,12 +94,14 @@ func TestTheKeyIsNeverSentAfterARedirect(t *testing.T) {
 			what   string
 			origin *httptest.Server
 			hc     *http.Client
+			target string // the URL the origin redirects to
 		}{
-			{"another host", plainOrigin(t, redirector(status, otherHost)), &http.Client{Timeout: testTimeout}},
-			{"the same host, another port", plainOrigin(t, redirector(status, tgt.URL)), &http.Client{Timeout: testTimeout}},
-			{"another scheme, the same host", tlsOrigin(t, redirector(status, tgt.URL)), nil},
+			{"another host", plainOrigin(t, redirector(status, otherHost)), &http.Client{Timeout: testTimeout}, otherHost},
+			{"the same host, another port", plainOrigin(t, redirector(status, tgt.URL)), &http.Client{Timeout: testTimeout}, tgt.URL},
+			{"another scheme, the same host", tlsOrigin(t, redirector(status, tgt.URL)), nil, tgt.URL},
 		}
 		for _, c := range cases {
+			reachable(t, target, c.target)
 			hc := c.hc
 			if hc == nil {
 				// The TLS origin's own client trusts its certificate, and is given the timeout.
@@ -128,6 +130,24 @@ func TestTheKeyIsNeverSentAfterARedirect(t *testing.T) {
 			target.reset()
 		}
 	}
+}
+
+// reachable checks that the redirect target answers a plain request made by this test, and
+// that the request reaches the recorder. Without it, a zero count after a refused call would
+// not show a refusal: the target could simply be unreachable from here (10-W4). It fails the
+// test when the target does not answer, so the case cannot pass for that reason.
+func reachable(t *testing.T, target *recorder, url string) {
+	t.Helper()
+	hc := &http.Client{Timeout: testTimeout}
+	resp, err := hc.Get(url)
+	if err != nil {
+		t.Fatalf("the redirect target %s is not reachable from the test (%v): the case would prove nothing", url, err)
+	}
+	_ = resp.Body.Close()
+	if calls, _ := target.counts(); calls != 1 {
+		t.Fatalf("a plain request to the redirect target reached it %d times, want 1", calls)
+	}
+	target.reset()
 }
 
 // TestARedirectIsNotFollowedWithNoKey checks that the refusal does not depend on a key: a

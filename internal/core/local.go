@@ -25,6 +25,10 @@ type Local struct {
 	// its read transaction, after the active task is read and before its steps
 	// and events are. It is nil in production (CONTRACT §9 item 35).
 	betweenReads func()
+
+	// clock is a test seam for the server's time. When it is set, now returns
+	// its value instead of the wall clock. It is nil in production.
+	clock func() time.Time
 }
 
 var _ Service = (*Local)(nil)
@@ -37,6 +41,9 @@ func NewLocal(st *store.Store) *Local {
 
 // now is the server's time for every record. It is UTC (CONTRACT §1.3).
 func (l *Local) now() time.Time {
+	if l.clock != nil {
+		return l.clock().UTC()
+	}
 	return time.Now().UTC()
 }
 

@@ -140,11 +140,13 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	err = l.st.WithReadTx(ctx, func(q store.Querier) error {
 		// Directives are read whether or not a task is active: they belong to the
 		// project, and CONTRACT §2 gives them with every answer.
-		dirs, err := directivesFor(ctx, q, c.Project, "")
+		set, err := directivesFor(ctx, q, c.Project, "", l.now())
 		if err != nil {
 			return err
 		}
-		cur.Directives = dirs
+		cur.Directives = set.Directives
+		cur.Expired = set.Expired
+		cur.Omitted = set.Omitted
 		active, err := activeTasks(ctx, q, c.Project)
 		if err != nil {
 			return err

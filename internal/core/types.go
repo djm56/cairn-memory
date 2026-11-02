@@ -264,6 +264,9 @@ type Directive struct {
 	RatifiedBy     string          `json:"ratified_by"`
 	RatifiedAt     time.Time       `json:"ratified_at"`
 	RetiredAt      *time.Time      `json:"retired_at,omitempty"`
+	// ReviewBy is the time the directive is due for review (decision D16). It is
+	// set on every active directive; a directive past it is expired.
+	ReviewBy *time.Time `json:"review_by,omitempty"`
 }
 
 // ClosePolicy is what task_close requires (DESIGN.md §3.7). Each field turns

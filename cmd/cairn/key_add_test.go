@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,6 +44,52 @@ func TestKeyAddRevokesAKeyItCannotShow(t *testing.T) {
 		t.Errorf("keys after the failed add = %+v, want the one key ci, revoked", keys)
 	}
 }
+
+// TestKeyAddRevokesWhenTheStdoutPipeIsClosed is 10-W3. The Go runtime ends a process with
+// SIGPIPE only for a failed write to fd 1 or 2, so an in-process write to an os.Pipe proves
+// nothing. The test runs key add in a child process whose stdout is a pipe with no reader. The
+// child must answer through the revoke branch: exit 1, the key revoked. Without the SIGPIPE
+// ignore the child dies from the signal, and the parent sees no exit code 1.
+func TestKeyAddRevokesWhenTheStdoutPipeIsClosed(t *testing.T) {
+	if os.Getenv(keyAddHelperEnv) == "1" {
+		// The child: stdout is the pipe with no reader.
+		os.Exit(runKey([]string{"add", "--db", os.Getenv(keyAddHelperDB), "--name", "piped", "--scope", "agent"}, os.Stdout, os.Stderr))
+	}
+	db := filepath.Join(t.TempDir(), "cairn.db")
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("close the reader: %v", err)
+	}
+	var stderr bytes.Buffer
+	cmd := exec.Command(os.Args[0], "-test.run=^TestKeyAddRevokesWhenTheStdoutPipeIsClosed$")
+	cmd.Env = append(os.Environ(), keyAddHelperEnv+"=1", keyAddHelperDB+"="+db)
+	cmd.Stdout = w
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	w.Close()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Fatalf("child: %v (stderr %q), want exit 1", err, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "so it was revoked") {
+		t.Errorf("stderr %q does not say the key was revoked", stderr.String())
+	}
+	keys, lerr := server.ListKeys(context.Background(), db)
+	if lerr != nil {
+		t.Fatalf("ListKeys: %v", lerr)
+	}
+	if len(keys) != 1 || keys[0].Name != "piped" || keys[0].RevokedAt == nil {
+		t.Errorf("keys after the closed-pipe add = %+v, want the one key piped, revoked", keys)
+	}
+}
+
+const (
+	keyAddHelperEnv = "CAIRN_KEYADD_CHILD"
+	keyAddHelperDB  = "CAIRN_KEYADD_DB"
+)
 
 // TestKeyAddNamesTheDatabaseItCreates checks 8-S4: a key add that creates the database says so
 // on stderr, and one that finds it does not.

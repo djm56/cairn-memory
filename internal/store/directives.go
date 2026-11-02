@@ -12,17 +12,17 @@ import (
 // scanDirective's order.
 const directiveColumns = `id, code, scope, project, agent, title, applies_when, rule,
 	rationale, reviewer_check, example, status, source_learning, ratified_by,
-	ratified_at, retired_at`
+	ratified_at, retired_at, review_by`
 
 // scanDirective reads one row in directiveColumns order.
 func scanDirective(r rowScanner) (DirectiveRow, error) {
 	var d DirectiveRow
 	var project, agent, appliesWhen, rationale, reviewerCheck, example sql.NullString
 	var sourceLearning sql.NullInt64
-	var ratifiedBy, ratifiedAt, retiredAt sql.NullString
+	var ratifiedBy, ratifiedAt, retiredAt, reviewBy sql.NullString
 	err := r.Scan(&d.ID, &d.Code, &d.Scope, &project, &agent, &d.Title, &appliesWhen,
 		&d.Rule, &rationale, &reviewerCheck, &example, &d.Status, &sourceLearning,
-		&ratifiedBy, &ratifiedAt, &retiredAt)
+		&ratifiedBy, &ratifiedAt, &retiredAt, &reviewBy)
 	if err != nil {
 		return d, err
 	}
@@ -42,6 +42,9 @@ func scanDirective(r rowScanner) (DirectiveRow, error) {
 	}
 	if d.RetiredAt, err = nullTime(retiredAt); err != nil {
 		return d, fmt.Errorf("directive %s retired_at: %w", d.Code, err)
+	}
+	if d.ReviewBy, err = nullTime(reviewBy); err != nil {
+		return d, fmt.Errorf("directive %s review_by: %w", d.Code, err)
 	}
 	return d, nil
 }
@@ -71,12 +74,13 @@ func NextDirectiveCode(ctx context.Context, q Querier) (string, error) {
 func InsertDirective(ctx context.Context, q Querier, d DirectiveRow) (int64, error) {
 	res, err := q.ExecContext(ctx, `INSERT INTO directives
 		(code, scope, project, agent, title, applies_when, rule, rationale,
-		 reviewer_check, example, status, source_learning, ratified_by, ratified_at, retired_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 reviewer_check, example, status, source_learning, ratified_by, ratified_at, retired_at,
+		 review_by)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.Code, d.Scope, textOrNil(d.Project), textOrNil(d.Agent), d.Title,
 		textOrNil(d.AppliesWhen), d.Rule, textOrNil(d.Rationale), textOrNil(d.ReviewerCheck),
 		textOrNil(d.Example), d.Status, d.SourceLearning, textOrNil(d.RatifiedBy),
-		timeOrNil(d.RatifiedAt), timeOrNil(d.RetiredAt))
+		timeOrNil(d.RatifiedAt), timeOrNil(d.RetiredAt), timeOrNil(d.ReviewBy))
 	if err != nil {
 		return 0, fmt.Errorf("store: insert directive %s: %w", d.Code, err)
 	}
