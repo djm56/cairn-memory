@@ -1,6 +1,6 @@
 # Getting started
 
-_Status as of 2026-10-31: M1 (Server-mode MCP) is current. M2 (Server) is built; its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-11-02: M2 (Server) is current, and its exit check passed (live run, #19). Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 This page is for contributors. For what Cairn is, read [Home](Home) and [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md).
 
@@ -44,7 +44,7 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 | Store | SQLite store with migrations, full-text search and task-id allocation (phase 2) | Postgres is Later. |
 | MCP adapter | `cairn mcp`: the 15 tools over stdio, to the server named by `server` in `.cairn.toml` or `CAIRN_SERVER`. It refuses to start without one. | — |
 | Claude Code plugin | Nothing yet | M5. |
-| Server | `cairn serve` is built in M2: TLS by files or behind a proxy, API keys with three scopes, backup and restore. Its live run (#19) is pending. The setup is in [DEPLOY.md](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md). | The web UI and dashboard in M3. |
+| Server | `cairn serve` is built in M2: TLS by files or behind a proxy, API keys with three scopes, backup and restore. Its live run (#19) passed on 2026-11-02. The setup is in [DEPLOY.md](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md). | The web UI and dashboard in M3. |
 | CLI and hooks | `cairn hook session-start` (M1), and the M1 commands in the Binary row | `internal/cli` (the CLI over the whole API, with `--json`), `pre-compact` and `stop`, in M4. |
 
 The milestones are in [PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones). The commands are in [DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).

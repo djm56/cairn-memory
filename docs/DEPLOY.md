@@ -261,7 +261,9 @@ passed every check over `https`.
 On the server itself, a `curl` of the public `https://` name timed out, while the second
 machine reached it. The cause was not diagnosed. Check `/healthz` from another machine.
 A host behind NAT often cannot reach its own public address; NAT is a possible cause,
-not a confirmed one.
+not a confirmed one. The `curl --resolve` check in step 1.4 of [M2-LIVE-RUN.md](M2-LIVE-RUN.md)
+tests the proxy from the server without its public address. It applies only when the
+proxy is on the same host as the server.
 
 With a local proxy, the server logs `tls=false`. That is expected. Caddy's automatic
 certificates need a public DNS name and open ports 80 and 443; for a server without
