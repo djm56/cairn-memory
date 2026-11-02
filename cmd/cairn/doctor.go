@@ -66,6 +66,12 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		checks = append(checks, reachCheck(url, key.Value))
 	}
 
+	if serverErr == nil && keyChk.status == "ok" && client.SendsKeyInClear(url) {
+		checks = append(checks, check{name: "transport", status: "warn", detail: fmt.Sprintf(
+			"the API key goes to %s over http, in clear text, to a host that is not loopback: use https, or --behind-proxy with TLS in front",
+			client.DisplayURL(url))})
+	}
+
 	failed := false
 	for _, c := range checks {
 		fmt.Fprintf(stdout, "%-8s %-5s %s\n", c.name, c.status, c.detail)

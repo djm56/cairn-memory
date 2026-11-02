@@ -63,6 +63,15 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 // createDatabaseFile makes the file at path with dbFileMode when it does not exist. An
 // existing file is left as it is, mode and all.
 func createDatabaseFile(path string) error {
+	// A dangling symbolic link at path is refused by name. The exclusive create below fails on
+	// it with EEXIST, which reads as "already exists", and the store would then create the link's
+	// target at SQLite's default mode, which is not dbFileMode (8-S3). A link to a file that exists
+	// is not refused here: the store opens that file, and its mode is the one it has.
+	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+		if _, serr := os.Stat(path); errors.Is(serr, fs.ErrNotExist) {
+			return fmt.Errorf("the database %s is a symbolic link to a file that does not exist: point the link at a real file, or remove it", path)
+		}
+	}
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, dbFileMode)
 	if errors.Is(err, fs.ErrExist) {
 		return nil

@@ -456,8 +456,8 @@ func TestReachGuardCanFail(t *testing.T) {
 		faults   int
 	}{
 		{"an import of internal/server in a guarded file", pkg + srvImp + "var _ = srv.Run\n", false, 1},
-		{"a call through the import in cmd/cairn/mcp.go", pkg + srvImp + "func f() { srv.Run(nil, srv.Options{}) }\n", false, 1},
-		{"the import in a file of internal/mcp", pkg + srvImp + "func f() { srv.AddKey(nil, \"\", \"\", \"\") }\n", false, 1},
+		{"a call through the import, in a file that is not named", pkg + srvImp + "func f() { srv.Run(nil, srv.Options{}) }\n", false, 1},
+		{"a second import of internal/server, in a file that is not named", pkg + srvImp + "func f() { srv.AddKey(nil, \"\", \"\", \"\") }\n", false, 1},
 		{"the same import in a named file", pkg + srvImp + "func f() { srv.Run(nil, srv.Options{}) }\n", true, 0},
 		{"a named file that also opens a store", pkg + srvImp + storeImp + "func f() { store.Open(\"x\") }\n", true, 2},
 	}

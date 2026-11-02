@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"text/tabwriter"
 	"time"
 
@@ -90,6 +92,13 @@ func keyFlags(action string, args []string, stdout, stderr io.Writer, flags []ke
 
 // runKeyAdd is `cairn key add`: it makes a key, prints it once on stdout, and warns on
 // stderr that it is shown once. Nothing about the key is logged.
+//
+// When the key cannot be written to stdout, the key was made and no one has seen it, and it
+// cannot be shown again. add revokes it, so no live key exists that nobody has, and exits 1
+// saying so. The name stays taken, since a name is not reused, so a retry needs a new name.
+// If the revoke fails too, the message names the key so the operator can revoke it by hand.
+// A database that add creates is named on stderr, so a mistyped path that makes one is
+// visible (8-S4).
 func runKeyAdd(args []string, stdout, stderr io.Writer) int {
 	db, name, scope := new(string), new(string), new(string)
 	flags := []keyFlag{{"db", db}, {"name", name}, {"scope", scope}}
@@ -100,12 +109,25 @@ func runKeyAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn key add: --scope must be agent, operator or viewer\n")
 		return 2
 	}
+	_, statErr := os.Stat(*db)
+	created := errors.Is(statErr, fs.ErrNotExist)
 	key, err := server.AddKey(context.Background(), *db, *name, auth.Scope(*scope))
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn key add: %v\n", err)
 		return 1
 	}
-	fmt.Fprintln(stdout, key)
+	if _, werr := fmt.Fprintln(stdout, key); werr != nil {
+		if rerr := server.RevokeKey(context.Background(), *db, *name); rerr != nil {
+			fmt.Fprintf(stderr, "cairn key add: the key named %s was made, but it could not be shown (%v) and could not be revoked (%v): revoke it with cairn key revoke --db %s --name %s\n",
+				*name, werr, rerr, *db, *name)
+			return 1
+		}
+		fmt.Fprintf(stderr, "cairn key add: the key named %s was made, but it could not be shown (%v), so it was revoked: add again with a new name\n", *name, werr)
+		return 1
+	}
+	if created {
+		fmt.Fprintf(stderr, "cairn key add: created %s\n", *db)
+	}
 	fmt.Fprintln(stderr, "cairn key add: the key is shown once above: store it now, it cannot be shown again")
 	return 0
 }

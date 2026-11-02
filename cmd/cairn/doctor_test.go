@@ -3,7 +3,9 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -89,5 +91,65 @@ func TestDoctorTakesNoArguments(t *testing.T) {
 	code, _, stderr := runCmd(t, "doctor", "--agent", "claude-code")
 	if code != 2 || !strings.Contains(stderr, "takes no arguments yet") {
 		t.Errorf("exit %d, stderr %q: want 2 and the usage error", code, stderr)
+	}
+}
+
+// TestDoctorDoesNotFollowARedirect checks the redirect rule (step 8 review W3) at the command: a
+// server that redirects the reach call to another server makes reach fail, and the other server
+// receives no request, so the key is not sent there. The output holds no key.
+func TestDoctorDoesNotFollowARedirect(t *testing.T) {
+	var mu sync.Mutex
+	var reached []string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reached = append(reached, r.Header.Get("Authorization"))
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(target.Close)
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", target.URL+r.URL.Path)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(origin.Close)
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+origin.URL+"\"\n")
+
+	code, out, _ := runCmd(t, "doctor")
+	if code != 1 || !strings.Contains(out, "reach    fail") || !strings.Contains(out, "redirect") {
+		t.Errorf("a redirecting server: exit %d, output:\n%s; want 1, a failing reach that names the redirect", code, out)
+	}
+	mu.Lock()
+	n := len(reached)
+	mu.Unlock()
+	if n != 0 {
+		t.Errorf("the redirect target received %d requests; want none", n)
+	}
+	if key := os.Getenv("CAIRN_API_KEY"); strings.Contains(out, key) {
+		t.Errorf("doctor printed the key")
+	}
+}
+
+// TestDoctorWarnsAboutAKeyInClearText checks 8-S9 at the command: a key found for an http server
+// on a host that is not loopback is warned about, on a transport line that does not fail the
+// check; a loopback server gets no such line. The host here does not resolve, so reach fails on
+// its own and the warning is read from the output beside it. The output holds no key.
+func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://cairn.example.invalid:8788\"\n")
+	code, out, _ := runCmd(t, "doctor")
+	if code != 1 || !strings.Contains(out, "transport warn") || !strings.Contains(out, "in clear text") {
+		t.Errorf("a LAN-style http server: exit %d, output:\n%s; want the transport warning", code, out)
+	}
+	if key := os.Getenv("CAIRN_API_KEY"); strings.Contains(out, key) {
+		t.Errorf("doctor printed the key")
+	}
+
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \"http://127.0.0.1:1\"\n")
+	_, out, _ = runCmd(t, "doctor")
+	if strings.Contains(out, "transport") {
+		t.Errorf("a loopback server got a transport line:\n%s", out)
 	}
 }
