@@ -43,7 +43,8 @@ to exist first (it creates the database file, not its directory).
   ```
 
   The key is printed once, on stdout. Copy it now. It is the first key on this server, so
-  DEPLOY.md's `ops` key is not needed for this run.
+  DEPLOY.md's `ops` key is not needed for this run. Leave the `key add` output out of
+  anything you paste back: it contains the key (see "Paste this back" below).
 - [ ] **1.3 Start the server, one of five ways.** Do exactly one.
   - *TLS by files (setup a, unit):* DEPLOY.md, "Setup (a)", steps 4 to 6: install the
     certificate files, install the unit and the override, start it. The user, the state
@@ -83,9 +84,13 @@ to exist first (it creates the database file, not its directory).
   `journalctl -u cairn -n 30 --no-pager` (as root), and stop: that is a finding, not
   something to work round.
 - [ ] **1.4 Check the server answers.** `curl -sS <server-url>/healthz` should print a
-  fixed body. For setup (a) use `https://` and the port; for setup (b) use the proxy's
-  address. For a tunnel, open it first (2.3) and use `http://127.0.0.1:8788/healthz`
-  on the client. The health check needs no key.
+  fixed body. For setup (a) use `https://` and the port. For setup (b), check the proxy
+  from the server without depending on its public address:
+  `curl -sS --max-time 10 --resolve <name>:443:127.0.0.1 https://<name>/healthz`.
+  From the client, setups (a) and (b) require one successful
+  `curl -sS https://<name>/healthz`. A server-side `curl` of the public name may time
+  out; that alone is not a failure. For a tunnel, open it first (2.3) and use
+  `http://127.0.0.1:8788/healthz` on the client. The health check needs no key.
 
 ## Part 2: the client
 
@@ -168,7 +173,8 @@ Do this on the second machine, in the project's directory.
   `cairn` trusts only the operating system's certificate roots and has no flag to skip
   a check; DEPLOY.md, "A server with no public DNS name", also covers a private CA.
 - [ ] **2.4 Write `.mcp.json` by hand, in the project root.** It registers `cairn mcp`.
-  Use the absolute path of the binary, since Claude Code may not have your `PATH`:
+  Use the absolute path of the binary, since Claude Code may not have your `PATH`.
+  This is the documented route.
 
   ```json
   {
@@ -184,6 +190,12 @@ Do this on the second machine, in the project's directory.
   On Linux the path is, for example, `/home/you/.local/bin/cairn`. Use what
   `command -v cairn` prints.
 
+  *User scope, as an alternative.* Run
+  `claude mcp add --scope user cairn -- <absolute path> mcp`. It registers `cairn` for
+  every project on this machine, and skips the approval prompt in
+  4.1, so 4.1's approval check does not apply to it. Use one route or the other, not
+  both. Its cleanup is in part 6.
+
 ## Part 3: `cairn doctor` passes
 
 - [ ] **3.1 Run it from the project directory:** `cairn doctor`.
@@ -195,16 +207,18 @@ Do this on the second machine, in the project's directory.
 ## Part 4: the Claude Code session
 
 - [ ] **4.1 Open Claude Code in the project.** Approve the project's `cairn` MCP server
-  when Claude Code asks. Then run `/mcp` and check that `cairn` is connected.
+  when Claude Code asks. (Not for the user-scope route in 2.4, which asks for no
+  approval.) Then run `/mcp` and check that `cairn` is connected.
 - [ ] **4.2 Ask for a small task, through the MCP tools only.** Paste this into the
   session:
 
   > Using the cairn MCP tools, not the shell: start a task titled "M2 live run" with a
   > one-line goal, using `task_start` with `agent` set to `claude-code`. Then set two
-  > steps with `step_plan`: "write a line", and "read it back". Start and finish step 1
-  > with `step_update`, and record a short `event_log` entry for it. Then close the task
-  > with `task_close`, outcome done, with a one-line summary. If the close is refused, it
-  > lists what is missing: supply it and close again. Tell me the task id.
+  > steps with `step_plan`: "write a line", and "read it back". Start and finish each step
+  > with `step_update`, and record a short `event_log` entry for each. Finish both steps
+  > before you close. Then close the task with `task_close`, outcome done, with a one-line
+  > summary. If the close is refused, it lists what is missing: supply it and close
+  > again. Tell me the task id.
 
 - [ ] **4.3 Note the task id.** Claude Code reports it, in the form `task-YYYYMMDD-NN`.
 
@@ -222,14 +236,20 @@ Do this on the second machine, in the project's directory.
   It runs `cairn doctor` and `cairn export task`, and prints both in one block. It never
   prints the key, and it creates and changes nothing. If `cairn` is not on your `PATH`,
   run it as `CAIRN=/full/path/to/cairn scripts/m2-live-run-check.sh <task-id>`.
-- [ ] **5.3 On the server, list the keys:**
+- [ ] **5.3 On the server, list the keys.** Use the block that matches the run from 1.2
+  and 1.3. The list shows names, scopes and times. It never shows a key.
+
+  *For the unit:*
+
+  ```bash
+  sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
+  ```
+
+  *For a server run in a terminal:*
 
   ```bash
   cairn key list --db ./m2-live-run.db
   ```
-
-  Or, for the unit, `sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db`.
-  The list shows names, scopes and times. It never shows a key.
 - [ ] **5.4 Pick the serve log lines.** Take the server's log lines for the run, and keep
   only the lines that have `msg=listening`, and any with `level=ERROR`. Redact the host
   name or the address if you wish, by replacing it with `<server>`. No key should appear
@@ -263,20 +283,31 @@ Paste these, in this order, in one message:
    `systemctl status cairn`, `systemd-analyze security cairn`).
 
 Do not paste the key itself, or the contents of `client.env`. The key should appear in
-none of them; if it does, say so and leave that line out.
+none of them; if it does, say so and leave that line out. The output of `cairn key add`
+(1.2) prints the key, so leave it out of the paste. In everything you paste, replace any
+`cairn_...` value with `<redacted>`. If a key is pasted anywhere, revoke it and make a
+new one.
 
 ## Part 6: clean up
 
-- [ ] **6.1 Revoke the test key** on the server, once the run is pasted back:
+- [ ] **6.1 Revoke the test key** on the server, once the run is pasted back. Use the
+  block that matches the run from 1.2 and 1.3. A revoked key stops working at its next
+  call, and its name is not reused.
+
+  *For the unit:*
+
+  ```bash
+  sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name m2-live-run
+  ```
+
+  *For a server run in a terminal:*
 
   ```bash
   cairn key revoke --db ./m2-live-run.db --name m2-live-run
   ```
-
-  For the unit, run it as `sudo -u cairn` against `/var/lib/cairn/cairn.db`. A revoked
-  key stops working at its next call, and its name is not reused.
 - [ ] **6.2 Remove the client's key file** if the machine is not kept for further runs:
-  `rm ~/.config/cairn/client.env`. Remove `.mcp.json` from the test project.
+  `rm ~/.config/cairn/client.env`. Remove `.mcp.json` from the test project, or, for the
+  user-scope route in 2.4, run `claude mcp remove cairn --scope user`.
 - [ ] **6.3 Stop a terminal server** if you started one for this run. Stop the unit only
   if it was started for this run.
 

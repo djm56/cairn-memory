@@ -249,16 +249,19 @@ Apache, with a certificate from `certbot`. Enable the modules first:
 </VirtualHost>
 ```
 
-`certbot` copies these lines into a new `*:443` site. It renews the certificate and
-reloads Apache by itself. `cairn` needs no restart, because it does not hold the
-certificate. The site above was run on Ubuntu 24.04 with Apache 2.4. `cairn` ran as
-the systemd unit on `127.0.0.1:8788`, and the site used `certbot --apache` and the
-HTTP-to-HTTPS redirect. `cairn doctor` on a second machine passed every check over
-`https`.
+`certbot` copies these lines into a new `*:443` site. `cairn` needs no restart when the
+certificate renews, because it does not hold the certificate. The live run was on
+Ubuntu 24.04; the Apache version was not recorded. `cairn` ran as the systemd unit on
+`127.0.0.1:8788`, behind Apache on the same host, and the site was set up with
+`certbot --apache`. `certbot` reported a certificate and said it had set up automatic
+renewal. That certbot renews the certificate and reloads Apache by itself is how
+certbot works; the run did not observe a renewal. `cairn doctor` on a second machine
+passed every check over `https`.
 
 On the server itself, a `curl` of the public `https://` name timed out, while the second
-machine reached it. Check `/healthz` from another machine. A host behind NAT often
-cannot reach its own public address.
+machine reached it. The cause was not diagnosed. Check `/healthz` from another machine.
+A host behind NAT often cannot reach its own public address; NAT is a possible cause,
+not a confirmed one.
 
 With a local proxy, the server logs `tls=false`. That is expected. Caddy's automatic
 certificates need a public DNS name and open ports 80 and 443; for a server without
@@ -369,10 +372,11 @@ AmbientCapabilities=
 WantedBy=multi-user.target
 ```
 
-**This unit is unverified until the live run.** It was checked by reading the
-directives against what the server does, and it has not been started under systemd or
-run through `systemd-analyze`. Its first start is the M2 live run
-([M2-LIVE-RUN.md](M2-LIVE-RUN.md), step 1.2). Check it on your host:
+**The unit was started under systemd in the M2 live run.** On 2026-11-02, on Ubuntu 24.04,
+it was installed from `cairn` `c4e9444` and started with `systemctl enable --now cairn`,
+and `systemctl status` showed `active (running)`. `systemd-analyze verify` printed
+nothing, and `systemd-analyze security` gave `Overall exposure level for cairn.service:
+3.2 OK`. Run the same three checks on your own host:
 
 ```bash
 systemd-analyze verify /etc/systemd/system/cairn.service
