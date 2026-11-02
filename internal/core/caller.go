@@ -15,8 +15,10 @@ type Role string
 const (
 	RoleAgent    Role = "agent"
 	RoleOperator Role = "operator"
-	// RoleViewer may read and not write. Core treats it as an agent for reads, and
-	// only the wire form refuses its writes (DESIGN.md §5.4, CONTRACT §1.2).
+	// RoleViewer may read and not write. Core treats it as an agent for reads, except
+	// that a viewer's read of a project with no row is not_found and writes no row
+	// (CONTRACT §9 item 44). Only the wire form refuses its writes (DESIGN.md §5.4,
+	// CONTRACT §1.2).
 	RoleViewer Role = "viewer"
 )
 

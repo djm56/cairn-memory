@@ -6,8 +6,10 @@
 -- No code has ever written it, so it is empty on every database. This migration
 -- replaces it with the M2 shape rather than editing v1. The assert first: a
 -- table holding any row aborts the migration, so no key row is dropped unseen.
--- The assert is a CHECK on a one-row table, which fails when the count is not 0.
-CREATE TABLE api_keys_assert_empty (x INTEGER CHECK (x = 0));
+-- The assert is a CHECK on a one-row table, which fails when the count is not 0. The
+-- column is named for the cause, so the error reads "CHECK constraint failed:
+-- api_keys_must_be_empty = 0" and an operator can see why the migration stopped.
+CREATE TABLE api_keys_assert_empty (api_keys_must_be_empty INTEGER CHECK (api_keys_must_be_empty = 0));
 INSERT INTO api_keys_assert_empty SELECT COUNT(*) FROM api_keys;
 DROP TABLE api_keys_assert_empty;
 DROP TABLE api_keys;

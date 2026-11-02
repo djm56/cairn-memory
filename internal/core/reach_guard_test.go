@@ -44,7 +44,10 @@ const (
 var serverSide = map[string]string{
 	"internal/store": "owns the database; it is the one place a store is opened",
 	"internal/core":  "the in-process Service over a store; it imports internal/store",
-	"internal/api":   "HTTP handlers only; the shipped binary starts no listener (D19). M2's cairn serve is in cmd/cairn, which is guarded",
+	"internal/api":   "HTTP handlers only; no listener is started here (D19)",
+	// cairn serve (D20) is the one place the server opens the store and listens. The
+	// command in cmd/cairn is guarded and only parses its flags, then calls server.Run.
+	"internal/server": "cairn serve (D20): opens the server's store and starts the listener; the command in cmd/cairn calls it",
 }
 
 // requiredGuarded are packages that must stay in the guard. Losing one of them to an

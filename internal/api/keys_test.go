@@ -132,11 +132,11 @@ func TestKeyScopeSetsTheRole(t *testing.T) {
 	}
 }
 
-// TestViewerIsRefusedOnEveryWrite checks one read and one write per scope, as the
-// step plan asks: a viewer key passes the read and is refused the write, with 403
-// and the kind read_only, before the service is reached. The operator write is
-// refused too, since it writes.
-func TestViewerIsRefusedOnEveryWrite(t *testing.T) {
+// TestViewerIsRefusedOnSampledWrites is a sample: one read and two writes. A viewer
+// key passes the read and is refused each write, with 403 and the kind read_only,
+// before the service is reached. Every route is checked by TestEveryRouteIsGatedByItsMark
+// in marks_test.go, which this sample does not stand in for.
+func TestViewerIsRefusedOnSampledWrites(t *testing.T) {
 	st := openKeyStore(t)
 	rec := &recorder{}
 	h := keyedHandler(st, rec)

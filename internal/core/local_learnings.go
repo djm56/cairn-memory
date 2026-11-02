@@ -117,7 +117,7 @@ func (l *Local) LearningList(ctx context.Context, req LearningListRequest) (*Lea
 	if err != nil {
 		return nil, err
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	rows, more, err := store.ListLearnings(ctx, l.st, store.LearningFilter{

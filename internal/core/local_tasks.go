@@ -133,7 +133,7 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	}
 	// ensureReadProject runs before the snapshot opens: it may write a new
 	// project row, which a read transaction must not do.
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	cur := &TaskCurrent{}
@@ -320,7 +320,7 @@ func (l *Local) TaskGet(ctx context.Context, req TaskGetRequest) (*TaskDetail, e
 			}
 		}
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	row, err := loadTask(ctx, l.st, c.Project, req.ID)
@@ -422,7 +422,7 @@ func (l *Local) TaskList(ctx context.Context, req TaskListRequest) (*TaskList, e
 	if err != nil {
 		return nil, err
 	}
-	if err := l.ensureReadProject(ctx, c.Project); err != nil {
+	if err := l.ensureReadProject(ctx, c); err != nil {
 		return nil, err
 	}
 	rows, more, err := store.ListTasks(ctx, l.st, c.Project, statuses, after, limit)

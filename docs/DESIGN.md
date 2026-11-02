@@ -459,9 +459,9 @@ any other backend. A behaviour exists when the conformance suite says so.
 Clients open no database. `cairn mcp` and the CLI send each call to
 `cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
 without a `server` (M1). The store stays inside `cairn serve`, and the web UI
-is served by the same process. Until M2 the shipped binary has no network
-listener, so M1's flow runs against an in-process server bound to loopback
-(D19).
+is served by the same process. In M1 the shipped binary had no network
+listener, and M1's flow ran against an in-process server bound to loopback
+(D19). M2 adds `cairn serve`, the binary's only listener, as set out below.
 
 D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend
@@ -469,6 +469,41 @@ and no switch in `.cairn.toml`.
 
 A project's data does not move automatically. `cairn serve` can be pointed at
 an existing SQLite file to make it the server's own database.
+
+**`cairn serve` (M2, D20).** Its flags:
+
+- `--addr` is the address to listen on. It defaults to `127.0.0.1:8787`, which
+  is the port of the server example in §2.1.
+- `--db` is the SQLite file the server keeps its data in. It has no default: the
+  operator names the file. It is created when it does not exist.
+- `--tls-cert` and `--tls-key` are PEM files. Give both or neither.
+- `--behind-proxy` says a proxy in front of the server terminates TLS.
+
+The bind policy is checked before the database is opened and before the server
+listens:
+
+- A loopback address (`127.0.0.0/8`, `::1`, or a name that resolves only to
+  those) needs no TLS.
+- Any other address, including `0.0.0.0`, `::` and an empty host, is refused
+  unless TLS files are given or `--behind-proxy` is. The bind is then the one
+  checked, so a host that resolves to a loopback address is listened on at it.
+- A non-loopback bind also needs at least one active API key (§8).
+- A loopback server with no active key starts. It prints one line on stderr
+  saying every call is refused with `401` until a key exists.
+
+The listener has these limits. Each call's body is capped at 1 MiB (§5.4), and
+the server as a whole at 1 MiB plus 64 KiB. The header block is capped at 64 KiB.
+`ReadHeaderTimeout` is 10 seconds, `ReadTimeout` and `WriteTimeout` 30 seconds
+each, and `IdleTimeout` 120 seconds. TLS is at least 1.2. On SIGINT or SIGTERM
+the server stops taking calls, and gives calls in flight 10 seconds to finish.
+
+`GET /healthz` answers `200` with a fixed body, needs no key, and reveals no
+version or configuration. Any other method on it is `405`.
+
+The server logs the method, the route path and the cause of each internal
+failure, and the cause of each failed `last_used_at` write. It never logs a
+header, a body or a key. `docs/DEPLOY.md`, written at M2 step 15, will document
+both setups, TLS by files and TLS behind a proxy.
 
 ### 5.4 The HTTP wire form
 
@@ -507,7 +542,10 @@ client and the CLI. This section is how the adapter reaches the server.
   no project is `invalid`. A key that is missing, malformed, unknown or revoked
   is `unauthenticated`, answered `401` before the body is read. A `viewer` key
   is refused on every write route with `read_only` (`403`), and core is not
-  reached. Operator routes are write routes. Each route is marked read or write
+  reached. Operator routes are write routes, and an agent key on one is refused
+  with `operator_only` (`403`) before the body is read. A viewer's read of a
+  project with no row is `not_found` and writes no row (CONTRACT §9 item 44).
+  Each route is marked read or write
   in the route table of `internal/api`, and a route with no mark is not mounted.
   The resolver is `api.KeyCaller` over `internal/auth`. The header-trusting
   `api.UnauthenticatedHeaderCaller` is for in-process tests only, and the reach
@@ -674,7 +712,8 @@ status; they only recommend.
 - Local mode (D2) was designed and cut by D11 before it was built. Its design
   listened on nothing and kept the database file under the user's control.
 - `cairn serve` binds loopback by default and refuses to bind anything else
-  without at least one API key. TLS by certificate files or behind a proxy.
+  without at least one API key. TLS by certificate files or behind a proxy. The
+  bind rules and the limits are in §5.3.
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
   `cairn_` and 32 random bytes in unpadded base64url, shown once when it is
   made. The 256 random bits are what make a fast hash enough: a guess of the key
@@ -685,6 +724,10 @@ status; they only recommend.
 - The role comes from the key's scope and from nothing else. The resolver never
   reads `X-Cairn-Role`, so an agent key that claims the operator role is refused
   on an operator route with `operator_only` (issue #110).
+- In M2 a key is not bound to a project or an agent name. Any valid key may claim
+  any project and any agent name in the request headers. That is intended for the
+  pilot, where every key holder is trusted with every project. The audit trail
+  records the name a call claims, not the key that made the call.
 - `last_used_at` is written at most once a minute per key, so a read does not
   become a write on every call.
 - An agent key cannot reach operator routes. The web UI asks for an operator
