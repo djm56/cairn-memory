@@ -227,6 +227,39 @@ server {
 }
 ```
 
+Apache, with a certificate from `certbot`. Enable the modules first:
+`a2enmod proxy proxy_http headers ssl`. Start from a plain HTTP site, and let
+`certbot --apache -d cairn.example.net` add the TLS site and the redirect to it:
+
+```apache
+<VirtualHost *:80>
+    ServerName cairn.example.net
+
+    ProxyPreserveHost On
+    ProxyRequests Off
+    ProxyPass        / http://127.0.0.1:8788/
+    ProxyPassReverse / http://127.0.0.1:8788/
+    RequestHeader set X-Forwarded-Proto "https"
+    # 1 MiB. Apache allows no comment at the end of a directive line.
+    LimitRequestBody 1048576
+
+    # The combined format logs no Authorization header. Do not add %{Authorization}i.
+    ErrorLog  ${APACHE_LOG_DIR}/cairn-error.log
+    CustomLog ${APACHE_LOG_DIR}/cairn-access.log combined
+</VirtualHost>
+```
+
+`certbot` copies these lines into a new `*:443` site. It renews the certificate and
+reloads Apache by itself. `cairn` needs no restart, because it does not hold the
+certificate. The site above was run on Ubuntu 24.04 with Apache 2.4. `cairn` ran as
+the systemd unit on `127.0.0.1:8788`, and the site used `certbot --apache` and the
+HTTP-to-HTTPS redirect. `cairn doctor` on a second machine passed every check over
+`https`.
+
+On the server itself, a `curl` of the public `https://` name timed out, while the second
+machine reached it. Check `/healthz` from another machine. A host behind NAT often
+cannot reach its own public address.
+
 With a local proxy, the server logs `tls=false`. That is expected. Caddy's automatic
 certificates need a public DNS name and open ports 80 and 443; for a server without
 one, see [A server with no public DNS name](#a-server-with-no-public-dns-name).
