@@ -357,6 +357,10 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 			if !strings.Contains(out.String(), "is not a readable SQLite database") {
 				t.Errorf("the report %q does not say the target was not a readable database", out.String())
 			}
+			// 14b-W1: the prompt says the lock could not be checked, and that serve must be stopped.
+			if !strings.Contains(out.String(), "The lock could not be checked") || !strings.Contains(out.String(), "Stop cairn serve") {
+				t.Errorf("the prompt %q does not say the lock could not be checked and to stop cairn serve", out.String())
+			}
 			assertReportNamesMoves(t, target, out.String())
 			if got := readBytes(t, preRestoreName(target)); string(got) != string(origMain) {
 				t.Errorf("the moved main file is not the bytes that were there: it was changed")
@@ -467,7 +471,7 @@ func TestOpenDatabaseRefusesToCreateOverAnInterruptedRestore(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := Run(ctx, Options{Addr: "127.0.0.1:0", DB: path, Log: io.Discard})
-	if err == nil || !strings.Contains(err.Error(), "a restore was interrupted") || !strings.Contains(err.Error(), pre) {
+	if err == nil || !strings.Contains(err.Error(), "a restore may have been interrupted") || !strings.Contains(err.Error(), pre) {
 		t.Fatalf("Run over an interrupted restore: err = %v, want the interrupted-restore refusal naming %s", err, pre)
 	}
 	if _, serr := os.Lstat(path); serr == nil {

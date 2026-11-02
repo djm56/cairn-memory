@@ -31,6 +31,10 @@ var (
 	openRestored = store.Open
 	// releaseLock gives up the probe's lock once the files have moved (step 4).
 	releaseLock = func(l *store.ExclusiveLock) error { return l.Release() }
+	// checkReadable is the read-only readability check of step 3.
+	checkReadable = store.CheckReadable
+	// acquireExclusive takes the probe's lock of step 3.
+	acquireExclusive = store.AcquireExclusive
 )
 
 // RestoreOptions is what cairn restore starts with. DB is the database to replace and Backup
@@ -52,7 +56,9 @@ type move struct {
 }
 
 // Restore replaces the database at o.DB with the backup at o.Backup. It runs in this order, and
-// stops at the first step that refuses, with nothing changed unless the error says otherwise:
+// stops at the first step that refuses. Before the lock of step 3 nothing is changed. After it, a
+// refusal moves and deletes nothing, though a readable database's -wal may be folded into its file
+// on release (see unchanged). An error after the first move names what moved:
 //
 //  1. stdin must be a terminal. Nothing is read, locked or copied before this is known.
 //  2. the backup is copied beside the database and checked there: it opens, passes PRAGMA
@@ -138,17 +144,21 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	// SQLite delete the -wal beside it on close, so an unreadable file is never opened that way.
 	raw := false
 	if exists {
-		err = store.CheckReadable(ctx, o.DB)
+		err = checkReadable(ctx, o.DB)
 		switch {
 		case errors.Is(err, store.ErrNotDatabase):
 			raw = true
 		case err != nil:
-			return err
+			return checkFailure(o.DB, err)
 		default:
-			lock, err = store.AcquireExclusive(ctx, o.DB)
+			lock, err = acquireExclusive(ctx, o.DB)
 			switch {
 			case errors.Is(err, store.ErrInUse):
 				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+			case errors.Is(err, store.ErrNotDatabase):
+				// The file read as a database a moment ago and does not now: it changed under the
+				// check, or it is damaged in a way the lock finds and the check did not (14b-S2).
+				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairn serve if it runs, check the file as the user that owns it, the service user for a service (the sqlite3 command-line tool may need installing) with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
 			case err != nil:
 				return err
 			}
@@ -167,6 +177,8 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		fmt.Fprintf(o.Out, "The database there now is moved to %s, after its -wal is folded into it, with any -shm beside it. Nothing is deleted.\n", pre)
 		if raw {
 			fmt.Fprintf(o.Out, "%s is not a readable SQLite database: its files are moved as they are, with no checkpoint.\n", o.DB)
+			// 14b-W1: a file that cannot be read cannot be locked, so a server holding it is not seen.
+			fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
 		}
 	} else {
 		fmt.Fprintf(o.Out, "No database is at %s now. This creates it from the backup %s.\n", o.DB, o.Backup)
@@ -177,10 +189,10 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	fmt.Fprintf(o.Out, "To confirm, type the database path exactly as given: ")
 	typed, err := readLine(o.Input)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w; %s", err, unchanged(lock != nil))
 	}
 	if typed != o.DB {
-		return fmt.Errorf("the path typed does not match %s; nothing was changed", o.DB)
+		return fmt.Errorf("the path typed does not match %s; %s", o.DB, unchanged(lock != nil))
 	}
 
 	// 5. Fold the database's -wal into it, then move the files. Each target name must be free,
@@ -188,11 +200,11 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	var moves []move
 	all := presentSuffixes(o.DB, dbSet)
 	if err := checkFree(pre, all); err != nil {
-		return err
+		return fmt.Errorf("%w; %s", err, unchanged(lock != nil))
 	}
 	if lock != nil {
 		if err := lock.Consolidate(ctx); err != nil {
-			return fmt.Errorf("fold the -wal of %s into it before any move: %w; nothing was moved", o.DB, err)
+			return fmt.Errorf("fold the -wal of %s into it before any move: %w; %s", o.DB, err, unchanged(true))
 		}
 	}
 	if len(all) > 0 {
@@ -278,7 +290,7 @@ func presentSuffixes(db string, suffixes []string) []string {
 func checkFree(pre string, suffixes []string) error {
 	for _, s := range suffixes {
 		if _, err := os.Lstat(pre + s); err == nil {
-			return fmt.Errorf("the name %s is taken; nothing was changed", pre+s)
+			return fmt.Errorf("the name %s is taken", pre+s)
 		}
 	}
 	return nil
@@ -300,7 +312,9 @@ func recoveryStep(db, pre string, moves []move) string {
 	kept := make([]string, 0, len(moves))
 	mainMoved := false
 	for _, m := range moves {
-		cmds = append(cmds, "mv "+m.to+" "+m.from)
+		// Each path is quoted, so a space or a quote in it does not split or end the argument (14b-W2).
+		// The -- ends the options, so a name that begins with a dash is still a file name.
+		cmds = append(cmds, "mv -- "+shellQuote(m.to)+" "+shellQuote(m.from))
 		kept = append(kept, m.to)
 		if m.from == db {
 			mainMoved = true
@@ -424,18 +438,48 @@ func undoMoves(moves []move) ([]move, error) {
 }
 
 // readLine reads one line from in, without its line ending. A missing reader or no input at all
-// is no confirmation, so it is an error.
+// is no confirmation, so it is an error. The caller adds what was left unchanged (unchanged).
 func readLine(in io.Reader) (string, error) {
 	if in == nil {
-		return "", errors.New("no confirmation was given; nothing was changed")
+		return "", errors.New("no confirmation was given")
 	}
 	line, err := bufio.NewReader(in).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return "", fmt.Errorf("read the confirmation: %w; nothing was changed", err)
+		return "", fmt.Errorf("read the confirmation: %w", err)
 	}
 	line = strings.TrimRight(line, "\r\n")
 	if line == "" {
-		return "", errors.New("no confirmation was given; nothing was changed")
+		return "", errors.New("no confirmation was given")
 	}
 	return line, nil
+}
+
+// unchanged says what a refusal left alone. Once the lock is held, a readable database's -wal may
+// be folded into the file when the lock is released, because closing the last connection of a WAL
+// database checkpoints it. That changes the bytes of the main file and no data (14b-S1). With no
+// lock, nothing was done to the files at all.
+func unchanged(locked bool) string {
+	if locked {
+		return "nothing was moved or deleted; the -wal may have been folded into the database, which changes no data"
+	}
+	return "nothing was changed"
+}
+
+// checkFailure is the error for a failed readability check. The check is read-only, so it moves
+// and deletes nothing. A -journal beside a database is the one thing a read-only open cannot
+// finish: SQLite rolls a hot journal back only with a writer, so the next step is to let one do
+// it (14b-S3).
+func checkFailure(db string, err error) error {
+	if _, serr := os.Lstat(db + "-journal"); serr == nil {
+		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairn serve, then open the database once as the user that owns it (for the service, sudo -u cairn; the sqlite3 command-line tool may need installing) with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",
+			err, db+"-journal", shellQuote(db))
+	}
+	return fmt.Errorf("%w; nothing was moved or deleted", err)
+}
+
+// shellQuote returns s as one word for a POSIX shell: wrapped in single quotes. Each single quote
+// in s becomes a close quote, an escaped quote, and a reopened quote. Nothing else in the word is
+// special inside single quotes.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

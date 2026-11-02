@@ -1,7 +1,8 @@
 # Cairn Memory — Design
 
-**Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are
-done, and their exit checks passed. Live progress is on the
+**Status as of 2026-10-31: M1 (Server-mode MCP) is current. M2 (Server) is built;
+its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are done, and
+their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
 
@@ -511,8 +512,10 @@ nothing changed unless the step says otherwise:
    beside it, after the copy is closed.
 3. If the database exists, it is first checked with a read-only open. A file that
    cannot be read as SQLite is not opened for writing at all: it takes no lock,
-   and it is moved as it is at step 5. A readable database must not be in use. An
-   exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
+   and it is moved as it is at step 5. Nothing can check for a server on such a
+   file, so the output says the lock could not be checked and that `cairn serve`
+   must be stopped, and the operator confirms that. A readable database must not be
+   in use. An exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
    or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
    do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is
    not blocked. The lock is held through the moves.
@@ -614,7 +617,7 @@ proxy or the firewall in front, not to the server.
 
 The server logs the method, the route path and the cause of each internal
 failure, and the cause of each failed `last_used_at` write. It never logs a
-header, a body or a key. `docs/DEPLOY.md`, written at M2 step 15, will document
+header, a body or a key. [DEPLOY.md](DEPLOY.md) documents
 both setups, TLS by files and TLS behind a proxy.
 
 ### 5.4 The HTTP wire form
@@ -825,7 +828,8 @@ status; they only recommend.
   listened on nothing and kept the database file under the user's control.
 - `cairn serve` binds loopback by default and refuses to bind anything else
   without at least one API key. TLS by certificate files or behind a proxy. The
-  bind rules and the limits are in §5.3.
+  bind rules and the limits are in §5.3. The setup steps, the proxy rules and the
+  systemd unit are in [DEPLOY.md](DEPLOY.md).
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
   `cairn_` and 32 random bytes in unpadded base64url, shown once when it is
   made. `cairn key add` makes one in the server's database and prints it once on

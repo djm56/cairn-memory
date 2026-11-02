@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/djm56/cairn-memory/internal/store"
 )
@@ -94,12 +95,28 @@ var copyBackup = func(ctx context.Context, st *store.Store, out string) error {
 	return st.Backup(ctx, out)
 }
 
+// syncFile flushes an open file or directory. It is f.Sync; a test replaces it to make the flush
+// fail, and puts it back when it ends.
+var syncFile = func(f *os.File) error { return f.Sync() }
+
 // syncPath flushes the file or directory at p to stable storage. A directory is opened read-only
 // and synced, which makes the names in it durable.
+//
+// Some file systems refuse a sync of a directory with EINVAL or ENOTSUP (certain network and FUSE
+// mounts do). On those, a directory sync cannot be made, so this call treats the directory as
+// synced and carries on rather than failing every backup and restore on that mount (14b-S5). The
+// tolerance is for directories only: a file that cannot be flushed is still an error, and so is
+// any other error from a directory sync.
 func syncPath(p string) error {
 	f, err := os.Open(p)
 	if err != nil {
 		return err
 	}
-	return errors.Join(f.Sync(), f.Close())
+	serr := syncFile(f)
+	fi, statErr := f.Stat()
+	isDir := statErr == nil && fi.IsDir()
+	if isDir && (errors.Is(serr, syscall.EINVAL) || errors.Is(serr, syscall.ENOTSUP)) {
+		serr = nil
+	}
+	return errors.Join(serr, f.Close())
 }

@@ -1,6 +1,6 @@
 # Glossary
 
-_Status as of 2026-10-30: M1 (Server-mode MCP) is current. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-10-31: M1 (Server-mode MCP) is current. M2 (Server) is built; its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 The terms follow [DESIGN.md §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts) and the sections it links. Cairn says **task**, not mission (decision D1).
 
