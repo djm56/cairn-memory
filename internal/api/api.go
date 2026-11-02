@@ -6,11 +6,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -64,6 +66,15 @@ const MaxBodyBytes = 1 << 20
 // message is always internalMessage, so the caller never sees the cause. The
 // cause goes to the FailureHook that Handler was given (DESIGN.md §5.4).
 const KindInternal core.Kind = "internal"
+
+// KindUnsupportedMediaType is the error kind of a body whose Content-Type is not
+// application/json. It is answered 415, and is a wire kind like KindInternal: no
+// core call returns it (CONTRACT §1.2).
+const KindUnsupportedMediaType core.Kind = "unsupported_media_type"
+
+// KindNoRoute is the error kind of a path that is no call. It is answered 404. A
+// missing entity is not_found, and a method other than POST is 405 (DESIGN §5.4).
+const KindNoRoute core.Kind = "no_route"
 
 const internalMessage = "internal error"
 
@@ -186,26 +197,51 @@ func recoverInternal(w http.ResponseWriter, r *http.Request, onFailure FailureHo
 }
 
 // decode reads the one JSON object of a request body into v. An empty body is
-// the zero request. An unknown field, a value of the wrong type, a second value
-// and a body over MaxBodyBytes are refused, each with the status it earns. The
-// status is returned with the error, and is zero when the body is read.
+// the zero request, and needs no Content-Type. A body with content must be
+// application/json (checkMediaType). A key written in the wrong case or given
+// twice is refused (checkKeys). An unknown field, a value of the wrong type, a
+// second value and a body over MaxBodyBytes are refused too, each with the status
+// it earns. The status is returned with the error, and is zero when the body is
+// read.
 func decode(w http.ResponseWriter, r *http.Request, v any) (int, *core.Error) {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
-	dec.DisallowUnknownFields()
-	err := dec.Decode(v)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBodyBytes))
 	var tooLarge *http.MaxBytesError
 	switch {
-	case errors.Is(err, io.EOF):
-		return 0, nil
 	case errors.As(err, &tooLarge):
 		return http.StatusRequestEntityTooLarge, &core.Error{Kind: core.KindInvalid, Message: fmt.Sprintf("the body is larger than %d bytes", MaxBodyBytes)}
 	case err != nil:
+		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body could not be read: " + err.Error()}
+	}
+	// Only the JSON white space counts as no body.
+	if len(bytes.Trim(body, " \t\r\n")) == 0 {
+		return 0, nil
+	}
+	if bad := checkMediaType(r); bad != nil {
+		return http.StatusUnsupportedMediaType, bad
+	}
+	if bad := checkKeys(body, v); bad != nil {
+		return http.StatusBadRequest, bad
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
 		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body is not the call's request: " + err.Error()}
 	}
 	if err := dec.Decode(new(json.RawMessage)); !errors.Is(err, io.EOF) {
 		return http.StatusBadRequest, &core.Error{Kind: core.KindInvalid, Message: "the body holds one JSON object: remove what follows it"}
 	}
 	return 0, nil
+}
+
+// checkMediaType refuses a request whose Content-Type is not application/json, or
+// that has none. Parameters such as charset are accepted. Refusing a missing type
+// as well keeps a form post sent as text/plain out of the decoder (issue #109).
+func checkMediaType(r *http.Request) *core.Error {
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err == nil && media == "application/json" {
+		return nil
+	}
+	return &core.Error{Kind: KindUnsupportedMediaType, Message: "the body must be JSON: send the header Content-Type: application/json"}
 }
 
 // writeFailure writes err as the answer to a call. A core.Error keeps its kind
@@ -245,11 +281,13 @@ func statusOf(kind core.Kind) int {
 }
 
 // notFound answers a path that is no call. A call of the wrong method is not a
-// missing call, and is answered by call.
+// missing call, and is answered by call. The message points at the base URL,
+// since a mis-set base is the usual reason for a path to miss.
 func notFound(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusNotFound, &core.Error{
-		Kind:    core.KindInvalid,
-		Message: "no call at " + r.URL.Path + ": agent calls are under " + Prefix + "/agent, operator calls under " + Prefix + "/operator",
+		Kind: KindNoRoute,
+		Message: "no call at " + r.URL.Path + ": check the server base URL. Calls are POST to " +
+			Prefix + "/agent/<call> and " + Prefix + "/operator/<call>",
 	})
 }
 

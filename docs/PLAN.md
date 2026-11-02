@@ -311,7 +311,8 @@ From what went well and badly in bishop-memory:
 **Adopted 2026-10-27 by the operator: D1–D10, each as recommended.** D10's
 order was the phase order that §2 and §3 then gave. Plan v1 (2026-10-30)
 replaces that order with the milestones in §2 and §3. D11–D18 come from Plan
-v1's decisions table, and D19 from issue #71.
+v1's decisions table, D19 from issue #71, D20 from issue #78 and D21 from issue
+#109.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -389,6 +390,25 @@ that is not a numbered decision here, and the table says what.
   another machine with no keys or TLS must never exist, even briefly, so the
   shipped M1 binary has no listener.*
 
+**Adopted 2026-10-31 by the operator (issue #78): D20.**
+
+- **D20. TLS is optional in `cairn serve`.** `cairn serve` takes optional
+  `--tls-cert` and `--tls-key`. It binds loopback by default. It refuses a
+  non-loopback bind without TLS unless `--behind-proxy` is given, so a proxy
+  that terminates TLS is a choice the operator makes, not a default. DEPLOY.md
+  will document both setups. *Answers the open question in §10 on TLS.*
+
+**Chosen by Bishop under the operator's veto, 2026-10-31 (issue #109): D21.**
+
+- **D21. The HTTP wire form is strict, and its versions are defined.** A request
+  key must match its field name in case, and a key given twice is refused. A
+  body with content must be `application/json`. A path that is no call is
+  `no_route`, a `404`. A missing entity stays `not_found`. DESIGN §5.4 states
+  the versioning rule: upgrade servers before clients, and what counts as a
+  breaking change. `step_add` and `step_update` keep their assignee field on the
+  MCP surface, as CONTRACT §3 names it. *Replaces the unsettled form that M1
+  left open (issue #109).*
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
@@ -421,8 +441,10 @@ that is not a numbered decision here, and the table says what.
 - [ ] Pilot project and the two developers (M7).
 - [ ] A second operator besides the first, so that daily review does not
   depend on one person.
-- [ ] Does the proxy in front of the server terminate TLS, or does `cairn serve`
-  carry certificates?
+- [x] Does the proxy in front of the server terminate TLS, or does `cairn serve`
+  carry certificates? **Answered 2026-10-31 (D20, #78):** both. `cairn serve`
+  carries optional certificates, and refuses a non-loopback bind without TLS
+  unless `--behind-proxy` is given.
 - [ ] Do viewers see proposed learnings, or only ratified directives?
 - [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
 - [ ] Rename to `cairn` now (one PR, before M1) or after M8?

@@ -202,7 +202,7 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, failure(route, resp)
+		return nil, failure(c.base, route, resp)
 	}
 	answer, err := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBytes+1))
 	if err != nil {
@@ -245,22 +245,34 @@ func setCaller(ctx context.Context, h http.Header) error {
 }
 
 // failure reads the error of an answer that is not a success. When the answer
-// carries a core error kind, the error is the core.Error it names. Anything else,
-// such as an internal failure or an answer that is not the wire form, is a
-// plain error that names the route and the status, and is not a core.Error.
-func failure(route string, resp *http.Response) error {
+// carries a core error kind, the error is the core.Error it names. A no_route
+// answer names the base URL the client was given, since a mis-set base is the
+// usual cause. Anything else, such as an internal failure or an answer that is
+// not the wire form, is a plain error that names the route and the status, and is
+// not a core.Error.
+func failure(base, route string, resp *http.Response) error {
 	var body api.ErrorBody
-	if err := json.NewDecoder(io.LimitReader(resp.Body, api.MaxBodyBytes)).Decode(&body); err == nil && body.Error != nil && isCoreKind(body.Error.Kind) {
-		return body.Error
+	if err := json.NewDecoder(io.LimitReader(resp.Body, api.MaxBodyBytes)).Decode(&body); err == nil && body.Error != nil {
+		switch {
+		case body.Error.Kind == api.KindNoRoute:
+			// The path is the one the client sent: the base URL, then the prefix and the route.
+			return &core.Error{Kind: api.KindNoRoute, Message: fmt.Sprintf(
+				"no call at %s%s%s: check the server base URL", DisplayURL(base), api.Prefix, route)}
+		case isCoreKind(body.Error.Kind):
+			return body.Error
+		}
 	}
 	return fmt.Errorf("client: %s: the server answered HTTP %d", route, resp.StatusCode)
 }
 
-// isCoreKind reports whether kind is one that core returns for a failure the
-// caller can act on. The wire-only kind internal is not.
+// isCoreKind reports whether kind is one a failed call returns as its core.Error:
+// a core kind the caller can act on, or one of the wire kinds the caller can fix
+// by changing the request or the base URL (api.KindNoRoute,
+// api.KindUnsupportedMediaType). The wire-only kind internal is not.
 func isCoreKind(kind core.Kind) bool {
 	switch kind {
-	case core.KindInvalid, core.KindNotFound, core.KindRefused, core.KindOperatorOnly:
+	case core.KindInvalid, core.KindNotFound, core.KindRefused, core.KindOperatorOnly,
+		api.KindNoRoute, api.KindUnsupportedMediaType:
 		return true
 	}
 	return false

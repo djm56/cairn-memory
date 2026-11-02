@@ -2,6 +2,8 @@ module github.com/djm56/cairn-memory
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/google/jsonschema-go v0.4.3
