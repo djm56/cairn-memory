@@ -49,7 +49,7 @@ const (
 )
 
 // The read pages' paths (DESIGN §5.5, Routes). Each is GET only; a POST to one is 405 from
-// the mux. The action routes of DESIGN §5.5 are not here: they arrive with the actions.
+// the mux, except where an action route shares the path, as the settings page does.
 const (
 	pathTasks        = "/ui/tasks"
 	pathTask         = "/ui/p/{project}/tasks/{task}"
@@ -58,6 +58,16 @@ const (
 	pathDirectives   = "/ui/directives"
 	pathProjects     = "/ui/projects"
 	pathSettings     = "/ui/projects/{project}/settings"
+)
+
+// The action paths (DESIGN §5.5, Routes). Each POST is wrapped in form, which checks the
+// session, the origin, the role, the body and the CSRF value before the action runs. The
+// ratify form is a GET for an operator only.
+const (
+	pathRatify   = "/ui/directives/new"
+	pathDecide   = "/ui/learnings/{id}/decide"
+	pathRetire   = "/ui/directives/{code}/retire"
+	pathReaffirm = "/ui/directives/{code}/reaffirm"
 )
 
 // The body caps (DESIGN §5.5): a sign-in form is 4 KiB, any other form 64 KiB.
@@ -106,6 +116,12 @@ func (u *ui) handler() http.Handler {
 	mux.HandleFunc("GET "+pathDirectives, u.page(u.directives))
 	mux.HandleFunc("GET "+pathProjects, u.page(u.projects))
 	mux.HandleFunc("GET "+pathSettings, u.page(u.projectSettings))
+	mux.HandleFunc("GET "+pathRatify, u.operatorPage(u.ratifyForm))
+	mux.HandleFunc("POST "+pathDecide, u.form(u.learningDecide))
+	mux.HandleFunc("POST "+pathDirectives, u.form(u.directiveRatify))
+	mux.HandleFunc("POST "+pathRetire, u.form(u.directiveRetire))
+	mux.HandleFunc("POST "+pathReaffirm, u.form(u.directiveReaffirm))
+	mux.HandleFunc("POST "+pathSettings, u.form(u.projectSettingsSet))
 	mux.HandleFunc("GET "+pathSignin, u.signinPage)
 	mux.HandleFunc("POST "+pathSignin, u.signinPost)
 	mux.HandleFunc("GET "+pathSignout, u.signout)
@@ -173,8 +189,10 @@ func (u *ui) render(w http.ResponseWriter, status int, name string, v view) {
 type view struct {
 	Title   string
 	Message string
-	Nav     *navView
-	Page    any
+	// Notice is the message of a form that failed, shown above the page it re-rendered.
+	Notice string
+	Nav    *navView
+	Page   any
 }
 
 // pages holds one parsed template set per page. Each set is the layout and one page, so
@@ -186,6 +204,7 @@ var pages = map[string]*template.Template{
 	"task":       parsePage("task"),
 	"learnings":  parsePage("learnings"),
 	"directives": parsePage("directives"),
+	"ratify":     parsePage("ratify"),
 	"projects":   parsePage("projects"),
 	"project":    parsePage("project"),
 	"error":      parsePage("error"),

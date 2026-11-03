@@ -1,0 +1,18 @@
+{{define "body"}}{{with .Page}}<h1>Ratify a directive</h1>
+{{with .FromLearning}}<p class="muted">From learning {{.}}. The learning must be accepted; it becomes applied when the directive is made.</p>{{end}}
+<form method="post" action="/ui/directives" class="action">
+<input type="hidden" name="csrf" value="{{$.Nav.CSRF}}">
+{{with .FromLearning}}<input type="hidden" name="from_learning" value="{{.}}">{{end}}
+<label>Scope <select name="scope">{{range .ScopeOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Value}}</option>{{end}}</select></label>
+<label>Project, for a project directive <input type="text" name="project" value="{{.Project}}" maxlength="64"></label>
+<label>Agent, for an agent directive <input type="text" name="agent" value="{{.Agent}}" maxlength="64"></label>
+<label>Title <input type="text" name="title" value="{{.Title}}" required></label>
+<label>Rule <textarea name="rule" rows="4" required>{{.Rule}}</textarea></label>
+<label>Applies when <textarea name="applies_when" rows="2">{{.AppliesWhen}}</textarea></label>
+<label>Rationale <textarea name="rationale" rows="3">{{.Rationale}}</textarea></label>
+<label>Reviewer check <textarea name="reviewer_check" rows="2">{{.ReviewerCheck}}</textarea></label>
+<label>Example <textarea name="example" rows="3">{{.Example}}</textarea></label>
+<label>Review by, a day in UTC, blank for 90 days from today <input type="date" name="review_by" value="{{.ReviewBy}}"></label>
+<button type="submit">Ratify</button>
+</form>
+{{end}}{{end}}

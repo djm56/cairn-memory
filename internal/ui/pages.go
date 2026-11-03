@@ -49,12 +49,19 @@ func readerCtx(r *http.Request, s signedIn, project string) context.Context {
 type navView struct {
 	Name, Role string
 	Projects   []string
+	// Operator is set for an operator's key. Only then does a page render an action form.
+	Operator bool
+	// CSRF is the value each action form carries in its hidden csrf field (DESIGN §5.5).
+	CSRF string
 }
 
 // navFor returns the header of a signed-in page. The switcher is read best effort: a failed
 // read leaves the list empty and is logged, so the page itself still answers.
 func (u *ui) navFor(ctx context.Context, s signedIn) *navView {
-	nav := &navView{Name: s.Key.Name, Role: string(s.Key.Scope)}
+	nav := &navView{
+		Name: s.Key.Name, Role: string(s.Key.Scope),
+		Operator: s.Key.Scope == auth.ScopeOperator, CSRF: csrfToken(s.token),
+	}
 	names, err := u.projectNames(ctx)
 	if err != nil {
 		u.log.Error("project switcher failed", "cause", u.redacted(err))
@@ -533,19 +540,32 @@ func reviewOf(data json.RawMessage) (verdict, counts string) {
 // ---- learnings ----
 
 // learningRow is one learning. Project and its links are set on the cross-project list; the
-// task link is set when the learning has a task of a valid project and id.
+// task link is set when the learning has a task of a valid project and id. Ratifiable is set
+// for an operator on an accepted learning, and Decide is set for an operator on a proposed one.
 type learningRow struct {
 	ID                                            int64
 	Project, ProjectHref                          string
 	Kind, Title, Body, Target, Rationale, Example string
 	Status, DecidedBy, DecidedAt, DecisionNote    string
 	TaskID, TaskHref                              string
+	Ratifiable                                    bool
+	Decide                                        *decideForm
+}
+
+// decideForm is the decide form of one proposed learning. Its values are the defaults, or the
+// ones the operator typed when the decision failed (DESIGN §5.5). Project is the page the form
+// sits on, which the decision returns to when it fails; it is "" on the all-projects list.
+type decideForm struct {
+	ID                         int64
+	Project                    string
+	Status, SupersededBy, Note string
 }
 
 // learningsPage is a list of learnings, one project's or every project's, with its filters.
 type learningsPage struct {
 	Project       string
 	AllProjects   bool
+	Operator      bool
 	StatusOptions []option
 	KindOptions   []option
 	Learnings     []learningRow
@@ -556,27 +576,35 @@ type learningsPage struct {
 // projectLearnings lists one project's learnings. The project is checked first.
 func (u *ui) projectLearnings(w http.ResponseWriter, r *http.Request, s signedIn) {
 	project := r.PathValue("project")
-	ctx := readerCtx(r, s, "")
 	if !core.ValidProjectName(project) {
-		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+		u.pageFail(w, readerCtx(r, s, ""), s, http.StatusNotFound, msgNotFound)
 		return
 	}
-	pctx := readerCtx(r, s, project)
-	if _, err := u.project(pctx, project); err != nil {
-		u.pageError(w, r, ctx, s, err)
-		return
-	}
-	u.learningsList(w, r, s, pctx, false, project)
+	u.renderLearnings(w, r, s, project, failed{})
 }
 
 // learnings lists the learnings of every project, through learning_list with all_projects.
 func (u *ui) learnings(w http.ResponseWriter, r *http.Request, s signedIn) {
-	u.learningsList(w, r, s, readerCtx(r, s, ""), true, "")
+	u.renderLearnings(w, r, s, "", failed{})
+}
+
+// renderLearnings answers the learnings page of project, or of every project when project is "".
+// A project's page checks the project before any other read, as the page does (DESIGN §5.5). f
+// is the failed form to show, if any.
+func (u *ui) renderLearnings(w http.ResponseWriter, r *http.Request, s signedIn, project string, f failed) {
+	ctx := readerCtx(r, s, project)
+	if project != "" {
+		if _, err := u.project(ctx, project); err != nil {
+			u.pageError(w, r, readerCtx(r, s, ""), s, err)
+			return
+		}
+	}
+	u.learningsList(w, r, s, ctx, project == "", project, f)
 }
 
 // learningsList answers a learnings page. The status defaults to proposed, and "all" lifts the
 // status filter. The kind is one of the three kinds, or every kind.
-func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, ctx context.Context, all bool, project string) {
+func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, ctx context.Context, all bool, project string, f failed) {
 	q := r.URL.Query()
 	status := q.Get("status")
 	if status == "" {
@@ -592,15 +620,16 @@ func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, c
 	}
 	list, err := u.cfg.Service.LearningList(ctx, req)
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(w, r, readerCtx(r, s, ""), s, err)
 		return
 	}
 	base := "/ui/learnings"
 	if !all {
 		base = projectLearningsHref(project)
 	}
+	operator := s.Key.Scope == auth.ScopeOperator
 	out := learningsPage{
-		Project: project, AllProjects: all,
+		Project: project, AllProjects: all, Operator: operator,
 		StatusOptions: optionsOf(status, "", "proposed", "accepted", "rejected", "applied",
 			"retired", "superseded", "all"),
 		KindOptions: optionsOf(kind, "any kind", "", "finding", "pattern", "agent-note"),
@@ -608,9 +637,34 @@ func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, c
 		FormAction:  base,
 	}
 	for _, l := range list.Learnings {
-		out.Learnings = append(out.Learnings, learningRowOf(l))
+		row := learningRowOf(l)
+		if operator {
+			row.Ratifiable = l.Status == core.LearningAccepted
+			if l.Status == core.LearningProposed {
+				row.Decide = decideFormOf(l.ID, project, f)
+			}
+		}
+		out.Learnings = append(out.Learnings, row)
 	}
-	u.render(w, http.StatusOK, "learnings", view{Title: "Learnings", Nav: u.navFor(ctx, s), Page: out})
+	code := http.StatusOK
+	if f.active() {
+		code = f.Status
+	}
+	u.render(w, code, "learnings", view{Title: "Learnings", Nav: u.navFor(ctx, s), Notice: f.Message, Page: out})
+}
+
+// decideFormOf returns the decide form of learning id. The form shows the typed values when the
+// failed decision was for this learning, and the defaults otherwise.
+func decideFormOf(id int64, project string, f failed) *decideForm {
+	d := &decideForm{ID: id, Project: project, Status: "accepted"}
+	if f.active() && f.Target == strconv.FormatInt(id, 10) {
+		if v := f.Draft["status"]; v != "" {
+			d.Status = v
+		}
+		d.SupersededBy = f.Draft["superseded_by"]
+		d.Note = f.Draft["note"]
+	}
+	return d
 }
 
 // learningRowOf converts a learning to a row.
@@ -633,12 +687,19 @@ type directiveRow struct {
 	AppliesWhen, Rule, Rationale, ReviewerCheck string
 	Example, ReviewBy, RatifiedBy, RatifiedAt   string
 	RetiredAt, SourceLearning                   string
+	// Actions is set for an operator on a directive that is not retired. ReaffirmBy is the day
+	// its reaffirm form offers.
+	Actions    bool
+	ReaffirmBy string
 }
 
 // directivesPage is the directives across projects, of one state, with the head figures.
+// Operator is set for an operator's key: an active directive then carries the reaffirm and
+// retire forms, and the page links to the ratify form.
 type directivesPage struct {
 	State          string
 	StateOptions   []option
+	Operator       bool
 	Active         int
 	Expired        int
 	OldestReview   string
@@ -650,6 +711,13 @@ type directivesPage struct {
 // directives lists the directives of the state in the query, active by default, with the head
 // figures of the dashboard: the active count, the expired count and the oldest review_by.
 func (u *ui) directives(w http.ResponseWriter, r *http.Request, s signedIn) {
+	u.renderDirectives(w, r, s, failed{})
+}
+
+// renderDirectives answers the directives page. f is the failed form to show, if any; the page
+// shows the state in the query, which a re-rendered page of a failed POST does not carry, so it
+// is the active list.
+func (u *ui) renderDirectives(w http.ResponseWriter, r *http.Request, s signedIn, f failed) {
 	q := r.URL.Query()
 	ctx := readerCtx(r, s, "")
 	state := q.Get("state")
@@ -668,9 +736,11 @@ func (u *ui) directives(w http.ResponseWriter, r *http.Request, s signedIn) {
 		u.pageError(w, r, ctx, s, err)
 		return
 	}
+	operator := s.Key.Scope == auth.ScopeOperator
 	out := directivesPage{
 		State:        state,
 		StateOptions: optionsOf(state, "", "active", "retired"),
+		Operator:     operator,
 		Active:       d.Directives.Active,
 		Expired:      d.Directives.Expired,
 		OldestReview: d.Directives.OldestReviewBy,
@@ -680,9 +750,26 @@ func (u *ui) directives(w http.ResponseWriter, r *http.Request, s signedIn) {
 		out.OldestRatified = fmt.Sprintf("%d days ago", *d.Directives.OldestAgeDays)
 	}
 	for _, b := range browse.Directives {
-		out.Directives = append(out.Directives, directiveRowOf(b))
+		row := directiveRowOf(b)
+		if operator && row.State != "retired" && core.ValidDirectiveCode(row.Code) {
+			row.Actions = true
+			row.ReaffirmBy = defaultReviewBy()
+			if f.active() && f.Target == row.Code && f.Draft["review_by"] != "" {
+				row.ReaffirmBy = f.Draft["review_by"]
+			}
+		}
+		out.Directives = append(out.Directives, row)
 	}
-	u.render(w, http.StatusOK, "directives", view{Title: "Directives", Nav: u.navFor(ctx, s), Page: out})
+	code := http.StatusOK
+	if f.active() {
+		code = f.Status
+	}
+	u.render(w, code, "directives", view{Title: "Directives", Nav: u.navFor(ctx, s), Notice: f.Message, Page: out})
+}
+
+// defaultReviewBy is the day a reaffirm form offers: 90 days from today, in UTC (DESIGN §5.5).
+func defaultReviewBy() string {
+	return time.Now().UTC().AddDate(0, 0, core.DirectiveReviewDays).Format("2006-01-02")
 }
 
 // directiveRowOf converts a browsed directive to a row.
@@ -765,22 +852,40 @@ func closeSwitchesOn(c core.ClosePolicy) int {
 	return n
 }
 
-// switchRow is one close-policy switch of a project's settings.
+// switchRow is one close-policy switch of a project's settings. State is the stored value, as
+// text. On is the value the form shows: the stored one, or the one the operator typed when a save
+// failed. Key is the form field.
 type switchRow struct {
-	Label, State string
+	Key, Label, State string
+	On                bool
 }
 
-// projectPage is one project's settings, shown as text for an operator and a viewer alike.
+// projectPage is one project's settings. An operator gets the form, with the display name and
+// the switches as selects; a viewer gets the same values as text.
 type projectPage struct {
 	Name, DisplayName, CreatedAt, LastSeenAt string
 	Parallel                                 string
+	ParallelOn                               bool
 	Switches                                 []switchRow
 	LearningsHref                            string
+	Operator                                 bool
+}
+
+// settingsKeys are the form fields of the settings form, in the order the page shows them. The
+// first is parallel_tasks; the rest are the five close-policy switches of CONTRACT §8.
+var settingsKeys = []string{
+	"parallel_tasks", "require_summary", "require_criteria_results", "require_lessons",
+	"require_mistakes", "require_no_active_steps",
 }
 
 // projectSettings shows one project's settings. The project is checked first.
 func (u *ui) projectSettings(w http.ResponseWriter, r *http.Request, s signedIn) {
-	name := r.PathValue("project")
+	u.renderSettings(w, r, s, r.PathValue("project"), failed{})
+}
+
+// renderSettings answers the settings page of name. f is the failed save to show, if any: its
+// draft holds what the operator typed, and the form shows it in place of the stored values.
+func (u *ui) renderSettings(w http.ResponseWriter, r *http.Request, s signedIn, name string, f failed) {
 	ctx := readerCtx(r, s, "")
 	if !core.ValidProjectName(name) {
 		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
@@ -792,18 +897,37 @@ func (u *ui) projectSettings(w http.ResponseWriter, r *http.Request, s signedIn)
 		return
 	}
 	c := p.Settings.ClosePolicy
+	// shown returns the form's value for key: the typed one after a failed save, else the stored one.
+	shown := func(key string, stored bool) bool {
+		if f.active() {
+			if v, ok := f.Draft[key]; ok {
+				return v == "on"
+			}
+		}
+		return stored
+	}
+	display := p.DisplayName
+	if v, ok := f.Draft["display_name"]; ok && f.active() {
+		display = v
+	}
 	out := projectPage{
-		Name: p.Name, DisplayName: p.DisplayName,
+		Name: p.Name, DisplayName: display,
 		CreatedAt: stamp(p.CreatedAt), LastSeenAt: stamp(p.LastSeenAt),
-		Parallel: onOff(p.Settings.ParallelTasks),
+		Parallel:   onOff(p.Settings.ParallelTasks),
+		ParallelOn: shown("parallel_tasks", p.Settings.ParallelTasks),
 		Switches: []switchRow{
-			{"Summary", onOff(c.RequireSummary)},
-			{"Criteria results", onOff(c.RequireCriteriaResults)},
-			{"Lessons, or a reason for none", onOff(c.RequireLessons)},
-			{"Mistakes", onOff(c.RequireMistakes)},
-			{"No active steps", onOff(c.RequireNoActiveSteps)},
+			{"require_summary", "Summary", onOff(c.RequireSummary), shown("require_summary", c.RequireSummary)},
+			{"require_criteria_results", "Criteria results", onOff(c.RequireCriteriaResults), shown("require_criteria_results", c.RequireCriteriaResults)},
+			{"require_lessons", "Lessons, or a reason for none", onOff(c.RequireLessons), shown("require_lessons", c.RequireLessons)},
+			{"require_mistakes", "Mistakes", onOff(c.RequireMistakes), shown("require_mistakes", c.RequireMistakes)},
+			{"require_no_active_steps", "No active steps", onOff(c.RequireNoActiveSteps), shown("require_no_active_steps", c.RequireNoActiveSteps)},
 		},
 		LearningsHref: projectLearningsHref(p.Name),
+		Operator:      s.Key.Scope == auth.ScopeOperator,
 	}
-	u.render(w, http.StatusOK, "project", view{Title: p.Name, Nav: u.navFor(ctx, s), Page: out})
+	code := http.StatusOK
+	if f.active() {
+		code = f.Status
+	}
+	u.render(w, code, "project", view{Title: p.Name, Nav: u.navFor(ctx, s), Notice: f.Message, Page: out})
 }

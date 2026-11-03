@@ -16,6 +16,19 @@
 {{if .DecidedBy}}<dt>Decided</dt><dd>{{.DecidedBy}} · {{.DecidedAt}}</dd>{{end}}
 {{with .DecisionNote}}<dt>Decision note</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
 </dl>
+{{with .Decide}}<form method="post" action="/ui/learnings/{{.ID}}/decide" class="action">
+<input type="hidden" name="csrf" value="{{$.Nav.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<label>Decision <select name="status">
+<option value="accepted"{{if eq .Status "accepted"}} selected{{end}}>accepted</option>
+<option value="rejected"{{if eq .Status "rejected"}} selected{{end}}>rejected</option>
+<option value="superseded"{{if eq .Status "superseded"}} selected{{end}}>superseded</option>
+</select></label>
+<label>Superseded by, a learning id (for superseded) <input type="text" name="superseded_by" value="{{.SupersededBy}}" inputmode="numeric"></label>
+<label>Note, required <textarea name="note" rows="2" required>{{.Note}}</textarea></label>
+<button type="submit">Record decision</button>
+</form>{{end}}
+{{if .Ratifiable}}<p><a href="/ui/directives/new?from_learning={{.ID}}">Ratify as a directive</a></p>{{end}}
 </article>
 {{else}}<p class="muted">No learning matches these filters.</p>
 {{end}}

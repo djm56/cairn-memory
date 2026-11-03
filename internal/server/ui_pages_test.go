@@ -203,10 +203,32 @@ func startPages(t *testing.T, st *store.Store) pageSessions {
 	}
 }
 
+// checkActionForms checks the forms of one page. Every form names its method, so no form can post
+// by default. A viewer's page has no form that posts and no csrf field. An operator's page has
+// one csrf field for each form that posts (DESIGN §5.5, Viewer mode, CSRF).
+func checkActionForms(t *testing.T, label, role, body string) {
+	t.Helper()
+	forms := strings.Count(body, "<form")
+	gets := strings.Count(body, `method="get"`)
+	posts := strings.Count(body, `method="post"`)
+	fields := strings.Count(body, `name="csrf"`)
+	if forms != gets+posts {
+		t.Errorf("%s: %d forms, %d with method=get and %d with method=post", label, forms, gets, posts)
+	}
+	if role == "viewer" {
+		if posts != 0 || fields != 0 {
+			t.Errorf("%s: a viewer's page has %d forms that post and %d csrf fields", label, posts, fields)
+		}
+		return
+	}
+	if fields != posts {
+		t.Errorf("%s: %d forms post but %d carry the csrf field", label, posts, fields)
+	}
+}
+
 // TestEveryReadPageRendersForOperatorAndViewer checks that each read page answers 200 with the
 // signed-in key's name and role in its header, and with the security headers. A viewer's page
-// has no form that posts, and neither does an operator's, since the actions arrive in a later
-// step (DESIGN §5.5, Viewer mode).
+// has no form that posts. An operator's forms each carry the csrf field (checkActionForms).
 func TestEveryReadPageRendersForOperatorAndViewer(t *testing.T) {
 	st := openStore(t)
 	f := seedPages(t, st, plainText)
@@ -226,9 +248,7 @@ func TestEveryReadPageRendersForOperatorAndViewer(t *testing.T) {
 			if !strings.Contains(body, who.name+" ("+who.role+")") {
 				t.Errorf("%s: the header does not name the key and its role", label)
 			}
-			if strings.Contains(strings.ToLower(body), `method="post"`) {
-				t.Errorf("%s: the page renders a form that posts", label)
-			}
+			checkActionForms(t, label, who.role, body)
 			checkPageHeaders(t, label, resp)
 		}
 	}

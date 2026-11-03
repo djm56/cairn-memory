@@ -1,4 +1,5 @@
 {{define "body"}}{{with .Page}}<h1>Directives</h1>
+{{if .Operator}}<p><a class="button" href="/ui/directives/new">Ratify a directive</a></p>{{end}}
 <dl class="facts">
 <dt>Active</dt><dd>{{.Active}}</dd>
 <dt>Expired</dt><dd>{{.Expired}}</dd>
@@ -20,6 +21,16 @@
 {{with .Example}}<dt>Example</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
 <dt>Ratified</dt><dd>{{.RatifiedBy}} · {{.RatifiedAt}}{{with .SourceLearning}} · from learning {{.}}{{end}}</dd>
 </dl>
+{{if .Actions}}<form method="post" action="/ui/directives/{{.Code}}/reaffirm" class="action">
+<input type="hidden" name="csrf" value="{{$.Nav.CSRF}}">
+<label>Review by, a day in UTC <input type="date" name="review_by" value="{{.ReaffirmBy}}" required></label>
+<button type="submit">Reaffirm</button>
+</form>
+<form method="post" action="/ui/directives/{{.Code}}/retire" class="action">
+<input type="hidden" name="csrf" value="{{$.Nav.CSRF}}">
+<label><input type="checkbox" name="confirm" value="yes"> Confirm. Retiring is final; to keep the rule, reaffirm it instead.</label>
+<button type="submit">Retire</button>
+</form>{{end}}
 </article>
 {{else}}<p class="muted">No directive is listed.</p>
 {{end}}
