@@ -481,6 +481,14 @@ type DirectiveRetireRequest struct {
 	Code string `json:"code"`
 }
 
+// DirectiveReaffirmRequest moves the review_by of an active directive, in place (CONTRACT
+// §8). ReviewBy is a YYYY-MM-DD day in UTC, after today. Empty means DirectiveReviewDays
+// from now.
+type DirectiveReaffirmRequest struct {
+	Code     string `json:"code"`
+	ReviewBy string `json:"review_by,omitempty"`
+}
+
 // ProjectSettingsRequest replaces a project's settings. The call replaces the
 // whole object, so Settings must give every switch: a nil Settings, or one with
 // any switch left nil, is invalid rather than read as off (CONTRACT §8, §9 item 23).

@@ -46,6 +46,7 @@ const (
 	RouteLearningDecide     = "/operator/learning_decide"
 	RouteDirectiveRatify    = "/operator/directive_ratify"
 	RouteDirectiveRetire    = "/operator/directive_retire"
+	RouteDirectiveReaffirm  = "/operator/directive_reaffirm"
 	RouteProjectSettingsSet = "/operator/project_settings_set"
 	// The web UI's reads (CONTRACT §8.1). They sit under /operator/ for grouping only: an
 	// operator or a viewer key may make them, and an agent key is refused.
@@ -144,6 +145,7 @@ var routeAccess = map[string]access{
 	RouteLearningDecide:     accessWrite,
 	RouteDirectiveRatify:    accessWrite,
 	RouteDirectiveRetire:    accessWrite,
+	RouteDirectiveReaffirm:  accessWrite,
 	RouteProjectSettingsSet: accessWrite,
 	RouteProjectList:        accessRead,
 	RouteTaskBrowse:         accessRead,
@@ -198,6 +200,7 @@ var operatorRoutes = map[string]bool{
 	RouteLearningDecide:     true,
 	RouteDirectiveRatify:    true,
 	RouteDirectiveRetire:    true,
+	RouteDirectiveReaffirm:  true,
 	RouteProjectSettingsSet: true,
 }
 
@@ -298,6 +301,7 @@ func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Ha
 	handle(RouteLearningDecide, call(caller, onFailure, specOf(RouteLearningDecide), svc.LearningDecide))
 	handle(RouteDirectiveRatify, call(caller, onFailure, specOf(RouteDirectiveRatify), svc.DirectiveRatify))
 	handle(RouteDirectiveRetire, call(caller, onFailure, specOf(RouteDirectiveRetire), svc.DirectiveRetire))
+	handle(RouteDirectiveReaffirm, call(caller, onFailure, specOf(RouteDirectiveReaffirm), svc.DirectiveReaffirm))
 	handle(RouteProjectSettingsSet, call(caller, onFailure, specOf(RouteProjectSettingsSet), svc.ProjectSettingsSet))
 
 	handle(RouteProjectList, call(caller, onFailure, specOf(RouteProjectList), svc.ProjectList))

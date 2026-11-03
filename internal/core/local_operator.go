@@ -302,6 +302,74 @@ func (l *Local) DirectiveRetire(ctx context.Context, req DirectiveRetireRequest)
 	return &out, nil
 }
 
+// DirectiveReaffirm moves the review_by of an active directive, in place (CONTRACT §8,
+// decision D26). The code, scope, rule, source learning and ratification are unchanged.
+// One row of directive_reaffirmations is written in the same transaction, with the
+// previous and the new day, the operator's name and the time. A retired directive is
+// refused: it is ratified again as a new code. An expired directive is reaffirmed like any
+// other. An empty review_by means DirectiveReviewDays from now, as ratify gives it.
+func (l *Local) DirectiveReaffirm(ctx context.Context, req DirectiveReaffirmRequest) (*Directive, error) {
+	c, err := operatorFor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !ValidDirectiveCode(req.Code) {
+		return nil, Invalid("a directive code is required, such as D-0001: %q is not one", req.Code)
+	}
+	var explicit *time.Time
+	if req.ReviewBy != "" {
+		day, err := time.Parse(reviewByLayout, req.ReviewBy)
+		if err != nil {
+			return nil, Invalid("review_by %q is not a date: give YYYY-MM-DD, a day in UTC", req.ReviewBy)
+		}
+		explicit = &day
+	}
+
+	var out Directive
+	err = l.st.WithTx(ctx, func(q store.Querier) error {
+		row, err := store.GetDirectiveByCode(ctx, q, req.Code)
+		if errors.Is(err, store.ErrNotFound) {
+			return NotFound("directive %s not found", req.Code)
+		}
+		if err != nil {
+			return err
+		}
+		if row.Status == string(DirectiveRetired) {
+			return Refused("directive %s is retired: a retired directive is ratified again as a new code, not reaffirmed", row.Code)
+		}
+		// An active directive always has a review_by: migration 0005 gave one to each, and
+		// ratify sets one. A missing one is a fault in the store, not a caller's error.
+		if row.ReviewBy == nil {
+			return errors.New("active directive " + row.Code + " has no review_by")
+		}
+		now := l.now()
+		reviewBy := now.AddDate(0, 0, DirectiveReviewDays)
+		if explicit != nil {
+			if !explicit.After(now) {
+				return Invalid("review_by %s is not in the future: give a day after today", req.ReviewBy)
+			}
+			reviewBy = *explicit
+		}
+		previous := *row.ReviewBy
+		if err := store.UpdateDirectiveReviewBy(ctx, q, row.Code, reviewBy); err != nil {
+			return err
+		}
+		if err := store.InsertDirectiveReaffirmation(ctx, q, store.ReaffirmationRow{
+			DirectiveID: row.ID, PreviousReviewBy: previous, ReviewBy: reviewBy,
+			ReaffirmedBy: c.Agent, ReaffirmedAt: now,
+		}); err != nil {
+			return err
+		}
+		row.ReviewBy = &reviewBy
+		out = directiveFromRow(row)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ProjectSettingsSet replaces a project's settings: parallel tasks and the
 // close policy (CONTRACT §8). The project is created if it has no row yet. A nil
 // display name leaves the stored one as it is. Settings must be given whole: an
