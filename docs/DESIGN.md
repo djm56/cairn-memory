@@ -346,6 +346,12 @@ ui_sessions     (schema 6, M3) token_hash PK, key_id, created_at, expires_at,
 Schema 6 (M3, migration 0006) adds `ui_sessions` here and `directive_reaffirmations`
 in §3.4.
 
+A stored `settings` value is decoded onto the defaults of §3.7. A switch the stored object
+leaves out reads as its default, and `'{}'`, the column default, reads as the defaults all
+round. The reads (`project_list`, CONTRACT §8.1) and the close rules (`task_close`, §3.7)
+decode it the same way, so a page shows the policy that is enforced. Every write stores the
+whole object (CONTRACT §8, `project_settings_set`).
+
 The step-review rule is deferred to Later (#41).
 
 ### 3.7 The close policy

@@ -109,6 +109,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 ### Changed
 
+- Behaviour change, M3 review fix (step 6 review W1): a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.
+
 - M3 review fixes for the web UI sign-in (step 4 review): a path the mux cleans first,
   such as `//ui/x`, now carries the UI's headers on the mux's own redirect. The UI's
   log lines quote the path, and the redacted cause of a render failure is logged

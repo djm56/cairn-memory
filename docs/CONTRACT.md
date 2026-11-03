@@ -459,7 +459,9 @@ who may call them, not the path. No MCP tool exposes them.
 last_seen_at, settings}`, where `settings` has the shape `ProjectSettingsSet`
 takes (`parallel_tasks`, `close_policy`); and `next`. A stored settings value of
 `'{}'`, the column default, is read as the defaults of `DefaultSettings`:
-`parallel_tasks` false, and every close-policy switch on.
+`parallel_tasks` false, and every close-policy switch on. The same holds for a switch
+that a stored object leaves out, and the close rules of `task_close` read a stored value
+in the same way, so the settings shown here are the ones enforced (DESIGN §3.6).
 **Errors:** `operator_only` for an agent caller. `invalid` for a bad `project`
 name, `limit` or `cursor`. `not_found` when `project` names no row.
 

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -38,13 +37,12 @@ func isReader(role Role) bool {
 	return role == RoleOperator || role == RoleViewer
 }
 
-// projectFromRow converts a stored project to the core form. A settings value of
-// '{}', the column default, reads as DefaultSettings: the defaults are filled in
-// before the stored object is decoded, so every switch the object leaves out keeps its
-// default (CONTRACT §8.1, project_list).
+// projectFromRow converts a stored project to the core form. Its settings are read by
+// decodeSettings, the reader the close rules use too, so a '{}' value reads as
+// DefaultSettings here and in enforcement (CONTRACT §8.1, project_list).
 func projectFromRow(r store.ProjectRow) (Project, error) {
-	settings := DefaultSettings()
-	if err := json.Unmarshal([]byte(r.Settings), &settings); err != nil {
+	settings, err := decodeSettings(r.Settings)
+	if err != nil {
 		return Project{}, fmt.Errorf("core: settings of project %s: %w", r.Name, err)
 	}
 	return Project{
