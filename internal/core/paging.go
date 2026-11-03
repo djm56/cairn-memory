@@ -21,33 +21,84 @@ func pageSize(limit, def int) (int, error) {
 	return limit, nil
 }
 
-// encodeTaskCursor returns the opaque cursor that resumes a task list below
-// key. The cursor is the key's time and id, base64url encoded, so a client
-// treats it as a token.
-func encodeTaskCursor(key store.TaskKey) string {
-	raw := key.UpdatedAt.UTC().Format(time.RFC3339Nano) + "|" + key.ID
+// encodeTimeKey returns the opaque cursor that resumes a list below the position
+// (at, id): a time and an id, base64url encoded, so a client treats it as a token.
+// The task list and the directive browse page this way.
+func encodeTimeKey(at time.Time, id string) string {
+	raw := at.UTC().Format(time.RFC3339Nano) + "|" + id
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+// decodeTimeKey reads a cursor from encodeTimeKey. An empty cursor is the first page,
+// and reports ok false with no error. Anything else that does not decode is invalid.
+func decodeTimeKey(cursor string) (at time.Time, id string, ok bool, err error) {
+	if cursor == "" {
+		return time.Time{}, "", false, nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return time.Time{}, "", false, Invalid("cursor is not valid")
+	}
+	ts, id, found := strings.Cut(string(raw), "|")
+	if !found {
+		return time.Time{}, "", false, Invalid("cursor is not valid")
+	}
+	at, err = time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		return time.Time{}, "", false, Invalid("cursor is not valid")
+	}
+	return at, id, true, nil
+}
+
+// encodeTaskCursor returns the opaque cursor that resumes a task list below key.
+func encodeTaskCursor(key store.TaskKey) string {
+	return encodeTimeKey(key.UpdatedAt, key.ID)
 }
 
 // decodeTaskCursor reads a cursor from encodeTaskCursor. An empty cursor is the
 // first page and returns nil. Anything else that does not decode is invalid.
 func decodeTaskCursor(cursor string) (*store.TaskKey, error) {
+	at, id, ok, err := decodeTimeKey(cursor)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &store.TaskKey{UpdatedAt: at, ID: id}, nil
+}
+
+// encodeDirectiveCursor returns the opaque cursor that resumes a directive browse
+// below key.
+func encodeDirectiveCursor(key store.DirectiveKey) string {
+	return encodeTimeKey(key.At, key.Code)
+}
+
+// decodeDirectiveCursor reads a cursor from encodeDirectiveCursor. An empty cursor is
+// the first page and returns nil. Anything else that does not decode is invalid.
+func decodeDirectiveCursor(cursor string) (*store.DirectiveKey, error) {
+	at, code, ok, err := decodeTimeKey(cursor)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &store.DirectiveKey{At: at, Code: code}, nil
+}
+
+// encodeNameCursor returns the opaque cursor that resumes a project list below name.
+func encodeNameCursor(name string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(name))
+}
+
+// decodeNameCursor reads a cursor from encodeNameCursor. An empty cursor is the first
+// page and returns nil. A cursor that does not decode, or whose name is not a project
+// name, is invalid.
+func decodeNameCursor(cursor string) (*string, error) {
 	if cursor == "" {
 		return nil, nil
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(cursor)
-	if err != nil {
+	if err != nil || !ValidProjectName(string(raw)) {
 		return nil, Invalid("cursor is not valid")
 	}
-	ts, id, ok := strings.Cut(string(raw), "|")
-	if !ok {
-		return nil, Invalid("cursor is not valid")
-	}
-	at, err := time.Parse(time.RFC3339Nano, ts)
-	if err != nil {
-		return nil, Invalid("cursor is not valid")
-	}
-	return &store.TaskKey{UpdatedAt: at, ID: id}, nil
+	name := string(raw)
+	return &name, nil
 }
 
 // encodeCursor returns the opaque cursor that resumes a list at position v. The

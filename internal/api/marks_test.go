@@ -45,14 +45,24 @@ var expectedRoutes = []expectedRoute{
 	{RouteProjectSettingsSet, accessWrite, true},
 }
 
+// expectedReaders is the four web UI reads of CONTRACT §8.1, written out by hand. Each is a
+// read, under /operator/, and an agent key is refused on it. A viewer key and an operator key
+// may make it.
+var expectedReaders = []string{
+	RouteProjectList,
+	RouteTaskBrowse,
+	RouteDirectiveBrowse,
+	RouteDashboard,
+}
+
 // TestRouteMarksMatchTheExpectedTable compares every mark with the table. It fails when
 // a route is marked the wrong way, when a route is marked but missing from the table, or
 // when the table names an operator route the marks do not have. TestEveryRouteIsGatedByItsMark
 // checks the same marks through the wire, so a flipped mark is caught twice.
 func TestRouteMarksMatchTheExpectedTable(t *testing.T) {
-	if len(routeAccess) != len(expectedRoutes) {
-		t.Fatalf("routeAccess has %d routes, the expected table %d: add a new route to both",
-			len(routeAccess), len(expectedRoutes))
+	if want := len(expectedRoutes) + len(expectedReaders); len(routeAccess) != want {
+		t.Fatalf("routeAccess has %d routes, the expected tables %d: add a new route to both",
+			len(routeAccess), want)
 	}
 	for _, e := range expectedRoutes {
 		got, ok := routeAccess[e.route]
@@ -66,8 +76,22 @@ func TestRouteMarksMatchTheExpectedTable(t *testing.T) {
 			t.Errorf("%s: the table names an operator route that is not a write", e.route)
 		}
 	}
+	for _, route := range expectedReaders {
+		if got, ok := routeAccess[route]; !ok || got != accessRead {
+			t.Errorf("%s: access mark %v, want a read", route, got)
+		}
+		if !uiReadRoutes[route] {
+			t.Errorf("%s: not marked as a web UI read", route)
+		}
+		if operatorRoutes[route] {
+			t.Errorf("%s: marked as an operator write, but it is a read that a viewer may make", route)
+		}
+	}
 	if want := 4; len(operatorRoutes) != want {
 		t.Errorf("operatorRoutes has %d routes, want %d (CONTRACT §8)", len(operatorRoutes), want)
+	}
+	if want := 4; len(uiReadRoutes) != want {
+		t.Errorf("uiReadRoutes has %d routes, want %d (CONTRACT §8.1)", len(uiReadRoutes), want)
 	}
 }
 
@@ -141,6 +165,26 @@ func TestEveryRouteIsGatedByItsMark(t *testing.T) {
 				t.Errorf("operator with a malformed body on %s: status %d, want 400 from the decoder: %s",
 					e.route, rec.Code, rec.Body.String())
 			}
+		}
+	}
+
+	// The web UI reads (CONTRACT §8.1): an agent is refused before the body, and an operator
+	// and a viewer are not. The viewer reaches core, which is unimplemented here, so 500.
+	for _, route := range expectedReaders {
+		rec := callRoute(agent, route, malformed)
+		if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), `"operator_only"`) {
+			t.Errorf("agent with a malformed body on web UI read %s: status %d, want 403 operator_only: %s",
+				route, rec.Code, rec.Body.String())
+		}
+		rec = callRoute(operator, route, malformed)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("operator with a malformed body on web UI read %s: status %d, want 400 from the decoder: %s",
+				route, rec.Code, rec.Body.String())
+		}
+		rec = callRoute(viewer, route, malformed)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("viewer with a malformed body on web UI read %s: status %d, want 400 from the decoder: %s",
+				route, rec.Code, rec.Body.String())
 		}
 	}
 }

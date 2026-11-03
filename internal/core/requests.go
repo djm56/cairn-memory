@@ -348,6 +348,107 @@ type SearchResult struct {
 	Next string      `json:"next,omitempty"`
 }
 
+// ---- the web UI's reads (CONTRACT §8.1) ----
+//
+// An operator or a viewer may make these, and they need no project. They list across
+// projects and create no project row. The dashboard figures are defined in CONTRACT §8.1.
+
+// ProjectListRequest asks for projects in name order. Project, when set, names one
+// project exactly, and the answer is that project or not_found.
+type ProjectListRequest struct {
+	Project string `json:"project,omitempty"`
+	Limit   int    `json:"limit,omitempty"` // default 20
+	Cursor  string `json:"cursor,omitempty"`
+}
+
+// ProjectList is a page of projects, ordered by name.
+type ProjectList struct {
+	Projects []Project `json:"projects"`
+	Next     string    `json:"next,omitempty"`
+}
+
+// TaskBrowseRequest asks for tasks of every project, or of Project when it is set.
+// Status is a list, and empty means every status.
+type TaskBrowseRequest struct {
+	Project string       `json:"project,omitempty"`
+	Status  []TaskStatus `json:"status,omitempty"`
+	Limit   int          `json:"limit,omitempty"` // default 20
+	Cursor  string       `json:"cursor,omitempty"`
+}
+
+// TaskBrowse is a page of tasks, most recently updated first.
+type TaskBrowse struct {
+	Tasks []TaskSummary `json:"tasks"`
+	Next  string        `json:"next,omitempty"`
+}
+
+// DirectiveBrowseRequest asks for the directives of one state, every one of them and
+// none capped. State is active (the default) or retired.
+type DirectiveBrowseRequest struct {
+	State  DirectiveStatus `json:"state,omitempty"`
+	Limit  int             `json:"limit,omitempty"` // default 20
+	Cursor string          `json:"cursor,omitempty"`
+}
+
+// DirectiveBrowse is a page of directives in the order of their state.
+type DirectiveBrowse struct {
+	Directives []BrowsedDirective `json:"directives"`
+	Next       string             `json:"next,omitempty"`
+}
+
+// Dashboard is the figures of the web UI's dashboard (CONTRACT §8.1, §9 item 51). Every
+// figure is read from one snapshot, at the server's time when the read starts.
+type Dashboard struct {
+	Running    DashboardRunning    `json:"running"`
+	Waiting    DashboardWaiting    `json:"waiting"`
+	Quality    DashboardQuality    `json:"quality_30d"`
+	Monthly    []DashboardMonth    `json:"monthly"` // six UTC months, oldest first
+	Directives DashboardDirectives `json:"directives"`
+}
+
+// DashboardRunning is the active tasks: their number, and the first DashboardRunningLimit
+// of them, most recently updated first.
+type DashboardRunning struct {
+	Count int           `json:"count"`
+	Tasks []TaskSummary `json:"tasks"`
+}
+
+// DashboardWaiting counts what waits for the operator.
+type DashboardWaiting struct {
+	ProposedLearnings int `json:"proposed_learnings"`
+	BlockedTasks      int `json:"blocked_tasks"`
+	ExpiredDirectives int `json:"expired_directives"`
+}
+
+// DashboardQuality is the tasks closed in the 30 days before now (done or failed), with
+// the criteria and high-impact mistakes recorded at those closes.
+type DashboardQuality struct {
+	Closed             int `json:"closed"`
+	Done               int `json:"done"`
+	CriteriaMet        int `json:"criteria_met"`
+	CriteriaTotal      int `json:"criteria_total"`
+	HighImpactMistakes int `json:"high_impact_mistakes"`
+}
+
+// DashboardMonth is one UTC calendar month of the dashboard's history.
+type DashboardMonth struct {
+	Month              string `json:"month"` // YYYY-MM
+	Closed             int    `json:"closed"`
+	Done               int    `json:"done"`
+	HighImpactMistakes int    `json:"high_impact_mistakes"`
+	DirectivesRatified int    `json:"directives_ratified"`
+}
+
+// DashboardDirectives counts the directives. OldestReviewBy and OldestAgeDays are left
+// out when no directive is active. OldestAgeDays is a pointer so that an age of zero is
+// still written.
+type DashboardDirectives struct {
+	Active         int    `json:"active"`
+	Expired        int    `json:"expired"`
+	OldestReviewBy string `json:"oldest_review_by,omitempty"` // YYYY-MM-DD
+	OldestAgeDays  *int   `json:"oldest_age_days,omitempty"`
+}
+
 // ---- operator calls ----
 
 type LearningDecideRequest struct {

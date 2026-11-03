@@ -100,12 +100,18 @@ func serveStyles(w http.ResponseWriter, _ *http.Request) {
 // internal answers a failure whose cause the browser must not see. The page says
 // "internal error", and the cause goes to the log, redacted.
 func (u *ui) internal(w http.ResponseWriter, r *http.Request, err error) {
+	u.log.Error("internal failure", "method", r.Method, "path", quoted(r.URL.Path), "cause", u.redacted(err))
+	u.fail(w, http.StatusInternalServerError, "internal error")
+}
+
+// redacted returns the text of err as it may be logged: with any key removed, when the
+// config gives a Redact function (Config.Redact).
+func (u *ui) redacted(err error) string {
 	cause := err.Error()
 	if u.cfg.Redact != nil {
 		cause = u.cfg.Redact(cause)
 	}
-	u.log.Error("internal failure", "method", r.Method, "path", r.URL.Path, "cause", cause)
-	u.fail(w, http.StatusInternalServerError, "internal error")
+	return cause
 }
 
 // fail answers status with the error page, showing msg as text. msg is always one of the
@@ -124,7 +130,7 @@ func (u *ui) render(w http.ResponseWriter, status int, name string, v view) {
 	}
 	var buf bytes.Buffer
 	if err := t.ExecuteTemplate(&buf, "layout", v); err != nil {
-		u.log.Error("render failed", "page", name, "cause", err.Error())
+		u.log.Error("render failed", "page", name, "cause", u.redacted(err))
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

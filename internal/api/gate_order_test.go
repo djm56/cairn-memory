@@ -64,6 +64,57 @@ func TestOperatorRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 	}
 }
 
+// readerRouteList is the four web UI reads of CONTRACT §8.1, by their route constants.
+var readerRouteList = []string{
+	api.RouteProjectList,
+	api.RouteTaskBrowse,
+	api.RouteDirectiveBrowse,
+	api.RouteDashboard,
+}
+
+// TestReaderRouteRefusesAnAgentBeforeTheBody checks the order of CONTRACT §1.2 and §8.1 on the
+// web UI reads: an agent key is refused with operator_only before the body is read, for every
+// body shape. A viewer key passes the role gate, so the same bodies reach the decoder and get
+// the decoder's answer (400, or 415 for a body that is not JSON). An operator key passes too.
+func TestReaderRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
+	st := openKeyStore(t)
+	h := keyedHandler(st, core.NewLocal(st))
+	agent := addKey(t, st, "ci", auth.ScopeAgent)
+	viewer := addKey(t, st, "watch", auth.ScopeViewer)
+
+	bodies := []struct {
+		what        string
+		body        string
+		contentType string
+		viewerCode  int
+	}{
+		{"a malformed body", `{"code":`, "application/json", http.StatusBadRequest},
+		{"an unknown field", `{"no_such_field":1}`, "application/json", http.StatusBadRequest},
+		{"a body that is not JSON", `code=D-0001`, "text/plain", http.StatusUnsupportedMediaType},
+	}
+	for _, route := range readerRouteList {
+		for _, b := range bodies {
+			hdr := bearer(agent)
+			hdr["Content-Type"] = b.contentType
+			got := serve(h, http.MethodPost, api.Prefix+route, b.body, hdr)
+			if got.Code != http.StatusForbidden {
+				t.Errorf("agent key on %s with %s: status %d, want 403 before the body is read: %s",
+					route, b.what, got.Code, got.Body.String())
+			} else if e := errorBody(t, got); e.Kind != core.KindOperatorOnly {
+				t.Errorf("agent key on %s with %s: kind %s, want operator_only", route, b.what, e.Kind)
+			}
+
+			hdr = bearer(viewer)
+			hdr["Content-Type"] = b.contentType
+			got = serve(h, http.MethodPost, api.Prefix+route, b.body, hdr)
+			if got.Code != b.viewerCode {
+				t.Errorf("viewer key on %s with %s: status %d, want %d from the decoder: %s",
+					route, b.what, got.Code, b.viewerCode, got.Body.String())
+			}
+		}
+	}
+}
+
 // TestUnauthenticatedAnswerNamesTheBearerScheme checks RFC 7235 §3.1 on a 401: it names
 // the scheme the server takes, and the answer still does not echo the credential.
 func TestUnauthenticatedAnswerNamesTheBearerScheme(t *testing.T) {

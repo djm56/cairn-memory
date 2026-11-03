@@ -10,6 +10,7 @@ import (
 type Service interface {
 	Agent
 	Operator
+	Reader
 }
 
 // Agent is the MCP tool surface (DESIGN.md §4), one method per tool. Every
@@ -44,6 +45,16 @@ type Operator interface {
 	DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest) (*Directive, error)
 	DirectiveRetire(ctx context.Context, req DirectiveRetireRequest) (*Directive, error)
 	ProjectSettingsSet(ctx context.Context, req ProjectSettingsRequest) (*Project, error)
+}
+
+// Reader holds the reads of the web UI (CONTRACT §8.1). An operator or a viewer may
+// make each one, and an agent is refused with KindOperatorOnly, checked before anything
+// else. None is an MCP tool. They need no project and create no project row.
+type Reader interface {
+	ProjectList(ctx context.Context, req ProjectListRequest) (*ProjectList, error)
+	TaskBrowse(ctx context.Context, req TaskBrowseRequest) (*TaskBrowse, error)
+	DirectiveBrowse(ctx context.Context, req DirectiveBrowseRequest) (*DirectiveBrowse, error)
+	Dashboard(ctx context.Context) (*Dashboard, error)
 }
 
 // ErrNotImplemented is returned by every Unimplemented call.
@@ -111,5 +122,17 @@ func (Unimplemented) DirectiveRetire(context.Context, DirectiveRetireRequest) (*
 	return nil, ErrNotImplemented
 }
 func (Unimplemented) ProjectSettingsSet(context.Context, ProjectSettingsRequest) (*Project, error) {
+	return nil, ErrNotImplemented
+}
+func (Unimplemented) ProjectList(context.Context, ProjectListRequest) (*ProjectList, error) {
+	return nil, ErrNotImplemented
+}
+func (Unimplemented) TaskBrowse(context.Context, TaskBrowseRequest) (*TaskBrowse, error) {
+	return nil, ErrNotImplemented
+}
+func (Unimplemented) DirectiveBrowse(context.Context, DirectiveBrowseRequest) (*DirectiveBrowse, error) {
+	return nil, ErrNotImplemented
+}
+func (Unimplemented) Dashboard(context.Context) (*Dashboard, error) {
 	return nil, ErrNotImplemented
 }

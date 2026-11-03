@@ -52,6 +52,9 @@ func TestHeadersOnEveryAnswer(t *testing.T) {
 			{"an unlisted path (404)", http.MethodGet, "/ui/nope", http.StatusNotFound},
 			{"a wrong method (405)", http.MethodPost, "/ui/", http.StatusMethodNotAllowed},
 			{"a sign-in with no body", http.MethodPost, "/ui/signin", http.StatusForbidden},
+			{"HEAD of the sign-in page", http.MethodHead, "/ui/signin", http.StatusOK},
+			{"a trailing slash on the sign-in page (404)", http.MethodGet, "/ui/signin/", http.StatusNotFound},
+			{"a trailing slash on the stylesheet (404)", http.MethodGet, "/ui/static/app.css/", http.StatusNotFound},
 		}
 		for _, c := range cases {
 			rec := hr.do(c.method, c.path, "", nil, nil)
@@ -356,6 +359,63 @@ func TestPOSTWithoutASessionRedirectsAndRunsNothing(t *testing.T) {
 	}
 	if ran {
 		t.Error("the action ran with no session")
+	}
+}
+
+// TestSessionIsCheckedBeforeOrigin pins the order of DESIGN §5.5 (step 4 review W3): a POST with
+// no session and a bad Origin is answered by the session check, a redirect to sign-in. The
+// origin is not checked, so nothing is logged about it, and the action does not run.
+func TestSessionIsCheckedBeforeOrigin(t *testing.T) {
+	hr := newHarness(t, false, false)
+	ran := false
+	chain := hr.u.form(func(http.ResponseWriter, *http.Request, signedIn) { ran = true })
+	rec := newRecorder()
+	chain.ServeHTTP(rec, hr.request(http.MethodPost, "/ui/x", "csrf=x", nil, map[string]string{"Origin": "http://evil.test"}))
+	if rec.status() != http.StatusSeeOther || rec.Header().Get("Location") != "/ui/signin" {
+		t.Errorf("POST with no session and a bad origin: status %d, location %q, want 303 to sign-in",
+			rec.status(), rec.Header().Get("Location"))
+	}
+	if ran {
+		t.Error("the action ran with no session")
+	}
+	if logs := hr.logText(); strings.Contains(logs, "form refused") {
+		t.Errorf("the origin was checked before the session: %q", logs)
+	}
+}
+
+// TestBodyOverTheCapIsRefusedBeforeCSRF pins the order of DESIGN §5.5 (step 4 review W3): a body
+// over 64 KiB is 413 whether or not its csrf field is right, since the body is read before the
+// field is compared. The field here is wrong on purpose.
+func TestBodyOverTheCapIsRefusedBeforeCSRF(t *testing.T) {
+	hr := newHarness(t, false, false)
+	cookie := hr.signIn(hr.opKey, nil)
+	big := "csrf=not-the-token&pad=" + strings.Repeat("x", formBodyCap)
+	rec, ran := formCase(hr, cookie, map[string]string{"Origin": hr.origin()}, big)
+	if ran || rec.status() != http.StatusRequestEntityTooLarge {
+		t.Errorf("a form over 64 KiB with a bad csrf: ran %v status %d, want 413 before the field is checked", ran, rec.status())
+	}
+}
+
+// TestLoggedPathIsQuotedAndCapped pins step 4 review S5: the path a refusal logs is quoted, so a
+// line break in it cannot start a line of its own in the log.
+func TestLoggedPathIsQuotedAndCapped(t *testing.T) {
+	hr := newHarness(t, false, false)
+	cookie := hr.signIn(hr.opKey, nil)
+	chain := hr.u.form(func(http.ResponseWriter, *http.Request, signedIn) {})
+	rec := newRecorder()
+	chain.ServeHTTP(rec, hr.request(http.MethodPost, "/ui/x%0AFAKE-LOG-LINE", "csrf="+csrfFor(cookie), cookie,
+		map[string]string{"Origin": "http://evil.test"}))
+	if rec.status() != http.StatusForbidden {
+		t.Fatalf("refused origin: status %d, want 403", rec.status())
+	}
+	logs := hr.logText()
+	if strings.Contains(logs, "\nFAKE-LOG-LINE") {
+		t.Errorf("a raw line break from the path reached the log: %q", logs)
+	}
+	// quoted() escapes the line break as \n, and slog's text handler quotes that again, so the
+	// log holds the escape doubled: a backslash, then n.
+	if !strings.Contains(logs, `\\nFAKE-LOG-LINE`) {
+		t.Errorf("the path is not quoted in the log: %q", logs)
 	}
 }
 

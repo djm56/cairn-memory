@@ -8,7 +8,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// wirePaths are the 19 paths of DESIGN.md §5.4, written out as literals. They
+// wirePaths are the 23 paths of DESIGN.md §5.4 and §5.5, written out as literals. They
 // are deliberately not taken from the api.Route constants: a client codes against
 // these strings, so a change to a constant must fail here, not follow it.
 var wirePaths = []string{
@@ -31,13 +31,17 @@ var wirePaths = []string{
 	"/v1/operator/directive_ratify",
 	"/v1/operator/directive_retire",
 	"/v1/operator/project_settings_set",
+	"/v1/operator/project_list",
+	"/v1/operator/task_browse",
+	"/v1/operator/directive_browse",
+	"/v1/operator/dashboard",
 }
 
-// TestWirePathsAreCalls checks that each of the 19 literal paths is a call: a
+// TestWirePathsAreCalls checks that each of the 23 literal paths is a call: a
 // POST to it is answered by a handler, not 404. A renamed route fails here.
 func TestWirePathsAreCalls(t *testing.T) {
-	if len(wirePaths) != 19 {
-		t.Fatalf("the literal list has %d paths, want 19", len(wirePaths))
+	if len(wirePaths) != 23 {
+		t.Fatalf("the literal list has %d paths, want 23", len(wirePaths))
 	}
 	h := api.Handler(core.Unimplemented{}, api.UnauthenticatedHeaderCaller, nil)
 	for _, path := range wirePaths {

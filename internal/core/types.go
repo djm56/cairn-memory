@@ -269,6 +269,15 @@ type Directive struct {
 	ReviewBy *time.Time `json:"review_by,omitempty"`
 }
 
+// BrowsedDirective is a directive as directive_browse lists it (CONTRACT §8.1). It has
+// the fields of Directive. Expired is set on an active directive whose review_by is
+// before now. Only directive_browse sets it: directive_list leaves expired directives
+// out and counts them instead.
+type BrowsedDirective struct {
+	Directive
+	Expired bool `json:"expired,omitempty"`
+}
+
 // ClosePolicy is what task_close requires (DESIGN.md §3.7). Each field turns
 // one requirement on; DefaultSettings turns them all on.
 type ClosePolicy struct {

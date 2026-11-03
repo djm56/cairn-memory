@@ -249,6 +249,51 @@ func TestUIHeadersCoverTheMuxAnswersThroughTheWholeHandler(t *testing.T) {
 	}
 }
 
+// TestUncleanUIPathsCarryTheHeaders pins step 4 review W1. A path the mux must clean before it
+// routes (//ui/x, /ui/./x, /ui//x) gets the mux's own 301 to the cleaned path, and that answer
+// is not the UI's. It must carry the headers of DESIGN §5.5 all the same, and HSTS when the
+// server serves TLS on a non-loopback address. GET and HEAD both.
+func TestUncleanUIPathsCarryTheHeaders(t *testing.T) {
+	st := openStore(t)
+	paths := []string{"//ui/x", "/ui/./x", "/ui//x", "//ui", "/ui/../ui/x"}
+	for _, tr := range []Transport{{}, {TLS: true}} {
+		h := NewHandler(st, testLogger(io.Discard), tr)
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			for _, p := range paths {
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, httptest.NewRequest(method, p, nil))
+				label := method + " " + p
+				// The mux's own redirect for an unclean path: 307 in the Go this module builds with,
+				// and 301 in older releases. Either is a redirect the mux made, not the UI's.
+				if rec.Code != http.StatusTemporaryRedirect && rec.Code != http.StatusMovedPermanently {
+					t.Errorf("%s (transport %+v): status %d, want the mux's redirect (307 or 301)", label, tr, rec.Code)
+				}
+				if loc := rec.Header().Get("Location"); !strings.HasPrefix(loc, "/ui/") && loc != "/ui" {
+					t.Errorf("%s: Location %q is not under /ui", label, loc)
+				}
+				want := map[string]string{
+					"Content-Security-Policy": "default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+					"X-Content-Type-Options":  "nosniff",
+					"Referrer-Policy":         "same-origin",
+					"Cache-Control":           "no-store",
+				}
+				for k, v := range want {
+					if got := rec.Header().Get(k); got != v {
+						t.Errorf("%s: %s = %q, want %q", label, k, got, v)
+					}
+				}
+				hsts := rec.Header().Get("Strict-Transport-Security")
+				if tr.TLS && hsts != "max-age=31536000" {
+					t.Errorf("%s: Strict-Transport-Security = %q, want max-age=31536000", label, hsts)
+				}
+				if !tr.TLS && hsts != "" {
+					t.Errorf("%s: Strict-Transport-Security = %q, want none", label, hsts)
+				}
+			}
+		}
+	}
+}
+
 // TestRevokedKeyEndsItsUISessionOnTheRunningServer revokes a key in the real store while
 // its browser holds a session, and checks that the next request ends the session.
 func TestRevokedKeyEndsItsUISessionOnTheRunningServer(t *testing.T) {

@@ -440,9 +440,9 @@ state, and the dashboard figures. These four are the reads of this section.
 Item 50 adds a fifth call with the same role rule, `learning_list` with
 `all_projects` (§5), so the family is five calls in all. They are reads, and
 they follow these rules (§9 item 50). They are not operator calls: a viewer may make them, and item 50
-gives them their own role rule. Their wire routes, when M4 adds them, sit under
-`/v1/operator/` for grouping only. The role rule decides who may call them, not
-the path. No MCP tool exposes them.
+gives them their own role rule. Their wire routes sit under `/v1/operator/` for
+grouping only, and M3 mounts them (DESIGN §5.4, 2026-11-03). The role rule decides
+who may call them, not the path. No MCP tool exposes them.
 
 - A caller with the `operator` or the `viewer` role may make them. A caller with
   the `agent` role is refused with `operator_only`, checked before anything else,

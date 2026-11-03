@@ -17,7 +17,9 @@ CREATE TABLE ui_sessions (
     expires_at    TEXT NOT NULL,
     last_seen_at  TEXT NOT NULL
 );
--- The cleanup deletes by expires_at, and a revoked key's sessions are found by key_id.
+-- The cleanup deletes the rows past either end: expires_at <= ? OR last_seen_at <= ?
+-- (DeleteExpiredUISessions). expires_at has this index; last_seen_at gets one in migration
+-- 0007. A revoked key's sessions are found by key_id.
 CREATE INDEX ui_sessions_expires_at ON ui_sessions(expires_at);
 CREATE INDEX ui_sessions_key_id ON ui_sessions(key_id);
 
