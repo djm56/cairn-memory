@@ -856,6 +856,13 @@ a browser to another address.
 | POST | `/ui/directives/{code}/reaffirm` | `DirectiveReaffirm` (CONTRACT §8). Field: `review_by`, optional. | operator |
 | POST | `/ui/projects/{project}/settings` | `ProjectSettingsSet`. Fields: `display_name`, `parallel_tasks`, and the five close-policy switches. | operator |
 
+**Built so far.** The read routes above are built, with every page of the table
+except the ratify form. The action routes (the POST rows, and `/ui/directives/new`) are
+not registered yet: until the actions arrive, a POST to a read route is `405`, and any
+other unlisted path is `404`. So a viewer's GET of `/ui/directives/new` is `404` for now,
+not the `403` the table gives, and that changes with the actions. No page renders an
+action form for any role.
+
 Each POST that changes state answers with a redirect to the page that shows
 the result (post, then redirect), so a reload does not repeat it. A POST that
 fails re-renders its form with the message, and the page keeps what the operator

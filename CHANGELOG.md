@@ -106,6 +106,14 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   refused with `operator_only`. None creates a project row. `learning_list` with
   `all_projects` needs no project for an operator or a viewer. Migration 0007 adds
   the indexes these reads use. The client implements the four reads.
+- M3 web UI read pages (DESIGN §5.5): the dashboard, the tasks list and a task's
+  record, learnings for one project and across projects, the directives, the project
+  list and each project's settings. The pages read through core in process, for an
+  operator and a viewer alike. None renders an action form yet; the actions arrive in
+  a later step. A project page checks its project first and answers 404 for a name with
+  no row, and creates none. Stored text is escaped, and multi-line text keeps its line
+  breaks. Every page has the header, with the signed-in key, its role, a link to each
+  page, and sign-out.
 
 ### Changed
 
