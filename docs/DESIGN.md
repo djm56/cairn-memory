@@ -1152,11 +1152,24 @@ while one transaction needs a new core call anyway. DESIGN §3.4 already says th
 UI edits `review_by` in M3, and CONTRACT §8 says the same. The call's rules are
 in CONTRACT §8.
 
-**Wire form of the UI reads.** The four reads of CONTRACT §8.1, and `learning_list`
-with `all_projects` (CONTRACT §5, item 50), reach the wire form as
-`/v1/operator/<call>` read routes when the CLI needs them (M4). The UI
-does not use the wire form. The route table of `internal/api` marks each route
-read or write, as §5.4 says.
+**Wire form of the UI reads.** The four reads of CONTRACT §8.1 are mounted in M3 as
+`/v1/operator/<call>` read routes: `project_list`, `task_browse`, `directive_browse`
+and `dashboard`. An operator key and a viewer key may make them, and an agent key is
+refused with `operator_only` (`403`) before the body is read. The client implements
+them, so the conformance suite runs them over the wire. The UI itself calls core in
+process and does not use the wire form. `learning_list` with `all_projects` (CONTRACT
+§5, item 50) is the agent route `/v1/agent/learning_list`, and it is read as CONTRACT
+§9 item 50 says for an operator or a viewer key. The route table of `internal/api`
+marks each route read or write, as §5.4 says.
+
+**Indexes of the UI reads (migration 0007).** Each index serves a query that the
+existing project-first indexes cannot. `tasks (updated_at, id)` lists tasks across
+projects for `task_browse`. `tasks (status, updated_at, id)` gives the running list
+and the blocked count. `tasks (status, closed_at)` serves the 30-day and monthly
+figures. `learnings (status)` gives the proposed count across projects. `directives
+(status, review_by)` serves the expired count, the oldest review and the order of
+`directive_browse`. The figures of one dashboard are read in one read transaction (CONTRACT
+§9 item 35).
 
 ## 6. Clients
 
