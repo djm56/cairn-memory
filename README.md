@@ -218,7 +218,8 @@ Operator keys make the changes.
 
 The design is in [DESIGN.md §5.5](docs/DESIGN.md#55-the-web-ui). The proxy, cookie
 and rate-limit rules for a server that other machines reach are in
-[docs/DEPLOY.md](docs/DEPLOY.md).
+[docs/DEPLOY.md](docs/DEPLOY.md). A hand check of the UI through a real proxy, with the
+headers, the cookie and the exit-check flow, is in [docs/M3-UI-CHECK.md](docs/M3-UI-CHECK.md).
 
 ## Documentation
 

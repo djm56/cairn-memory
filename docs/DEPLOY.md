@@ -164,6 +164,19 @@ fresh host:
 
 5. **Configure the proxy**, as below, and reload it.
 
+On this path the web UI needs `--behind-proxy`, and the shipped unit does not pass it.
+Without the flag the UI refuses every form, sign-in included, because its origin check
+expects `http://` while the browser sends the `https://` origin. Add the override below
+with `systemctl edit cairn`, then run `systemctl daemon-reload` and
+`systemctl restart cairn`. The journal's listening line should then show
+`behind_proxy=true`. The `127.0.0.1` address is the one the shipped unit listens on:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788 --behind-proxy
+```
+
 If the proxy is **not on this host**, the server must listen on a non-loopback address
 with `--behind-proxy`, and then it needs a key before it starts. Use this order
 instead: steps 1 and 2; then step 4 (the key); then install the unit and this
@@ -193,10 +206,12 @@ The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
   once, and the browser keeps only a session cookie. An agent key is refused there.
   A viewer key reads every page and is refused every change, so a viewer can look
   but cannot act.
-- **Behind a proxy the cookie is always `Secure`.** The server sets the flag whenever
-  `--behind-proxy` is given, so the cookie is `__Secure-cairn_ui`, and a browser keeps
-  it only for an https page. Open the UI at the proxy's https address. Over plain
-  `http` the browser refuses the cookie, and sign-in does not stick.
+- **Behind a proxy the cookie is `Secure`, but only when `--behind-proxy` is given.**
+  The server sets the flag from that option, so the cookie is `__Secure-cairn_ui`, and
+  a browser keeps it only for an https page. The shipped unit does not give the flag, so
+  setup (b) adds it: with the same-host override under step 5, or with the override for
+  a proxy on another host. Open the UI at the proxy's https
+  address. Over plain `http` the browser refuses the cookie, and sign-in does not stick.
 - **Rate-limit `POST /ui/signin` at the proxy or the firewall, per client address.**
   The server has no rate cap of its own. A key has 256 random bits, so guessing one
   is not the risk, and the limit is there against floods of attempts.
@@ -220,6 +235,9 @@ The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
   and the reason is in DESIGN.md §5.5. HSTS is scoped to the host name, not the port, so
   a browser that has seen it for `localhost` holds every other port on `localhost` to
   https for a year. A developer with a trusted local certificate would be caught by that.
+
+A hand check of the UI through the Apache site above, with the headers, the cookie and
+the exit-check flow, is in [M3-UI-CHECK.md](M3-UI-CHECK.md).
 
 Caddy, with TLS handled by Caddy:
 
