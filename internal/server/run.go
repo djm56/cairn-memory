@@ -101,7 +101,8 @@ func Run(ctx context.Context, o Options) error {
 		<-ctx.Done()
 		stop()
 	}()
-	if err := Serve(ctx, ln, Handler(st, logger), tlsCfg, logger); err != nil {
+	transport := Transport{TLS: tlsOn, BehindProxy: o.BehindProxy, Loopback: loopback}
+	if err := Serve(ctx, ln, NewHandler(st, logger, transport), tlsCfg, logger); err != nil {
 		return fmt.Errorf("cairn serve: %w", err)
 	}
 	logger.Info("stopped")

@@ -11,6 +11,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/auth"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/store"
+	"github.com/djm56/cairn-memory/internal/ui"
 )
 
 // The limits and timeouts of the listener (DESIGN §5.3, D20). They are fixed rather than
@@ -29,24 +30,59 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
-// Handler returns the server's handler over st: the calls under /v1, the liveness
-// probe at /healthz, and the body cap over both. The causes of failures and the
-// failures of last_used_at go to logger.
-func Handler(st *store.Store, logger *slog.Logger) http.Handler {
-	return handler(api.NewStoreLookup(st), core.NewLocal(st), logger)
+// Transport is how the server is reached. The web UI needs it for its cookie's Secure
+// flag, the https scheme of a form's Origin, and HSTS (DESIGN §5.5). Run sets it from the
+// flags and the listen address.
+type Transport struct {
+	TLS         bool // the server serves TLS itself (--tls-cert and --tls-key)
+	BehindProxy bool // a proxy in front terminates TLS (--behind-proxy)
+	Loopback    bool // the listen address is a loopback address
 }
 
-// handler builds the server's handler over a key lookup and a Service. Handler passes
-// the store's; a test passes its own to reach a failure the store cannot give.
-func handler(lookup auth.Lookup, svc core.Service, logger *slog.Logger) http.Handler {
+// Handler returns the server's handler over st, for a server that is not reached through
+// a transport of its own: the calls under /v1, the liveness probe at /healthz, the web UI
+// under /ui, and the body cap over all of them. Its Transport is the zero value, so the
+// UI's cookie is not Secure and HSTS is not sent. Run uses NewHandler with the real one.
+// The causes of failures and the failures of last_used_at go to logger.
+func Handler(st *store.Store, logger *slog.Logger) http.Handler {
+	return NewHandler(st, logger, Transport{})
+}
+
+// NewHandler is Handler with the transport the server is reached over.
+func NewHandler(st *store.Store, logger *slog.Logger, tr Transport) http.Handler {
+	return handler(api.NewStoreLookup(st), NewSessionStore(st), core.NewLocal(st), logger, tr)
+}
+
+// handler builds the server's handler over a key lookup, a session store and a Service.
+// NewHandler passes the store's; a test passes its own to reach a failure the store
+// cannot give.
+func handler(lookup auth.Lookup, sessions auth.SessionStore, svc core.Service, logger *slog.Logger, tr Transport) http.Handler {
 	resolver := auth.NewResolver(lookup, func(err error) {
 		// A failed last_used_at write does not refuse the call that used the key, but it
 		// is logged, never dropped (DESIGN §5.3).
 		logger.Error("last_used_at was not written", "cause", redact(err.Error()))
 	})
 	calls := api.Handler(svc, api.KeyCaller(resolver), failureHook(logger))
+	sess := auth.NewSessions(sessions, resolver, nil, func(err error) {
+		// A session failure that refuses nothing (a last_seen_at write, a cleanup) is logged
+		// with the same redaction as every other cause.
+		logger.Error("web UI session failure", "cause", redact(err.Error()))
+	})
+	web := ui.New(ui.Config{
+		Sessions: sess,
+		Secure:   tr.TLS || tr.BehindProxy,
+		// HSTS is scoped to the host name, not the port, so a trusted certificate here would
+		// hold every other service on this host to https. Loopback is therefore excluded.
+		HSTS:   tr.TLS && !tr.Loopback,
+		Logger: logger,
+		Redact: redact,
+	})
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthz)
+	// /ui and /ui/ both go to the UI, so the redirect from /ui carries its headers and
+	// the mux does not answer it itself.
+	mux.Handle("/ui", web)
+	mux.Handle("/ui/", web)
 	mux.Handle("/", calls)
 	return http.MaxBytesHandler(mux, api.MaxBodyBytes+bodyAllowance)
 }

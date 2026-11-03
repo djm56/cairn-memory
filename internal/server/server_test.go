@@ -305,7 +305,7 @@ func (touchFails) Touch(context.Context, int64, time.Time) error {
 func TestTouchFailureIsLoggedAndDoesNotRefuse(t *testing.T) {
 	st := openStore(t)
 	var logs syncBuffer
-	h := handler(touchFails{}, core.NewLocal(st), testLogger(&logs))
+	h := handler(touchFails{}, NewSessionStore(st), core.NewLocal(st), testLogger(&logs), Transport{})
 	base := startServer(t, h, nil)
 	resp, body := send(t, client(nil), http.MethodPost, base+"/v1/agent/task_current", "",
 		map[string]string{"X-Cairn-Project": "acme-api", "X-Cairn-Agent": "main",
