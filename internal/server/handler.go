@@ -93,12 +93,13 @@ func handler(lookup auth.Lookup, sessions auth.SessionStore, svc core.Service, l
 }
 
 // failureHook logs the cause of each internal failure (CONTRACT §1.2, DESIGN §5.4,
-// issue #112). It logs the method, the route path and the cause, redacted. It takes
-// no header and no body, so the Authorization header, and the key in it, cannot reach
-// the log through this hook.
+// issue #112). It logs the method, the route path and the cause, redacted. The path is
+// quoted and cut to the UI's log cap (ui.LogValue, #160), so a path with a line break or
+// a long length cannot forge or grow the line. It takes no header and no body, so the
+// Authorization header, and the key in it, cannot reach the log through this hook.
 func failureHook(logger *slog.Logger) api.FailureHook {
 	return func(r *http.Request, err error) {
-		logger.Error("internal failure", "method", r.Method, "path", r.URL.Path, "cause", redact(err.Error()))
+		logger.Error("internal failure", "method", r.Method, "path", ui.LogValue(r.URL.Path), "cause", redact(err.Error()))
 	}
 }
 

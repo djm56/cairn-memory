@@ -278,8 +278,10 @@ func TestInternalFailureLogsTheCauseNotTheKey(t *testing.T) {
 	if !strings.Contains(text, "internal failure") || !strings.Contains(text, "database is closed") {
 		t.Errorf("the hook did not log the cause: %q", text)
 	}
-	if !strings.Contains(text, "path=/v1/agent/task_current") {
-		t.Errorf("the hook did not log the route path: %q", text)
+	// The path is quoted as the UI's log lines quote theirs (#160), and slog's text handler
+	// quotes the value again, so the logged form is path="\"/v1/agent/task_current\"".
+	if !strings.Contains(text, `path="\"/v1/agent/task_current\""`) {
+		t.Errorf("the hook did not log the quoted route path: %q", text)
 	}
 	if strings.Contains(text, key) {
 		t.Errorf("the log holds the API key: %q", text)

@@ -41,9 +41,9 @@ client, and a role. The adapter sets it; request types do not carry it.
   letters and digits in hyphen-separated groups, at most 64 characters
   (`acme-api`). A project row is created on its first call. Each write call
   moves the project's `last_seen_at` on to the server's time. A read does not,
-  and creates the row only when the project has none, and only for an agent: a
-  viewer's read of such a project is `not_found` and writes no row (§9 items 38
-  and 44).
+  and creates the row only when the project has none, and only for an agent or an
+  operator: a viewer's read of such a project is `not_found` and writes no row (§9
+  items 38 and 44).
 - **Agent.** Required for every write (each tool marked *write* below). It is
   stored on the rows the call creates: `agent`, `reviewer`, `created_by`. The
   reads `task_current` and `recall` take it too, as the caller's role, which names
@@ -406,14 +406,19 @@ refuse a nameless call all the same.
 | `DirectiveReaffirm` | `code`, `review_by` (optional) | Sets the `review_by` of an active directive, in place. Its rule and code do not change. A retired directive is `refused`. The rules are below. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. A project with no row is `not_found` (see below). |
 
-**An operator call does not create a project (M3, issue #164).** `DirectiveRatify` with
-scope `project`, and `ProjectSettingsSet`, name a project. When that project has no row,
-the call is `not_found`, with the message "There is no project named …. A project is
+**These two operator calls do not create a project (M3, issue #164).** `DirectiveRatify`
+with scope `project`, and `ProjectSettingsSet`, name a project. When that project has no
+row, the call is `not_found`, with the message "There is no project named …. A project is
 created by its first agent call: check the name.", and it writes nothing. A misspelt
-name therefore never becomes a project. The row comes from the project's first agent
-call (§1.1), and every agent write still creates it, as before. The web UI checks the
-project before these two calls (DESIGN §5.5), so a UI user sees the same refusal and
-the same page as before.
+name therefore never becomes a project through either call. The row comes from the
+project's first agent call (§1.1), and every agent write still creates it, as before. The
+web UI checks the project before these two calls (DESIGN §5.5). That check only chooses
+the page's response, so a UI user sees the same refusal and the same page as before.
+
+The exception is a read, not these calls. An operator-role caller on an agent read route
+with a project still creates the row when the project has none (`ensureReadProject` in
+`internal/core/local.go`), as an agent's read does. A viewer's read does not (§1.1). This
+is unchanged.
 
 **Extending a directive in M2.** `DirectiveRatify` on an active directive is not a
 call: every ratify makes a new directive with the next code. There is no call that

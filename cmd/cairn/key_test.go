@@ -100,6 +100,29 @@ func TestKeyCommandUsageRefusals(t *testing.T) {
 	}
 }
 
+// TestKeyDBNamesTheUnitDatabase checks #136: each key action that needs --db names the systemd
+// unit's database path when --db is missing, and so does --help, so an operator who ran the
+// command against the wrong file can see which file the unit serves.
+func TestKeyDBNamesTheUnitDatabase(t *testing.T) {
+	for _, action := range []string{"add", "list", "revoke"} {
+		args := []string{"key", action}
+		switch action {
+		case "add":
+			args = append(args, "--name", "ci", "--scope", "agent")
+		case "revoke":
+			args = append(args, "--name", "ci")
+		}
+		code, _, errs := runCmd(t, args...)
+		if code != 2 || !strings.Contains(errs, "needs --db") || !strings.Contains(errs, "/var/lib/cairn/cairn.db") {
+			t.Errorf("key %s with no --db: exit %d, stderr %q; want 2, needs --db, and the unit's database path", action, code, errs)
+		}
+	}
+	_, out, _ := runCmd(t, "key", "--help")
+	if !strings.Contains(out, "/var/lib/cairn/cairn.db") {
+		t.Errorf("key --help does not name the unit's database path: %q", out)
+	}
+}
+
 // TestKeyRevokeTwiceAndAnUnknownNameExitOne checks that a second revocation and a name with no
 // key are exit 1, with the store's meaning in words.
 func TestKeyRevokeTwiceAndAnUnknownNameExitOne(t *testing.T) {

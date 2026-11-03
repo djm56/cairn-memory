@@ -866,9 +866,10 @@ redirects to the page that shows the result. A failed form re-renders its page w
 message, at the status of the Errors table, and keeps what the operator typed. A failed
 decision re-renders the page its form was on: the project's learnings, or the list across
 projects. A ratify into a project, and a settings save, name a project that must already
-have a row. A name with none is refused, with `400` for a ratify and `404` for a save, so a
-misspelt name creates no project row. A retire without `confirm=yes` is refused with `400`,
-and a reaffirm of a retired directive is `409`.
+have a row. Core refuses a name with none itself (`not_found`, CONTRACT §8), so a misspelt
+name creates no project row. The UI's check before the call only chooses the response form:
+a ratify with no row is answered `400`, and a save with no row `404`. A retire without
+`confirm=yes` is refused with `400`, and a reaffirm of a retired directive is `409`.
 
 Each POST that changes state answers with a redirect to the page that shows
 the result (post, then redirect), so a reload does not repeat it. A POST that

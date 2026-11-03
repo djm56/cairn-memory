@@ -414,7 +414,7 @@ func TestLoggedPathIsQuotedAndCapped(t *testing.T) {
 	if strings.Contains(logs, "\nFAKE-LOG-LINE") {
 		t.Errorf("a raw line break from the path reached the log: %q", logs)
 	}
-	// quoted() escapes the line break as \n, and slog's text handler quotes that again, so the
+	// LogValue() escapes the line break as \n, and slog's text handler quotes that again, so the
 	// log holds the escape doubled: a backslash, then n.
 	if !strings.Contains(logs, `\\nFAKE-LOG-LINE`) {
 		t.Errorf("the path is not quoted in the log: %q", logs)
