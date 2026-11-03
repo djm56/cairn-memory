@@ -297,7 +297,7 @@ func strayRefusal(db string, strays []string) error {
 		paths[i] = db + s
 		quoted[i] = shellQuote(db + s)
 	}
-	return fmt.Errorf("no database is at %s, but a -wal or -shm is beside it with no database to belong to: %s. Nothing was changed. SQLite replays a -wal that it finds beside a database it opens, so a restore here could mix in another database's changes. Check these files, then move them aside yourself to a folder of your own, for example: mkdir -p -- <folder> && mv -- %s <folder>/ . Then run restore again. Nothing is deleted (README, If a restore fails)",
+	return fmt.Errorf("no database is at %s, but a -wal or -shm is beside it with no database to belong to: %s. Nothing was changed. SQLite replays a -wal that it finds beside a database it opens, so a restore here could mix in another database's changes. Check these files, then move them aside yourself to a folder of your own, for example: mkdir -p -- /path/to/folder && mv -- %s /path/to/folder/ . Then run restore again. Nothing is deleted (README, If a restore fails)",
 		db, strings.Join(paths, ", "), strings.Join(quoted, " "))
 }
 
@@ -322,8 +322,10 @@ func printMoves(w io.Writer, moves []move) {
 
 // recoveryStep is the text an error gives after a move: where the files that moved are kept, and
 // the steps that put them back. The moves are the ones still in effect. When the database itself
-// moved, its pre-restore name is named as the database before the restore. When only a stray -wal
-// or -shm moved (an absent database), there was no database to keep, and the text says so.
+// moved, its pre-restore name is named as the database before the restore. When no database
+// moved, the files moved were strays beside an absent path, and the text says there was no
+// database to keep. That is reached only by a race: the check before step 2 refuses a stray beside
+// an absent path before anything is copied, so a stray must have appeared after that check.
 func recoveryStep(db, pre string, moves []move) string {
 	cmds := make([]string, 0, len(moves))
 	kept := make([]string, 0, len(moves))
@@ -338,6 +340,9 @@ func recoveryStep(db, pre string, moves []move) string {
 		}
 	}
 	what := "the database before the restore is kept at " + pre
+	// Reached only when the database was absent when the restore began and a stray -wal or -shm
+	// appeared beside its path before step 5. The check before step 2 refuses strays beside an
+	// absent path, so this branch is a race, and is kept so that such a file is named, not misread.
 	if !mainMoved {
 		what = "no database was there before the restore; the files moved aside are kept at " + strings.Join(kept, " and ")
 	}

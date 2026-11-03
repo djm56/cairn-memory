@@ -36,8 +36,10 @@ func TestOperatorRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 	h := keyedHandler(st, core.NewLocal(st))
 	agent := addKey(t, st, "ci", auth.ScopeAgent)
 	operator := addKey(t, st, "ops", auth.ScopeOperator)
-	if len(operatorRouteList) == 0 {
-		t.Fatal("the route table marks no operator route: the list is empty, so nothing is tested")
+	// The table marks five operator routes (CONTRACT §8). A route dropped from it would shrink the
+	// list without failing the loop below, so the floor is asserted here.
+	if len(operatorRouteList) < 5 {
+		t.Fatalf("the route table marks %d operator routes, want at least 5: a route was dropped from it, so the gate is not tested for every operator call", len(operatorRouteList))
 	}
 
 	bodies := []struct {

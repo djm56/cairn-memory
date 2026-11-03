@@ -84,9 +84,10 @@ func (s *Store) Version(ctx context.Context) (int, error) {
 	return currentVersion(ctx, s.db)
 }
 
-// Backup writes a consistent copy of the database to out. out must be an empty file the
-// caller has just made with O_EXCL: SQLite's VACUUM INTO writes into an empty file, and
-// refuses any other. The file keeps the mode the caller gave it.
+// Backup writes a consistent copy of the database to out. out must not exist, or must be an
+// empty file: SQLite's VACUUM INTO writes into a name that is free or holds an empty file, and
+// refuses any other. The file is created with the mode the process umask allows, so a caller
+// that needs an owner-only copy sets the umask first (server.Backup does).
 //
 // Why VACUUM INTO and not the online backup API: VACUUM INTO runs as one read transaction
 // over the whole database. In WAL mode a reader sees the database as it was when its

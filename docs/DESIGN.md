@@ -508,9 +508,21 @@ any other backend. A behaviour exists when the conformance suite says so.
 reach guard names those two command files as the only ones that may import the
 server package, beside `serve` and `key`.
 
-**Backup.** The copy is made by `VACUUM INTO` into an empty file made with
-`O_EXCL` at mode 0600. An existing `<out>` is refused, and so are `:memory:`, a
-`file:` name and a name with `?`. The database is opened without migrating, so a
+**Backup.** The copy is made by `VACUUM INTO` into a file in a staging directory
+of its own, made beside `<out>` by `os.MkdirTemp`: mode 0700, unpredictable name.
+The copy is given the name `<out>` by `os.Link`, which fails on any existing
+entry, a symbolic link included, so nothing is written over and nothing is written
+through a link at `<out>`. The copy is made under umask 077 and is set to mode
+0600. The staging directory is opened once as an `os.Root`, and its entries are
+removed through that root. Before the copy, the link and the removal, the staging
+name is compared with the directory made, and a swap is refused (#129, W1). A hard
+link is required: on a filesystem without one the backup is refused, and the
+message says the filesystem must support hard links. `VACUUM INTO` takes a path,
+so the copy itself is written by name, and that window is narrowed, not closed:
+the output directory must not be writable by other users, as `docs/DEPLOY.md`
+requires (mode 0700, owned by the service user). An existing
+`<out>` is refused, and so are `:memory:`, a `file:` name and a name with `?`. The
+database is opened without migrating, so a
 backup never changes the database it copies, and a file with no Cairn schema, or
 a schema newer than this build, is refused. `VACUUM INTO` is one read transaction.
 In WAL mode the copy holds every commit that finished before it began and no part
@@ -550,8 +562,10 @@ nothing changed unless the step says otherwise:
    Any file of the set still there after the moves is moved too. Each move is
    reported, and the directory is synced. An unreadable file is moved as it is,
    with no checkpoint, and the output says it was not a readable database.
-   An absent database with a stray `-wal` or `-shm` beside its path has those
-   moved to `<db>.pre-restore-<UTC>-wal` and `-shm` first, and reported.
+   An absent database with a stray `-wal` or `-shm` beside its path is refused
+   before step 2: nothing is copied or moved. The refusal names the files and tells
+   the operator to check them, move them out of the folder by hand, and run the
+   restore again. Nothing is deleted.
 6. The checked copy is renamed to the database path, and the database is opened,
    which migrates it to this build's schema.
 
@@ -571,8 +585,11 @@ name with `mv`. The files are the ones the restore printed as moved: normally
 A restore that stopped before its first move changed nothing to undo. While a
 `<db>.pre-restore-*` file sits beside an absent database path, `cairn serve` and
 `cairn key add` refuse to create a database there, and name the file, so an
-interrupted restore does not become an empty server. The same steps are in the
-README under "If a restore fails".
+interrupted restore does not become an empty server. Those refusals also give the
+start-fresh text: check the files, move each one out of the folder by hand to a
+folder of the operator's own, then start `cairn serve` again. Nothing is deleted.
+The stray refusal before step 2 gives the same instruction for a `-wal` or `-shm`
+with no database beside it. The same steps are in the README under "If a restore fails".
 
 ### 5.3 The server
 

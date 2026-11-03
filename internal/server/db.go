@@ -101,9 +101,10 @@ func refuseNewOverRestore(path string) error {
 	}
 	newest, stamps := newestPreRestore(found, prefix)
 	if newest.name == "" {
-		// Only -wal or -shm files are beside the path (a restore with the database absent moves
-		// just those). None is a database, so no mv is offered: putting one at the database path
-		// would be wrong (16-S2).
+		// Only -wal or -shm files are beside the path. A restore does not move them with the
+		// database absent: it refuses first (14-W3), so they were left by hand, or a restore raced
+		// past that check. None is a database, so no mv is offered: putting one at the database
+		// path would be wrong (16-S2).
 		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere. %s (README, If a restore fails)",
 			path, strings.Join(stamps, ", "), joinNames(dir, found), base, startFresh(dir, found))
 	}
@@ -120,7 +121,7 @@ func startFresh(dir string, names []string) string {
 	for i, n := range names {
 		quoted[i] = shellQuote(filepath.Join(dir, n))
 	}
-	return fmt.Sprintf("To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own: mkdir -p -- <folder> && mv -- %s <folder>/ . Then start cairn serve again. Nothing is deleted.",
+	return fmt.Sprintf("To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own: mkdir -p -- /path/to/folder && mv -- %s /path/to/folder/ . Then start cairn serve again. Nothing is deleted.",
 		strings.Join(quoted, " "))
 }
 
