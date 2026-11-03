@@ -108,6 +108,7 @@ func Cases() []Case {
 	all = append(all, learningCases...)
 	all = append(all, directiveCapCases...)
 	all = append(all, searchCases...)
+	all = append(all, webCases...)
 	return all
 }
 

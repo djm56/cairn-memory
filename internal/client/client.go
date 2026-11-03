@@ -227,6 +227,27 @@ func (c *Client) ProjectSettingsSet(ctx context.Context, req core.ProjectSetting
 	return post[core.Project](ctx, c, api.RouteProjectSettingsSet, req)
 }
 
+// ProjectList sends the project_list web UI read.
+func (c *Client) ProjectList(ctx context.Context, req core.ProjectListRequest) (*core.ProjectList, error) {
+	return post[core.ProjectList](ctx, c, api.RouteProjectList, req)
+}
+
+// TaskBrowse sends the task_browse web UI read.
+func (c *Client) TaskBrowse(ctx context.Context, req core.TaskBrowseRequest) (*core.TaskBrowse, error) {
+	return post[core.TaskBrowse](ctx, c, api.RouteTaskBrowse, req)
+}
+
+// DirectiveBrowse sends the directive_browse web UI read.
+func (c *Client) DirectiveBrowse(ctx context.Context, req core.DirectiveBrowseRequest) (*core.DirectiveBrowse, error) {
+	return post[core.DirectiveBrowse](ctx, c, api.RouteDirectiveBrowse, req)
+}
+
+// Dashboard sends the dashboard web UI read. The call takes no request, so the body is
+// the empty object.
+func (c *Client) Dashboard(ctx context.Context) (*core.Dashboard, error) {
+	return post[core.Dashboard](ctx, c, api.RouteDashboard, struct{}{})
+}
+
 // post sends one call: req as the JSON body of route, with the caller that ctx
 // carries in the Cairn headers. It returns the result the server answers with,
 // or the error the call failed with.

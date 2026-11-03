@@ -90,10 +90,18 @@ func (l *Local) LearningAdd(ctx context.Context, req LearningAddRequest) (*Learn
 // LearningList returns learnings, newest first, one page at a time. Only the
 // caller's project is listed unless AllProjects is set. Status and kind are
 // lists, and an empty list means every value.
+//
+// An operator or a viewer that sets AllProjects needs no project and creates no
+// project row: it reads across projects, for the web UI's learnings page (CONTRACT
+// §9 item 50). Every other caller, an agent included, is read as before.
 func (l *Local) LearningList(ctx context.Context, req LearningListRequest) (*LearningList, error) {
-	c, err := callerFor(ctx, false)
-	if err != nil {
-		return nil, err
+	c, crossProject := CallerFrom(ctx)
+	crossProject = crossProject && req.AllProjects && isReader(c.Role)
+	if !crossProject {
+		var err error
+		if c, err = callerFor(ctx, false); err != nil {
+			return nil, err
+		}
 	}
 	statuses := make([]string, 0, len(req.Status))
 	for _, s := range req.Status {
@@ -117,8 +125,10 @@ func (l *Local) LearningList(ctx context.Context, req LearningListRequest) (*Lea
 	if err != nil {
 		return nil, err
 	}
-	if err := l.ensureReadProject(ctx, c); err != nil {
-		return nil, err
+	if !crossProject {
+		if err := l.ensureReadProject(ctx, c); err != nil {
+			return nil, err
+		}
 	}
 	rows, more, err := store.ListLearnings(ctx, l.st, store.LearningFilter{
 		Project: c.Project, AllProjects: req.AllProjects, Statuses: statuses,

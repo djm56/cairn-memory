@@ -256,6 +256,22 @@ func (r routedService) ProjectSettingsSet(ctx context.Context, req core.ProjectS
 	return r.pick(ctx).ProjectSettingsSet(ctx, req)
 }
 
+func (r routedService) ProjectList(ctx context.Context, req core.ProjectListRequest) (*core.ProjectList, error) {
+	return r.pick(ctx).ProjectList(ctx, req)
+}
+
+func (r routedService) TaskBrowse(ctx context.Context, req core.TaskBrowseRequest) (*core.TaskBrowse, error) {
+	return r.pick(ctx).TaskBrowse(ctx, req)
+}
+
+func (r routedService) DirectiveBrowse(ctx context.Context, req core.DirectiveBrowseRequest) (*core.DirectiveBrowse, error) {
+	return r.pick(ctx).DirectiveBrowse(ctx, req)
+}
+
+func (r routedService) Dashboard(ctx context.Context) (*core.Dashboard, error) {
+	return r.pick(ctx).Dashboard(ctx)
+}
+
 // listenerService returns the suite's Service over a fresh database and a real listener: one
 // agent, one operator and one viewer key, each client sending its own.
 func listenerService(t *testing.T) core.Service {

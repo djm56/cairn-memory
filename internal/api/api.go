@@ -47,6 +47,12 @@ const (
 	RouteDirectiveRatify    = "/operator/directive_ratify"
 	RouteDirectiveRetire    = "/operator/directive_retire"
 	RouteProjectSettingsSet = "/operator/project_settings_set"
+	// The web UI's reads (CONTRACT §8.1). They sit under /operator/ for grouping only: an
+	// operator or a viewer key may make them, and an agent key is refused.
+	RouteProjectList     = "/operator/project_list"
+	RouteTaskBrowse      = "/operator/task_browse"
+	RouteDirectiveBrowse = "/operator/directive_browse"
+	RouteDashboard       = "/operator/dashboard"
 )
 
 // The headers that carry the caller (CONTRACT §1.1). None is required by the
@@ -139,15 +145,22 @@ var routeAccess = map[string]access{
 	RouteDirectiveRatify:    accessWrite,
 	RouteDirectiveRetire:    accessWrite,
 	RouteProjectSettingsSet: accessWrite,
+	RouteProjectList:        accessRead,
+	RouteTaskBrowse:         accessRead,
+	RouteDirectiveBrowse:    accessRead,
+	RouteDashboard:          accessRead,
 }
 
 // RouteInfo is one route of the table, as a caller outside this package reads it. The
 // server's exit tests walk Routes, so a route added to the table is tested without a
 // list of its own.
 type RouteInfo struct {
-	Route    string // the route, relative to Prefix: the call's path is Prefix+Route
-	Write    bool   // a viewer key is refused on a write route (DESIGN.md §5.4)
-	Operator bool   // only an operator key may make the call (CONTRACT §8)
+	Route string // the route, relative to Prefix: the call's path is Prefix+Route
+	Write bool   // a viewer key is refused on a write route (DESIGN.md §5.4)
+	// Operator is true for a route under /operator/, which an agent key is refused. Only
+	// the write calls of CONTRACT §8 are operator-only: a viewer key is refused them too.
+	// The reads of CONTRACT §8.1 are under /operator/ as well, and a viewer key may make them.
+	Operator bool
 }
 
 // Routes returns every route of the table, sorted by path. It reads the same marks
@@ -155,7 +168,10 @@ type RouteInfo struct {
 func Routes() []RouteInfo {
 	out := make([]RouteInfo, 0, len(routeAccess))
 	for route, a := range routeAccess {
-		out = append(out, RouteInfo{Route: route, Write: a == accessWrite, Operator: operatorRoutes[route]})
+		out = append(out, RouteInfo{
+			Route: route, Write: a == accessWrite,
+			Operator: operatorRoutes[route] || uiReadRoutes[route],
+		})
 	}
 	slices.SortFunc(out, func(a, b RouteInfo) int { return strings.Compare(a.Route, b.Route) })
 	return out
@@ -182,21 +198,36 @@ var operatorRoutes = map[string]bool{
 	RouteProjectSettingsSet: true,
 }
 
+// uiReadRoutes are the web UI's reads (CONTRACT §8.1). They are reads, so a viewer key
+// passes them, and an operator key passes them. An agent key is refused with operator_only
+// before the body is read (CONTRACT §9 item 50). Core checks the role again on its side.
+var uiReadRoutes = map[string]bool{
+	RouteProjectList:     true,
+	RouteTaskBrowse:      true,
+	RouteDirectiveBrowse: true,
+	RouteDashboard:       true,
+}
+
 // routeSpec is what call needs to know about a route before it reads a request.
 type routeSpec struct {
 	access   access
-	operator bool
+	operator bool // only an operator key may make the call (CONTRACT §8)
+	reader   bool // an operator or a viewer key may make it, and an agent key may not (CONTRACT §8.1)
 }
 
 // specOf returns the spec of route. It panics on a route with no read or write
 // mark, as accessOf does, so a route is never mounted without its gates.
 func specOf(route string) routeSpec {
-	return routeSpec{access: accessOf(route), operator: operatorRoutes[route]}
+	return routeSpec{access: accessOf(route), operator: operatorRoutes[route], reader: uiReadRoutes[route]}
 }
 
 // operatorOnlyMessage is the message of an agent key's refused operator call. It is
 // the message core gives for the same refusal, so the two answers read the same.
 const operatorOnlyMessage = "this call is an operator decision, and only an operator may make it"
+
+// readerOnlyMessage is the message of an agent key's refused web UI read. It is the
+// message core gives for the same refusal (CONTRACT §8.1).
+const readerOnlyMessage = "this read is for the web UI: only an operator or a viewer key may make it"
 
 // CallerFunc derives the caller of a request. The role must come from the
 // server's own knowledge of the request, never from what the client sends: the
@@ -270,6 +301,13 @@ func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Ha
 	handle(RouteDirectiveRetire, call(caller, onFailure, specOf(RouteDirectiveRetire), svc.DirectiveRetire))
 	handle(RouteProjectSettingsSet, call(caller, onFailure, specOf(RouteProjectSettingsSet), svc.ProjectSettingsSet))
 
+	handle(RouteProjectList, call(caller, onFailure, specOf(RouteProjectList), svc.ProjectList))
+	handle(RouteTaskBrowse, call(caller, onFailure, specOf(RouteTaskBrowse), svc.TaskBrowse))
+	handle(RouteDirectiveBrowse, call(caller, onFailure, specOf(RouteDirectiveBrowse), svc.DirectiveBrowse))
+	handle(RouteDashboard, call(caller, onFailure, specOf(RouteDashboard), func(ctx context.Context, _ struct{}) (*core.Dashboard, error) {
+		return svc.Dashboard(ctx)
+	}))
+
 	mux.Handle("/", http.HandlerFunc(notFound))
 	return mux
 }
@@ -284,7 +322,8 @@ func Handler(svc core.Service, caller CallerFunc, onFailure FailureHook) http.Ha
 // before its body is read. A viewer's write is refused after the caller, with
 // KindReadOnly. On an operator route, a caller that is not an operator is refused
 // with KindOperatorOnly. Both are answered before the body is read, so a request of
-// the wrong shape from a lower role gets the role's refusal, not a 400 or 415.
+// the wrong shape from a lower role gets the role's refusal, not a 400 or 415. On a web UI
+// read, a caller that is neither an operator nor a viewer is refused the same way.
 func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, spec routeSpec, fn func(context.Context, Req) (*Res, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverInternal(w, r, onFailure)
@@ -304,6 +343,10 @@ func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, spec route
 		}
 		if spec.operator && c.Role != core.RoleOperator {
 			writeError(w, http.StatusForbidden, &core.Error{Kind: core.KindOperatorOnly, Message: operatorOnlyMessage})
+			return
+		}
+		if spec.reader && c.Role != core.RoleOperator && c.Role != core.RoleViewer {
+			writeError(w, http.StatusForbidden, &core.Error{Kind: core.KindOperatorOnly, Message: readerOnlyMessage})
 			return
 		}
 		var req Req
