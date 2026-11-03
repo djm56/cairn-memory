@@ -18,7 +18,7 @@ Cairn is one binary, `cairn`. It uses SQLite with full-text search. Clients use 
 ## Status
 
 - **Phases 0 to 2:** done, and their exit checks passed.
-- **M1, Server-mode MCP:** current.
+- **M1, Server-mode MCP:** open; its exit check is not recorded as passed.
 - **M2, Server:** exit check passed on 2026-11-02 (live run, #19).
 - **M3 to M8, and Later:** planned. See the [Roadmap](Roadmap) and the [milestones](https://github.com/djm56/cairn-memory/milestones) for live progress.
 - **Version 1** is the scope of M1 to M8: a central server, the web UI and dashboard, hooks and a CLI, the Claude Code plugin, the import from bishop-memory, a pilot, and the roll-out.
