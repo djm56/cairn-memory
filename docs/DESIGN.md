@@ -657,7 +657,9 @@ client and the CLI. This section is how the adapter reaches the server.
   is `unauthenticated`, answered `401` before the body is read. A `viewer` key
   is refused on every write route with `read_only` (`403`), and core is not
   reached. Operator routes are write routes, and an agent key on one is refused
-  with `operator_only` (`403`) before the body is read. A viewer's read of a
+  with `operator_only` (`403`) before the body is read. The four UI reads of
+  CONTRACT §8.1 are the one read family under `/v1/operator/`, and a viewer key
+  passes them (§5.5). A viewer's read of a
   project with no row is `not_found` and writes no row (CONTRACT §9 item 44).
   Each route is marked read or write
   in the route table of `internal/api`, and a route with no mark is not mounted.
@@ -738,6 +740,297 @@ headers and the events key, and the key-case, repeated-key, Content-Type and
 route rules (`strict_test.go`, `api_test.go`). `internal/client` tests the
 no_route message, the Content-Type it sends and its tolerance of extra response
 fields (`wire_test.go`).
+
+### 5.5 The web UI
+
+The web UI is served by `cairn serve`, in the same process, under `/ui/`
+(M3, decisions D23 to D26). It renders HTML on the server, needs no JavaScript,
+and loads one embedded stylesheet. Sign-in and the session rules are D23; the
+viewer rule is D24; the reaffirm call is D26.
+
+The pages call `core.Service` in process. They do not go through the HTTP wire
+form of §5.4, so the UI keeps its own checks, and the rules it enforces are
+listed here. The reads and operator calls it makes have the rules of CONTRACT
+§8 and §8.1.
+
+**Packages.** `internal/ui` holds the handlers, the `html/template` pages and
+the stylesheet, embedded with `embed`. `internal/auth` holds the session token
+and its hash. `internal/store` holds migration 0006 and its queries.
+`internal/server/handler.go` mounts `/ui/` on the mux beside `/healthz` and
+`/`. The `/ui/` pattern is longer than `/`, and no API route starts with
+`/ui/`, so the two cannot collide.
+
+**Routes.** Every route is listed here. A path not in these tables is `404`,
+and a wrong method is `405` with an `Allow` header. `GET /ui` redirects to
+`/ui/`. Every page answers a request with no session by redirecting to
+`/ui/signin`, with no `next` parameter, so a link cannot carry a browser to
+another address.
+
+| Method | Path | Does | Role |
+|---|---|---|---|
+| GET | `/ui/signin` | Sign-in page. A signed-in browser is sent to `/ui/`. | none |
+| GET | `/ui/signout` | Ends the session and clears the cookie, then redirects to `/ui/signin`. | any session |
+| GET | `/ui/` | Dashboard: the figures of CONTRACT §8.1. | operator, viewer |
+| GET | `/ui/tasks` | Tasks across projects. Query: `project` (optional), `status` (repeatable), `cursor`. | operator, viewer |
+| GET | `/ui/p/{project}/tasks/{task_id}` | One task: brief, steps, journal, reviews and close record. | operator, viewer |
+| GET | `/ui/p/{project}/learnings` | A project's learnings. Query: `status` (default `proposed`), `kind`, `cursor`. | operator, viewer |
+| GET | `/ui/directives` | Directives across projects. Query: `state` (`active` by default, or `retired`), `cursor`. | operator, viewer |
+| GET | `/ui/directives/new` | Ratify form. Query: `from_learning` (optional learning id). | operator (a viewer gets `403`) |
+| GET | `/ui/projects` | Project list. | operator, viewer |
+| GET | `/ui/projects/{project}/settings` | A project's settings, as a form for an operator and as text for a viewer. | operator, viewer |
+| GET | `/ui/static/app.css` | The embedded stylesheet. | none |
+| POST | `/ui/signin` | Sign-in. Field: `key`. | none (no session yet) |
+| POST | `/ui/learnings/{id}/decide` | `LearningDecide`. Fields: `status`, `superseded_by`, `note`. Redirects to the learning's project page. | operator |
+| POST | `/ui/directives` | `DirectiveRatify`. The fields of CONTRACT §8, and `from_learning` when given. Redirects to `/ui/directives`. | operator |
+| POST | `/ui/directives/{code}/retire` | `DirectiveRetire`. Field `confirm` must be `yes`. | operator |
+| POST | `/ui/directives/{code}/reaffirm` | `DirectiveReaffirm` (CONTRACT §8). Field: `review_by`, optional. | operator |
+| POST | `/ui/projects/{project}/settings` | `ProjectSettingsSet`. Fields: `display_name`, `parallel_tasks`, and the five close-policy switches. | operator |
+
+Each POST that changes state answers with a redirect to the page that shows
+the result (post, then redirect), so a reload does not repeat it. A POST that
+fails re-renders its form with the message, and the page keeps what the operator
+typed, except the sign-in key.
+
+**Choosing a project.** Three kinds of page. The cross-project pages (dashboard,
+tasks, directives, projects) take no project, or a filter. The project pages
+carry the project in the path, `/ui/p/{project}/`. Every page's project switcher
+lists the names from `project_list` (CONTRACT §8.1). No current project is kept
+in the session or in a cookie. A project name is checked with
+`core.ValidProjectName` before it is used, and a name that fails is `404`. A
+project page for a project with no row is `404` too (`not_found`, CONTRACT §9
+item 44).
+
+**Sessions.**
+
+- **Sign-in.** `POST /ui/signin` trims the white space at each end of `key` and
+  takes the result as the key, with no other change. It hashes the key with
+  `auth.HashKey` (SHA-256, as DESIGN §8 gives) and looks up the row in
+  `api_keys`. It accepts the key only when the row is not revoked and its scope
+  is `operator` or `viewer`. Any other key is refused.
+- **Token.** 32 random bytes from `crypto/rand`, unpadded base64url, held in the
+  cookie. The server stores only the SHA-256 of the token, in hex, in
+  `token_hash`.
+- **Table.** Migration 0006 creates `ui_sessions`. The name is not `sessions`,
+  which migration 0001 already uses for agent sessions (DESIGN §3.6).
+
+  ```sql
+  CREATE TABLE ui_sessions (
+      token_hash    TEXT PRIMARY KEY,   -- hex SHA-256 of the cookie token
+      key_id        INTEGER NOT NULL REFERENCES api_keys(id),
+      role          TEXT NOT NULL CHECK (role IN ('operator', 'viewer')),
+      csrf_hash     TEXT NOT NULL,      -- hex SHA-256 of the CSRF token
+      created_at    TEXT NOT NULL,
+      expires_at    TEXT NOT NULL,      -- absolute: created_at + 12 hours
+      last_seen_at  TEXT NOT NULL       -- idle: last_seen_at + 2 hours
+  );
+  CREATE INDEX ui_sessions_expires_at ON ui_sessions(expires_at);
+  CREATE INDEX ui_sessions_key_id ON ui_sessions(key_id);
+  ```
+
+  Timestamps use the stored form of `store/codec.go`. Migration 0006 also
+  creates `directive_reaffirmations` (D26, below): `id`, `directive_id`
+  (references `directives`), `previous_review_by`, `review_by`, `reaffirmed_by`
+  and `reaffirmed_at`, all `NOT NULL`.
+- **Lifetimes (Bishop default, pending operator approval).** An absolute
+  lifetime of 12 hours from `created_at`, and an idle lifetime of 2 hours from
+  `last_seen_at`. The absolute lifetime does not slide. The idle lifetime does.
+- **Each request.** The token's hash selects the row. The row is ended, the
+  session deleted and the browser sent to sign-in, when the row is past either
+  lifetime, when its key is revoked or gone, or when the key's scope is no
+  longer `operator` or `viewer`. The role is the key's scope now, read from
+  `api_keys` on each request, not the role stored in the row. A revoked key's
+  sessions end at their next request.
+- **Stored activity.** `last_seen_at` is written at most once a minute, so the
+  idle lifetime can end a session up to a minute early and never late. Each
+  request also moves the key's `last_used_at` under the same once-a-minute rule
+  as DESIGN §8.
+- **Sign-out.** `GET /ui/signout` deletes the row and sends the cookie again with
+  `Max-Age=0`, same name, path and flags. A GET is acceptable here because the
+  cookie is `SameSite=Strict`: a browser does not send it on a navigation begun
+  by another site, so another site cannot sign a browser out.
+- **Cleanup.** Rows past either lifetime are deleted at each sign-in, and at most
+  once an hour on the first request after the hour. A deleted row is not revived.
+
+**Cookie.** Name `cairn_ui`. Value: the token. `Path=/ui`, `HttpOnly`,
+`SameSite=Strict`. It has no `Max-Age` and no `Expires`, so it is a browser
+session cookie, and the server's lifetimes decide when a session ends.
+
+`Secure` is set whenever the server serves TLS (`--tls-cert` and `--tls-key`) or
+runs with `--behind-proxy`. The bind rule of §5.3 means every non-loopback server
+is one of those two, so a cookie from a non-loopback server is always `Secure`.
+On a plain-HTTP loopback server the cookie is not `Secure`. Some browsers do not
+accept a `Secure` cookie set over plain HTTP even on loopback, so the flag would
+stop sign-in there. The only plaintext path is the loopback interface, which no
+other host can read. A process on the same machine that can read the browser's
+cookies could already read the key typed at sign-in.
+
+**CSRF.** Every form that writes has a synchronizer token: 32 random bytes,
+generated at sign-in, stored as the SHA-256 hex in `csrf_hash`, and sent in the
+form as the hidden field `csrf`. The server hashes the field and compares it
+with `csrf_hash` in constant time. The token is tied to the session, and no
+form that writes is rendered without it.
+
+Each POST is checked in this order:
+
+1. The session. No session: redirect to sign-in, and nothing is done.
+2. The origin. If `Origin` is present, it must equal the request's scheme and
+   `Host`. The scheme is `https` when TLS is served or the server runs with
+   `--behind-proxy`, and `http` otherwise. The proxy must pass `Host` through
+   unchanged (DEPLOY.md). If `Origin` is absent, `Sec-Fetch-Site`, when present,
+   must be `same-origin`. A POST with neither header is refused.
+3. The role. A viewer's POST is `403` with the kind `read_only`, answered before
+   the body is read, as §5.4 does for the wire form.
+4. The body, read up to 64 KiB. A larger body is `413`.
+5. The `csrf` field, then the action.
+
+A failed origin check or a failed CSRF check is `403` with the message "The form
+could not be verified. Load the page again and try again." It does not end the
+session. Sign-in has no session, so it has no CSRF token. Its origin check
+(step 2) applies, and CSP `form-action 'self'` limits where a form can post.
+
+**Headers.** Every UI response carries these, including the sign-in page, error
+pages and the stylesheet:
+
+- `Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: no-referrer`
+- `Cache-Control: no-store`
+
+With `default-src 'none'` and no `script-src`, a page cannot run script. With
+`style-src 'self'`, a page has no `style=` attribute and no inline `<style>`
+element; styling comes from `app.css` only.
+
+**Sign-in.**
+
+- An agent key is refused: "This is an agent key. The web UI signs in operator
+  and viewer keys." Any other refusal (malformed, unknown, revoked, or not
+  starting with `cairn_`) reads "The key was not accepted."
+- No error text repeats what was typed. The key is never logged: the redaction
+  of §5.3 applies to any cause that carries one.
+- The sign-in body is capped at 4 KiB.
+- There is no rate cap in the server, consistent with §5.3. The proxy or the
+  firewall rate-limits `POST /ui/signin` per client address. The 256 random bits
+  of a key are what make guessing it pointless, and the rate limit is for the
+  noise.
+- Over a non-loopback address the key crosses the network in the sign-in body.
+  That relies on TLS by files or by the proxy, which §5.3 already requires for
+  every non-loopback server.
+- Success redirects to `/ui/`. The key is kept nowhere in the browser.
+
+**Viewer mode (D24).** A viewer sees every page in the table above, proposed
+learnings included, read-only. No action form is rendered for a viewer: no
+decide, ratify, retire, reaffirm or settings form. A viewer who requests an
+action page (`/ui/directives/new`) gets `403`, kind `read_only`. Every POST from a
+viewer is `403`, `read_only`, and core never sees it. Core treats the viewer as
+an agent for reads and refuses no read on that account (`internal/core/caller.go`),
+so the UI's role check is the only guard on the viewer's writes, and it runs
+before the body is read.
+
+**Operator name.** An operator call from the UI passes the signed-in key's name,
+from `api_keys.name`, as the caller's agent. The browser supplies no name. That
+name is what `decided_by` and `ratified_by` record, and what
+`directive_reaffirmations.reaffirmed_by` records. The name is the key's, not a
+claim the caller makes (§8). Key names are checked when a key is made (§8).
+
+**Pages.** Each page shows the following. All of it is read-only except where a
+form is named.
+
+- **Dashboard.** The figures of CONTRACT §8.1 `dashboard`, each with a link to
+  the list that holds its items: running tasks, the three waiting counts, the
+  30-day quality figures, the six monthly rows, and the directive figures. The
+  page shows each rate as a count and a percentage, with the percentage left out
+  when its base is zero.
+- **Tasks** (`/ui/tasks`). A table of id, project, title, status, priority and
+  `updated_at`. A filter form (GET) for project and status, and a `next` link.
+  No action forms: the UI makes no task writes in M3.
+- **Task** (`/ui/p/{project}/tasks/{task_id}`). The header: status, priority,
+  owner, next action and blockers. The brief: goal, context, constraints,
+  criteria and key files. The steps: number, title, agent, status, attempts and
+  summary. The journal, newest first, 20 entries a page with an older link. A
+  `review` entry shows its verdict and counts. A review with no `data` (written
+  before M1) shows "no verdict recorded" (CONTRACT §9 item 39). The close record,
+  for a closed task: outcome, summary, criteria with results and evidence,
+  lessons, `no_lessons_reason`, mistakes with their impact, and deliverables.
+- **Learnings** (`/ui/p/{project}/learnings`). Rows for the chosen status and
+  kind: kind, title, body, target, rationale, example, the task link, status,
+  `decided_by`, `decided_at` and `decision_note`. For an operator, a learning
+  with status `proposed` carries a decide form: `status` (one of `accepted`,
+  `rejected`, `superseded`), `superseded_by` (a learning id, required for
+  `superseded`), and `note`. The UI requires a non-blank `note` for all three.
+  This is a UI rule. The contract does not require it.
+- **Directives** (`/ui/directives`). Every directive of the chosen state, across
+  projects, from `directive_browse` (CONTRACT §8.1): code, scope with its project
+  or role, title, rule, `review_by`, and state (`active`, `expired` or `retired`).
+  The head shows the active count, the expired count and the oldest
+  `review_by`, from the dashboard figures. For an operator, each active
+  directive carries two forms. A reaffirm form with a `review_by` date, which
+  defaults to 90 days from today (UTC), and a retire form with a `confirm`
+  checkbox. The retire form says that retiring is final, and that to keep the
+  rule the operator should reaffirm it. A button leads to the ratify form.
+- **Ratify** (`/ui/directives/new`, operator only). The fields of
+  `DirectiveRatify` (CONTRACT §8): `scope` (`global`, `project` or `agent`),
+  `project` when the scope is `project`, `agent` when the scope is `agent`,
+  `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`,
+  `example`, and `review_by` (optional, 90 days from today if left blank). A
+  learning page's link passes `from_learning` as a hidden field and shows "from
+  learning N". It fills no other field, so the operator writes the rule. Core
+  refuses the call unless the learning is `accepted` (CONTRACT §8).
+- **Projects** (`/ui/projects`). A table of name, `display_name`, `last_seen_at`,
+  whether parallel tasks are on, and how many of the five close-policy switches
+  are on. A link leads to each project's settings. The page has no "new project"
+  form, because a project is created by its first agent call (CONTRACT §1.1).
+- **Project settings** (`/ui/projects/{project}/settings`). `display_name`,
+  `parallel_tasks`, and the five close-policy switches, each as an on/off select.
+  A select always sends its value, so every switch reaches the call, which
+  requires them all (CONTRACT §9 item 23). The page warns that changing the close
+  policy changes what `task_close` accepts from every agent in the project. A
+  viewer sees the same values as text.
+
+**Escaping.** All output goes through `html/template`'s contextual escaping. A
+stored value (a title, a rule, a note, a piece of evidence) is text. No
+`template.HTML`, `template.URL`, `template.JS` or `template.CSS` is built from
+stored data. Every link's path parts come from validated values: the project
+name, the task id, the learning id and the directive code. Multi-line fields
+are shown with a CSS class that sets `white-space: pre-wrap`, not with a style
+attribute.
+
+**Errors.** The UI answers a core error with the status the wire form gives it
+(§5.4), as a page with the message in text:
+
+| Kind | Answer |
+|---|---|
+| `unauthenticated` (no session, or a session that has ended) | `303` to `/ui/signin` |
+| `read_only` (a viewer's write) | `403`, "This key is read-only." |
+| `operator_only` | `403` |
+| `invalid` | `400`, with the form re-rendered and the message shown |
+| `not_found` | `404` |
+| `refused` | `409`, with the form re-rendered and the message shown |
+| failed origin or CSRF check | `403`, the message given under **CSRF** |
+| body over 64 KiB | `413` |
+| `internal` | `500`, "internal error". The cause goes to the server log through the failure hook, redacted, as §5.3 says. |
+
+**Tests.** `internal/ui` tests each route's role gate, the order of the checks
+above, the origin and CSRF failures, the four headers on every response, the
+cookie's flags in both transports, and the escaping of a stored value that holds
+markup. `internal/auth` and `internal/store` test the session lifetimes, the
+cleanup, and the revoked-key case. Core and conformance test the four new reads
+and `DirectiveReaffirm` (CONTRACT §8, §8.1).
+
+**Reaffirm (D26).** The directive page reaffirms through `DirectiveReaffirm`,
+which sets `review_by` in place. It does not retire and ratify. Three reasons.
+The code is how agents, learnings and rationale text cite a directive, and a
+reaffirm by retire and ratify gives every directive a new code each time it is
+due. Retire and ratify also loses the link to the source learning, because
+`from_learning` needs an `accepted` learning and the source is already `applied`.
+And two calls can fail between them and leave a rule retired with no successor,
+while one transaction needs a new core call anyway. DESIGN §3.4 already says the
+UI edits `review_by` in M3, and CONTRACT §8 says the same. The call's rules are
+in CONTRACT §8.
+
+**Wire form of the UI reads.** The four reads of CONTRACT §8.1 reach the wire
+form as `/v1/operator/<call>` read routes when the CLI needs them (M4). The UI
+does not use the wire form. The route table of `internal/api` marks each route
+read or write, as §5.4 says.
 
 ## 6. Clients
 
@@ -857,5 +1150,6 @@ status; they only recommend.
 - `last_used_at` is written at most once a minute per key, so a read does not
   become a write on every call.
 - An agent key cannot reach operator routes. The web UI asks for an operator
-  key. A viewer key sees every page and gets 403 on every action (planned, M3).
+  or a viewer key (§5.5). A viewer key sees every page and gets 403 on every
+  action (planned, M3).
 - Request bodies are capped on every route.
