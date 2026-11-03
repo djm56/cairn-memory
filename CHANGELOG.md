@@ -129,6 +129,9 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   viewer key sees every page and is refused every action. The check runs over a real
   listener, store and core.
 - Docs: M3's exit check passed and was recorded on 2026-11-03, and M4 Hooks + CLI is current.
+- Docs: `docs/M3-UI-CHECK.md`, an optional hand-test guide for the web UI through a real
+  proxy: the upgrade and its rollback, the headers and cookie, and the exit-check flow.
+  Linked from the README's Web UI section and from DEPLOY.md.
 
 ### Changed
 

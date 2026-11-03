@@ -221,6 +221,9 @@ The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
   a browser that has seen it for `localhost` holds every other port on `localhost` to
   https for a year. A developer with a trusted local certificate would be caught by that.
 
+A hand check of the UI through the Apache site above, with the headers, the cookie and
+the exit-check flow, is in [M3-UI-CHECK.md](M3-UI-CHECK.md).
+
 Caddy, with TLS handled by Caddy:
 
 ```caddy
