@@ -785,8 +785,10 @@ store is reached through two interfaces, and `internal/auth` names both:
 - `auth.SessionStore`, for the session rows. `CreateSession` inserts a row.
   `ReadSession(tokenHash)` returns the row with its key's current scope and
   revocation, joined from `api_keys`. `TouchSession(tokenHash, at)` sets
-  `last_seen_at`. `DeleteSession(tokenHash)` deletes one row. `DeleteExpired(now)`
-  deletes the rows past either lifetime and returns their count.
+  `last_seen_at`. `DeleteSession(tokenHash)` deletes one row. `DeleteExpired` takes
+  two cutoffs, `expiredBy` (the absolute end, now) and `idleBefore` (now minus the
+  idle lifetime), deletes the rows past either, and returns their count. The caller
+  computes both, since the lifetimes are auth's and the store holds no policy.
 
 `auth` decides whether a row is still live, from the lifetimes and the key's
 state. The store only reads and writes. `internal/server` builds the adapter over
@@ -951,8 +953,9 @@ Each POST is checked in this order:
    so `null` has no legitimate sender. If `Origin` is absent, `Sec-Fetch-Site`,
    when present, must be `same-origin`. A POST with neither header is refused.
    A refusal at this step is logged on the server log line with the `Host` and
-   `Origin` values, which show the cause of a proxy that rewrote `Host`. The page
-   never shows them. It shows the message under **CSRF**.
+   `Origin` values, which show the cause of a proxy that rewrote `Host`. Each value
+   is quoted and cut to 200 bytes before it is logged, since either is text the
+   client chose. The page never shows them. It shows the message under **CSRF**.
 3. The role. A viewer's POST is `403` with the kind `read_only`, answered before
    the body is read, as §5.4 does for the wire form.
 4. The body, read up to 64 KiB. A larger body is `413`.
@@ -974,8 +977,12 @@ error pages, the `404` and `405` answers, the `/ui` redirect and the stylesheet:
   requests still get no referrer.
 - `Cache-Control: no-store`
 - `Strict-Transport-Security: max-age=31536000`, when the server serves TLS itself
-  (`--tls-cert` and `--tls-key`). It is not sent behind a proxy, which may set its
-  own, and DEPLOY.md says so.
+  (`--tls-cert` and `--tls-key`) on a non-loopback address. It is not sent on a
+  loopback address, and it is not sent behind a proxy, which may set its own. The
+  reason for the loopback rule is that HSTS is scoped to the host name, not the
+  port. A trusted local certificate on `localhost:8443` would make every other
+  `http://localhost:<port>` the browser visits switch to https for a year, with no
+  setting in the docs to undo it. DEPLOY.md says so too.
 
 The middleware wraps the whole `/ui/` subtree. The server registers `/ui` and
 `/ui/` on the mux to the same wrapped handler, so the `/ui` redirect carries the
@@ -989,9 +996,13 @@ element; styling comes from `app.css` only.
 
 - An agent key is refused: "This is an agent key. The web UI signs in operator
   and viewer keys." Any other refusal (malformed, unknown, revoked, or not
-  starting with `cairn_`) reads "The key was not accepted."
-- The key field is `type="password"` with `autocomplete="off"`, so a browser does
-  not show or save the key.
+  starting with `cairn_`) reads "The key was not accepted." Both are answered
+  with the form again at status `401`. DESIGN gives no status for a refused key,
+  so `401` is the choice here.
+- The key field is `type="password"`, so the key is not shown on the screen.
+  `autocomplete="off"` asks the browser not to offer to save it. Browsers and
+  password managers may ignore that request, so the page does not promise that
+  the key is never saved.
 - No error text repeats what was typed. The key is never logged: the redaction
   of §5.3 applies to any cause that carries one.
 - The sign-in body is capped at 4 KiB.
@@ -1108,7 +1119,7 @@ attribute.
 
 **Tests.** `internal/ui` tests each route's role gate, the order of the checks
 above, the origin and CSRF failures, the four headers on every answer under `/ui/`
-(and HSTS only when the server serves TLS), the cookie's flags and name in both
+(and HSTS only when the server serves TLS on a non-loopback address), the cookie's flags and name in both
 transports, and the escaping of a stored value that holds markup. Further:
 
 - An `Origin` of `null` is refused. A same-origin form POST that carries its real
@@ -1141,8 +1152,9 @@ while one transaction needs a new core call anyway. DESIGN §3.4 already says th
 UI edits `review_by` in M3, and CONTRACT §8 says the same. The call's rules are
 in CONTRACT §8.
 
-**Wire form of the UI reads.** The four reads of CONTRACT §8.1 reach the wire
-form as `/v1/operator/<call>` read routes when the CLI needs them (M4). The UI
+**Wire form of the UI reads.** The four reads of CONTRACT §8.1, and `learning_list`
+with `all_projects` (CONTRACT §5, item 50), reach the wire form as
+`/v1/operator/<call>` read routes when the CLI needs them (M4). The UI
 does not use the wire form. The route table of `internal/api` marks each route
 read or write, as §5.4 says.
 

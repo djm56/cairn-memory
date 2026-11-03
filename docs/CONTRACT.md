@@ -436,8 +436,10 @@ expired by the upgrade. Retired directives keep no `review_by`.
 
 The web UI needs four reads that no agent read gives it: the project list with
 each project's settings, the tasks of every project, the directives of every
-state, and the dashboard figures. They are reads, and they follow these rules
-(§9 item 50). They are not operator calls: a viewer may make them, and item 50
+state, and the dashboard figures. These four are the reads of this section.
+Item 50 adds a fifth call with the same role rule, `learning_list` with
+`all_projects` (§5), so the family is five calls in all. They are reads, and
+they follow these rules (§9 item 50). They are not operator calls: a viewer may make them, and item 50
 gives them their own role rule. Their wire routes, when M4 adds them, sit under
 `/v1/operator/` for grouping only. The role rule decides who may call them, not
 the path. No MCP tool exposes them.
@@ -466,7 +468,8 @@ name, `limit` or `cursor`. `not_found` when `project` names no row.
 **In:** `project` (optional; an exact name); `status` (a list; empty means all);
 `limit` (default 20); `cursor`.
 **Out:** `tasks`, each `{id, project, title, status, priority, updated_at}`, most
-recently updated first, with `id` breaking a tie; and `next`. Tasks of every
+recently updated first, with `id` descending breaking a tie (as `running.tasks` of
+`dashboard` breaks its tie); and `next`. Tasks of every
 project are listed, or only the named project's when `project` is given.
 **Errors:** `operator_only`. `invalid` for a bad name, status, `limit` or
 `cursor`. `not_found` when `project` names no row.
