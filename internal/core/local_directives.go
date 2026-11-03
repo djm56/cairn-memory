@@ -32,6 +32,17 @@ func ValidDirectiveCode(code string) bool {
 	return directiveCodePattern.MatchString(code)
 }
 
+// checkDirectiveCode returns invalid when code is not a directive code, and nil when it is.
+// The operator calls that name a directive by its code, retire and reaffirm, check it with
+// this before the row is read, so both give the same answer for the same bad code (CONTRACT
+// §8, issue #163).
+func checkDirectiveCode(code string) error {
+	if !ValidDirectiveCode(code) {
+		return Invalid("a directive code is required, such as D-0001: %q is not one", code)
+	}
+	return nil
+}
+
 // directiveFromRow converts a stored directive to the core form. A ratified
 // time that is absent is the zero time; every stored directive has one.
 func directiveFromRow(r store.DirectiveRow) Directive {

@@ -136,6 +136,9 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 ### Changed
 
+- Behaviour change, M3 (issue #163): `directive_retire` refuses a code of the wrong form (not `D-` and four or more digits) as `invalid`, as `directive_reaffirm` already did. Before, a malformed code was `not_found`. A well-formed code with no row is still `not_found`.
+- Behaviour change, M3 (issue #164): an operator call that names a project with no row, a `directive_ratify` of project scope or a `project_settings_set`, is refused as `not_found` in core, for every caller (CONTRACT §8). Before, only the web UI refused it, and core created the row. Agent calls still create a project's row on its first call.
+
 - M3 web UI: `/ui/tasks` filters on every repeated `status` in its query, as DESIGN §5.5
   gives it. Before, it read the first one only.
 - Behaviour change, M3: a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.

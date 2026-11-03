@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -171,10 +172,60 @@ func TestDirectiveRetireRules(t *testing.T) {
 	}
 }
 
+// TestDirectiveRetireCodeCheckMatchesReaffirm checks that retire refuses a code of the wrong
+// form as invalid, as reaffirm does (CONTRACT §8, issue #163). Retire used to answer not_found
+// for these, and the web UI hid the difference by checking the path first. A well-formed code
+// with no row is still not_found.
+func TestDirectiveRetireCodeCheckMatchesReaffirm(t *testing.T) {
+	s, _ := openLocal(t)
+	for _, code := range []string{"", "nope", "D-1", "d-0001", "D-0001 "} {
+		_, err := s.DirectiveRetire(opCtx(), core.DirectiveRetireRequest{Code: code})
+		wantKindLocal(t, err, core.KindInvalid, "retire of malformed code "+code)
+		_, err = s.DirectiveReaffirm(opCtx(), core.DirectiveReaffirmRequest{Code: code})
+		wantKindLocal(t, err, core.KindInvalid, "reaffirm of malformed code "+code)
+	}
+	_, err := s.DirectiveRetire(opCtx(), core.DirectiveRetireRequest{Code: "D-9999"})
+	wantKindLocal(t, err, core.KindNotFound, "retire of a well-formed code with no row")
+}
+
+// TestOperatorCallsNeedAProjectRow checks that a project-scope directive ratify and a settings
+// save that name a project with no row are refused as not_found, and create no row (CONTRACT
+// §8, issue #164). The web UI already refused these; core now refuses them for every caller.
+// The row is made by an agent's first call, and the same operator calls then succeed.
+func TestOperatorCallsNeedAProjectRow(t *testing.T) {
+	s, st := openLocal(t)
+	const misspelt = "acme-apii"
+
+	_, err := s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: misspelt, Title: "t", Rule: "r"})
+	wantKindLocal(t, err, core.KindNotFound, "project directive ratified for a project with no row")
+	_, err = s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: misspelt, Settings: core.DefaultSettings().AsInput()})
+	wantKindLocal(t, err, core.KindNotFound, "settings saved for a project with no row")
+	if _, err := store.GetProject(context.Background(), st, misspelt); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("project row after the refused operator calls: err %v, want no row", err)
+	}
+
+	must(s.TaskCurrent(as(misspelt, "main")))(t)
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: misspelt, Title: "t", Rule: "r"}))(t)
+	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: misspelt, Settings: core.DefaultSettings().AsInput()}))(t)
+}
+
+// TestAgentWriteStillCreatesTheProjectRow checks the other side of the rule: an agent's write
+// to a new project creates its row, as CONTRACT §1.1 and §8 say. Only operator calls refuse a
+// missing row.
+func TestAgentWriteStillCreatesTheProjectRow(t *testing.T) {
+	s, st := openLocal(t)
+	const fresh = "acme-fresh"
+	mustLearning(as(fresh, "main"), t, s, core.LearningAddRequest{Kind: core.LearningFinding, Title: "t", Body: "b"})
+	if _, err := store.GetProject(context.Background(), st, fresh); err != nil {
+		t.Errorf("project row after an agent write: %v, want one", err)
+	}
+}
+
 // TestProjectSettingsSetRules checks the project name check of
 // project_settings_set, and that a nil display name keeps the stored one.
 func TestProjectSettingsSetRules(t *testing.T) {
 	s, st := openLocal(t)
+	seedProject(t, st, projA)
 	for _, name := range []string{"", "Acme"} {
 		_, err := s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: name, Settings: core.DefaultSettings().AsInput()})
 		wantKindLocal(t, err, core.KindInvalid, "project name "+name)
@@ -207,6 +258,7 @@ func TestProjectSettingsSetRules(t *testing.T) {
 // refusal. Each case leaves out one switch and names it in the message.
 func TestProjectSettingsSetNeedsEverySwitch(t *testing.T) {
 	s, st := openLocal(t)
+	seedProject(t, st, projA)
 	must(s.ProjectSettingsSet(opCtx(), core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()}))(t)
 	before, err := store.GetProject(context.Background(), st, projA)
 	if err != nil {

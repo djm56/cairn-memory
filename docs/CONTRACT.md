@@ -71,7 +71,7 @@ A failure the caller can act on has a kind and a message:
 | Kind | Meaning |
 |---|---|
 | `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
-| `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
+| `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. An operator call that names a project with no row (§8) is also `not_found`. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
 | `operator_only` | An operator call made without the operator role, or a UI read of §8.1 made with an agent key. |
 | `no_route` | Wire form only (DESIGN §5.4): the path is not a call. The message says to check the server base URL. Answered `404`. Core never returns it. |
@@ -402,9 +402,18 @@ refuse a nameless call all the same.
 |---|---|---|
 | `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
 | `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC. The directive is expired from 00:00 UTC of that day, so it is due at the start of the named day, not after it; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
-| `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
+| `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A `code` of the wrong form (not `D-` and four or more digits) is `invalid`, as for `DirectiveReaffirm`; a well-formed code with no row is `not_found`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
 | `DirectiveReaffirm` | `code`, `review_by` (optional) | Sets the `review_by` of an active directive, in place. Its rule and code do not change. A retired directive is `refused`. The rules are below. |
-| `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
+| `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. A project with no row is `not_found` (see below). |
+
+**An operator call does not create a project (M3, issue #164).** `DirectiveRatify` with
+scope `project`, and `ProjectSettingsSet`, name a project. When that project has no row,
+the call is `not_found`, with the message "There is no project named …. A project is
+created by its first agent call: check the name.", and it writes nothing. A misspelt
+name therefore never becomes a project. The row comes from the project's first agent
+call (§1.1), and every agent write still creates it, as before. The web UI checks the
+project before these two calls (DESIGN §5.5), so a UI user sees the same refusal and
+the same page as before.
 
 **Extending a directive in M2.** `DirectiveRatify` on an active directive is not a
 call: every ratify makes a new directive with the next code. There is no call that

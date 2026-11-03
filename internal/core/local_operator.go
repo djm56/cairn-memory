@@ -29,22 +29,19 @@ func operatorFor(ctx context.Context) (Caller, error) {
 	return c, nil
 }
 
-// ensureOperatorProject makes sure project has a row before an operator call
-// writes to it. A directive of project scope and a project's settings both
-// name the project, and the database refuses a name with no row. An existing
-// row is left alone: unlike EnsureProject, this does not move last_seen_at,
-// which records agent calls only.
+// requireOperatorProject refuses an operator call that names a project with no row. A
+// directive of project scope and a project's settings both name the project, and the
+// database refuses a name with no row. An operator call does not create the row: a
+// misspelt name would otherwise become a project, so the project must exist already,
+// through an agent's first call (CONTRACT §8). The message is the one the web UI gives
+// for the same case (DESIGN §5.5).
 //
-// Write function: call it through WithTx.
-func ensureOperatorProject(ctx context.Context, q store.Querier, project string, now time.Time) error {
+// Read function: it writes nothing, and may run inside or outside WithTx.
+func requireOperatorProject(ctx context.Context, q store.Querier, project string) error {
 	_, err := store.GetProject(ctx, q, project)
-	if err == nil {
-		return nil
+	if errors.Is(err, store.ErrNotFound) {
+		return NotFound("There is no project named %s. A project is created by its first agent call: check the name.", project)
 	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return err
-	}
-	_, err = ensureProject(ctx, q, project, now)
 	return err
 }
 
@@ -148,9 +145,10 @@ func supersedeReaches(ctx context.Context, q store.Querier, from, to int64) (boo
 
 // DirectiveRatify creates an active directive with the next code (CONTRACT §8).
 // Its scope names what it applies to: a global directive has no project or
-// agent, a project directive names a valid project, and an agent directive names
-// a role. With FromLearning, the learning must be accepted, and it becomes
-// applied in the same transaction.
+// agent, a project directive names a valid project that already has a row (refused
+// as not_found otherwise, and no row is created), and an agent directive names a
+// role. With FromLearning, the learning must be accepted, and it becomes applied in
+// the same transaction.
 func (l *Local) DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest) (*Directive, error) {
 	c, err := operatorFor(ctx)
 	if err != nil {
@@ -208,7 +206,7 @@ func (l *Local) DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest)
 			reviewBy = *explicitReviewBy
 		}
 		if req.Scope == ScopeProject {
-			if err := ensureOperatorProject(ctx, q, req.Project, now); err != nil {
+			if err := requireOperatorProject(ctx, q, req.Project); err != nil {
 				return err
 			}
 		}
@@ -263,16 +261,17 @@ func (l *Local) DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest)
 	return &out, nil
 }
 
-// DirectiveRetire retires a directive by its code (CONTRACT §8). A retired
-// directive is no longer listed, recalled or found by search. A directive that
-// is already retired is refused: the retirement happened once, and its time is
-// kept.
+// DirectiveRetire retires a directive by its code (CONTRACT §8). A code of the wrong
+// form is invalid, as DirectiveReaffirm gives it; a well-formed code with no row is
+// not_found. A retired directive is no longer listed, recalled or found by search. A
+// directive that is already retired is refused: the retirement happened once, and its
+// time is kept.
 func (l *Local) DirectiveRetire(ctx context.Context, req DirectiveRetireRequest) (*Directive, error) {
 	if _, err := operatorFor(ctx); err != nil {
 		return nil, err
 	}
-	if blank(req.Code) {
-		return nil, Invalid("a directive code is required, such as D-0001")
+	if err := checkDirectiveCode(req.Code); err != nil {
+		return nil, err
 	}
 
 	var out Directive
@@ -313,8 +312,8 @@ func (l *Local) DirectiveReaffirm(ctx context.Context, req DirectiveReaffirmRequ
 	if err != nil {
 		return nil, err
 	}
-	if !ValidDirectiveCode(req.Code) {
-		return nil, Invalid("a directive code is required, such as D-0001: %q is not one", req.Code)
+	if err := checkDirectiveCode(req.Code); err != nil {
+		return nil, err
 	}
 	var explicit *time.Time
 	if req.ReviewBy != "" {
@@ -371,10 +370,10 @@ func (l *Local) DirectiveReaffirm(ctx context.Context, req DirectiveReaffirmRequ
 }
 
 // ProjectSettingsSet replaces a project's settings: parallel tasks and the
-// close policy (CONTRACT §8). The project is created if it has no row yet. A nil
-// display name leaves the stored one as it is. Settings must be given whole: an
-// omitted object, or one missing any switch, is invalid, since the call replaces
-// the whole of it.
+// close policy (CONTRACT §8). A project with no row is not_found: the call does not
+// create one, so a misspelt name cannot become a project. A nil display name leaves
+// the stored one as it is. Settings must be given whole: an omitted object, or one
+// missing any switch, is invalid, since the call replaces the whole of it.
 func (l *Local) ProjectSettingsSet(ctx context.Context, req ProjectSettingsRequest) (*Project, error) {
 	if _, err := operatorFor(ctx); err != nil {
 		return nil, err
@@ -396,8 +395,7 @@ func (l *Local) ProjectSettingsSet(ctx context.Context, req ProjectSettingsReque
 
 	var out Project
 	err = l.st.WithTx(ctx, func(q store.Querier) error {
-		now := l.now()
-		if err := ensureOperatorProject(ctx, q, req.Project, now); err != nil {
+		if err := requireOperatorProject(ctx, q, req.Project); err != nil {
 			return err
 		}
 		row, err := store.GetProject(ctx, q, req.Project)
