@@ -95,8 +95,9 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Docs: M1 is recorded as passed, M3 (Web UI + dashboard) is current, and #72 is placed in M4 (D22), `cairn export project` in M4 Hooks + CLI.
 
 - M3 design, docs only: the web UI, its sessions, CSRF and headers (DESIGN §5.5),
-  four new operator and viewer reads and the `directive_reaffirm` call (CONTRACT
-  §8, §8.1, §9 items 50 to 53), and decisions D23 to D26 (PLAN §8, §10).
+  four new operator and viewer reads and the `DirectiveReaffirm` call (CONTRACT
+  §8, §8.1, §9 items 50 to 53), and decisions D23 to D26 (PLAN §8, §10)
+  ([PR #150](https://github.com/djm56/cairn-memory/pull/150)).
 
 ### Changed
 

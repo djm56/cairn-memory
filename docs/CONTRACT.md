@@ -328,7 +328,9 @@ it.
 ### `learning_list` — read, paged
 
 **In:** `status`, `kind` (lists; empty means all); `all_projects` (by
-default only the caller's project); `target`; `limit` (default 20); `cursor`.
+default only the caller's project; for the operator and viewer roles with
+`all_projects`, no project is needed, see item 50); `target`; `limit` (default 20);
+`cursor`.
 **Out:** `learnings`, newest first, and `next`.
 
 ### `directive_list` — read
@@ -435,7 +437,10 @@ expired by the upgrade. Retired directives keep no `review_by`.
 The web UI needs four reads that no agent read gives it: the project list with
 each project's settings, the tasks of every project, the directives of every
 state, and the dashboard figures. They are reads, and they follow these rules
-(§9 item 50). They are not operator calls, and no MCP tool exposes them.
+(§9 item 50). They are not operator calls: a viewer may make them, and item 50
+gives them their own role rule. Their wire routes, when M4 adds them, sit under
+`/v1/operator/` for grouping only. The role rule decides who may call them, not
+the path. No MCP tool exposes them.
 
 - A caller with the `operator` or the `viewer` role may make them. A caller with
   the `agent` role is refused with `operator_only`, checked before anything else,
@@ -450,7 +455,9 @@ state, and the dashboard figures. They are reads, and they follow these rules
 `cursor`.
 **Out:** `projects`, ordered by name, each `{name, display_name, created_at,
 last_seen_at, settings}`, where `settings` has the shape `ProjectSettingsSet`
-takes (`parallel_tasks`, `close_policy`); and `next`.
+takes (`parallel_tasks`, `close_policy`); and `next`. A stored settings value of
+`'{}'`, the column default, is read as the defaults of `DefaultSettings`:
+`parallel_tasks` false, and every close-policy switch on.
 **Errors:** `operator_only` for an agent caller. `invalid` for a bad `project`
 name, `limit` or `cursor`. `not_found` when `project` names no row.
 
@@ -469,8 +476,8 @@ project are listed, or only the named project's when `project` is given.
 **In:** `state` (`active` or `retired`; default `active`); `limit` (default 20);
 `cursor`.
 **Out:** `directives`, and `next`. Each directive has the fields `directive_list`
-gives it, and `retired_at` when retired. An active directive whose `review_by`
-is before now carries `expired: true`. That is a flag on the directive, not a
+gives it, and `retired_at` when retired. An active directive that is expired (item 46)
+carries `expired: true`. That is a flag on the directive, not a
 count. Ordering: `active` by `review_by` ascending, then `code`; `retired` by
 `retired_at` descending, then `code`.
 Unlike `directive_list`, nothing is capped and nothing is left out. Every
@@ -500,26 +507,30 @@ the server's time when the read starts. A day is a whole UTC day, and an age is
 whole days, rounded down.
 
 - `running.count` is the number of tasks with status `active`, in every project.
-  `running.tasks` is the first 20 of them, most recently updated first. Parallel
-  tasks can make the count higher than one per project.
+  `running.tasks` is the first 20 of them, most recently updated first, with `id`
+  descending breaking a tie. Parallel tasks can make the count higher than one per
+  project.
 - `waiting.proposed_learnings` is the number of learnings with status `proposed`,
   in every project. `waiting.blocked_tasks` is the number of tasks with status
   `blocked`, in every project. `waiting.expired_directives` is the number of
-  active directives whose `review_by` is before now.
+  active directives that are expired (item 46).
 - `quality_30d` covers the tasks with status `done` or `failed` whose `closed_at`
-  is within the 30 days up to now. `closed` counts them. `done` counts those with
-  outcome `done`. `criteria_met` counts the criterion results of `met` among all
+  is in the window `[now − 30 days, now)`: the lower bound is inclusive, so a task
+  closed exactly 30 days ago counts, and the upper bound is exclusive. `closed`
+  counts them. `done` counts those with status `done`. Status is the outcome
+  (§2, `task_close`), so no other field is read for it. `criteria_met` counts the criterion results of `met` among all
   the criterion results recorded at those closes, and `criteria_total` counts
   every criterion result recorded at them. `high_impact_mistakes` counts the
   mistakes with impact `high` recorded at those closes.
-- `monthly` covers the six UTC calendar months ending with the current one. The
-  tasks in a month are those whose `closed_at` falls in it: `closed` counts them,
-  `done` counts those with outcome `done`, and `high_impact_mistakes` counts the
+- `monthly` covers the six UTC calendar months ending with the current one. A
+  month runs from 00:00 UTC on its first day, inclusive, to 00:00 UTC of the next
+  month, exclusive. The tasks in a month are those whose `closed_at` falls in it:
+  `closed` counts them, `done` counts those with status `done`, as above, and `high_impact_mistakes` counts the
   mistakes with impact `high` recorded at their closes. `directives_ratified`
   counts the directives ratified in the month, by `ratified_at`, retired ones
   included.
 - `directives.active` counts the directives with status `active`, expired ones
-  included. `directives.expired` counts those whose `review_by` is before now.
+  included. `directives.expired` counts those that are expired (item 46).
   `oldest_review_by` is the earliest `review_by` among the active directives, as
   a day. `oldest_age_days` is the whole days from the `ratified_at` of the active
   directive ratified earliest, to now.
@@ -719,8 +730,8 @@ only a core test checks it. An item with no check of its own is marked
     kind `read_only`, for a viewer key, before the body is read. Operator routes
     are write routes, so a viewer on one gets `read_only`. An agent key on an
     operator route still gets `operator_only` (§8), also before the body is read.
-    The operator calls of §8 are writes. The reads of §8.1 are the one exception,
-    and item 50 sets their rule (amended 2026-11-03).
+    The reads of §8.1 are not writes, and item 50 sets their rule (amended
+    2026-11-03).
     A viewer's read of a project that has no row is `not_found`, and writes no
     row, so a viewer key cannot create a project. An agent's first read of the
     project still creates it (§1.1). *Bishop default, operator veto open (step 4
@@ -761,13 +772,18 @@ only a core test checks it. An item with no check of its own is marked
     `project_list`, `task_browse`, `directive_browse` and `dashboard` (§8.1) are
     open to the `operator` and `viewer` roles, and refuse the `agent` role with
     `operator_only`. They take no project, and create no project row. Each reads
-    one snapshot. This amends item 44's last sentence, which said no operator
-    route is a read: these four are the reads of that family, and no other read
-    is. *Bishop default, pending operator approval.*
+    one snapshot. For the same two roles, `learning_list` with `all_projects` set
+    needs no project and creates no row, so the UI's cross-project learnings page
+    can read through it (§5, DESIGN §5.5). An agent's `learning_list` is
+    unchanged. This amends item 44: these reads are not writes, and these five
+    calls are the only reads of that family. *Bishop default, pending operator
+    approval.*
 51. **Dashboard figures (2026-11-03).** Each figure of `dashboard` is defined in
     §8.1 as written there: what it counts, which rows, and over what window. The
     figures are read from one snapshot (item 35), and "now" is the server's time
-    at the start of the read. *Bishop default, pending operator approval.*
+    at the start of the read. The read takes an injectable clock, so a core test
+    can set "now" at the edges of each window. *Bishop default, pending operator
+    approval.* (core test only: the conformance suite cannot move the clock.)
 52. **Directive reaffirm (2026-11-03, D26).** `DirectiveReaffirm` changes only
     `review_by`, in place, of an active directive, and writes a
     `directive_reaffirmations` row in the same transaction. A retired directive

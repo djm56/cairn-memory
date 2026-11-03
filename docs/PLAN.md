@@ -445,8 +445,8 @@ that is not a numbered decision here, and the table says what.
 **Chosen by Bishop under the operator's veto, 2026-11-03: D26.**
 
 - **D26. Directives are reaffirmed in place.** The directive page reaffirms a
-  directive through a new operator call, `directive_reaffirm`, which sets its
-  `review_by` in place and writes a journal row. It does not retire and ratify
+  directive through a new operator call, `DirectiveReaffirm`, which sets its
+  `review_by` in place and writes a `directive_reaffirmations` row. It does not retire and ratify
   again. The code, the rule and the link to the source learning are kept. Each
   reason is in [DESIGN.md §5.5](DESIGN.md#55-the-web-ui), and the call is in
   [CONTRACT.md §8](CONTRACT.md#8-operator-calls). *Replaces: retire and ratify
