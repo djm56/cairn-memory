@@ -392,6 +392,11 @@ func TestNullOriginIsRefused(t *testing.T) {
 	if ran || rec.status() != http.StatusForbidden || !strings.Contains(rec.body.String(), msgFormRefused) {
 		t.Errorf("Origin null: ran %v status %d body %q, want a 403 form refusal", ran, rec.status(), rec.body.String())
 	}
+	// The mismatch rule also refuses "null", so the status alone cannot show this clause
+	// ran. The logged reason names it.
+	if !strings.Contains(hr.logText(), "Origin is null") {
+		t.Errorf("the refusal was not the null clause: log %q", hr.logText())
+	}
 }
 
 // TestCrossOriginPOSTIsRefused checks that a POST from another origin is refused.
@@ -477,6 +482,9 @@ func TestViewerPOSTIsRefusedBeforeTheBodyIsRead(t *testing.T) {
 	cookie := hr.signIn(hr.viewKey, nil)
 	trap := &bodyTrap{t: t}
 	r := hr.request(http.MethodPost, "/ui/x", "", cookie, map[string]string{"Origin": hr.origin()})
+	// The form content type is what makes ParseForm read the body, so the trap would fire
+	// if the role check ran after the body read.
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Body = trap
 	r.ContentLength = -1
 	rec := newRecorder()
