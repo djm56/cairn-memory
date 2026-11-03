@@ -9,7 +9,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/auth"
 )
 
-// TestNewDatabaseAndItsFilesAreOwnerOnly checks 6-S3: a database the server makes, and the
+// TestNewDatabaseAndItsFilesAreOwnerOnly checks that a database the server makes, and the
 // -wal and -shm files SQLite makes beside it, are 0600. The files exist only while the store
 // is open, so the check runs before Close. A row is written first, so the -wal file exists.
 //
@@ -59,7 +59,7 @@ func TestOpenDatabaseLeavesAnExistingFileAlone(t *testing.T) {
 }
 
 // TestCheckDBPath checks the names a database may have. The store appends its options after
-// a '?', and a memory database or a file URI loses its data at exit (6-S10).
+// a '?', and a memory database or a file URI loses its data at exit.
 func TestCheckDBPath(t *testing.T) {
 	cases := []struct {
 		path string

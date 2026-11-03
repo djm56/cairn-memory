@@ -33,7 +33,7 @@ func errorServer(t *testing.T, kind, message string) string {
 	return srv.URL
 }
 
-// TestServerErrorTextIsOneLineOnEveryPath is step 12 review W3. A server's error message
+// TestServerErrorTextIsOneLineOnEveryPath checks that a server's error message
 // is printed by status, export, the hook's stderr and doctor's detail, and each of them
 // prints it as one printable line: no escape sequence, no control character and no format
 // character reaches the terminal or the model.

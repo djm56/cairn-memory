@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// The subcommand rule (step 8 review W2). The guard's import and selector rules see a
+// The subcommand rule. The guard's import and selector rules see a
 // call only through its package. cmd/cairn is one package, so a function in mcp.go that
 // calls runServe, which starts the listener, names no import and no listener selector,
 // and nothing above it reports the call. This rule closes that route: the names the two
@@ -18,7 +18,7 @@ import (
 // file set is what it reads (nonTestGoFiles), and a file added to cmd/cairn is checked
 // from its first commit.
 //
-// The dispatch identifiers of main.go are guarded too (step 10 review 10-W1). run and
+// The dispatch identifiers of main.go are guarded too. run and
 // commands are how main.go reaches the two files: a call to run with a subcommand's
 // name starts that subcommand, and names no guarded identifier. main.go may name them
 // anywhere in the file. No other non-test file in cmd/cairn may.

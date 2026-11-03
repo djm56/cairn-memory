@@ -250,7 +250,7 @@ func TestAcquireExclusiveRefusesAWriterRunning(t *testing.T) {
 	}
 }
 
-// TestOpenExistingLeavesARefusedFileAsItWas checks 14-S5: a file with no Cairn schema is refused
+// TestOpenExistingLeavesARefusedFileAsItWas checks that a file with no Cairn schema is refused
 // without being switched to WAL. Its header bytes that say the journal mode are the same afterwards,
 // and no -wal is created beside it.
 func TestOpenExistingLeavesARefusedFileAsItWas(t *testing.T) {

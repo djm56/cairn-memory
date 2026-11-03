@@ -89,7 +89,7 @@ func TestRestoreCommandRestoresAtATerminal(t *testing.T) {
 	}
 }
 
-// TestRestoreCommandNamesTheNoDatabasePrompt checks 14-S3: restoring into a path with no database
+// TestRestoreCommandNamesTheNoDatabasePrompt checks that restoring into a path with no database
 // says so in the prompt, and does not say a database is moved.
 func TestRestoreCommandNamesTheNoDatabasePrompt(t *testing.T) {
 	dir := t.TempDir()

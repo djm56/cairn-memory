@@ -72,7 +72,7 @@ type move struct {
 //     readable is not checkpointed. Then the files of the set that exist (the database, -wal and
 //     -shm) are moved to pre-restore names, each reported, and never deleted. An absent database
 //     with a stray -wal or -shm beside its path is refused before step 2, and nothing is moved
-//     (14-W3: the operator moves those files aside, by hand, and runs the restore again);
+//     (the operator moves those files aside, by hand, and runs the restore again);
 //  6. the checked copy is renamed to the database path, and the database is opened, which
 //     migrates it to this build's schema.
 //
@@ -92,7 +92,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	if o.Backup == "" {
 		return errors.New("needs a backup file: cairn restore --db <file> <backup>")
 	}
-	// 1. Checked first, so a restore that cannot be confirmed does nothing else (14-S1).
+	// 1. Checked first, so a restore that cannot be confirmed does nothing else.
 	if !o.Terminal {
 		return errors.New("stdin is not a terminal: the restore asks you to type the database path, so run it from an interactive shell; nothing was changed")
 	}
@@ -104,7 +104,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		return fmt.Errorf("the backup %s is not a regular file", o.Backup)
 	}
 	// A link at a name of the set is refused. A restore moves the file a name holds, and a link
-	// would be moved in place of the file it points to, which would stay where it was (14-S2).
+	// would be moved in place of the file it points to, which would stay where it was.
 	for _, suffix := range dbSet {
 		if li, lerr := os.Lstat(o.DB + suffix); lerr == nil && li.Mode()&fs.ModeSymlink != 0 {
 			return fmt.Errorf("%s is a symbolic link: point --db at the database file itself; nothing was changed", o.DB+suffix)
@@ -118,7 +118,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	if exists && os.SameFile(di, bi) {
 		return fmt.Errorf("the backup %s is the database itself: restore from a copy made by cairn backup", o.Backup)
 	}
-	// 14-W3. With no database at the path, a -wal or -shm beside it belongs to a database that is
+	// With no database at the path, a -wal or -shm beside it belongs to a database that is
 	// not there. SQLite replays a -wal it finds beside the file it opens, so the restore refuses
 	// rather than move the file, and changes nothing. The operator decides what to do with it.
 	if !exists {
@@ -166,7 +166,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
 			case errors.Is(err, store.ErrNotDatabase):
 				// The file read as a database a moment ago and does not now: it changed under the
-				// check, or it is damaged in a way the lock finds and the check did not (14b-S2).
+				// check, or it is damaged in a way the lock finds and the check did not.
 				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairn serve if it runs, check the file as the user that owns it, the service user for a service (the sqlite3 command-line tool may need installing) with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
 			case err != nil:
 				return err
@@ -182,7 +182,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		fmt.Fprintf(o.Out, "The database there now is moved to %s, after its -wal is folded into it, with any -shm beside it. Nothing is deleted.\n", pre)
 		if raw {
 			fmt.Fprintf(o.Out, "%s is not a readable SQLite database: its files are moved as they are, with no checkpoint.\n", o.DB)
-			// 14b-W1: a file that cannot be read cannot be locked, so a server holding it is not seen.
+			// A file that cannot be read cannot be locked, so a server holding it is not seen.
 			fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
 		}
 	} else {
@@ -286,7 +286,7 @@ func presentSuffixes(db string, suffixes []string) []string {
 	return out
 }
 
-// strayRefusal is the refusal for a -wal or -shm beside a database path that has no database (14-W3).
+// strayRefusal is the refusal for a -wal or -shm beside a database path that has no database.
 // It names each file, and says what the operator does with them: check them, then move them aside
 // by hand. Nothing is moved or deleted here. The command to move them is quoted, so a path with a
 // space or a quote in it is still one argument.
@@ -331,7 +331,7 @@ func recoveryStep(db, pre string, moves []move) string {
 	kept := make([]string, 0, len(moves))
 	mainMoved := false
 	for _, m := range moves {
-		// Each path is quoted, so a space or a quote in it does not split or end the argument (14b-W2).
+		// Each path is quoted, so a space or a quote in it does not split or end the argument.
 		// The -- ends the options, so a name that begins with a dash is still a file name.
 		cmds = append(cmds, "mv -- "+shellQuote(m.to)+" "+shellQuote(m.from))
 		kept = append(kept, m.to)
@@ -478,7 +478,7 @@ func readLine(in io.Reader) (string, error) {
 
 // unchanged says what a refusal left alone. Once the lock is held, a readable database's -wal may
 // be folded into the file when the lock is released, because closing the last connection of a WAL
-// database checkpoints it. That changes the bytes of the main file and no data (14b-S1). With no
+// database checkpoints it. That changes the bytes of the main file and no data. With no
 // lock, nothing was done to the files at all.
 func unchanged(locked bool) string {
 	if locked {
@@ -490,7 +490,7 @@ func unchanged(locked bool) string {
 // checkFailure is the error for a failed readability check. The check is read-only, so it moves
 // and deletes nothing. A -journal beside a database is the one thing a read-only open cannot
 // finish: SQLite rolls a hot journal back only with a writer, so the next step is to let one do
-// it (14b-S3).
+// it.
 func checkFailure(db string, err error) error {
 	if _, serr := os.Lstat(db + "-journal"); serr == nil {
 		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairn serve, then open the database once as the user that owns it (for the service, sudo -u cairn; the sqlite3 command-line tool may need installing) with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",

@@ -40,3 +40,12 @@ jobs:
 
       - name: go test -race
         run: make test
+
+      - name: Cross-build for Windows and macOS
+        # A compile check only, so a platform break is caught on the pull request. It does not make
+        # Windows a supported target: nothing here runs the binaries built for it.
+        run: GOOS=windows go build ./... && GOOS=darwin go build ./...
+
+      - name: Invisible and bidirectional characters
+        # Refuses a tracked file that holds one, including a byte-order mark (Makefile, scan-invisible).
+        run: make scan-invisible

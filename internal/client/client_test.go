@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -150,9 +151,17 @@ func TestMalformedAnswerIsAnError(t *testing.T) {
 
 // TestOversizedAnswerIsAnError checks that a success larger than MaxResponseBytes
 // is refused, not read into memory, and is not a result.
+//
+// The body is one byte over the limit, and it sets its own Content-Length. The client therefore
+// reads the whole body, and the size check is the only thing that can fail the call. The earlier
+// body was 16 MiB, and the client stopped reading part way through it. A transport error on that
+// connection, under load, carries a different text and would fail this test for the wrong reason
+// (#126).
 func TestOversizedAnswerIsAnError(t *testing.T) {
-	big := `{"task":{"id":"` + strings.Repeat("x", client.MaxResponseBytes) + `"}}`
+	const prefix, suffix = `{"task":{"id":"`, `"}}`
+	big := prefix + strings.Repeat("x", client.MaxResponseBytes+1-len(prefix)-len(suffix)) + suffix
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(big)))
 		_, _ = w.Write([]byte(big))
 	}))
 	t.Cleanup(srv.Close)

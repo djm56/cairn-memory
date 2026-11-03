@@ -27,7 +27,7 @@ func printedCommand(t *testing.T, msg string) string {
 	return msg[i+len(lead) : j]
 }
 
-// TestRecoveryStepPrintsACommandThatMovesTheFilesBack is the proof for 14b-W2. The database path has
+// TestRecoveryStepPrintsACommandThatMovesTheFilesBack is the proof that the printed command is quoted. The database path has
 // a space and a single quote in it. A restore fails after its moves, and the command the error
 // prints, run as printed under sh, puts every moved file back under its name.
 func TestRecoveryStepPrintsACommandThatMovesTheFilesBack(t *testing.T) {
@@ -77,7 +77,7 @@ func TestShellQuoteIsOneWord(t *testing.T) {
 	}
 }
 
-// TestSQLiteRefusalNamesTheNextStep checks 14b-S2: CheckReadable passed and the lock then finds the
+// TestSQLiteRefusalNamesTheNextStep checks that when CheckReadable passed and the lock then finds the
 // file is not a database. The refusal says nothing was moved or deleted, and gives the next step.
 // The seam stands for the race between the two opens.
 func TestSQLiteRefusalNamesTheNextStep(t *testing.T) {
@@ -101,7 +101,7 @@ func TestSQLiteRefusalNamesTheNextStep(t *testing.T) {
 	assertUntouched(t, target, "beta")
 }
 
-// TestCheckFailureNamesTheJournal checks 14b-S3: a read-only check fails and a -journal sits beside
+// TestCheckFailureNamesTheJournal checks that a read-only check fails and a -journal sits beside
 // the database. The refusal names the journal and the step that rolls it back. Without a journal
 // the same failure gets no such advice.
 func TestCheckFailureNamesTheJournal(t *testing.T) {

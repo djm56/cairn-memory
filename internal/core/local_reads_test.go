@@ -98,7 +98,7 @@ func TestDirectiveReadsByScope(t *testing.T) {
 	}
 
 	// With no task active, task_current still answers with the project's
-	// directives. It gives the caller's own role's agent scope only (12-W1): main's,
+	// directives. It gives the caller's own role's agent scope only: main's,
 	// so the reviewer's directive is not listed for a main session.
 	cur, err := s.TaskCurrent(ctx)
 	if err != nil {

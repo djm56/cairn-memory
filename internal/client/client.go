@@ -89,8 +89,7 @@ func keyedClient(hc *http.Client) *http.Client {
 
 // DisplayURL returns a server URL as it may be printed: with its user name and
 // password removed. A server URL with credentials must not reach a terminal, a log or
-// a committed file, so every message that names the URL goes through here (step 10
-// review W5). A URL that does not parse is shown as a fixed phrase, since its
+// a committed file, so every message that names the URL goes through here. A URL that does not parse is shown as a fixed phrase, since its
 // credentials cannot be told apart from the rest.
 func DisplayURL(base string) string {
 	u, err := url.Parse(base)
@@ -104,14 +103,14 @@ func DisplayURL(base string) string {
 // SendsKeyInClear reports whether a key sent to base would cross the network in clear text: base
 // is http, and its host is not on loopback. localhost and an IP address in a loopback range are
 // on loopback. The host is judged by its name and is not resolved, so a name that resolves to a
-// loopback or a LAN address is judged as the name reads (step 8 review S9).
+// loopback or a LAN address is judged as the name reads.
 func SendsKeyInClear(base string) bool {
 	u, err := url.Parse(base)
 	if err != nil || u.Scheme != "http" {
 		return false
 	}
 	// Host names are case-insensitive, and a trailing dot names the same host. localhost and
-	// any name under it are loopback by RFC 6761 (10-S7).
+	// any name under it are loopback by RFC 6761.
 	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
 		return false
@@ -170,7 +169,7 @@ func (c *Client) StepUpdate(ctx context.Context, req core.StepUpdateRequest) (*c
 // EventLog sends the event_log call. Data that is not JSON cannot be written into
 // a request body, so the client does not send it. It refuses the call with the
 // message core gives for that data in process, so the message is the same on both
-// paths (step 6 W1). With several faults the order differs: in process a missing
+// paths. With several faults the order differs: in process a missing
 // task id, an unknown kind or empty text comes first; here the data does.
 func (c *Client) EventLog(ctx context.Context, req core.EventLogRequest) (*core.Event, error) {
 	if len(req.Data) > 0 && !json.Valid(req.Data) {
@@ -304,7 +303,7 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 // field the caller leaves empty is not sent, so the server sees it as absent. A
 // context with no caller sends no headers, and the server then finds no project.
 // A name the headers cannot carry unchanged is refused here, with core's message
-// (core.CheckCaller), and nothing is sent (step 8 review W3).
+// (core.CheckCaller), and nothing is sent.
 func setCaller(ctx context.Context, h http.Header) error {
 	caller, ok := core.CallerFrom(ctx)
 	if !ok {

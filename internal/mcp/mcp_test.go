@@ -215,7 +215,7 @@ func TestTaskFlowReachesEveryTool(t *testing.T) {
 		t.Errorf("task_get events: no next cursor on a page of 2 with more to come")
 	}
 
-	// The brief reads back what the start wrote (step 8 review S4: results are asserted).
+	// The brief reads back what the start wrote, so the result is asserted, not only the call's success.
 	brief := mustCall(t, cs, "task_get", map[string]any{"id": taskID, "section": "brief"})
 	if task, _ := brief["task"].(map[string]any); task["goal"] != "Requests over 100 a minute get 429." {
 		t.Errorf("task_get brief = %v, want the goal the start wrote", brief)

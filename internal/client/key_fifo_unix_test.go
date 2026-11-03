@@ -13,9 +13,9 @@ import (
 	"github.com/djm56/cairn-memory/internal/client"
 )
 
-// TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking checks 8-S1: a client.env that is a named
+// TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking checks that a client.env that is a named
 // pipe is refused as not a regular file, and the lookup does not block on it. The open is
-// non-blocking and the kind is checked on the descriptor (step 10 review 10-S3), so the test
+// non-blocking and the kind is checked on the descriptor, so the test
 // fails rather than hangs if the open waits for a writer.
 //
 // This test does not prove the swap race (a regular file replaced by a FIFO between a check and

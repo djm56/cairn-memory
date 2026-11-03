@@ -109,7 +109,7 @@ func keyFlags(action string, args []string, stdout, stderr io.Writer, flags []ke
 // saying so. The name stays taken, since a name is not reused, so a retry needs a new name.
 // If the revoke fails too, the message names the key so the operator can revoke it by hand.
 // A database that add creates is named on stderr, so a mistyped path that makes one is
-// visible (8-S4).
+// visible.
 func runKeyAdd(args []string, stdout, stderr io.Writer) int {
 	db, name, scope := new(string), new(string), new(string)
 	flags := []keyFlag{{"db", db}, {"name", name}, {"scope", scope}}
@@ -129,7 +129,7 @@ func runKeyAdd(args []string, stdout, stderr io.Writer) int {
 	}
 	// A write to a closed stdout pipe makes the Go runtime send SIGPIPE, which ends the
 	// process before the revoke below can run. Ignoring it for this one write makes the write
-	// return EPIPE instead, so the key is revoked (10-W3). The ignore is reset straight after.
+	// return EPIPE instead, so the key is revoked. The ignore is reset straight after.
 	signal.Ignore(syscall.SIGPIPE)
 	_, werr := fmt.Fprintln(stdout, key)
 	signal.Reset(syscall.SIGPIPE)

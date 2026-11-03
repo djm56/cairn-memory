@@ -40,7 +40,7 @@ func checkBackupOut(out string) error {
 // The copy is never written at out. It is made in a directory of its own, created beside out by
 // os.MkdirTemp: that directory is 0700 and its name is unpredictable. The directory is opened once
 // as an os.Root, and everything removed from it is removed through that root, so the removal stays
-// bound to the directory made and never follows a name that has been swapped (#129, W1). The copy
+// bound to the directory made and never follows a name that has been swapped (#129). The copy
 // is then given the name out with os.Link, which fails if any entry holds the name, a symbolic link
 // included. So a copy cannot be written through a link at out (#129), and nothing is overwritten.
 // The staging name is removed once the copy is linked, and the directory of out is flushed.
@@ -117,7 +117,7 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	if err := sr.Chmod(copyName, dbFileMode); err != nil {
 		return 0, errors.Join(fmt.Errorf("set the mode of the backup copy for %s: %w", out, err), removeStage(sr, stage, made))
 	}
-	// The copy is on disk before its name is made (14-S7). A copy that cannot be flushed is not linked.
+	// The copy is on disk before its name is made. A copy that cannot be flushed is not linked.
 	if err := syncPath(tmp); err != nil {
 		return 0, errors.Join(fmt.Errorf("flush the backup file %s: %w", out, err), removeStage(sr, stage, made))
 	}
@@ -154,7 +154,7 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 		_ = os.Remove(out)
 		return 0, fmt.Errorf("remove the staging copy of the backup %s: the staging directory %s may be left with a partial copy: %w", out, stage, err)
 	}
-	// The new name is durable before the backup is reported made (14-S7).
+	// The new name is durable before the backup is reported made.
 	if err := syncPath(filepath.Dir(out)); err != nil {
 		_ = os.Remove(out)
 		return 0, fmt.Errorf("flush the directory of the backup file %s: %w", out, err)
@@ -267,7 +267,7 @@ var syncFile = func(f *os.File) error { return f.Sync() }
 //
 // Some file systems refuse a sync of a directory with EINVAL or ENOTSUP (certain network and FUSE
 // mounts do). On those, a directory sync cannot be made, so this call treats the directory as
-// synced and carries on rather than failing every backup and restore on that mount (14b-S5). The
+// synced and carries on rather than failing every backup and restore on that mount. The
 // tolerance is for directories only: a file that cannot be flushed is still an error, and so is
 // any other error from a directory sync.
 func syncPath(p string) error {

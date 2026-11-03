@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// The reach guard (step 8 review W1, step 10 review W1). The M1 promises that the
+// The reach guard. The M1 promises that the
 // CLI, the MCP adapter and the client never open a database and never listen
 // (DESIGN.md §5.2, §5.3; D11, D19). That is checked here by reading the source, not
 // by a grep run once. The guarded packages link core and store, since the client
@@ -116,7 +116,7 @@ func contains(list []string, s string) bool {
 // reason. Importing one is a fault on its own, since it is the way to reach the call.
 // internal/server is the exemption by package (serverSide), and that exemption is not a
 // licence for a guarded file to import it: it opens the server's database and starts its
-// listener, so only the files in serverImportAllowed may import it (6-W1).
+// listener, so only the files in serverImportAllowed may import it.
 var bannedImports = map[string]string{
 	storePath:    "opens a database",
 	httptestPath: "starts an in-process HTTP listener",
@@ -328,7 +328,7 @@ func importsPath(f *ast.File, p string) bool {
 	return false
 }
 
-// TestServerImportIsOnlyInTheNamedFiles is the exact-set half of 6-W1. The guarded packages
+// TestServerImportIsOnlyInTheNamedFiles is the exact-set half of the rule above. The guarded packages
 // import internal/server in exactly the files serverImportAllowed names, and no others. The
 // set is two files; a third file that imports the server, or one of the two that stops
 // importing it, fails the test and names it.
@@ -448,7 +448,7 @@ func TestReachGuardCanFail(t *testing.T) {
 		})
 	}
 
-	// internal/server (6-W1). A guarded file that imports it is a fault, whatever it calls with
+	// internal/server. A guarded file that imports it is a fault, whatever it calls with
 	// the import. Only a named file may import it, and the named file's own faults still count.
 	srvImp := `import srv "` + serverPath + `"` + "\n"
 	serverCases := []struct {

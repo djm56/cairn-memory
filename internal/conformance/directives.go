@@ -62,7 +62,7 @@ var directiveCapCases = []Case{
 		}
 	}},
 	{"directive/other_role_does_not_crowd_the_cap", func(t T, s core.Service) {
-		// CONTRACT §2, §5, §9 item 49 (12-W1): task_current and recall give the agent
+		// CONTRACT §2, §5, §9 item 49: task_current and recall give the agent
 		// scope of the caller's own role. Twelve reviewer directives do not push out
 		// the project and global ones of a main session, and a caller with no role
 		// gets none of them.

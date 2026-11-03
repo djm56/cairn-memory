@@ -6,7 +6,7 @@ import (
 )
 
 // TestDefaultClientHasTheDefaultTimeout checks the 30-second bound on a client
-// built with no HTTP client (step 8 review S5). A server that stops answering
+// built with no HTTP client. A server that stops answering
 // would otherwise hang the caller, and the net/http default client has no timeout.
 // It is an internal test, since the bound is a field of the client's own HTTP client.
 func TestDefaultClientHasTheDefaultTimeout(t *testing.T) {

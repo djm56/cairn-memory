@@ -40,7 +40,7 @@ import (
 const Name = "cairn"
 
 // diagnostics receives what the adapter tells the operator and not the model: the
-// stack of a panic in a tool (step 10 review S5). It is stderr, since stdout carries
+// stack of a panic in a tool. It is stderr, since stdout carries
 // the protocol. A test replaces it.
 var diagnostics io.Writer = os.Stderr
 
@@ -96,14 +96,14 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 	}
 	tool := &mcp.Tool{Name: name, Description: description, InputSchema: schema}
 	s.srv.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (res *mcp.CallToolResult, err error) {
-		// The SDK does not recover a panic in a handler (step 8 review S2; SDK
+		// The SDK does not recover a panic in a handler (SDK
 		// v1.8.0 has no recover in its non-test code, as far as its source shows).
 		// A panic becomes an internal tool error, so one bad field does not end the
 		// session. The cause is in the message, as for other internal errors.
 		defer func() {
 			if p := recover(); p != nil {
 				// The model gets the cause. The stack goes to diagnostics, for the
-				// operator (step 10 review S5), since the model cannot act on it.
+				// operator, since the model cannot act on it.
 				fmt.Fprintf(diagnostics, "cairn mcp: the %s tool panicked: %v\n%s", name, p, debug.Stack())
 				res, err = failure(fmt.Errorf("the tool failed: %v", p)), nil
 			}
@@ -128,7 +128,7 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 }
 
 // withRestart adds to the refusal for an unresolved project that the session must
-// be restarted after the fix (step 8 review S9). The project is read once, when
+// be restarted after the fix. The project is read once, when
 // the session starts, so a fix made later is not seen until then. The kind and the
 // missing list are kept; the error is copied, not changed, since core's ErrNoProject
 // is shared.
@@ -141,7 +141,7 @@ func withRestart(err error) error {
 }
 
 // withAgentArgument names the agent argument in the refusal of a write with no
-// agent (step 8 review S6). Core refuses the call, and its message does not say
+// agent. Core refuses the call, and its message does not say
 // which argument to give; on this surface the argument is agent. Only the text
 // changes: the refusal and its kind are core's. Core checks the caller before any
 // other field, so a blank agent on a write is always the first fault, and the

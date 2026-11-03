@@ -17,7 +17,7 @@ func (panicking) TaskCurrent(context.Context) (*core.TaskCurrent, error) {
 	panic("nil map write")
 }
 
-// TestAnswersKeepMarkupCharacters is step 8 review S1. A result is read by a model,
+// TestAnswersKeepMarkupCharacters checks that a result is read by a model,
 // and "&&", "->" and "<" are text, not escapes. The goal goes back as it was written.
 func TestAnswersKeepMarkupCharacters(t *testing.T) {
 	svc, _ := newService(t)
@@ -32,7 +32,7 @@ func TestAnswersKeepMarkupCharacters(t *testing.T) {
 	}
 }
 
-// TestPanicInAToolIsAnInternalError is step 8 review S2. A panic in a tool handler
+// TestPanicInAToolIsAnInternalError checks that a panic in a tool handler
 // is answered as an internal tool error, with the cause, and the session goes on.
 // The SDK does not recover it, as far as its non-test source shows.
 func TestPanicInAToolIsAnInternalError(t *testing.T) {
@@ -45,7 +45,7 @@ func TestPanicInAToolIsAnInternalError(t *testing.T) {
 	if got.Kind != "internal" || !strings.Contains(got.Message, "nil map write") {
 		t.Errorf("panic: %+v, want kind internal with the cause", got)
 	}
-	// The stack goes to the operator's diagnostics, and not to the model (S5).
+	// The stack goes to the operator's diagnostics, and not to the model.
 	if !strings.Contains(diag.String(), "task_current tool panicked: nil map write") || !strings.Contains(diag.String(), "goroutine") {
 		t.Errorf("diagnostics = %q, want the panic and its stack", diag.String())
 	}
@@ -56,7 +56,7 @@ func TestPanicInAToolIsAnInternalError(t *testing.T) {
 	errorOf(t, text, isErr)
 }
 
-// TestMissingAgentNamesTheArgument is step 8 review S6. The refusal of a write
+// TestMissingAgentNamesTheArgument checks that the refusal of a write
 // with no agent says which argument to give, since on this surface that is the
 // one the model sends.
 func TestMissingAgentNamesTheArgument(t *testing.T) {
@@ -69,7 +69,7 @@ func TestMissingAgentNamesTheArgument(t *testing.T) {
 	}
 }
 
-// TestUnresolvedProjectSaysToRestart is step 8 review S9. The project is read once,
+// TestUnresolvedProjectSaysToRestart checks the refusal's advice. The project is read once,
 // when the session starts, so the refusal says to restart the session after the fix.
 // The shared core.ErrNoProject is copied, not changed.
 func TestUnresolvedProjectSaysToRestart(t *testing.T) {

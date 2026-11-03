@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestInitLeavesTheUmaskInCharge is step 12 review W4. The file is created at 0644 and the
+// TestInitLeavesTheUmaskInCharge checks that the umask has the last word on the mode. The file is created at 0644 and the
 // umask takes its share, on the link path and on the direct write of the fallback. A
 // umask of 077 leaves 0600; the file is not chmodded past it.
 func TestInitLeavesTheUmaskInCharge(t *testing.T) {

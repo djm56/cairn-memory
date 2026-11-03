@@ -149,7 +149,7 @@ func TestBackupWhileWritesRun(t *testing.T) {
 
 	assertIntegrityOK(t, out)
 	// Group the writer's rows by transaction. Each group must be whole in the copy: all txRows
-	// rows or none, never a part (14-S9). Every transaction committed before Backup began must be
+	// rows or none, never a part. Every transaction committed before Backup began must be
 	// in the copy.
 	groups := map[string]int{}
 	for _, name := range keyNames(t, out) {
@@ -306,7 +306,7 @@ func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
 	}
 }
 
-// TestBackupRefusesAStagingDirectorySwappedAfterTheCopy is W-B (a), the swap after the copy. The
+// TestBackupRefusesAStagingDirectorySwappedAfterTheCopy checks a swap of the staging name after the copy. The
 // copy is complete and sits in the directory the root holds when the staging name is moved and a
 // link put in its place, pointing at a directory with a sentinel file. The check after the copy
 // must refuse. The root-held copy must be removed through the root: it is removed from the moved
@@ -360,7 +360,7 @@ func TestBackupRefusesAStagingDirectorySwappedAfterTheCopy(t *testing.T) {
 	}
 }
 
-// TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink is W-B (b), the post-link SameFile
+// TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink checks the post-link SameFile
 // branch. The copy is replaced by another file between the last check and the link. The name is
 // the same, so the check passes, and os.Link links the file that now holds it. The check on the
 // linked file must find it is not the copy made, remove the output name, and say so.

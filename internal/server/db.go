@@ -70,7 +70,7 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 // an empty server where the restore was interrupted, and the database that was there would look
 // lost. The same files are kept for good after a restore that succeeded, so the refusal can be
 // stale. The error therefore says "may", names the newest stamp (the database it moved aside
-// last), and lists every stamp found, so an old copy is not taken for the current one (14b-W3).
+// last), and lists every stamp found, so an old copy is not taken for the current one.
 // Nothing is created and nothing is moved. A path that exists is not refused here.
 func refuseNewOverRestore(path string) error {
 	if _, err := os.Lstat(path); err == nil || !errors.Is(err, fs.ErrNotExist) {
@@ -83,7 +83,7 @@ func refuseNewOverRestore(path string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		// A folder that does not exist is not a restore that was interrupted. Its error is returned
-		// as it is, so the operator sees the missing folder and not a restore message (16b-W2).
+		// as it is, so the operator sees the missing folder and not a restore message.
 		if errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
@@ -102,9 +102,9 @@ func refuseNewOverRestore(path string) error {
 	newest, stamps := newestPreRestore(found, prefix)
 	if newest.name == "" {
 		// Only -wal or -shm files are beside the path. A restore does not move them with the
-		// database absent: it refuses first (14-W3), so they were left by hand, or a restore raced
+		// database absent: it refuses first, so they were left by hand, or a restore raced
 		// past that check. None is a database, so no mv is offered: putting one at the database
-		// path would be wrong (16-S2).
+		// path would be wrong.
 		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere. %s (README, If a restore fails)",
 			path, strings.Join(stamps, ", "), joinNames(dir, found), base, startFresh(dir, found))
 	}
@@ -115,7 +115,7 @@ func refuseNewOverRestore(path string) error {
 // startFresh is the text for an operator who wants a new, empty database instead of putting one
 // back. The files of the earlier restore are checked, then moved out of the folder by hand. Each
 // one is named and quoted, so the mv command runs as printed once the folder is filled in. Nothing
-// is deleted, and nothing is moved onto the database path (16-S2).
+// is deleted, and nothing is moved onto the database path.
 func startFresh(dir string, names []string) string {
 	quoted := make([]string, len(names))
 	for i, n := range names {
@@ -135,7 +135,7 @@ type preRestoreFile struct {
 // with prefix, and every distinct stamp found, oldest first. A stamp is fixed-width UTC, so string
 // order is time order. The file returned is the main file (no -wal or -shm suffix) of the newest
 // stamp that has one: a -wal or -shm is never the file to put back at the database path. When no
-// stamp has a main file, the returned file is the zero value (16-S2).
+// stamp has a main file, the returned file is the zero value.
 func newestPreRestore(found []string, prefix string) (preRestoreFile, []string) {
 	var best preRestoreFile
 	seen := map[string]bool{}
@@ -175,7 +175,7 @@ func joinNames(dir string, names []string) string {
 func createDatabaseFile(path string) error {
 	// A dangling symbolic link at path is refused by name. The exclusive create below fails on
 	// it with EEXIST, which reads as "already exists", and the store would then create the link's
-	// target at SQLite's default mode, which is not dbFileMode (8-S3). A link to a file that exists
+	// target at SQLite's default mode, which is not dbFileMode. A link to a file that exists
 	// is not refused here: the store opens that file, and its mode is the one it has.
 	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
 		if _, serr := os.Stat(path); errors.Is(serr, fs.ErrNotExist) {

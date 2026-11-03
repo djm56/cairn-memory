@@ -20,7 +20,7 @@ var unsafeAdvice = []string{"--force", "rm ", "reset"}
 // core, the HTTP handlers and client that carry its errors to a caller, the
 // project and server resolution, the MCP tools that carry the errors to a model,
 // and the CLI, which prints them.
-// The identity package is included (step 8 review S8): its messages reach a
+// The identity package is included: its messages reach a
 // caller as core.Invalid, and the audit must read them too.
 var errorSources = []string{"../core", "../api", "../client", "../identity", "../mcp", "../../cmd/cairn"}
 
@@ -41,8 +41,8 @@ var errorConstructors = map[string]bool{
 // Only literals are read. Text a caller supplies at run time is quoted back to
 // it, not advised, so it is not checked.
 //
-// The step 10 review (W2) found the audit read two strings in ../identity while it
-// missed the five or six that name `cairn init`. TestErrorAuditCanFail holds the
+// An earlier audit read two strings in ../identity and missed the five or six that name
+// `cairn init`. TestErrorAuditCanFail holds the
 // forms the audit reads, so a form that drops out fails there, not here.
 func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 	var checked int
@@ -175,7 +175,7 @@ func errorLiterals(f *ast.File) []*ast.BasicLit {
 					}
 				}
 			}
-			// A doctor check: its detail is printed to a person (step 10 review W2).
+			// A doctor check: its detail is printed to a person.
 			if identName(n.Type) == "check" {
 				for _, el := range n.Elts {
 					if kv, ok := el.(*ast.KeyValueExpr); ok && identName(kv.Key) == "detail" {

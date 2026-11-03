@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestSyncPathToleratesOnlyADirectorySyncRefusal checks 14b-S5. A directory whose sync the file
+// TestSyncPathToleratesOnlyADirectorySyncRefusal checks that a directory whose sync the file
 // system refuses with EINVAL or ENOTSUP is treated as synced. Any other error from a directory
 // sync is still an error, and so is a refused sync of a file.
 func TestSyncPathToleratesOnlyADirectorySyncRefusal(t *testing.T) {

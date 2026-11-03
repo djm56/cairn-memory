@@ -20,7 +20,7 @@ type failWriter struct{}
 // Write refuses the bytes.
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("the pipe is closed") }
 
-// TestKeyAddRevokesAKeyItCannotShow checks 8-W7: when the key cannot be written to stdout, add
+// TestKeyAddRevokesAKeyItCannotShow checks that, when the key cannot be written to stdout, add
 // revokes the key it just made, exits 1, and says in words that the key was made and revoked. No
 // key text reaches stderr, and the key is revoked in the database, not left live and unseen.
 func TestKeyAddRevokesAKeyItCannotShow(t *testing.T) {
@@ -45,7 +45,7 @@ func TestKeyAddRevokesAKeyItCannotShow(t *testing.T) {
 	}
 }
 
-// TestKeyAddRevokesWhenTheStdoutPipeIsClosed is 10-W3. The Go runtime ends a process with
+// TestKeyAddRevokesWhenTheStdoutPipeIsClosed checks that the revoke still runs when stdout is a closed pipe. The Go runtime ends a process with
 // SIGPIPE only for a failed write to fd 1 or 2, so an in-process write to an os.Pipe proves
 // nothing. The test runs key add in a child process whose stdout is a pipe with no reader. The
 // child must answer through the revoke branch: exit 1, the key revoked. Without the SIGPIPE
@@ -91,7 +91,7 @@ const (
 	keyAddHelperDB  = "CAIRN_KEYADD_DB"
 )
 
-// TestKeyAddNamesTheDatabaseItCreates checks 8-S4: a key add that creates the database says so
+// TestKeyAddNamesTheDatabaseItCreates checks that a key add that creates the database says so
 // on stderr, and one that finds it does not.
 func TestKeyAddNamesTheDatabaseItCreates(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairn.db")
@@ -105,7 +105,7 @@ func TestKeyAddNamesTheDatabaseItCreates(t *testing.T) {
 	}
 }
 
-// TestKeyAddMakesTheDatabaseOwnerOnly checks 8-S9 at the command: the database that cairn key add
+// TestKeyAddMakesTheDatabaseOwnerOnly checks at the command: the database that cairn key add
 // creates is 0600, not only the database the server opens.
 func TestKeyAddMakesTheDatabaseOwnerOnly(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairn.db")
@@ -121,7 +121,7 @@ func TestKeyAddMakesTheDatabaseOwnerOnly(t *testing.T) {
 	}
 }
 
-// TestKeyRevokeDoesNotPrintAPastedKey checks 8-W6 at the command: revoking with a key given as
+// TestKeyRevokeDoesNotPrintAPastedKey checks at the command: revoking with a key given as
 // the name is exit 1, prints the rule, and prints no key, on either stream.
 func TestKeyRevokeDoesNotPrintAPastedKey(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairn.db")

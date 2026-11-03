@@ -198,7 +198,7 @@ var eventCases = []Case{
 	{"event/review_data_truncated_refused", func(t T, s core.Service) {
 		// CONTRACT §4: data that is not JSON is a malformed review, and the message
 		// names the fix. Over HTTP the client refuses it before the call, with the
-		// same message core gives in process (W1).
+		// same message core gives in process.
 		res := startTask(t, s, mainCtx(), "t")
 		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventReview, Text: "x", Data: json.RawMessage(`{"verdict":`)})
 		wantKind(t, err, core.KindInvalid, "review with truncated data")
@@ -210,7 +210,7 @@ var eventCases = []Case{
 	{"event/note_data_truncated_refused", func(t T, s core.Service) {
 		// CONTRACT §4: the data of any other kind, when given, is a JSON object. Data
 		// that is not JSON is invalid, with the message core gives in process, and
-		// writes no row (W1).
+		// writes no row.
 		res := startTask(t, s, mainCtx(), "t")
 		_, err := s.EventLog(mainCtx(), core.EventLogRequest{TaskID: res.ID, Kind: core.EventNote, Text: "x", Data: json.RawMessage(`{"word":`)})
 		wantKind(t, err, core.KindInvalid, "note with truncated data")

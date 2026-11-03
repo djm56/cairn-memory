@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestPlainFoldsAndStripsServerText checks the rules of plain (step 10 review W3): each
+// TestPlainFoldsAndStripsServerText checks the rules of plain: each
 // line break and separator is a space, each control character and each escape sequence
 // is gone, and the edges are trimmed.
 func TestPlainFoldsAndStripsServerText(t *testing.T) {
@@ -70,7 +70,7 @@ func TestFoldLineHasNoCap(t *testing.T) {
 	}
 }
 
-// TestFormatCharactersAreDropped is step 10 review W2. A format character (Unicode
+// TestFormatCharactersAreDropped checks that a format character (Unicode
 // category Cf) shows nothing and changes how the text around it is read, so plain,
 // foldLine and blockText drop each group of them, and keep the text on both sides.
 func TestFormatCharactersAreDropped(t *testing.T) {

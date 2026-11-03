@@ -94,8 +94,8 @@ func NoKeyMessage() string {
 // same file. Any group or other permission is refused.
 func readKeyFile(path string) (string, error) {
 	// The file is opened without a prior stat, and the kind is checked on the descriptor below.
-	// A named pipe is refused as not a regular file (8-S1). Opening a named pipe for reading
-	// waits for a writer, so the open is non-blocking (step 10 review 10-S3): a FIFO there
+	// A named pipe is refused as not a regular file. Opening a named pipe for reading
+	// waits for a writer, so the open is non-blocking: a FIFO there
 	// returns at once, and the kind check refuses it. A regular file reads the same either way,
 	// so the flag changes nothing else. A symbolic link is followed by the open, so its target
 	// is what is checked.

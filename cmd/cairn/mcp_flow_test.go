@@ -14,8 +14,7 @@ import (
 )
 
 // stdioConnectTimeout bounds the client's connect over the pipes. A connect that does not
-// finish is a fault to report, with the cause, not a hang of the whole package (step 12
-// review 12-W4).
+// finish is a fault to report, with the cause, not a hang of the whole package.
 const stdioConnectTimeout = 10 * time.Second
 
 // goroutineDump returns the stacks of every goroutine, for a connect that timed out.
@@ -146,12 +145,10 @@ func fieldOf(t *testing.T, obj map[string]any, key string) map[string]any {
 // the end, a review and a note in the journal, a learning proposed and listed, the
 // directives and the recall and search reads, a task list and an update, a refused close,
 // and a close. tools/list names the fifteen tools of DESIGN §4, and no other. Every call's
-// result is read and asserted, not only the fact that it succeeded (step 8 review S4; step
-// 12 review W1).
+// result is read and asserted, not only the fact that it succeeded.
 //
 // It runs twice: "env", with the server and project in the environment, and "toml", with
-// them in .cairn.toml (12-W4: the toml form was never in the suite; the stdio hang of step
-// 12 was seen on it).
+// them in .cairn.toml (the toml form was never in the suite, and a stdio hang was seen on it).
 func TestMCPStdioFlowAssertsEachResult(t *testing.T) {
 	t.Run("env", func(t *testing.T) {
 		_, url := newServer(t, nil)

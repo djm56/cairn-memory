@@ -220,7 +220,7 @@ var identityCases = []Case{
 		}
 	}},
 	{"identity/agent_name_control_character_refused", func(t T, s core.Service) {
-		// CONTRACT §1.1, step 8 review W3: a name the wire form cannot carry is
+		// CONTRACT §1.1: a name the wire form cannot carry is
 		// refused on every agent call, reads included, and the message names the
 		// field. The client refuses it before it sends, so it answers the same.
 		for _, c := range agentCalls {
@@ -258,7 +258,7 @@ var identityCases = []Case{
 	}},
 	{"identity/session_name_refused", func(t T, s core.Service) {
 		// The session is optional, and the header carries it on the wire, so the
-		// same rule applies to it (step 10 review S4): a control character or an
+		// same rule applies to it: a control character or an
 		// edge space is refused, on a read and a write, and the message names it.
 		for _, session := range []string{"sess\nion", " session"} {
 			ctx := core.WithCaller(context.Background(), core.Caller{Project: projA, Agent: "main", Session: session, Client: "conformance", Role: core.RoleAgent})

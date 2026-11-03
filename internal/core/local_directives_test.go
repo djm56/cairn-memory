@@ -197,7 +197,7 @@ func ratifyAgent(t *testing.T, s core.Service, role, title string) {
 	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeAgent, Agent: role, Title: title, Rule: "r"}))(t)
 }
 
-// TestOtherRoleDirectivesDoNotCrowdTheCap is 12-W1. Twelve reviewer directives must not
+// TestOtherRoleDirectivesDoNotCrowdTheCap checks that twelve reviewer directives must not
 // push out the project and global directives of a main-session caller, from task_current
 // or recall. A caller with no role gets none of the reviewer's. The reviewer, asking for
 // its own, gets its twelve first. directive_list with no agent is the explicit listing of
@@ -245,7 +245,7 @@ func TestOtherRoleDirectivesDoNotCrowdTheCap(t *testing.T) {
 	}
 }
 
-// TestDirectiveWithNoReviewByIsNeverExpired is 12-S1: an active directive with a NULL
+// TestDirectiveWithNoReviewByIsNeverExpired checks that an active directive with a NULL
 // review_by is live, however late the clock runs. No call writes one, so the row is
 // written through the store.
 func TestDirectiveWithNoReviewByIsNeverExpired(t *testing.T) {
@@ -270,7 +270,7 @@ func TestDirectiveWithNoReviewByIsNeverExpired(t *testing.T) {
 	}
 }
 
-// TestReviewByBoundary is 12-S1 at the edge. A directive whose review_by is 2026-11-05 is
+// TestReviewByBoundary checks the edge. A directive whose review_by is 2026-11-05 is
 // live at 00:00:00 UTC that day, which is review_by == now, and expired one nanosecond
 // later (CONTRACT §8: it expires at 00:00 UTC of the named day).
 func TestReviewByBoundary(t *testing.T) {
@@ -293,7 +293,7 @@ func TestReviewByBoundary(t *testing.T) {
 	}
 }
 
-// TestExpiredDirectivesDoNotTakeCapSlots is 12-S1. Fourteen live and two expired global
+// TestExpiredDirectivesDoNotTakeCapSlots checks that expired directives are left out before the cap. Fourteen live and two expired global
 // directives: the expired two are left out before the cap, so twelve are listed, two are
 // omitted, and two are counted as expired, in every read.
 func TestExpiredDirectivesDoNotTakeCapSlots(t *testing.T) {
@@ -323,7 +323,7 @@ func TestExpiredDirectivesDoNotTakeCapSlots(t *testing.T) {
 	}
 }
 
-// TestSearchStillFindsAnExpiredDirective is 12-S2. search does not use the capped set, and
+// TestSearchStillFindsAnExpiredDirective checks that search does not use the capped set, and
 // it still returns an expired directive, so a lapsed rule can be found and reaffirmed. The
 // directive is left out of the three reads, and search is the one read that finds it.
 func TestSearchStillFindsAnExpiredDirective(t *testing.T) {

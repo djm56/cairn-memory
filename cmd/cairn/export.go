@@ -106,8 +106,7 @@ func allEvents(t *target, id string) ([]core.Event, error) {
 // renderTask writes the task as Markdown. The journal is written oldest first, as a
 // person reads a history; the server gives it newest first. A single-line field is
 // folded to one line by foldLine, so a title or a note cannot start a heading or a
-// list item of its own, and no control character reaches the document (step 10
-// review W3). A section body keeps its own line breaks and Markdown, and loses its
+// list item of its own, and no control character reaches the document. A section body keeps its own line breaks and Markdown, and loses its
 // control characters, as blockText does. Nothing in it is a command to run.
 func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	task := d.Task
@@ -233,8 +232,8 @@ func section(w io.Writer, title, body string) {
 }
 
 // fileLine is one key file or deliverable, with its role and note when it has them.
-// The path is one line without control characters (step 10 review W3), in a code span
-// that a backtick in the path cannot end (step 12 review S5).
+// The path is one line without control characters in a code span
+// that a backtick in the path cannot end.
 func fileLine(f core.TaskFile) string {
 	line := "- " + codeSpan(foldLine(f.Path))
 	if f.Role != "" {
