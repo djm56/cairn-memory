@@ -254,11 +254,12 @@ func TestBackupRefusesAFileThatIsNotACairnDatabase(t *testing.T) {
 	}
 }
 
-// TestBackupRefusesAStagingDirectorySwappedDuringTheCopy plays the attack of W1 (#129). While the
-// copy is made, the staging directory is renamed and a symbolic link is put at its name, pointing
-// at a directory that holds a sentinel file. VACUUM INTO follows the link and writes the copy into
-// that directory. The backup must be refused, the output must not exist, the sentinel must survive
-// the cleanup, and the copy written into the swapped-in directory must be owner-only.
+// TestBackupRefusesAStagingDirectorySwappedDuringTheCopy plays the attack that #129 closed:
+// while the copy is made, the staging directory is renamed and a symbolic link is put at its
+// name, pointing at a directory that holds a sentinel file. VACUUM INTO follows the link and
+// writes the copy into that directory. The backup must be refused, the output must not exist,
+// the sentinel must survive the cleanup, and the copy written into the swapped-in directory
+// must be owner-only.
 func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
 	dir := t.TempDir()
 	db := filepath.Join(dir, "cairn.db")

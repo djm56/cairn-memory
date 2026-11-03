@@ -250,6 +250,13 @@ using these keys:
 
 A refused close changes nothing. Supply the missing items and call again.
 
+**Pending steps do not block a close.** `task_close` with outcome `done` is allowed while
+steps are still `pending`. Only an `active` step blocks it (`active_steps`, from
+`closeMissing` in `internal/core/local_close.go`, under the `require_no_active_steps`
+switch). A `done` close over pending steps is recorded as such: the steps keep their
+`pending` status, and the close event reads `Closed as done`. `cairn export task` prints
+every step with its status, so the open plan items show in the export.
+
 ## 3. Step tools
 
 All three are writes, and are `refused` on a terminal task.

@@ -293,10 +293,11 @@ func parseFile(t *testing.T, fset *token.FileSet, file string) *ast.File {
 	return f
 }
 
-// TestGuardedPackagesNeverOpenStoreOrListen is W1. Every package the guard derives,
-// the CLI, the MCP adapter, the client and identity among them, makes no call that
-// opens a store or starts a listener, and imports no store or test server, in any of
-// its non-test files, including the ones added later.
+// TestGuardedPackagesNeverOpenStoreOrListen checks the reach rule for the guarded
+// packages. Every package the guard derives, the CLI, the MCP adapter, the client and
+// identity among them, makes no call that opens a store or starts a listener, and
+// imports no store or test server, in any of its non-test files, including the ones
+// added later.
 func TestGuardedPackagesNeverOpenStoreOrListen(t *testing.T) {
 	for _, dir := range guardedDirs(t) {
 		for _, file := range nonTestGoFiles(t, filepath.Join(repoRoot, dir)) {
@@ -328,10 +329,11 @@ func importsPath(f *ast.File, p string) bool {
 	return false
 }
 
-// TestServerImportIsOnlyInTheNamedFiles is the exact-set half of the rule above. The guarded packages
-// import internal/server in exactly the files serverImportAllowed names, and no others. The
-// set is two files; a third file that imports the server, or one of the two that stops
-// importing it, fails the test and names it.
+// TestServerImportIsOnlyInTheNamedFiles is the exact-set half of the rule in bannedImports,
+// which bans internal/server outside the files serverImportAllowed names. The guarded
+// packages import internal/server in exactly those files, and no others. The set is the
+// four files serve, key, backup and restore; a fifth file that imports the server, or one
+// of the four that stops importing it, fails the test and names it.
 func TestServerImportIsOnlyInTheNamedFiles(t *testing.T) {
 	if len(serverImportAllowed) != 4 {
 		t.Errorf("serverImportAllowed names %d files, want exactly the four: serve, key, backup and restore (M2 #74)", len(serverImportAllowed))
@@ -357,9 +359,9 @@ func TestServerImportIsOnlyInTheNamedFiles(t *testing.T) {
 	}
 }
 
-// TestNoNonTestUseOfUnauthenticatedHeaderCaller is W1's second half. The
-// unauthenticated caller trusts the role header, so it is a test helper, and no
-// non-test file in the repository may use it. The walk covers the whole module.
+// TestNoNonTestUseOfUnauthenticatedHeaderCaller is the second half of the reach rule. The
+// unauthenticated caller trusts the role header, so it is a test helper, and no non-test
+// file in the repository may use it. The walk covers the whole module.
 func TestNoNonTestUseOfUnauthenticatedHeaderCaller(t *testing.T) {
 	var files int
 	err := filepath.WalkDir(repoRoot, func(p string, d fs.DirEntry, err error) error {

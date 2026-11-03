@@ -140,6 +140,11 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   mark, and exits non-zero when any is found. CI runs it on every pull request.
 - M3 follow-ups (CI): CI cross-builds the module for Windows and macOS on every pull request, so a
   platform break is caught. The cross-build does not make Windows a supported target.
+- Docs, M3 follow-ups (#134): CONTRACT §2 says that a `done` close is allowed while steps are still `pending`, and that only an `active` step blocks it. A `done` close over pending steps keeps those steps `pending`, and `cairn export task` prints them with their status.
+- Docs, M3 follow-ups (#147): DEPLOY.md restarts the unit with `systemctl restart` when the proxy override is added to a unit that is already running, and makes a replacement key before revoking the old one, since a server that listens beyond loopback refuses to start with no active key. M2-LIVE-RUN.md step 6.1 says the same.
+- Docs, M3 follow-ups (#148): DEPLOY.md gives the `systemd-analyze security` result as a description of the score, not as verbatim output.
+- Docs, M3 follow-ups (#165): the review labels in the Go test and source comments are replaced by the rule they stood for, and the comments that were awkward or unwrapped are reworded. No code token changed. DESIGN.md §5.2.1 drops a review label, and DEPLOY.md says what a backup swap can leave behind, including an empty `.cairn-backup-*` directory from a refused backup.
+- Docs, M3 follow-ups: CONTRIBUTING.md lists `scan-invisible` and the Windows and macOS cross-builds among what CI runs. CLAUDE.md no longer names a local checkout path. wiki/Decisions.md records D27 to D29 as Bishop defaults, pending operator approval.
 
 ### Changed
 

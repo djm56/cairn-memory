@@ -197,7 +197,7 @@ func ratifyAgent(t *testing.T, s core.Service, role, title string) {
 	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeAgent, Agent: role, Title: title, Rule: "r"}))(t)
 }
 
-// TestOtherRoleDirectivesDoNotCrowdTheCap checks that twelve reviewer directives must not
+// TestOtherRoleDirectivesDoNotCrowdTheCap checks that twelve reviewer directives do not
 // push out the project and global directives of a main-session caller, from task_current
 // or recall. A caller with no role gets none of the reviewer's. The reviewer, asking for
 // its own, gets its twelve first. directive_list with no agent is the explicit listing of

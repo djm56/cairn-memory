@@ -42,7 +42,8 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 // Once its arguments are right, it exits 0 whatever happens after. A hook that fails
 // the session start is worse than a missing context line. So when the project or the
 // server is not there, or does not answer, nothing is printed on stdout and the reason
-// goes to stderr. A panic is the same: it is reported on stderr, and the session starts. It writes nothing: its one call is a read.
+// goes to stderr. A panic is the same: it is reported on stderr, and the session starts.
+// It writes nothing: its one call is a read.
 func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 	if len(args) > 0 {
 		fmt.Fprintf(stderr, "cairn hook session-start: takes no arguments, got %q\n", args)

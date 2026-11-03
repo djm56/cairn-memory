@@ -8,8 +8,9 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// TestDisplayURLRemovesCredentials checks W5: the URL a message names carries no user
-// name and no password, and keeps the rest of it.
+// TestDisplayURLRemovesCredentials checks the rule that a server URL reaches a message
+// without its credentials: the URL a message names carries no user name and no password,
+// and keeps the rest of it.
 func TestDisplayURLRemovesCredentials(t *testing.T) {
 	cases := map[string]string{
 		"https://keeper:secret@cairn.lan:8788": "https://cairn.lan:8788",
@@ -26,9 +27,9 @@ func TestDisplayURLRemovesCredentials(t *testing.T) {
 	}
 }
 
-// TestCredentialsNeverReachAnError checks W5 on the two paths a URL can reach a
-// message: a base that is refused when the client is built, and a call that fails in
-// transport. Neither error may carry the user name or the password.
+// TestCredentialsNeverReachAnError checks the same credential rule on the two paths a URL
+// can reach a message: a base that is refused when the client is built, and a call that
+// fails in transport. Neither error may carry the user name or the password.
 func TestCredentialsNeverReachAnError(t *testing.T) {
 	if _, err := New("ftp://keeper:secret@cairn.lan", nil); err == nil || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "keeper") {
 		t.Errorf("New refused the base with %v, want an error with no credentials", err)

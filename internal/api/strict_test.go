@@ -339,9 +339,9 @@ func TestRequestTypesHaveNoUnmarshaler(t *testing.T) {
 }
 
 // unmarshalerTypes returns each type reachable from root that has an UnmarshalJSON,
-// json.RawMessage excepted. The check comes before the kind switch, so a named
-// slice, array or map with one is reported as well as a struct. The walk does not stop at a type it has seen in another call: each call
-// starts clean, so the answer depends on root alone.
+// json.RawMessage excepted. The check comes before the kind switch, so a named slice,
+// array or map with one is reported as well as a struct. The walk does not stop at a type
+// it has seen in another call: each call starts clean, so the answer depends on root alone.
 func unmarshalerTypes(root reflect.Type) []reflect.Type {
 	unmarshaler := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 	rawMessage := reflect.TypeOf(json.RawMessage(nil))
@@ -392,10 +392,9 @@ type testHolder struct {
 	D testDict
 }
 
-// TestUnmarshalerCheckCatchesCollections proves TestRequestTypesHaveNoUnmarshaler can
-// fail on a named slice, array or map with an UnmarshalJSON,
-// reached through a struct field, is reported. Before the check moved, these were
-// skipped.
+// TestUnmarshalerCheckCatchesCollections proves that TestRequestTypesHaveNoUnmarshaler can
+// fail: a named slice, array or map with an UnmarshalJSON, reached through a struct field,
+// is reported. Before the check moved, these were skipped.
 func TestUnmarshalerCheckCatchesCollections(t *testing.T) {
 	got := unmarshalerTypes(reflect.TypeOf(testHolder{}))
 	want := map[reflect.Type]bool{

@@ -104,10 +104,11 @@ func allEvents(t *target, id string) ([]core.Event, error) {
 }
 
 // renderTask writes the task as Markdown. The journal is written oldest first, as a
-// person reads a history; the server gives it newest first. A single-line field is
-// folded to one line by foldLine, so a title or a note cannot start a heading or a
-// list item of its own, and no control character reaches the document. A section body keeps its own line breaks and Markdown, and loses its
-// control characters, as blockText does. Nothing in it is a command to run.
+// person reads a history; the server gives it newest first. A single-line field is folded
+// to one line by foldLine, so a title or a note cannot start a heading or a list item of
+// its own, and no control character reaches the document. A section body keeps its own
+// line breaks and Markdown, and loses its control characters, as blockText does. Nothing
+// in it is a command to run.
 func renderTask(w io.Writer, d *core.TaskDetail, events []core.Event) {
 	task := d.Task
 	fmt.Fprintf(w, "# %s\n\n", foldLine(task.Title))

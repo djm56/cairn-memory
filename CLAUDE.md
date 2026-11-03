@@ -47,7 +47,7 @@ make fmt-check   # CI fails on unformatted files
 
 ## Reference implementation
 
-Cairn replaces bishop-memory, checked out at `/Users/djm56/bishop-memory`.
+Cairn replaces bishop-memory, which is checked out locally; ask the operator for the path.
 PLAN.md §1.1 and each phase's "Guided by" line name the files to read for
 reference. Read them there. Write Cairn's code fresh: copy nothing from that
 checkout, and never write to it or to its database. Bishop and

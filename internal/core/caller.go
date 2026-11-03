@@ -53,14 +53,13 @@ func ValidProjectName(name string) bool {
 	return len(name) <= 64 && projectName.MatchString(name)
 }
 
-// CheckCaller refuses an agent, client or session name that the wire form cannot
-// carry unchanged, and the session name too. The name
-// must hold no control character and no space at either end. An HTTP header value
-// cannot carry a control character, and loses its edge spaces on the way, so a name
-// that passed here would reach the server as a different name. A blank name is no
+// CheckCaller refuses an agent, client or session name that the wire form cannot carry
+// unchanged. The name must hold no control character and no space at either end. An HTTP
+// header value cannot carry a control character, and loses its edge spaces on the way, so
+// a name that passed here would reach the server as a different name. A blank name is no
 // name: the agent is refused by the write checks (CONTRACT §1.1), and the session and
-// client are optional. CheckCaller writes nothing. The client runs it before a call
-// is sent, so the same refusal comes back over HTTP.
+// client are optional. CheckCaller writes nothing. The client runs it before a call is
+// sent, so the same refusal comes back over HTTP.
 func CheckCaller(c Caller) error {
 	if err := checkName("agent name", c.Agent); err != nil {
 		return err

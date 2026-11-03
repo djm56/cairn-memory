@@ -45,11 +45,12 @@ func TestKeyAddRevokesAKeyItCannotShow(t *testing.T) {
 	}
 }
 
-// TestKeyAddRevokesWhenTheStdoutPipeIsClosed checks that the revoke still runs when stdout is a closed pipe. The Go runtime ends a process with
-// SIGPIPE only for a failed write to fd 1 or 2, so an in-process write to an os.Pipe proves
-// nothing. The test runs key add in a child process whose stdout is a pipe with no reader. The
-// child must answer through the revoke branch: exit 1, the key revoked. Without the SIGPIPE
-// ignore the child dies from the signal, and the parent sees no exit code 1.
+// TestKeyAddRevokesWhenTheStdoutPipeIsClosed checks that the revoke still runs when stdout
+// is a closed pipe. The Go runtime ends a process with SIGPIPE only for a failed write to
+// fd 1 or 2, so an in-process write to an os.Pipe proves nothing. The test runs key add in
+// a child process whose stdout is a pipe with no reader. The child must answer through the
+// revoke branch: exit 1, the key revoked. Without the SIGPIPE ignore the child dies from the
+// signal, and the parent sees no exit code 1.
 func TestKeyAddRevokesWhenTheStdoutPipeIsClosed(t *testing.T) {
 	if os.Getenv(keyAddHelperEnv) == "1" {
 		// The child: stdout is the pipe with no reader.
@@ -105,8 +106,8 @@ func TestKeyAddNamesTheDatabaseItCreates(t *testing.T) {
 	}
 }
 
-// TestKeyAddMakesTheDatabaseOwnerOnly checks at the command: the database that cairn key add
-// creates is 0600, not only the database the server opens.
+// TestKeyAddMakesTheDatabaseOwnerOnly checks through the command that the database cairn key
+// add creates is 0600, not only the database the server opens.
 func TestKeyAddMakesTheDatabaseOwnerOnly(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairn.db")
 	if code, _, errs := runCmd(t, "key", "add", "--db", db, "--name", "ci", "--scope", "agent"); code != 0 {
@@ -121,8 +122,8 @@ func TestKeyAddMakesTheDatabaseOwnerOnly(t *testing.T) {
 	}
 }
 
-// TestKeyRevokeDoesNotPrintAPastedKey checks at the command: revoking with a key given as
-// the name is exit 1, prints the rule, and prints no key, on either stream.
+// TestKeyRevokeDoesNotPrintAPastedKey checks through the command that revoking with a key
+// given as the name exits 1, prints the rule, and prints no key, on either stream.
 func TestKeyRevokeDoesNotPrintAPastedKey(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairn.db")
 	code, out, errs := runCmd(t, "key", "add", "--db", db, "--name", "ci", "--scope", "agent")
