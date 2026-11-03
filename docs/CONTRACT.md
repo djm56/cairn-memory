@@ -250,11 +250,11 @@ using these keys:
 
 A refused close changes nothing. Supply the missing items and call again.
 
-**Pending steps do not block a close.** `task_close` with outcome `done` is allowed while
-steps are still `pending`. Only an `active` step blocks it (`active_steps`, from
+**Pending steps do not block a close.** `task_close`, with outcome `done` or `failed`, is allowed while
+steps are still `pending`. Only an `active` step blocks it, whatever the outcome (`active_steps`, from
 `closeMissing` in `internal/core/local_close.go`, under the `require_no_active_steps`
-switch). A `done` close over pending steps is recorded as such: the steps keep their
-`pending` status, and the close event reads `Closed as done`. `cairn export task` prints
+switch). A close over pending steps is recorded as such: the steps keep their
+`pending` status, and the close event reads `Closed as done` or `Closed as failed`. `cairn export task` prints
 every step with its status, so the open plan items show in the export.
 
 ## 3. Step tools
@@ -384,7 +384,7 @@ A retired directive is not a hit: it is not listed by
 either. An **expired** directive (§5) is still a hit: search does not use the
 capped set, and it has no `expired` count. So a lapsed rule can be found, then
 reaffirmed by retiring it and ratifying it again (§8). Only the three reads leave
-it out (12-S2, pinned by `TestSearchStillFindsAnExpiredDirective`). A `note` hit comes only from a row written before the M1 change that
+it out, and `TestSearchStillFindsAnExpiredDirective` pins that. A `note` hit comes only from a row written before the M1 change that
 removed notes.
 No call reads a note, so such a hit has its snippet and no call to open it.
 
@@ -760,8 +760,7 @@ only a core test checks it. An item with no check of its own is marked
     2026-11-03).
     A viewer's read of a project that has no row is `not_found`, and writes no
     row, so a viewer key cannot create a project. An agent's first read of the
-    project still creates it (§1.1). *Bishop default, operator veto open (step 4
-    review, finding 4-W1).* Tests: api, core
+    project still creates it (§1.1). *Bishop default, operator veto open.* Tests: api, core
     and conformance.
 
 45. **Directive cap and ranking (2026-10-31).** `task_current`, `directive_list`
@@ -791,8 +790,7 @@ only a core test checks it. An item with no check of its own is marked
     own), and none when there is no role. An empty role is no role, not every
     role. A reviewer's directives therefore cannot fill the cap of a main
     session. `directive_list` is the one read that lists every role when `agent`
-    is empty, and that stays so: it is the explicit listing. Found in the step 12
-    review (12-W1). *Bishop default, pending operator approval.* (core and
+    is empty, and that stays so: it is the explicit listing. *Bishop default, pending operator approval.* (core and
     conformance tests)
 50. **The UI reads are operator and viewer reads (2026-11-03).**
     `project_list`, `task_browse`, `directive_browse` and `dashboard` (§8.1) are

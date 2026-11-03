@@ -518,12 +518,12 @@ owned by `cairn` anyway: the copies are then readable by that user only, and no 
 can rename the directory `backup` is working in. Do not point backups at a shared
 directory such as `/tmp`, where another user could. The output directory must not be
 writable by other users: the copy is written by name while it is made, so a user who
-could write there could redirect it for the length of the copy. If a swap happens, the
-copy can be left in the other directory it was redirected to, owner-only but a full database
-copy, and the backup is refused. Such a swap can also leave the staging directory, renamed
-by whoever swapped it and now empty, or a symlink at the staging name, beside the output.
-A refused backup can also leave an empty `.cairn-backup-*` directory beside the output,
-which the operator may remove after checking.
+could write there could redirect it for the length of the copy. If the staging name is swapped during the
+copy, the backup is refused and nothing at that name is removed, so the directory the backup
+made, emptied first, can be left beside the output renamed by whoever swapped it, a symlink
+can stay at the staging name, and the copy may be in the other directory it was redirected
+to, owner-only but a full database copy. The operator may remove an empty `.cairn-backup-*`
+directory after checking.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
 never overwrites one. `backup` needs a filesystem that supports hard links, and fails

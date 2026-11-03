@@ -2,7 +2,7 @@
 
 _Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). D22 was adopted on 2026-11-03 (operator decision, issue #72). D23 to D25 were adopted on 2026-11-03 by the operator (D24 from issue #82, D25 from issue #143), and D26 was chosen by Bishop under the operator's veto the same day. D27 to D29 are Bishop defaults from the M3 follow-up review, pending operator approval, and are not yet adopted. The wording of each decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions). The lines below only name each one. Reopening a decision needs the operator.
+D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). D22 was adopted on 2026-11-03 (operator decision, issue #72). D23 to D25 were adopted on 2026-11-03 by the operator (D24 from issue #82, D25 from issue #143), and D26 was chosen by Bishop under the operator's veto the same day. D27 to D29 are Bishop defaults from the M3 follow-up review. They are pending operator approval and are not yet adopted, so they sit under their own heading below the adopted list. The wording of each adopted decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions), and the wording of each pending one is in its source issue. The lines below only name each one. Reopening a decision needs the operator.
 
 ## Adopted decisions
 
@@ -35,11 +35,13 @@ D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #
 - **D24. Viewers see every page,** including proposed learnings, read-only. Operator decision, 2026-11-03 (issue #82). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D25. Migration 0005 keeps its backfill.** Every active directive's `review_by` is 90 days after the upgrade. Operator decision, 2026-11-03 (issue #143). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D26. Directives are reaffirmed in place.** The directive page reaffirms a directive through a new operator call, `DirectiveReaffirm`, which sets its `review_by` in place and writes a `directive_reaffirmations` row. The code, the rule and the link to the source learning are kept. Retire and ratify still work. Chosen by Bishop under the operator's veto, 2026-11-03. [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
-- **D27. An operator write to an unknown project is refused.** Core refuses an operator ratify and a settings write that name a project with no row, as `not_found`. Agent writes still create the project. Bishop default, pending operator approval (issue #164).
-- **D28. The shipped unit stays without `--behind-proxy`.** A proxy on the same host adds the flag through the override in `docs/deploy/cairn-behind-proxy.conf` (DEPLOY setup (b)). Bishop default, pending operator approval (issue #168).
-- **D29. Restore refuses a stray `-wal` or `-shm` instead of moving it aside.** A restore into a path with no database refuses when one is beside it, and changes nothing. This reverses the M2 behaviour, which moved the file aside. Bishop default, pending operator approval (issue #140).
-
 To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/issues/new?template=decision.yml). The form asks which decision it touches, the options with their costs, and a recommendation.
+
+## Pending operator approval
+
+- **D27. An operator write to an unknown project is refused.** Core refuses an operator ratify and a settings write that name a project with no row, as `not_found`. Agent writes still create the project. Bishop default, pending operator approval. Source: issue [#164](https://github.com/djm56/cairn-memory/issues/164).
+- **D28. The shipped unit stays without `--behind-proxy`.** A proxy on the same host adds the flag through the override in `docs/deploy/cairn-behind-proxy.conf` (DEPLOY setup (b)). Bishop default, pending operator approval. Source: issue [#168](https://github.com/djm56/cairn-memory/issues/168).
+- **D29. Restore refuses a stray `-wal` or `-shm` instead of moving it aside.** A restore into a path with no database refuses when one is beside it, and changes nothing. This reverses the M2 behaviour, which moved the file aside. Bishop default, pending operator approval. Source: issue [#140](https://github.com/djm56/cairn-memory/issues/140).
 
 ## Settled in the contract
 
