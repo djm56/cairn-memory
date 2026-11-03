@@ -1127,6 +1127,16 @@ form is named.
   policy changes what `task_close` accepts from every agent in the project. A
   viewer sees the same values as text.
 
+**GET filters.** The lists read their query as follows. A value outside the
+listed set is `400`, and a `cursor` that does not decode is `400` on each paged list.
+
+- `/ui/tasks`: `project` (a name that must have a row, else `404`), and `status`,
+  which repeats. Every value in the query is a filter, and the form sets one.
+- `/ui/learnings` and `/ui/p/{project}/learnings`: `status`, default `proposed`.
+  The value `all` lifts the status filter, so every status is listed. `kind` is
+  `finding`, `pattern` or `agent-note`, and empty is every kind.
+- `/ui/directives`: `state`, `active` by default, or `retired`.
+
 **Escaping.** All output goes through `html/template`'s contextual escaping. A
 stored value (a title, a rule, a note, a piece of evidence) is text. No
 `template.HTML`, `template.URL`, `template.JS` or `template.CSS` is built from
@@ -1152,8 +1162,13 @@ attribute.
 
 **Tests.** `internal/ui` tests each route's role gate, the order of the checks
 above, the origin and CSRF failures, the four headers on every answer under `/ui/`
-(and HSTS only when the server serves TLS on a non-loopback address), the cookie's flags and name in both
-transports, and the escaping of a stored value that holds markup. Further:
+(and HSTS only when the server serves TLS on a non-loopback address), and the cookie's
+flags and name in both transports. It keeps to no store, so it runs over a stub
+service. The page tests that need a store sit in `internal/server/ui_pages_test.go`:
+the escaping of a stored value that holds markup, the `404` of a project with no row
+(with no row created), the paging and the repeated filters, and the form rules of each
+action. They run over a real listener, the real handler, the real core and a real store.
+Further:
 
 - An `Origin` of `null` is refused. A same-origin form POST that carries its real
   `Origin` passes the origin check, and then succeeds for an operator. This is a

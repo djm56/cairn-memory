@@ -334,9 +334,18 @@ func (u *ui) tasks(w http.ResponseWriter, r *http.Request, s signedIn) {
 		}
 		req.Project = project
 	}
-	status := q.Get("status")
-	if status != "" {
-		req.Status = []core.TaskStatus{core.TaskStatus(status)}
+	// status repeats (DESIGN §5.5): every value is a filter. The select shows the first one,
+	// since it is the only one the form can set; the others come back only from a typed URL.
+	var statuses []core.TaskStatus
+	for _, v := range q["status"] {
+		if v != "" {
+			statuses = append(statuses, core.TaskStatus(v))
+		}
+	}
+	req.Status = statuses
+	status := ""
+	if len(statuses) > 0 {
+		status = string(statuses[0])
 	}
 	page, err := u.cfg.Service.TaskBrowse(ctx, req)
 	if err != nil {

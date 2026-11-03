@@ -359,6 +359,25 @@ func TestPagingAndInvalidCursor(t *testing.T) {
 	}
 }
 
+// TestTasksStatusReadsEveryRepeat checks that /ui/tasks filters on every status in the query,
+// as DESIGN §5.5 gives the query as repeatable. The fixture has one open task, one active task
+// and one done task. Two statuses name the open and the active one, and not the done one.
+func TestTasksStatusReadsEveryRepeat(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	s := startPages(t, st)
+	_, body := readPage(t, noRedirect(), s.base+"/ui/tasks?status=open&status=active", s.ops)
+	if got := strings.Count(body, "<tr><td>"); got != 2 {
+		t.Errorf("status=open&status=active rows = %d, want 2 (the open task and the active one)", got)
+	}
+	if !strings.Contains(body, "A web task") {
+		t.Error("the open task is not listed for status=open&status=active")
+	}
+	if strings.Contains(body, "<td>done</td>") {
+		t.Error("a done task is listed for a filter that names no done status")
+	}
+}
+
 // TestDashboardFiguresLinkToTheirLists checks that each waiting figure links to the list that
 // holds its items (DESIGN §5.5, Pages), and that a rate with no base is left out.
 func TestDashboardFiguresLinkToTheirLists(t *testing.T) {

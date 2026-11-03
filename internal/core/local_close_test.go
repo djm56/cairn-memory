@@ -99,7 +99,8 @@ func TestCloseShapeRefusals(t *testing.T) {
 	}
 }
 
-// TestStoredSettingsReadTheSameInTheReadAndTheRules checks step 6 review W1: a stored settings
+// TestStoredSettingsReadTheSameInTheReadAndTheRules checks that the settings read and the close rules
+// agree on a stored settings
 // object that is '{}', or that leaves switches out, reads its missing switches as the defaults,
 // both in project_list and in the close rules. A switch the object sets to false stays off in
 // both. The row is written first, with the object under test, so the first call does not
