@@ -18,7 +18,7 @@
 <span class="who">{{.Name}} ({{.Role}})</span>
 <a href="/ui/signout">Sign out</a>
 </nav>
-{{if .Projects}}<nav class="projects" aria-label="Projects">Projects:{{range .Projects}} <a href="/ui/p/{{.}}/learnings">{{.}}</a>{{end}}</nav>{{end}}
+{{if .Projects}}<nav class="projects" aria-label="Projects">Projects:{{range .Projects}} <a href="/ui/p/{{.}}/learnings">{{.}}</a>{{end}}{{if .More}} <a href="/ui/projects">more…</a>{{end}}</nav>{{end}}
 {{end}}
 </header>
 <main>

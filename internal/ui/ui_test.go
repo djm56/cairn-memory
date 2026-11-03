@@ -308,6 +308,24 @@ func TestGETWithNoSessionRedirectsWithNoNext(t *testing.T) {
 	}
 }
 
+// TestPOSTToAReadPathWithNoSessionIs405 pins what a POST with no session gets on a read path: the
+// mux's 405, not a redirect to sign-in. No read path takes a POST, and the route table answers the
+// method before any session check runs (DESIGN §5.5, Sessions). The test signs in nowhere, so it
+// covers the no-session case alone. /ui/directives is not a read path for this purpose: it takes a
+// POST, the ratify form, so a POST there with no session is redirected like the other forms.
+func TestPOSTToAReadPathWithNoSessionIs405(t *testing.T) {
+	hr := newHarness(t, false, false)
+	for _, path := range []string{"/ui/", "/ui/tasks", "/ui/learnings", "/ui/projects"} {
+		rec := hr.do(http.MethodPost, path, "", nil, nil)
+		if rec.status() != http.StatusMethodNotAllowed {
+			t.Errorf("POST %s with no session: status %d, want the mux's 405", path, rec.status())
+		}
+		if loc := rec.Header().Get("Location"); loc != "" {
+			t.Errorf("POST %s with no session: redirected to %q, want no redirect", path, loc)
+		}
+	}
+}
+
 // TestRevokedKeyEndsItsSessionAtTheNextRequest checks that revoking a key ends the session
 // of the browser that signed in with it, at its next request.
 func TestRevokedKeyEndsItsSessionAtTheNextRequest(t *testing.T) {

@@ -352,7 +352,8 @@ func TestRatifyRefusalsAndValidation(t *testing.T) {
 		{"a review_by that is not a date", url.Values{"review_by": {"31/12/2099"}}, "not a date", 400, ""},
 		{"from_learning that is not a number", url.Values{"from_learning": {"abc"}}, "whole number", 400, ""},
 		{"from a learning that is not accepted", url.Values{"from_learning": {learning}}, "only an accepted learning", 409, ""},
-		{"from a learning that does not exist", url.Values{"from_learning": {"999999"}}, textNotFound, 404, ""},
+		// A from_learning with no learning behind it re-renders the form with the typed values (#161).
+		{"from a learning that does not exist", url.Values{"from_learning": {"999999"}, "title": {"Typed title"}}, "names no learning", 400, `value="Typed title"`},
 	}
 	for _, tc := range cases {
 		resp, body := formAs(t, s.base, "/ui/directives", s.ops, ratifyValues(csrf, tc.over))

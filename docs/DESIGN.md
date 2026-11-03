@@ -850,7 +850,11 @@ headers. It carries the headers of Headers below, as every other answer under `/
 does. The header middleware wraps the whole subtree, including those answers and
 the `/ui` redirect (see Headers). Every page answers a request with no session
 by redirecting to `/ui/signin`, with no `next` parameter, so a link cannot carry
-a browser to another address.
+a browser to another address. A POST to a read path with no session (the
+dashboard, tasks, learnings, projects) is answered with the mux's `405`, and is
+not redirected: no read path takes a POST, and the mux matches the method before
+any session is checked. The paths that take a POST are in the table below, and a
+POST to one of them with no session is redirected like any form (#159).
 
 | Method | Path | Does | Role |
 |---|---|---|---|
@@ -896,7 +900,10 @@ typed, except the sign-in key.
 **Choosing a project.** Three kinds of page. The cross-project pages (dashboard,
 tasks, directives, projects) take no project, or a filter. The project pages
 carry the project in the path, `/ui/p/{project}/`. Every page's project switcher
-lists the names from `project_list` (CONTRACT §8.1). No current project is kept
+lists the first ten names from `project_list` (CONTRACT §8.1), in name order, in
+one bounded read. When more projects exist, the header links to the projects page
+with "more…", so a page costs the same however many projects there are (#156).
+No current project is kept
 in the session or in a cookie. A project name is checked with
 `core.ValidProjectName` before it is used, and a name that fails is `404`. A
 project page for a project with no row is `404` too (`not_found`, CONTRACT §9
@@ -1132,6 +1139,12 @@ form is named.
   defaults to 90 days from today (UTC), and a retire form with a `confirm`
   checkbox. The retire form says that retiring is final, and that to keep the
   rule the operator should reaffirm it. A button leads to the ratify form.
+  The head and the list come from two reads, not one: the head from the dashboard
+  figures, the list from `directive_browse`. At a `review_by` boundary, the
+  expired count in the head and the expired flags on the rows can briefly
+  disagree, for a page that is read between the two. One read would need a change
+  to CONTRACT §9 item 50, which names the five UI reads, so the boundary is
+  accepted (#166).
 - **Ratify** (`/ui/directives/new`, operator only). The fields of
   `DirectiveRatify` (CONTRACT §8): `scope` (`global`, `project` or `agent`),
   `project` when the scope is `project`, `agent` when the scope is `agent`,
@@ -1140,7 +1153,10 @@ form is named.
   learning page's link passes `from_learning` as a hidden field and shows "from
   learning N". It fills no other field, so the operator writes the rule. Core
   refuses the call unless the learning is `accepted` (CONTRACT §8). So the link
-  appears only on a learning whose status is `accepted`, and on no other.
+  appears only on a learning whose status is `accepted`, and on no other. A
+  `from_learning` that names no learning re-renders the form at `400`, with the
+  typed values and the message "from_learning names no learning", rather than
+  answering `404` (#161).
 - **Projects** (`/ui/projects`). A table of name, `display_name`, `last_seen_at`,
   whether parallel tasks are on, and how many of the five close-policy switches
   are on. A link leads to each project's settings. The page has no "new project"
@@ -1177,7 +1193,7 @@ attribute.
 |---|---|
 | `unauthenticated` (no session, or a session that has ended) | `303` to `/ui/signin` |
 | `read_only` (a viewer's write) | `403`, "This key is read-only." |
-| `operator_only` | `403` |
+| `operator_only` | `500`, as `internal`. Not reached: the scope is checked before core is called, so no page or action sends core a call its role refuses (#162). |
 | `invalid` | `400`, with the form re-rendered and the message shown |
 | `not_found` | `404` |
 | `refused` | `409`, with the form re-rendered and the message shown |
