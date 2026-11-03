@@ -1,0 +1,15 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Cairn</title>
+<link rel="stylesheet" href="/ui/static/app.css">
+</head>
+<body>
+<header class="top"><span class="brand">Cairn</span></header>
+<main>
+{{block "body" .}}{{end}}
+</main>
+</body>
+</html>{{end}}

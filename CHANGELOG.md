@@ -98,6 +98,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   four new operator and viewer reads and the `DirectiveReaffirm` call (CONTRACT
   §8, §8.1, §9 items 50 to 53), and decisions D23 to D26 (PLAN §8, §10)
   ([PR #150](https://github.com/djm56/cairn-memory/pull/150)).
+- M3 web UI sign-in and sessions (D23): `cairn serve` serves `/ui/` beside the API. An operator or viewer key signs in with a password field, and an agent key is refused. The session is a random token in an HttpOnly, SameSite=Strict cookie, named `__Secure-cairn_ui` over TLS or behind a proxy. Its server side keeps only the hash, and it ends at 12 hours or after 2 hours idle, or at the next request once its key is revoked. Forms are checked for session, origin, role, body and CSRF, in that order. Every answer under `/ui/` carries a content security policy, `nosniff`, `same-origin` referrer policy and `no-store`. Migration 0006 adds `ui_sessions` and `directive_reaffirmations`. The dashboard is a placeholder until M3's later steps.
 
 ### Changed
 
