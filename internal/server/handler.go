@@ -39,7 +39,7 @@ type Transport struct {
 	Loopback    bool // the listen address is a loopback address
 }
 
-// Handler returns the server's handler over st, for tests only (step 4 review S2). It takes
+// Handler returns the server's handler over st, for tests only (see NewHandler). It takes
 // the zero Transport, so the UI's cookie is not Secure and HSTS is not sent: wrong for any
 // server reached over TLS or a proxy. A served server uses NewHandler with its real
 // Transport, as Run does. The handler holds the calls under /v1, the liveness probe at

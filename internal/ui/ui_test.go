@@ -362,7 +362,7 @@ func TestPOSTWithoutASessionRedirectsAndRunsNothing(t *testing.T) {
 	}
 }
 
-// TestSessionIsCheckedBeforeOrigin pins the order of DESIGN §5.5 (step 4 review W3): a POST with
+// TestSessionIsCheckedBeforeOrigin pins the order of DESIGN §5.5 (Forms, the form chain): a POST with
 // no session and a bad Origin is answered by the session check, a redirect to sign-in. The
 // origin is not checked, so nothing is logged about it, and the action does not run.
 func TestSessionIsCheckedBeforeOrigin(t *testing.T) {
@@ -383,7 +383,7 @@ func TestSessionIsCheckedBeforeOrigin(t *testing.T) {
 	}
 }
 
-// TestBodyOverTheCapIsRefusedBeforeCSRF pins the order of DESIGN §5.5 (step 4 review W3): a body
+// TestBodyOverTheCapIsRefusedBeforeCSRF pins the order of DESIGN §5.5 (the form chain): a body
 // over 64 KiB is 413 whether or not its csrf field is right, since the body is read before the
 // field is compared. The field here is wrong on purpose.
 func TestBodyOverTheCapIsRefusedBeforeCSRF(t *testing.T) {
@@ -396,8 +396,9 @@ func TestBodyOverTheCapIsRefusedBeforeCSRF(t *testing.T) {
 	}
 }
 
-// TestLoggedPathIsQuotedAndCapped pins step 4 review S5: the path a refusal logs is quoted, so a
-// line break in it cannot start a line of its own in the log.
+// TestLoggedPathIsQuotedAndCapped checks that the path a refusal logs is quoted, so a line break
+// in it cannot start a line of its own, and cut to logCap bytes, so a long path cannot fill the
+// log. A cut is marked with "...".
 func TestLoggedPathIsQuotedAndCapped(t *testing.T) {
 	hr := newHarness(t, false, false)
 	cookie := hr.signIn(hr.opKey, nil)
@@ -416,6 +417,21 @@ func TestLoggedPathIsQuotedAndCapped(t *testing.T) {
 	// log holds the escape doubled: a backslash, then n.
 	if !strings.Contains(logs, `\\nFAKE-LOG-LINE`) {
 		t.Errorf("the path is not quoted in the log: %q", logs)
+	}
+
+	// The cap: a path of 400 bytes is logged as its first logCap bytes and "...". The path is
+	// "/ui/" then z's, so the log keeps logCap minus four z's, then the mark.
+	long := "/ui/" + strings.Repeat("z", 400)
+	rec = newRecorder()
+	chain.ServeHTTP(rec, hr.request(http.MethodPost, long, "csrf="+csrfFor(cookie), cookie,
+		map[string]string{"Origin": "http://evil.test"}))
+	logs = hr.logText()
+	kept := logCap - len("/ui/")
+	if !strings.Contains(logs, strings.Repeat("z", kept)+"...") {
+		t.Errorf("the long path is not cut to %d bytes and marked: log %q", logCap, logs)
+	}
+	if strings.Contains(logs, strings.Repeat("z", kept+1)) {
+		t.Errorf("the long path reached the log past its cap: log holds more than %d z's", kept)
 	}
 }
 

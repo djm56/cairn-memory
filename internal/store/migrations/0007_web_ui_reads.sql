@@ -5,12 +5,12 @@
 
 -- ui_sessions.last_seen_at: the idle half of the cleanup. DeleteExpiredUISessions deletes
 -- where expires_at <= ? OR last_seen_at <= ?, and migration 0006 indexes only expires_at,
--- so the idle half would scan the table (step 4 review S3).
+-- so the idle half would scan the table (docs/DESIGN.md §5.5, Indexes of the UI reads).
 CREATE INDEX ui_sessions_last_seen_at ON ui_sessions(last_seen_at);
 
 -- directive_reaffirmations.directive_id: the foreign-key child of directives. A delete of
 -- a directive scans this table without it, as migration 0002 avoids for the other child
--- tables (step 4 review W2).
+-- tables (docs/DESIGN.md §5.5, Indexes of the UI reads).
 CREATE INDEX directive_reaffirmations_directive_id ON directive_reaffirmations(directive_id);
 
 -- tasks across projects, for the dashboard and task_browse. task_browse without a
