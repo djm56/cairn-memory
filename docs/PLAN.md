@@ -434,12 +434,14 @@ that is not a numbered decision here, and the table says what.
   `scripts/check-docs.sh` checks that the two agree. docs/CONTRACT.md's line
   states the contract's own state (draft or approved), not a milestone. The
   status lines and the marker name only the milestone that is current, and
-  whether its exit check has passed. The current milestone is the lowest milestone in build order whose exit check is not recorded as passed. They change together, and only when a
-  milestone's exit check passes, so they cannot go stale between exits. They
-  never carry pull request numbers or merge state. Live progress (pull
-  requests, issues, merges) is on the
-  [milestones](https://github.com/djm56/cairn-memory/milestones) and the
-  [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
+  whether its exit check has passed. The current milestone is the lowest
+  milestone in build order whose exit check is not recorded as passed. The
+  status lines and the marker change together, and only when a milestone's exit
+  check passes, so they cannot go stale between exits. They never carry pull
+  request numbers or merge state. Live progress (pull requests, issues, merges)
+  is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and
+  the [Cairn Memory Roadmap
+  board](https://github.com/djm56/cairn-memory/projects).
 
 ## 10. Open questions
 
