@@ -50,7 +50,7 @@ var ratifyKeys = []string{
 }
 
 // ratifyPage is the ratify form. FromLearning is the learning the directive comes from, when the
-// form was reached from one (W7 in DESIGN §5.5, Ratify).
+// form was reached from one.
 type ratifyPage struct {
 	FromLearning                                string
 	ScopeOptions                                []option
@@ -180,6 +180,8 @@ func (u *ui) directiveRatify(w http.ResponseWriter, r *http.Request, s signedIn)
 	if fl := f.Get("from_learning"); fl != "" {
 		id, ok := parseID(fl)
 		if !ok {
+			// The bad value is not carried back into the hidden field of the re-rendered form.
+			delete(draft, "from_learning")
 			again(http.StatusBadRequest, msgLearningID)
 			return
 		}

@@ -192,6 +192,11 @@ func TestM3ExitCheck(t *testing.T) {
 	}
 
 	// 6. A viewer key sees every page, with no action form, and gets 403 read_only on every action.
+	// The sweep must change nothing, so the status, the directive count and the display name are
+	// read now and again after it.
+	learningBefore := rowText(t, st, `SELECT status FROM learnings WHERE id = ?`, id)
+	directivesBefore := rowCount(t, st, `SELECT COUNT(*) FROM directives`)
+	nameBefore := rowText(t, st, `SELECT display_name FROM projects WHERE name = 'acme-api'`)
 	watch := s.viewers
 	for _, path := range append(pagePaths(f), "/ui/p/acme-api/learnings?status=all") {
 		resp, body := readPage(t, c, base+path, watch)
@@ -223,6 +228,15 @@ func TestM3ExitCheck(t *testing.T) {
 	}
 	if n := rowCount(t, st, `SELECT COUNT(*) FROM directives WHERE status = 'retired'`); n != 0 {
 		t.Errorf("a viewer's retire changed %d directives", n)
+	}
+	if got := rowText(t, st, `SELECT status FROM learnings WHERE id = ?`, id); got != learningBefore {
+		t.Errorf("the viewer sweep changed the learning from %s to %s", learningBefore, got)
+	}
+	if n := rowCount(t, st, `SELECT COUNT(*) FROM directives`); n != directivesBefore {
+		t.Errorf("the viewer sweep changed the directive count from %d to %d", directivesBefore, n)
+	}
+	if got := rowText(t, st, `SELECT display_name FROM projects WHERE name = 'acme-api'`); got != nameBefore {
+		t.Errorf("the viewer sweep changed the display name from %q to %q", nameBefore, got)
 	}
 }
 
@@ -269,6 +283,53 @@ func TestDecideRerendersWithTheTypedValues(t *testing.T) {
 	}
 }
 
+// TestFailedDecideFromAProjectPageRerendersThatPage checks that a failed decision posted from a
+// project's learnings page re-renders that page, not the all-projects list. The project field
+// of the form is what chooses it, so the test posts a decision with no note and the project set.
+func TestFailedDecideFromAProjectPageRerendersThatPage(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	agent := addKey(t, st, "main-agent", auth.ScopeAgent)
+	s := startPages(t, st)
+	id := addLearning(t, s.base, agent, "Project page learning")
+	csrf := pageCSRF(t, s.base, "/ui/p/acme-api/learnings", s.ops)
+	resp, body := formAs(t, s.base, "/ui/learnings/"+idText(id)+"/decide", s.ops, url.Values{
+		"csrf": {csrf}, "project": {"acme-api"}, "status": {"rejected"}, "note": {"  "},
+	})
+	if resp.StatusCode != http.StatusBadRequest || !strings.Contains(body, textNoteNeeded) {
+		t.Fatalf("decide with no note from a project page: status %d, want 400 with the note message", resp.StatusCode)
+	}
+	if !strings.Contains(body, "<h1>Learnings: acme-api</h1>") {
+		t.Error("a failed decide from a project page did not re-render that project's learnings page")
+	}
+	if strings.Contains(body, "Learnings, all projects") {
+		t.Error("a failed decide from a project page re-rendered the all-projects list")
+	}
+	if got := rowText(t, st, `SELECT status FROM learnings WHERE id = ?`, id); got != "proposed" {
+		t.Errorf("a refused decision changed the learning to %s", got)
+	}
+}
+
+// TestRatifyIntoAnExistingProjectSucceeds checks the positive case the refusal tests do not reach:
+// a project directive named for a project that has a row is written, with that project, and the
+// answer is the directives page.
+func TestRatifyIntoAnExistingProjectSucceeds(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	s := startPages(t, st)
+	csrf := pageCSRF(t, s.base, "/ui/directives/new", s.ops)
+	resp, _ := formAs(t, s.base, "/ui/directives", s.ops, ratifyValues(csrf, url.Values{
+		"scope": {"project"}, "project": {"acme-api"}, "title": {"Project rule"}, "rule": {"Keep the project rule"},
+	}))
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/ui/directives" {
+		t.Fatalf("ratify into acme-api: status %d, Location %q; want 303 to /ui/directives",
+			resp.StatusCode, resp.Header.Get("Location"))
+	}
+	if got := rowText(t, st, `SELECT scope || '|' || project FROM directives WHERE title = 'Project rule'`); got != "project|acme-api" {
+		t.Errorf("the ratified directive is %q, want project|acme-api", got)
+	}
+}
+
 // TestRatifyRefusalsAndValidation checks each ratify failure: its status and message, the typed
 // values kept, and that no directive is written and no project row is made.
 func TestRatifyRefusalsAndValidation(t *testing.T) {
@@ -301,6 +362,11 @@ func TestRatifyRefusalsAndValidation(t *testing.T) {
 		if tc.keep != "" && !strings.Contains(body, tc.keep) {
 			t.Errorf("%s: the page does not keep the typed value %q", tc.name, tc.keep)
 		}
+	}
+	// A from_learning that is not a number is not carried back into the re-rendered form.
+	_, bad := formAs(t, s.base, "/ui/directives", s.ops, ratifyValues(csrf, url.Values{"from_learning": {"abc"}}))
+	if strings.Contains(bad, `name="from_learning" value="abc"`) {
+		t.Error("the re-rendered ratify form carries a from_learning that is not a number")
 	}
 	// The fixture holds one directive, D-0001. A refused ratify writes none.
 	if n := rowCount(t, st, `SELECT COUNT(*) FROM directives`); n != 1 {
@@ -555,5 +621,36 @@ func TestSettingsRoundTripThroughOneDecoder(t *testing.T) {
 	}))
 	if resp.StatusCode != http.StatusBadRequest || !strings.Contains(body, textSwitchNeeded) || !strings.Contains(body, `value="Typed name"`) {
 		t.Errorf("a switch that is not on or off: status %d, want 400 keeping the typed name", resp.StatusCode)
+	}
+}
+
+// TestParallelTasksOnReadsBackAsTrue checks that a save with parallel_tasks on reads back as true
+// through project_list. The fixture starts with it off, so a save that stored nothing, or always
+// stored false, would fail here.
+func TestParallelTasksOnReadsBackAsTrue(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	s := startPages(t, st)
+	parallel := func() bool {
+		t.Helper()
+		list, err := core.NewLocal(st).ProjectList(core.WithCaller(context.Background(),
+			core.Caller{Agent: "reader", Role: core.RoleOperator}), core.ProjectListRequest{Project: "acme-api"})
+		if err != nil || len(list.Projects) != 1 {
+			t.Fatalf("project_list: %v, %d projects", err, len(list.Projects))
+		}
+		return list.Projects[0].Settings.ParallelTasks
+	}
+	if parallel() {
+		t.Fatal("the fixture starts with parallel tasks on, so the test cannot show a change to on")
+	}
+	csrf := pageCSRF(t, s.base, "/ui/projects/acme-api/settings", s.ops)
+	resp, _ := formAs(t, s.base, "/ui/projects/acme-api/settings", s.ops, settingsValues(csrf, url.Values{
+		"parallel_tasks": {"on"},
+	}))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("settings save with parallel_tasks on: status %d, want 303", resp.StatusCode)
+	}
+	if !parallel() {
+		t.Error("parallel_tasks saved on reads back as false")
 	}
 }
