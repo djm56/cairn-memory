@@ -1,6 +1,6 @@
 # Cairn Memory — Design
 
-**Status as of 2026-11-02: M2 (Server) is current, and its exit check passed (live run, #19). Phases 0 to 2 are done, and
+**Status as of 2026-11-03: M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are done, and
 their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
@@ -473,7 +473,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
-| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is not yet placed in a milestone. |
+| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is placed in M4 (D22). |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
 | `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
 | `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |

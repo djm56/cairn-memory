@@ -1,8 +1,8 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-milestone: M2 -->
+<!-- cairn-milestone: M3 -->
 
-**Status as of 2026-11-02: M2 (Server) is current, and its exit check passed (live run, #19). Phases 0 to 2 are done, and
+**Status as of 2026-11-03: M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are done, and
 their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
 §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
@@ -143,7 +143,7 @@ the only thing that moves the status line (§9).
 | M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. `internal/api` lands here as handlers only, with no network listener in the shipped binary and no `cairn serve`; `internal/client` is tested against an in-process `httptest` server (D19). The directive cap and `review_by` land in M2 | An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live Claude Code run against `cairn serve` on another machine is M2's exit check (#19) |
 | M2 Server | Phase 5 | `cairn serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or proxy, loopback default, body caps beyond the 1 MiB handler cap that M1 already applies, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it |
 | M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
-| M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
+| M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `cairn export project`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
 | M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairn:init`, `/cairn:status`, `cairn-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
 | M6 Import | Phase 7 | `cairn import bishop-memory --db --dry-run`; mapping per PLAN.md §5.1 minus the reviews table (verdicts become `review` events); idempotent; counts report | Dry run on a copy maps every mission, step, event, finding, directive, criterion, lesson, mistake and deliverable, or names each skip; counts match; history visible on the dashboard |
 | M7 Pilot | New | One pilot project, two developers, one operator; daily review of findings; weekly look at the dashboard with a project manager | Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone |
@@ -312,7 +312,7 @@ From what went well and badly in bishop-memory:
 order was the phase order that §2 and §3 then gave. Plan v1 (2026-10-30)
 replaces that order with the milestones in §2 and §3. D11–D18 come from Plan
 v1's decisions table, D19 from issue #71, D20 from issue #78 and D21 from issue
-#109.
+#109 and D22 from issue #72.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -409,6 +409,11 @@ that is not a numbered decision here, and the table says what.
   MCP surface, as CONTRACT §3 names it. *Replaces the unsettled form that M1
   left open (issue #109).*
 
+**Operator decision, 2026-11-03 (issue #72): D22.**
+
+- **D22. `cairn export project` is placed in M4 Hooks + CLI.** Operator decision,
+  2026-11-03 (issue #72).
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
@@ -429,7 +434,7 @@ that is not a numbered decision here, and the table says what.
   `scripts/check-docs.sh` checks that the two agree. docs/CONTRACT.md's line
   states the contract's own state (draft or approved), not a milestone. The
   status lines and the marker name only the milestone that is current, and
-  whether its exit check has passed. They change together, and only when a
+  whether its exit check has passed. The current milestone is the lowest milestone in build order whose exit check is not recorded as passed. They change together, and only when a
   milestone's exit check passes, so they cannot go stale between exits. They
   never carry pull request numbers or merge state. Live progress (pull
   requests, issues, merges) is on the
