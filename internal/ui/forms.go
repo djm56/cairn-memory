@@ -71,7 +71,7 @@ func (u *ui) originOK(r *http.Request) bool {
 // refusedOrigin logs one refused origin check. The values are quoted and cut to logCap,
 // so a hostile header cannot put a line break or a long string into the log.
 func (u *ui) refusedOrigin(r *http.Request, origin, reason string) {
-	u.log.Warn("form refused", "reason", reason, "path", r.URL.Path,
+	u.log.Warn("form refused", "reason", reason, "path", quoted(r.URL.Path),
 		"host", quoted(r.Host), "origin", quoted(origin))
 }
 
@@ -136,7 +136,7 @@ func (u *ui) form(h func(http.ResponseWriter, *http.Request, signedIn)) http.Han
 			u.fail(w, http.StatusForbidden, msgFormRefused)
 			return
 		}
-		if s.Key.Scope == auth.ScopeViewer {
+		if s.Key.Scope != auth.ScopeOperator {
 			u.fail(w, http.StatusForbidden, msgReadOnly)
 			return
 		}

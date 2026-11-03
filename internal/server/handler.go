@@ -39,11 +39,12 @@ type Transport struct {
 	Loopback    bool // the listen address is a loopback address
 }
 
-// Handler returns the server's handler over st, for a server that is not reached through
-// a transport of its own: the calls under /v1, the liveness probe at /healthz, the web UI
-// under /ui, and the body cap over all of them. Its Transport is the zero value, so the
-// UI's cookie is not Secure and HSTS is not sent. Run uses NewHandler with the real one.
-// The causes of failures and the failures of last_used_at go to logger.
+// Handler returns the server's handler over st, for tests only (step 4 review S2). It takes
+// the zero Transport, so the UI's cookie is not Secure and HSTS is not sent: wrong for any
+// server reached over TLS or a proxy. A served server uses NewHandler with its real
+// Transport, as Run does. The handler holds the calls under /v1, the liveness probe at
+// /healthz, the web UI under /ui, and the body cap over all of them. The causes of failures
+// and the failures of last_used_at go to logger.
 func Handler(st *store.Store, logger *slog.Logger) http.Handler {
 	return NewHandler(st, logger, Transport{})
 }
@@ -68,14 +69,15 @@ func handler(lookup auth.Lookup, sessions auth.SessionStore, svc core.Service, l
 		// with the same redaction as every other cause.
 		logger.Error("web UI session failure", "cause", redact(err.Error()))
 	})
+	// HSTS is scoped to the host name, not the port, so a trusted certificate here would
+	// hold every other service on this host to https. Loopback is therefore excluded.
+	hsts := tr.TLS && !tr.Loopback
 	web := ui.New(ui.Config{
 		Sessions: sess,
 		Secure:   tr.TLS || tr.BehindProxy,
-		// HSTS is scoped to the host name, not the port, so a trusted certificate here would
-		// hold every other service on this host to https. Loopback is therefore excluded.
-		HSTS:   tr.TLS && !tr.Loopback,
-		Logger: logger,
-		Redact: redact,
+		HSTS:     hsts,
+		Logger:   logger,
+		Redact:   redact,
 	})
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthz)
@@ -84,7 +86,9 @@ func handler(lookup auth.Lookup, sessions auth.SessionStore, svc core.Service, l
 	mux.Handle("/ui", web)
 	mux.Handle("/ui/", web)
 	mux.Handle("/", calls)
-	return http.MaxBytesHandler(mux, api.MaxBodyBytes+bodyAllowance)
+	// The mux answers an unclean path such as //ui/x with its own redirect, before it routes
+	// anything, so CoverPaths sets the UI's headers outside the mux for that answer too.
+	return http.MaxBytesHandler(ui.CoverPaths(hsts, mux), api.MaxBodyBytes+bodyAllowance)
 }
 
 // failureHook logs the cause of each internal failure (CONTRACT §1.2, DESIGN §5.4,

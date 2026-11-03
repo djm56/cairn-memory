@@ -3,6 +3,16 @@
 -- never edited; a change is a new numbered file. No table or column changes: every
 -- statement here is an index.
 
+-- ui_sessions.last_seen_at: the idle half of the cleanup. DeleteExpiredUISessions deletes
+-- where expires_at <= ? OR last_seen_at <= ?, and migration 0006 indexes only expires_at,
+-- so the idle half would scan the table (step 4 review S3).
+CREATE INDEX ui_sessions_last_seen_at ON ui_sessions(last_seen_at);
+
+-- directive_reaffirmations.directive_id: the foreign-key child of directives. A delete of
+-- a directive scans this table without it, as migration 0002 avoids for the other child
+-- tables (step 4 review W2).
+CREATE INDEX directive_reaffirmations_directive_id ON directive_reaffirmations(directive_id);
+
 -- tasks across projects, for the dashboard and task_browse. task_browse without a
 -- status lists every task, most recently updated first (keyset on updated_at, id).
 -- idx_tasks_project_updated (migration 0002) starts with project, so it does not serve

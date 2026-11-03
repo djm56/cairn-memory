@@ -775,6 +775,20 @@ holds migration 0006 and its queries. `internal/server/handler.go` mounts the UI
 beside `/healthz` and `/`. The `/ui/` pattern is longer than `/`, and no API
 route starts with `/ui/`, so the two cannot collide.
 
+**Exported API the UI relies on (step 4 review, departures 5 and 6).** Two additions
+to the shapes §5.3 and §5.5 first gave.
+
+- `auth.Resolver` has `Find(ctx, raw)`, the check of `Resolve` with the header already
+  taken off. It does not move `last_used_at`, so sign-in can refuse an agent key without
+  counting it as used. `TouchKey(ctx, id)` is the once-a-minute `last_used_at` write,
+  which a session's request makes. `Resolve` is still the one call that reads a header.
+- `server.NewHandler(st, logger, Transport)` builds the handler a served server uses.
+  `Transport` says how the server is reached: `TLS` (it serves TLS itself), `BehindProxy`
+  (a proxy terminates TLS), and `Loopback` (the listen address is loopback). `Secure`
+  and `HSTS` follow from it. `server.Handler(st, logger)` takes the zero `Transport` and
+  is for tests only. Its cookie is not `Secure` and it sends no HSTS, which is wrong for
+  any server reached over TLS or a proxy. `Run` uses `NewHandler`.
+
 **The seam with the store.** `internal/ui` and `internal/auth` are guarded by the
 reach guard, which bars `internal/store`, so neither imports the store. The
 store is reached through two interfaces, and `internal/auth` names both:
@@ -802,10 +816,14 @@ and `internal/auth` stay guarded by default. Neither imports `internal/store`,
 and `serverImportAllowed` stay as they are.
 
 **Routes.** Every route is listed here. A path not in these tables is `404`,
-and a wrong method is `405` with an `Allow` header. `GET /ui` redirects to
-`/ui/`. The `/ui/` pattern matches every path below it, so the dashboard answers
-only the exact path `/ui/`, and the UI's own router answers any other unlisted
-path. The header middleware wraps the whole subtree, including those answers and
+and a wrong method is `405` with an `Allow` header. `GET /ui` answers `301`, a
+permanent redirect to `/ui/`. The `/ui/` pattern matches every path below it, so
+the dashboard answers only the exact path `/ui/`, and the UI's own router answers
+any other unlisted path. A path the mux must clean first, such as `//ui/x`,
+`/ui/./x` or `/ui//x`, gets the mux's own redirect to the cleaned path before the
+UI routes it. That redirect is `307` in the Go release this module builds with,
+and it carries the headers of Headers below, as every other answer under `/ui/`
+does. The header middleware wraps the whole subtree, including those answers and
 the `/ui` redirect (see Headers). Every page answers a request with no session
 by redirecting to `/ui/signin`, with no `next` parameter, so a link cannot carry
 a browser to another address.
@@ -899,7 +917,8 @@ mistyped name from creating a row.
   request also moves the key's `last_used_at` under the same once-a-minute rule
   as DESIGN §8.
 - **Sign-out.** `GET /ui/signout` deletes the row and sends the cookie again with
-  `Max-Age=0`, same name, path and flags. A GET is acceptable here because the
+  `Max-Age=0`, same name, path and flags. `HEAD /ui/signout` also signs out, since a
+  `GET` pattern matches `HEAD`, and the same low risk applies to it. A GET is acceptable here because the
   cookie is `SameSite=Strict`: a browser does not send it on a navigation begun
   by another site, so another site cannot sign a browser out. A page on the same
   site can still send that GET, since a different port on the same host is the
@@ -1169,7 +1188,9 @@ and the blocked count. `tasks (status, closed_at)` serves the 30-day and monthly
 figures. `learnings (status)` gives the proposed count across projects. `directives
 (status, review_by)` serves the expired count, the oldest review and the order of
 `directive_browse`. The figures of one dashboard are read in one read transaction (CONTRACT
-§9 item 35).
+§9 item 35). Migration 0007 also indexes the two columns the cleanup and the reaffirm log
+use: `ui_sessions (last_seen_at)`, for the idle half of the cleanup, and
+`directive_reaffirmations (directive_id)`, the foreign-key child of `directives`.
 
 ## 6. Clients
 
