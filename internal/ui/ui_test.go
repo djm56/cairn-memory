@@ -118,9 +118,10 @@ func TestOperatorAndViewerKeysSignIn(t *testing.T) {
 		if page.status() != http.StatusOK {
 			t.Fatalf("%s dashboard status %d", c.role, page.status())
 		}
-		want := "Signed in as " + c.name + " (" + c.role + ")."
+		// The header names the key and its role.
+		want := c.name + " (" + c.role + ")"
 		if !strings.Contains(page.body.String(), want) {
-			t.Errorf("dashboard does not say %q: %s", want, page.body.String())
+			t.Errorf("header does not say %q: %s", want, page.body.String())
 		}
 	}
 }

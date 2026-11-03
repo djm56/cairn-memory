@@ -3,9 +3,9 @@
 // embedded stylesheet. Sign-in, the session rules and their lifetimes are in
 // internal/auth; this package holds the routes, the forms, the headers and the pages.
 //
-// The package imports no store and no server (the reach guard, internal/core, holds it
-// to that). It reaches the session table through auth.Sessions, which the server builds
-// over the store. The pages that call core.Service arrive in later steps.
+// The package imports no store and no server (the reach guard holds it to that). It reaches
+// the session table through auth.Sessions, which the server builds over the store, and the
+// pages through core.Service, which the server passes in.
 package ui
 
 import (
@@ -15,12 +15,16 @@ import (
 	"net/http"
 
 	"github.com/djm56/cairn-memory/internal/auth"
+	"github.com/djm56/cairn-memory/internal/core"
 )
 
 // Config is what the UI is built over.
 type Config struct {
 	// Sessions makes, checks and ends the sessions of the browsers.
 	Sessions *auth.Sessions
+	// Service is the core the pages read through, in process (DESIGN §5.5). It is required:
+	// New panics without it, since no page can answer without one.
+	Service core.Service
 	// Secure is set when the server serves TLS itself or runs behind a proxy that
 	// terminates it (DESIGN §5.5). It sets the cookie's Secure flag, its __Secure- name,
 	// and the https scheme a form's Origin must carry.
@@ -44,6 +48,18 @@ const (
 	pathStyles  = "/ui/static/app.css"
 )
 
+// The read pages' paths (DESIGN §5.5, Routes). Each is GET only; a POST to one is 405 from
+// the mux. The action routes of DESIGN §5.5 are not here: they arrive with the actions.
+const (
+	pathTasks        = "/ui/tasks"
+	pathTask         = "/ui/p/{project}/tasks/{task}"
+	pathLearnings    = "/ui/learnings"
+	pathProjLearning = "/ui/p/{project}/learnings"
+	pathDirectives   = "/ui/directives"
+	pathProjects     = "/ui/projects"
+	pathSettings     = "/ui/projects/{project}/settings"
+)
+
 // The body caps (DESIGN §5.5): a sign-in form is 4 KiB, any other form 64 KiB.
 const (
 	signinBodyCap = 4 << 10
@@ -64,8 +80,13 @@ func New(cfg Config) http.Handler {
 	return newUI(cfg).handler()
 }
 
-// newUI builds the UI over cfg, with a discarding logger when none is given.
+// newUI builds the UI over cfg, with a discarding logger when none is given. It panics
+// when cfg has no Service: a page cannot answer without one, so a server built without it
+// is a fault at start, not at the first request.
 func newUI(cfg Config) *ui {
+	if cfg.Service == nil {
+		panic("ui: Config.Service is nil: the pages need core.Service")
+	}
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
@@ -78,6 +99,13 @@ func (u *ui) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ui", redirectToRoot)
 	mux.HandleFunc("GET /ui/{$}", u.page(u.dashboard))
+	mux.HandleFunc("GET "+pathTasks, u.page(u.tasks))
+	mux.HandleFunc("GET "+pathTask, u.page(u.task))
+	mux.HandleFunc("GET "+pathLearnings, u.page(u.learnings))
+	mux.HandleFunc("GET "+pathProjLearning, u.page(u.projectLearnings))
+	mux.HandleFunc("GET "+pathDirectives, u.page(u.directives))
+	mux.HandleFunc("GET "+pathProjects, u.page(u.projects))
+	mux.HandleFunc("GET "+pathSettings, u.page(u.projectSettings))
 	mux.HandleFunc("GET "+pathSignin, u.signinPage)
 	mux.HandleFunc("POST "+pathSignin, u.signinPost)
 	mux.HandleFunc("GET "+pathSignout, u.signout)
@@ -139,21 +167,28 @@ func (u *ui) render(w http.ResponseWriter, status int, name string, v view) {
 	_, _ = w.Write(buf.Bytes())
 }
 
-// view is the data every page is rendered with. A page reads the fields it needs. Name
-// is a stored value, so the template shows it as text.
+// view is the data every page is rendered with. Nav is the header of a signed-in page, and
+// nil on the sign-in page, where no session exists. Page is the page's own data. Every
+// stored value in it is text to the template.
 type view struct {
 	Title   string
 	Message string
-	Name    string // the signed-in key's name
-	Role    string // the signed-in key's role: operator or viewer
+	Nav     *navView
+	Page    any
 }
 
 // pages holds one parsed template set per page. Each set is the layout and one page, so
 // the "title" and "body" blocks of one page cannot clash with another's.
 var pages = map[string]*template.Template{
-	"signin":    parsePage("signin"),
-	"dashboard": parsePage("dashboard"),
-	"error":     parsePage("error"),
+	"signin":     parsePage("signin"),
+	"dashboard":  parsePage("dashboard"),
+	"tasks":      parsePage("tasks"),
+	"task":       parsePage("task"),
+	"learnings":  parsePage("learnings"),
+	"directives": parsePage("directives"),
+	"projects":   parsePage("projects"),
+	"project":    parsePage("project"),
+	"error":      parsePage("error"),
 }
 
 // parsePage parses the layout and the named page. A template that does not parse is a

@@ -1,0 +1,10 @@
+{{define "body"}}{{with .Page}}<h1>Projects</h1>
+{{if .Projects}}<table>
+<thead><tr><th>Project</th><th>Display name</th><th>Last seen</th><th>Parallel tasks</th><th>Close switches on</th></tr></thead>
+<tbody>
+{{range .Projects}}<tr><td>{{if .Href}}<a href="{{.Href}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</td><td>{{.DisplayName}}</td><td>{{.LastSeenAt}}</td><td>{{.Parallel}}</td><td>{{.CloseOn}}</td></tr>
+{{end}}</tbody>
+</table>
+{{with .Next}}<p><a href="{{.}}">Next page</a></p>{{end}}
+{{else}}<p class="muted">No project is recorded yet.</p>{{end}}
+{{end}}{{end}}

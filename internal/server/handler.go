@@ -74,6 +74,7 @@ func handler(lookup auth.Lookup, sessions auth.SessionStore, svc core.Service, l
 	hsts := tr.TLS && !tr.Loopback
 	web := ui.New(ui.Config{
 		Sessions: sess,
+		Service:  svc,
 		Secure:   tr.TLS || tr.BehindProxy,
 		HSTS:     hsts,
 		Logger:   logger,

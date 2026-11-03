@@ -1,0 +1,27 @@
+{{define "body"}}{{with .Page}}<h1>Directives</h1>
+<dl class="facts">
+<dt>Active</dt><dd>{{.Active}}</dd>
+<dt>Expired</dt><dd>{{.Expired}}</dd>
+{{with .OldestReview}}<dt>Earliest review due</dt><dd>{{.}}</dd>{{end}}
+{{with .OldestRatified}}<dt>Earliest ratified</dt><dd>{{.}}</dd>{{end}}
+</dl>
+<form method="get" action="/ui/directives" class="filter">
+<label>Show <select name="state">{{range .StateOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+<button type="submit">Filter</button>
+</form>
+{{range .Directives}}<article class="item">
+<h2>{{.Code}} {{.Title}}</h2>
+<p class="muted">{{.Scope}} · {{.State}}{{with .ReviewBy}} · review by {{.}}{{end}}{{with .RetiredAt}} · retired {{.}}{{end}}</p>
+<dl class="facts">
+<dt>Rule</dt><dd><div class="pre">{{.Rule}}</div></dd>
+{{with .AppliesWhen}}<dt>Applies when</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+{{with .Rationale}}<dt>Rationale</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+{{with .ReviewerCheck}}<dt>Reviewer check</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+{{with .Example}}<dt>Example</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+<dt>Ratified</dt><dd>{{.RatifiedBy}} · {{.RatifiedAt}}{{with .SourceLearning}} · from learning {{.}}{{end}}</dd>
+</dl>
+</article>
+{{else}}<p class="muted">No directive is listed.</p>
+{{end}}
+{{with .Next}}<p><a href="{{.}}">Next page</a></p>{{end}}
+{{end}}{{end}}

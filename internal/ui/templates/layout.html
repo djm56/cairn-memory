@@ -7,7 +7,20 @@
 <link rel="stylesheet" href="/ui/static/app.css">
 </head>
 <body>
-<header class="top"><span class="brand">Cairn</span></header>
+<header class="top">
+<span class="brand">Cairn</span>
+{{with .Nav}}<nav class="main-nav" aria-label="Main">
+<a href="/ui/">Dashboard</a>
+<a href="/ui/tasks">Tasks</a>
+<a href="/ui/learnings">Learnings</a>
+<a href="/ui/directives">Directives</a>
+<a href="/ui/projects">Projects</a>
+<span class="who">{{.Name}} ({{.Role}})</span>
+<a href="/ui/signout">Sign out</a>
+</nav>
+{{if .Projects}}<nav class="projects" aria-label="Projects">Projects:{{range .Projects}} <a href="/ui/p/{{.}}/learnings">{{.}}</a>{{end}}</nav>{{end}}
+{{end}}
+</header>
 <main>
 {{block "body" .}}{{end}}
 </main>

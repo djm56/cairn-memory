@@ -1,0 +1,23 @@
+{{define "body"}}{{with .Page}}{{if .AllProjects}}<h1>Learnings, all projects</h1>{{else}}<h1>Learnings: {{.Project}}</h1>{{end}}
+<form method="get" action="{{.FormAction}}" class="filter">
+<label>Status <select name="status">{{range .StatusOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+<label>Kind <select name="kind">{{range .KindOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+<button type="submit">Filter</button>
+</form>
+{{range .Learnings}}<article class="item">
+<h2>#{{.ID}} {{.Title}}</h2>
+<p class="muted">{{.Kind}} · {{.Status}}{{if .Project}} · {{if .ProjectHref}}<a href="{{.ProjectHref}}">{{.Project}}</a>{{else}}{{.Project}}{{end}}{{end}}</p>
+<div class="pre">{{.Body}}</div>
+<dl class="facts">
+{{with .Target}}<dt>Target</dt><dd>{{.}}</dd>{{end}}
+{{with .Rationale}}<dt>Rationale</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+{{with .Example}}<dt>Example</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+{{if .TaskID}}<dt>Task</dt><dd>{{if .TaskHref}}<a href="{{.TaskHref}}">{{.TaskID}}</a>{{else}}{{.TaskID}}{{end}}</dd>{{end}}
+{{if .DecidedBy}}<dt>Decided</dt><dd>{{.DecidedBy}} · {{.DecidedAt}}</dd>{{end}}
+{{with .DecisionNote}}<dt>Decision note</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+</dl>
+</article>
+{{else}}<p class="muted">No learning matches these filters.</p>
+{{end}}
+{{with .Next}}<p><a href="{{.}}">Next page</a></p>{{end}}
+{{end}}{{end}}
