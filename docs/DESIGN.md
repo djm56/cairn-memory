@@ -653,7 +653,7 @@ client and the CLI. This section is how the adapter reaches the server.
   for the 15 calls of §4. Operator calls (CONTRACT §8) go to
   `/v1/operator/<call>`. The names are the snake_case tool names: `task_current`,
   `task_start` … `search`, and `learning_decide`, `directive_ratify`,
-  `directive_retire`, `project_settings_set`. A path that is no call is `404`,
+  `directive_retire`, `directive_reaffirm`, `project_settings_set`. A path that is no call is `404`,
   with the kind `no_route` and a message that names the server base URL to
   check. A method other than `POST` is `405`, with `Allow: POST`.
 - **Request.** A JSON object with the call's fields, as the request types in
@@ -856,12 +856,19 @@ a browser to another address.
 | POST | `/ui/directives/{code}/reaffirm` | `DirectiveReaffirm` (CONTRACT §8). Field: `review_by`, optional. | operator |
 | POST | `/ui/projects/{project}/settings` | `ProjectSettingsSet`. Fields: `display_name`, `parallel_tasks`, and the five close-policy switches. | operator |
 
-**Built so far.** The read routes above are built, with every page of the table
-except the ratify form. The action routes (the POST rows, and `/ui/directives/new`) are
-not registered yet: until the actions arrive, a POST to a read route is `405`, and any
-other unlisted path is `404`. So a viewer's GET of `/ui/directives/new` is `404` for now,
-not the `403` the table gives, and that changes with the actions. No page renders an
-action form for any role.
+**Built so far.** Every route of the table is built: the read pages, the ratify form and
+the action routes. A path not in the table is `404`, and a wrong method on a listed path
+is `405`.
+
+**Actions.** Each POST runs after the form checks of Sessions (session, origin, role,
+body, CSRF), and then calls core with the signed-in key's name as the operator. A success
+redirects to the page that shows the result. A failed form re-renders its page with the
+message, at the status of the Errors table, and keeps what the operator typed. A failed
+decision re-renders the page its form was on: the project's learnings, or the list across
+projects. A ratify into a project, and a settings save, name a project that must already
+have a row. A name with none is refused, with `400` for a ratify and `404` for a save, so a
+misspelt name creates no project row. A retire without `confirm=yes` is refused with `400`,
+and a reaffirm of a retired directive is `409`.
 
 Each POST that changes state answers with a redirect to the page that shows
 the result (post, then redirect), so a reload does not repeat it. A POST that
@@ -1127,6 +1134,16 @@ form is named.
   policy changes what `task_close` accepts from every agent in the project. A
   viewer sees the same values as text.
 
+**GET filters.** The lists read their query as follows. A value outside the
+listed set is `400`, and a `cursor` that does not decode is `400` on each paged list.
+
+- `/ui/tasks`: `project` (a name that must have a row, else `404`), and `status`,
+  which repeats. Every value in the query is a filter, and the form sets one.
+- `/ui/learnings` and `/ui/p/{project}/learnings`: `status`, default `proposed`.
+  The value `all` lifts the status filter, so every status is listed. `kind` is
+  `finding`, `pattern` or `agent-note`, and empty is every kind.
+- `/ui/directives`: `state`, `active` by default, or `retired`.
+
 **Escaping.** All output goes through `html/template`'s contextual escaping. A
 stored value (a title, a rule, a note, a piece of evidence) is text. No
 `template.HTML`, `template.URL`, `template.JS` or `template.CSS` is built from
@@ -1152,8 +1169,14 @@ attribute.
 
 **Tests.** `internal/ui` tests each route's role gate, the order of the checks
 above, the origin and CSRF failures, the four headers on every answer under `/ui/`
-(and HSTS only when the server serves TLS on a non-loopback address), the cookie's flags and name in both
-transports, and the escaping of a stored value that holds markup. Further:
+(and HSTS only when the server serves TLS on a non-loopback address), and the cookie's
+flags and name in both transports. It keeps to no store, so it runs over a stub
+service. The page tests that need a store sit in `internal/server/ui_pages_test.go`:
+the escaping of a stored value that holds markup, the `404` of a project with no row
+(with no row created), the paging and the repeated filters, and the form rules of each
+action. They run over a real listener, the real handler, the real core and a real store.
+The action tests, and the exit check of PLAN M3 (`TestM3ExitCheck`), are in
+`internal/server/ui_actions_test.go`. Further:
 
 - An `Origin` of `null` is refused. A same-origin form POST that carries its real
   `Origin` passes the origin check, and then succeeds for an operator. This is a

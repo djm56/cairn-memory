@@ -308,9 +308,11 @@ func DefaultSettings() ProjectSettings {
 
 // decodeSettings reads a stored settings object. Every reader of the column uses it,
 // project_list and the close rules alike, so the settings the UI shows are the ones the
-// close policy enforces (step 6 review W1). The object is decoded onto DefaultSettings:
-// a switch it leaves out keeps its default, and '{}', the column default, reads as the
-// defaults (CONTRACT §8.1). A value that is not a JSON object is an error.
+// close policy enforces (DESIGN §3.6). The object is decoded onto DefaultSettings: a switch
+// it leaves out keeps its default, and '{}', the column default, reads as the defaults
+// (CONTRACT §8.1). A value that is a JSON string, number or array, or malformed, is an
+// error. A JSON null is not an error: it leaves DefaultSettings in place, which is the
+// same as '{}'.
 func decodeSettings(raw string) (ProjectSettings, error) {
 	s := DefaultSettings()
 	if err := json.Unmarshal([]byte(raw), &s); err != nil {

@@ -102,7 +102,7 @@ var writeRoutes = []string{
 	"/agent/step_plan", "/agent/step_add", "/agent/step_update",
 	"/agent/event_log", "/agent/learning_add",
 	"/operator/learning_decide", "/operator/directive_ratify", "/operator/directive_retire",
-	"/operator/project_settings_set",
+	"/operator/directive_reaffirm", "/operator/project_settings_set",
 }
 
 // operatorPrefix is the path every operator call lives under (CONTRACT §8, api.go). The
@@ -256,6 +256,10 @@ func (r routedService) DirectiveRatify(ctx context.Context, req core.DirectiveRa
 
 func (r routedService) DirectiveRetire(ctx context.Context, req core.DirectiveRetireRequest) (*core.Directive, error) {
 	return r.pick(ctx).DirectiveRetire(ctx, req)
+}
+
+func (r routedService) DirectiveReaffirm(ctx context.Context, req core.DirectiveReaffirmRequest) (*core.Directive, error) {
+	return r.pick(ctx).DirectiveReaffirm(ctx, req)
 }
 
 func (r routedService) ProjectSettingsSet(ctx context.Context, req core.ProjectSettingsRequest) (*core.Project, error) {

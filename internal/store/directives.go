@@ -166,6 +166,40 @@ func ListActiveDirectives(ctx context.Context, q Querier, project, agent string,
 	return out, nil
 }
 
+// UpdateDirectiveReviewBy sets the review_by of the directive with the given code, in
+// place. It is how DirectiveReaffirm moves a due date (CONTRACT §8, D26): the code, rule
+// and ratification stay as they are. It returns ErrNotFound (wrapped) when no directive
+// has the code. The caller checks that the directive is active.
+//
+// Write function: call it through WithTx. Operator calls only (CONTRACT §8); the store
+// does not check who calls.
+func UpdateDirectiveReviewBy(ctx context.Context, q Querier, code string, reviewBy time.Time) error {
+	res, err := q.ExecContext(ctx, `UPDATE directives SET review_by = ? WHERE code = ?`,
+		formatTime(reviewBy), code)
+	if err != nil {
+		return fmt.Errorf("store: update review_by of %s: %w", code, err)
+	}
+	return requireOneRow(res, fmt.Sprintf("directive %s", code))
+}
+
+// InsertDirectiveReaffirmation writes one row of directive_reaffirmations (CONTRACT §8,
+// D26): the directive's row id, the review_by it had and the one it has now, the
+// operator's name and the time of the call.
+//
+// Write function: call it through WithTx, in the same transaction as the
+// UpdateDirectiveReviewBy it records.
+func InsertDirectiveReaffirmation(ctx context.Context, q Querier, r ReaffirmationRow) error {
+	_, err := q.ExecContext(ctx, `INSERT INTO directive_reaffirmations
+		(directive_id, previous_review_by, review_by, reaffirmed_by, reaffirmed_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		r.DirectiveID, formatTime(r.PreviousReviewBy), formatTime(r.ReviewBy),
+		r.ReaffirmedBy, formatTime(r.ReaffirmedAt))
+	if err != nil {
+		return fmt.Errorf("store: insert reaffirmation of directive %d: %w", r.DirectiveID, err)
+	}
+	return nil
+}
+
 // UpdateDirectiveStatus sets the status and retired_at of the directive with
 // the given code. It is how a directive is retired (CONTRACT §8). It returns
 // ErrNotFound (wrapped) when no directive has the code.

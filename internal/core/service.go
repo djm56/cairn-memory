@@ -44,6 +44,7 @@ type Operator interface {
 	LearningDecide(ctx context.Context, req LearningDecideRequest) (*Learning, error)
 	DirectiveRatify(ctx context.Context, req DirectiveRatifyRequest) (*Directive, error)
 	DirectiveRetire(ctx context.Context, req DirectiveRetireRequest) (*Directive, error)
+	DirectiveReaffirm(ctx context.Context, req DirectiveReaffirmRequest) (*Directive, error)
 	ProjectSettingsSet(ctx context.Context, req ProjectSettingsRequest) (*Project, error)
 }
 
@@ -119,6 +120,9 @@ func (Unimplemented) DirectiveRatify(context.Context, DirectiveRatifyRequest) (*
 	return nil, ErrNotImplemented
 }
 func (Unimplemented) DirectiveRetire(context.Context, DirectiveRetireRequest) (*Directive, error) {
+	return nil, ErrNotImplemented
+}
+func (Unimplemented) DirectiveReaffirm(context.Context, DirectiveReaffirmRequest) (*Directive, error) {
 	return nil, ErrNotImplemented
 }
 func (Unimplemented) ProjectSettingsSet(context.Context, ProjectSettingsRequest) (*Project, error) {

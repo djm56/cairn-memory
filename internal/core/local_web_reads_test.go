@@ -260,7 +260,7 @@ func TestDirectiveBrowsePagesActiveByReviewBy(t *testing.T) {
 	}
 }
 
-// TestDirectiveBrowseRetiredPagesInOrder checks step 6 review W3: retired directives are ordered
+// TestDirectiveBrowseRetiredPagesInOrder checks that retired directives are ordered
 // by retired_at descending, then code ascending, and a page that ends inside a tie on retired_at
 // resumes at the next code. Two directives share one retired_at, and the third is later.
 func TestDirectiveBrowseRetiredPagesInOrder(t *testing.T) {
@@ -300,7 +300,7 @@ func TestDirectiveBrowseRetiredPagesInOrder(t *testing.T) {
 	}
 }
 
-// TestExpiryAtReviewByAgreesAcrossTheReads checks step 6 review W3: a directive whose review_by is
+// TestExpiryAtReviewByAgreesAcrossTheReads checks that a directive whose review_by is
 // exactly now is live, and one a nanosecond later is expired. directive_list, the dashboard's
 // expired figure and directive_browse's flag must say the same at both instants. The three read
 // the rule in different code (Go in directive_list and directive_browse, SQL in the dashboard), so

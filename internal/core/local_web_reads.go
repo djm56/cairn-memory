@@ -18,7 +18,7 @@ const dashboardWindowDays = 30
 
 // ReaderOnlyMessage is the message of an agent's refused web UI read. The wire form
 // (internal/api) gives this same text, so the two answers read the same. One constant
-// holds it, so the two cannot drift apart (step 6 review S3).
+// holds it, so the two cannot drift apart.
 const ReaderOnlyMessage = "this read is for the web UI: only an operator or a viewer key may make it"
 
 // readerFor returns the caller of a web UI read (CONTRACT §8.1, §9 item 50). The role is

@@ -222,6 +222,11 @@ func (c *Client) DirectiveRetire(ctx context.Context, req core.DirectiveRetireRe
 	return post[core.Directive](ctx, c, api.RouteDirectiveRetire, req)
 }
 
+// DirectiveReaffirm sends the directive_reaffirm operator call.
+func (c *Client) DirectiveReaffirm(ctx context.Context, req core.DirectiveReaffirmRequest) (*core.Directive, error) {
+	return post[core.Directive](ctx, c, api.RouteDirectiveReaffirm, req)
+}
+
 // ProjectSettingsSet sends the project_settings_set operator call.
 func (c *Client) ProjectSettingsSet(ctx context.Context, req core.ProjectSettingsRequest) (*core.Project, error) {
 	return post[core.Project](ctx, c, api.RouteProjectSettingsSet, req)

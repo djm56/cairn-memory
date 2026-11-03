@@ -22,7 +22,8 @@
 {{end}}
 </header>
 <main>
-{{block "body" .}}{{end}}
+{{with .Notice}}<p class="error" role="alert">{{.}}</p>
+{{end}}{{block "body" .}}{{end}}
 </main>
 </body>
 </html>{{end}}

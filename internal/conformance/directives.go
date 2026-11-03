@@ -126,4 +126,56 @@ var directiveCapCases = []Case{
 			t.Errorf("refused review_by still wrote %d directives", len(got.Directives))
 		}
 	}},
+	{"directive/reaffirm_moves_review_by_only", func(t T, s core.Service) {
+		// CONTRACT §8, §9 item 52: a reaffirm sets review_by in place. The code, rule,
+		// scope and ratification stay as they were, and the directive keeps its place.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "the rule", ReviewBy: "2099-12-31"}))(t)
+		got := must(s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code, ReviewBy: "2100-06-30"}))(t)
+		want := time.Date(2100, 6, 30, 0, 0, 0, 0, time.UTC)
+		if got.ReviewBy == nil || !got.ReviewBy.Equal(want) {
+			t.Errorf("reaffirmed review_by = %v, want %v", got.ReviewBy, want)
+		}
+		if got.Code != d.Code || got.Rule != "the rule" || got.Scope != core.ScopeGlobal || got.Status != core.DirectiveActive {
+			t.Errorf("reaffirm changed the directive: %+v", got)
+		}
+		if !got.RatifiedAt.Equal(d.RatifiedAt) || got.RatifiedBy != d.RatifiedBy {
+			t.Errorf("reaffirm changed the ratification: at %v by %q, was at %v by %q",
+				got.RatifiedAt, got.RatifiedBy, d.RatifiedAt, d.RatifiedBy)
+		}
+		list := must(s.DirectiveList(mainCtx(), core.DirectiveListRequest{}))(t)
+		if len(list.Directives) != 1 || list.Directives[0].ReviewBy == nil || !list.Directives[0].ReviewBy.Equal(want) {
+			t.Errorf("directive_list after the reaffirm = %+v, want one directive due %v", list.Directives, want)
+		}
+	}},
+	{"directive/reaffirm_default_is_ninety_days", func(t T, s core.Service) {
+		// CONTRACT §8: with no review_by, a reaffirm sets it 90 days from now, as ratify does.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "r", ReviewBy: "2099-12-31"}))(t)
+		before := time.Now().UTC()
+		got := must(s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code}))(t)
+		after := time.Now().UTC()
+		if got.ReviewBy == nil {
+			t.Fatalf("reaffirmed directive has no review_by")
+		}
+		lo := before.AddDate(0, 0, core.DirectiveReviewDays).Add(-time.Second)
+		hi := after.AddDate(0, 0, core.DirectiveReviewDays).Add(time.Second)
+		if got.ReviewBy.Before(lo) || got.ReviewBy.After(hi) {
+			t.Errorf("reaffirmed review_by = %v, want between %v and %v", got.ReviewBy, lo, hi)
+		}
+	}},
+	{"directive/reaffirm_refuses_retired_and_bad_input", func(t T, s core.Service) {
+		// CONTRACT §8: a retired directive is refused; a bad code or review_by is invalid;
+		// a code that names no row is not_found. None of them changes the directive.
+		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "t", Rule: "r", ReviewBy: "2099-12-31"}))(t)
+		_, err := s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: "nope"})
+		wantKind(t, err, core.KindInvalid, "reaffirm with a bad code")
+		_, err = s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code, ReviewBy: "2000-01-01"})
+		wantKind(t, err, core.KindInvalid, "reaffirm to a past day")
+		_, err = s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code, ReviewBy: "31/12/2099"})
+		wantKind(t, err, core.KindInvalid, "reaffirm to a malformed day")
+		_, err = s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: "D-9999"})
+		wantKind(t, err, core.KindNotFound, "reaffirm of an unknown code")
+		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
+		_, err = s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code, ReviewBy: "2100-01-01"})
+		wantKind(t, err, core.KindRefused, "reaffirm of a retired directive")
+	}},
 }

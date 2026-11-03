@@ -78,6 +78,9 @@ var operatorCalls = []call{
 	{"DirectiveRetire", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.DirectiveRetire(ctx, core.DirectiveRetireRequest{Code: "D-0001"}))
 	}},
+	{"DirectiveReaffirm", true, func(ctx context.Context, s core.Service) error {
+		return ignore(s.DirectiveReaffirm(ctx, core.DirectiveReaffirmRequest{Code: "D-0001"}))
+	}},
 	{"ProjectSettingsSet", true, func(ctx context.Context, s core.Service) error {
 		return ignore(s.ProjectSettingsSet(ctx, core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()}))
 	}},

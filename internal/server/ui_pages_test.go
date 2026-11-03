@@ -203,10 +203,32 @@ func startPages(t *testing.T, st *store.Store) pageSessions {
 	}
 }
 
+// checkActionForms checks the forms of one page. Every form names its method, so no form can post
+// by default. A viewer's page has no form that posts and no csrf field. An operator's page has
+// one csrf field for each form that posts (DESIGN §5.5, Viewer mode, CSRF).
+func checkActionForms(t *testing.T, label, role, body string) {
+	t.Helper()
+	forms := strings.Count(body, "<form")
+	gets := strings.Count(body, `method="get"`)
+	posts := strings.Count(body, `method="post"`)
+	fields := strings.Count(body, `name="csrf"`)
+	if forms != gets+posts {
+		t.Errorf("%s: %d forms, %d with method=get and %d with method=post", label, forms, gets, posts)
+	}
+	if role == "viewer" {
+		if posts != 0 || fields != 0 {
+			t.Errorf("%s: a viewer's page has %d forms that post and %d csrf fields", label, posts, fields)
+		}
+		return
+	}
+	if fields != posts {
+		t.Errorf("%s: %d forms post but %d carry the csrf field", label, posts, fields)
+	}
+}
+
 // TestEveryReadPageRendersForOperatorAndViewer checks that each read page answers 200 with the
 // signed-in key's name and role in its header, and with the security headers. A viewer's page
-// has no form that posts, and neither does an operator's, since the actions arrive in a later
-// step (DESIGN §5.5, Viewer mode).
+// has no form that posts. An operator's forms each carry the csrf field (checkActionForms).
 func TestEveryReadPageRendersForOperatorAndViewer(t *testing.T) {
 	st := openStore(t)
 	f := seedPages(t, st, plainText)
@@ -226,9 +248,7 @@ func TestEveryReadPageRendersForOperatorAndViewer(t *testing.T) {
 			if !strings.Contains(body, who.name+" ("+who.role+")") {
 				t.Errorf("%s: the header does not name the key and its role", label)
 			}
-			if strings.Contains(strings.ToLower(body), `method="post"`) {
-				t.Errorf("%s: the page renders a form that posts", label)
-			}
+			checkActionForms(t, label, who.role, body)
 			checkPageHeaders(t, label, resp)
 		}
 	}
@@ -356,6 +376,25 @@ func TestPagingAndInvalidCursor(t *testing.T) {
 			t.Errorf("%s: status %d, want 400", path, resp.StatusCode)
 		}
 		checkPageHeaders(t, path, resp)
+	}
+}
+
+// TestTasksStatusReadsEveryRepeat checks that /ui/tasks filters on every status in the query,
+// as DESIGN §5.5 gives the query as repeatable. The fixture has one open task, one active task
+// and one done task. Two statuses name the open and the active one, and not the done one.
+func TestTasksStatusReadsEveryRepeat(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	s := startPages(t, st)
+	_, body := readPage(t, noRedirect(), s.base+"/ui/tasks?status=open&status=active", s.ops)
+	if got := strings.Count(body, "<tr><td>"); got != 2 {
+		t.Errorf("status=open&status=active rows = %d, want 2 (the open task and the active one)", got)
+	}
+	if !strings.Contains(body, "A web task") {
+		t.Error("the open task is not listed for status=open&status=active")
+	}
+	if strings.Contains(body, "<td>done</td>") {
+		t.Error("a done task is listed for a filter that names no done status")
 	}
 }
 

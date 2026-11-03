@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"time"
 
@@ -20,6 +21,16 @@ const DirectiveReviewDays = 90
 // reviewByLayout is the form of a review_by date in a ratify call: a calendar day
 // in UTC, such as 2026-12-31. The stored value is the start of that day.
 const reviewByLayout = "2006-01-02"
+
+// directiveCodePattern is the form of a directive code: D- and four or more digits, as
+// NextDirectiveCode makes them (CONTRACT §1.3).
+var directiveCodePattern = regexp.MustCompile(`^D-[0-9]{4,}$`)
+
+// ValidDirectiveCode reports whether code has the form of a directive code. The web UI
+// checks a code in a path with it before the code is read.
+func ValidDirectiveCode(code string) bool {
+	return directiveCodePattern.MatchString(code)
+}
 
 // directiveFromRow converts a stored directive to the core form. A ratified
 // time that is absent is the zero time; every stored directive has one.

@@ -2,7 +2,23 @@
 {{with .DisplayName}}<p>{{.}}</p>{{end}}
 <p class="muted">{{with .LearningsHref}}<a href="{{.}}">Learnings</a>{{end}}</p>
 
-<h2>Settings</h2>
+{{if .Operator}}<h2>Settings</h2>
+<form method="post" action="/ui/projects/{{.Name}}/settings" class="action">
+<input type="hidden" name="csrf" value="{{$.Nav.CSRF}}">
+<label>Display name <input type="text" name="display_name" value="{{.DisplayName}}"></label>
+<label>Parallel tasks <select name="parallel_tasks">
+<option value="on"{{if .ParallelOn}} selected{{end}}>on</option>
+<option value="off"{{if not .ParallelOn}} selected{{end}}>off</option>
+</select></label>
+<h2>Close policy</h2>
+<p class="muted">Changing the close policy changes what task_close accepts from every agent in the project.</p>
+{{range .Switches}}<label>{{.Label}} <select name="{{.Key}}">
+<option value="on"{{if .On}} selected{{end}}>on</option>
+<option value="off"{{if not .On}} selected{{end}}>off</option>
+</select></label>
+{{end}}<button type="submit">Save settings</button>
+</form>
+{{else}}<h2>Settings</h2>
 <dl class="facts">
 <dt>Parallel tasks</dt><dd>{{.Parallel}}</dd>
 </dl>
@@ -12,5 +28,6 @@
 <tbody>{{range .Switches}}<tr><th>{{.Label}}</th><td>{{.State}}</td></tr>
 {{end}}</tbody>
 </table>
+{{end}}
 <p class="muted">Created {{.CreatedAt}}. Last seen {{.LastSeenAt}}.</p>
 {{end}}{{end}}

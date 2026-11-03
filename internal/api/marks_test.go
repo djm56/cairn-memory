@@ -21,7 +21,7 @@ type expectedRoute struct {
 	operator bool
 }
 
-// expectedRoutes is every call of the wire form: the 15 agent calls, then the four
+// expectedRoutes is every call of the wire form: the 15 agent calls, then the five
 // operator calls, which are write routes that need the operator role.
 var expectedRoutes = []expectedRoute{
 	{RouteTaskCurrent, accessRead, false},
@@ -42,6 +42,7 @@ var expectedRoutes = []expectedRoute{
 	{RouteLearningDecide, accessWrite, true},
 	{RouteDirectiveRatify, accessWrite, true},
 	{RouteDirectiveRetire, accessWrite, true},
+	{RouteDirectiveReaffirm, accessWrite, true},
 	{RouteProjectSettingsSet, accessWrite, true},
 }
 
@@ -87,7 +88,7 @@ func TestRouteMarksMatchTheExpectedTable(t *testing.T) {
 			t.Errorf("%s: marked as an operator write, but it is a read that a viewer may make", route)
 		}
 	}
-	if want := 4; len(operatorRoutes) != want {
+	if want := 5; len(operatorRoutes) != want {
 		t.Errorf("operatorRoutes has %d routes, want %d (CONTRACT §8)", len(operatorRoutes), want)
 	}
 	if want := 4; len(uiReadRoutes) != want {

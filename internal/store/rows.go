@@ -163,6 +163,16 @@ type LearningRow struct {
 	CreatedAt    time.Time
 }
 
+// ReaffirmationRow is one row of directive_reaffirmations (CONTRACT §8, D26): one call of
+// DirectiveReaffirm, with the review_by the directive had before and after it.
+type ReaffirmationRow struct {
+	DirectiveID      int64
+	PreviousReviewBy time.Time
+	ReviewBy         time.Time
+	ReaffirmedBy     string
+	ReaffirmedAt     time.Time
+}
+
 // DirectiveRow is one row of directives (DESIGN §3.4). Project is "" unless the
 // scope is project; Agent is "" unless the scope is agent.
 type DirectiveRow struct {
