@@ -73,7 +73,7 @@ A failure the caller can act on has a kind and a message:
 | `invalid` | The request is malformed: a required field is empty, a value is unknown, there is no project or agent. Fix the request. |
 | `not_found` | The task, step, learning or directive does not exist. For an agent call, that means **in the caller's project**: another project's rows are not found, not forbidden. An operator call (§8) finds its row by id or code in any project. |
 | `refused` | Well formed, but a rule forbids it now: a status transition, a second active task, the close policy. `task_close` adds `missing`. |
-| `operator_only` | An operator call made without the operator role. |
+| `operator_only` | An operator call made without the operator role, or a UI read of §8.1 made with an agent key. |
 | `no_route` | Wire form only (DESIGN §5.4): the path is not a call. The message says to check the server base URL. Answered `404`. Core never returns it. |
 | `unsupported_media_type` | Wire form only (DESIGN §5.4): the body is not `application/json`. Answered `415`. Core never returns it. |
 | `unauthenticated` | Wire form only (DESIGN §5.4): the API key is missing, malformed, unknown or revoked. Answered `401`, and the answer does not echo the header. Core never returns it. |
@@ -328,7 +328,9 @@ it.
 ### `learning_list` — read, paged
 
 **In:** `status`, `kind` (lists; empty means all); `all_projects` (by
-default only the caller's project); `target`; `limit` (default 20); `cursor`.
+default only the caller's project; for the operator and viewer roles with
+`all_projects`, no project is needed, see item 50); `target`; `limit` (default 20);
+`cursor`.
 **Out:** `learnings`, newest first, and `next`.
 
 ### `directive_list` — read
@@ -388,7 +390,8 @@ task's `context`.
 
 These are not MCP tools, and never will be. The web UI (M3) and the
 CLI reach them. Each one refuses a caller without the operator role
-(`operator_only`) before any other check. Operators act across projects, so
+(`operator_only`) before any other check. The reads of §8.1 are not operator
+calls: a viewer key may make them, and an agent key may not. Operators act across projects, so
 these calls do not need the caller's project. Every call needs the operator's
 name, which the caller carries as its agent; a call without one is `invalid`.
 `LearningDecide` and `DirectiveRatify` record the name (`decided_by`,
@@ -400,6 +403,7 @@ refuse a nameless call all the same.
 | `LearningDecide` | `id`, `status` (any but `proposed`), `superseded_by` (required for `superseded`), `note` | Sets the status, `decided_by`, `decided_at` and `decision_note`. A `superseded_by` that leads back to this learning, directly or through a chain of superseded learnings, is `refused`, since it would close a cycle. |
 | `DirectiveRatify` | `scope`, `project` (scope project), `agent` (scope agent), `title`, `rule` (required), `applies_when`, `rationale`, `reviewer_check`, `example`, `from_learning`, `review_by` | Creates an active directive with the next code. `review_by` is an optional calendar day, `YYYY-MM-DD` in UTC. The directive is expired from 00:00 UTC of that day, so it is due at the start of the named day, not after it; it must be after today, else `invalid`. Without it, `review_by` is 90 days after ratification (§9 item 47). With `from_learning`, that learning must be `accepted` (otherwise `refused`), and it becomes `applied`. |
 | `DirectiveRetire` | `code` | Sets `retired`, and `retired_at`. A directive retires once: a second call for the same code is `refused`, and the first time stands. Retired directives are no longer listed. |
+| `DirectiveReaffirm` | `code`, `review_by` (optional) | Sets the `review_by` of an active directive, in place. Its rule and code do not change. A retired directive is `refused`. The rules are below. |
 | `ProjectSettingsSet` | `project`, `display_name`, `settings` (`parallel_tasks`, `close_policy`) | Replaces the project's settings, all of them: `settings` is required and must give every switch. An object with no `settings`, or missing any one switch, is `invalid`, and the message names the missing switch. The close policy has one switch per row of the table in §2 (`task_close`), except `outcome`, which is always required. |
 
 **Extending a directive in M2.** `DirectiveRatify` on an active directive is not a
@@ -407,11 +411,132 @@ call: every ratify makes a new directive with the next code. There is no call th
 changes the `review_by` of an active directive. The route is `DirectiveRetire` of
 the old code, then `DirectiveRatify` with the `review_by` wanted. The new code
 does not keep the old one's `source_learning`. The M3 UI may edit `review_by`
-(DESIGN §3.4).
+(DESIGN §3.4). From M3 the call below does that in place, and the route above
+still works.
+
+**Reaffirming a directive (M3, D26).** `DirectiveReaffirm` sets the `review_by` of
+an active directive, in place. It takes `code`, and `review_by`, a `YYYY-MM-DD`
+calendar day in UTC. The day must be after today, else `invalid`, and the rule
+is the one `DirectiveRatify` gives. Without it, `review_by` is 90 days after
+today. The directive is expired from 00:00 UTC of that day, as for ratify. The
+call returns the directive. Its code, scope, rule, `source_learning` and
+`ratified_by` do not change. It writes one `directive_reaffirmations` row in the
+same transaction: the previous and new `review_by`, the operator's name, and the
+time. An expired directive is reaffirmed like any other, and a directive may be
+reaffirmed more than once, each time recorded. Errors: `operator_only`; `invalid`
+for a missing name, a bad `code` or a bad `review_by`; `not_found` for an unknown
+code; `refused` for a retired directive. A retired directive is ratified again as
+a new code, not reaffirmed.
 
 **Upgrade to schema 5.** Migration 0005 gives every active directive a `review_by`
 90 days after the upgrade runs, whatever its `ratified_at`. No directive is
 expired by the upgrade. Retired directives keep no `review_by`.
+
+## 8.1 Reads for the web UI
+
+The web UI needs four reads that no agent read gives it: the project list with
+each project's settings, the tasks of every project, the directives of every
+state, and the dashboard figures. They are reads, and they follow these rules
+(§9 item 50). They are not operator calls: a viewer may make them, and item 50
+gives them their own role rule. Their wire routes, when M4 adds them, sit under
+`/v1/operator/` for grouping only. The role rule decides who may call them, not
+the path. No MCP tool exposes them.
+
+- A caller with the `operator` or the `viewer` role may make them. A caller with
+  the `agent` role is refused with `operator_only`, checked before anything else,
+  in the order operator calls use.
+- They need no project. They read across projects, and create no project row.
+- Each reads one snapshot of the database, as `task_current` does (§9 item 35).
+- A paged read takes `limit` and `cursor` as §1.3 gives them.
+
+### `project_list` — read
+
+**In:** `project` (optional; one project's name, exact); `limit` (default 20);
+`cursor`.
+**Out:** `projects`, ordered by name, each `{name, display_name, created_at,
+last_seen_at, settings}`, where `settings` has the shape `ProjectSettingsSet`
+takes (`parallel_tasks`, `close_policy`); and `next`. A stored settings value of
+`'{}'`, the column default, is read as the defaults of `DefaultSettings`:
+`parallel_tasks` false, and every close-policy switch on.
+**Errors:** `operator_only` for an agent caller. `invalid` for a bad `project`
+name, `limit` or `cursor`. `not_found` when `project` names no row.
+
+### `task_browse` — read
+
+**In:** `project` (optional; an exact name); `status` (a list; empty means all);
+`limit` (default 20); `cursor`.
+**Out:** `tasks`, each `{id, project, title, status, priority, updated_at}`, most
+recently updated first, with `id` breaking a tie; and `next`. Tasks of every
+project are listed, or only the named project's when `project` is given.
+**Errors:** `operator_only`. `invalid` for a bad name, status, `limit` or
+`cursor`. `not_found` when `project` names no row.
+
+### `directive_browse` — read
+
+**In:** `state` (`active` or `retired`; default `active`); `limit` (default 20);
+`cursor`.
+**Out:** `directives`, and `next`. Each directive has the fields `directive_list`
+gives it, and `retired_at` when retired. An active directive that is expired (item 46)
+carries `expired: true`. That is a flag on the directive, not a
+count. Ordering: `active` by `review_by` ascending, then `code`; `retired` by
+`retired_at` descending, then `code`.
+Unlike `directive_list`, nothing is capped and nothing is left out. Every
+directive of the state is listed, expired ones included.
+**Errors:** `operator_only`. `invalid` for a bad `state`, `limit` or `cursor`.
+
+### `dashboard` — read
+
+**In:** nothing.
+**Out:**
+
+```json
+{"running": {"count": 2, "tasks": [{"id": "…", "project": "…", "title": "…", "status": "active", "priority": "normal", "updated_at": "…"}]},
+ "waiting": {"proposed_learnings": 3, "blocked_tasks": 1, "expired_directives": 0},
+ "quality_30d": {"closed": 9, "done": 7, "criteria_met": 20, "criteria_total": 24, "high_impact_mistakes": 1},
+ "monthly": [{"month": "2026-06", "closed": 4, "done": 3, "high_impact_mistakes": 0, "directives_ratified": 1}],
+ "directives": {"active": 11, "expired": 0, "oldest_review_by": "2027-01-12", "oldest_age_days": 140}}
+```
+
+`monthly` has six entries, oldest first. `oldest_review_by` and
+`oldest_age_days` are left out when there is no active directive.
+
+**Errors:** `operator_only`.
+
+**The figures (Bishop default, pending operator approval; §9 item 51).** "Now" is
+the server's time when the read starts. A day is a whole UTC day, and an age is
+whole days, rounded down.
+
+- `running.count` is the number of tasks with status `active`, in every project.
+  `running.tasks` is the first 20 of them, most recently updated first, with `id`
+  descending breaking a tie. Parallel tasks can make the count higher than one per
+  project.
+- `waiting.proposed_learnings` is the number of learnings with status `proposed`,
+  in every project. `waiting.blocked_tasks` is the number of tasks with status
+  `blocked`, in every project. `waiting.expired_directives` is the number of
+  active directives that are expired (item 46).
+- `quality_30d` covers the tasks with status `done` or `failed` whose `closed_at`
+  is in the window `[now − 30 days, now)`: the lower bound is inclusive, so a task
+  closed exactly 30 days ago counts, and the upper bound is exclusive. `closed`
+  counts them. `done` counts those with status `done`. Status is the outcome
+  (§2, `task_close`), so no other field is read for it. `criteria_met` counts the criterion results of `met` among all
+  the criterion results recorded at those closes, and `criteria_total` counts
+  every criterion result recorded at them. `high_impact_mistakes` counts the
+  mistakes with impact `high` recorded at those closes.
+- `monthly` covers the six UTC calendar months ending with the current one. A
+  month runs from 00:00 UTC on its first day, inclusive, to 00:00 UTC of the next
+  month, exclusive. The tasks in a month are those whose `closed_at` falls in it:
+  `closed` counts them, `done` counts those with status `done`, as above, and `high_impact_mistakes` counts the
+  mistakes with impact `high` recorded at their closes. `directives_ratified`
+  counts the directives ratified in the month, by `ratified_at`, retired ones
+  included.
+- `directives.active` counts the directives with status `active`, expired ones
+  included. `directives.expired` counts those that are expired (item 46).
+  `oldest_review_by` is the earliest `review_by` among the active directives, as
+  a day. `oldest_age_days` is the whole days from the `ratified_at` of the active
+  directive ratified earliest, to now.
+
+The UI shows a rate as its count over its base, and a percentage beside it when
+the base is not zero. The read returns the counts only.
 
 ## 9. Settled here, for review
 
@@ -605,7 +730,8 @@ only a core test checks it. An item with no check of its own is marked
     kind `read_only`, for a viewer key, before the body is read. Operator routes
     are write routes, so a viewer on one gets `read_only`. An agent key on an
     operator route still gets `operator_only` (§8), also before the body is read.
-    No operator route is a read, so no viewer read of an operator route arises.
+    The reads of §8.1 are not writes, and item 50 sets their rule (amended
+    2026-11-03).
     A viewer's read of a project that has no row is `not_found`, and writes no
     row, so a viewer key cannot create a project. An agent's first read of the
     project still creates it (§1.1). *Bishop default, operator veto open (step 4
@@ -642,3 +768,30 @@ only a core test checks it. An item with no check of its own is marked
     is empty, and that stays so: it is the explicit listing. Found in the step 12
     review (12-W1). *Bishop default, pending operator approval.* (core and
     conformance tests)
+50. **The UI reads are operator and viewer reads (2026-11-03).**
+    `project_list`, `task_browse`, `directive_browse` and `dashboard` (§8.1) are
+    open to the `operator` and `viewer` roles, and refuse the `agent` role with
+    `operator_only`. They take no project, and create no project row. Each reads
+    one snapshot. For the same two roles, `learning_list` with `all_projects` set
+    needs no project and creates no row, so the UI's cross-project learnings page
+    can read through it (§5, DESIGN §5.5). An agent's `learning_list` is
+    unchanged. This amends item 44: these reads are not writes, and these five
+    calls are the only reads of that family. *Bishop default, pending operator
+    approval.*
+51. **Dashboard figures (2026-11-03).** Each figure of `dashboard` is defined in
+    §8.1 as written there: what it counts, which rows, and over what window. The
+    figures are read from one snapshot (item 35), and "now" is the server's time
+    at the start of the read. The read takes an injectable clock, so a core test
+    can set "now" at the edges of each window. *Bishop default, pending operator
+    approval.* (core test only: the conformance suite cannot move the clock.)
+52. **Directive reaffirm (2026-11-03, D26).** `DirectiveReaffirm` changes only
+    `review_by`, in place, of an active directive, and writes a
+    `directive_reaffirmations` row in the same transaction. A retired directive
+    is `refused`. This amends the M2 statement in §8 that no call changes the
+    `review_by` of an active directive. The code, rule and source learning stay.
+    *Bishop default, pending operator approval.*
+53. **The UI's operator name is the key's name (2026-11-03).** An operator call
+    made from the web UI passes the signed-in key's name, from `api_keys.name`,
+    as the caller's agent. The browser supplies no name. The name is what
+    `decided_by`, `ratified_by` and `reaffirmed_by` record (§8). *Bishop default,
+    pending operator approval.*

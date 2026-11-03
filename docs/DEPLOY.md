@@ -187,6 +187,21 @@ Two rules for the proxy:
   server caps each call at 1 MiB and refuses more; the proxy is the place to cap
   earlier.
 
+The web UI at `/ui/` adds three things to check. DESIGN.md §5.5 sets each one.
+
+- **The proxy must pass `Host` through unchanged.** The UI refuses a form POST whose
+  `Origin` does not match the request's `Host`. A proxy that rewrites `Host` makes
+  every sign-in and every form fail, with the message "The form could not be verified."
+  The page does not say why. The server's log line names the `Host` and `Origin`
+  values, so read that line first. The configs below keep `Host`: Caddy by default,
+  nginx with `proxy_set_header Host $host`, Apache with `ProxyPreserveHost On`.
+- **Cookies are shared across ports on one host name.** The UI's cookie is `cairn_ui`
+  (`__Secure-cairn_ui` over TLS), and browsers do not separate cookies by port. Two
+  `cairn serve` processes on one host name therefore sign each other out. Run one
+  server per host name, or accept that.
+- **HSTS comes from the server only when it serves TLS itself** (setup (a)). Behind a
+  proxy the server sends no `Strict-Transport-Security`. Set it in the proxy if you want it.
+
 Caddy, with TLS handled by Caddy:
 
 ```caddy

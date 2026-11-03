@@ -312,7 +312,9 @@ From what went well and badly in bishop-memory:
 order was the phase order that §2 and §3 then gave. Plan v1 (2026-10-30)
 replaces that order with the milestones in §2 and §3. D11–D18 come from Plan
 v1's decisions table, D19 from issue #71, D20 from issue #78 and D21 from issue
-#109 and D22 from issue #72.
+#109, D22 from issue #72, D23 to D25 from the operator's decisions of
+2026-11-03 (D24 from issue #82, D25 from issue #143), and D26 from Bishop under
+the operator's veto, the same day.
 
 - **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
   every harness understands. Bishop's doctrine can keep its word.
@@ -414,6 +416,42 @@ that is not a numbered decision here, and the table says what.
 - **D22. `cairn export project` is placed in M4 Hooks + CLI.** Operator decision,
   2026-11-03 (issue #72).
 
+**Operator decision, 2026-11-03: D23.**
+
+- **D23. Web UI sign-in.** The key is pasted once, on a sign-in page. The server
+  creates a session: a random token, stored only as its hash, with an expiry. The
+  browser holds a cookie that is `HttpOnly` and `SameSite=Strict`, and `Secure`
+  whenever the server serves TLS or runs with `--behind-proxy`. The session's role
+  comes from the key's scope, and an agent key is refused at sign-in. Every form
+  that writes carries a CSRF token. Pages are rendered on the server with
+  `html/template` and need no JavaScript, and every page is sent with security
+  headers. The key is never stored in the browser, and revoking a key ends its
+  sessions at their next request. [DESIGN.md §5.5](DESIGN.md#55-the-web-ui)
+  gives the detail.
+
+**Operator decision, 2026-11-03 (issue #82): D24.**
+
+- **D24. Viewers see every page.** A viewer sees every page of the web UI,
+  including proposed learnings, read-only. Answers the open question in §10 on
+  viewers.
+
+**Operator decision, 2026-11-03 (issue #143): D25.**
+
+- **D25. Migration 0005 keeps its backfill.** Every active directive's `review_by`
+  is 90 days after the upgrade runs, not after its ratification, so the upgrade
+  expires no directive. [CONTRACT.md §8](CONTRACT.md#8-operator-calls) gives the
+  upgrade note.
+
+**Chosen by Bishop under the operator's veto, 2026-11-03: D26.**
+
+- **D26. Directives are reaffirmed in place.** The directive page reaffirms a
+  directive through a new operator call, `DirectiveReaffirm`, which sets its
+  `review_by` in place and writes a `directive_reaffirmations` row. It does not retire and ratify
+  again. The code, the rule and the link to the source learning are kept. Each
+  reason is in [DESIGN.md §5.5](DESIGN.md#55-the-web-ui), and the call is in
+  [CONTRACT.md §8](CONTRACT.md#8-operator-calls). *Replaces: retire and ratify
+  as the way to reaffirm. That route still works.*
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
@@ -452,7 +490,9 @@ that is not a numbered decision here, and the table says what.
   carry certificates? **Answered 2026-10-31 (D20, #78):** both. `cairn serve`
   carries optional certificates, and refuses a non-loopback bind without TLS
   unless `--behind-proxy` is given.
-- [ ] Do viewers see proposed learnings, or only ratified directives?
+- [x] Do viewers see proposed learnings, or only ratified directives?
+  **Answered 2026-11-03 (D24, #82):** viewers see every page, proposed learnings
+  included, read-only.
 - [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
 - [ ] Rename to `cairn` now (one PR, before M1) or after M8?
 - [x] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
