@@ -1,9 +1,8 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-milestone: M1 -->
+<!-- cairn-milestone: M2 -->
 
-**Status as of 2026-10-31: M1 (Server-mode MCP) is current. M2 (Server) is built;
-its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-02: M2 (Server) is current, and its exit check passed (live run, #19). Phases 0 to 2 are done, and
 their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
 §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the

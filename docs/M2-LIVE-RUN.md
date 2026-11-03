@@ -69,8 +69,9 @@ to exist first (it creates the database file, not its directory).
     client. To serve TLS from a terminal, add `--addr 0.0.0.0:8788 --tls-cert <cert.pem>
     --tls-key <key.pem>`. Run every later server-side command in a **second** terminal.
 
-  **For a unit, check it as it starts.** The unit has not been run under systemd before
-  this run, so these three checks are part of the result. Run them and keep the output:
+  **For a unit, check it as it starts.** The unit was first started under systemd in the
+  2026-11-02 live run (see DEPLOY.md). The three checks stay part of every run's result.
+  Run them and keep the output:
 
   ```bash
   systemd-analyze verify /etc/systemd/system/cairn.service
@@ -87,6 +88,7 @@ to exist first (it creates the database file, not its directory).
   fixed body. For setup (a) use `https://` and the port. For setup (b), check the proxy
   from the server without depending on its public address:
   `curl -sS --max-time 10 --resolve <name>:443:127.0.0.1 https://<name>/healthz`.
+  This check applies only when the proxy runs on the same host as the server.
   From the client, setups (a) and (b) require one successful
   `curl -sS https://<name>/healthz`. A server-side `curl` of the public name may time
   out; that alone is not a failure. For a tunnel, open it first (2.3) and use

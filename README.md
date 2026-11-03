@@ -8,10 +8,10 @@ every agent follows.
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
 in Cairn leaves the same kind of marker.
 
-<!-- cairn-milestone: M1 -->
+<!-- cairn-milestone: M2 -->
 
-> **Status as of 2026-10-31:** M1 (Server-mode MCP) is current. M2 (Server) is
-> built; its live run (#19) is pending, so M2 is not passed. Phases 0 to 2 are
+> **Status as of 2026-11-02:** M2 (Server) is current, and its exit check passed
+> (live run, #19). Phases 0 to 2 are
 > done, and their exit checks passed. Live progress is on the
 > [milestones](https://github.com/djm56/cairn-memory/milestones)
 > and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
@@ -45,13 +45,13 @@ in Cairn leaves the same kind of marker.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
-  the HTTP server (`cairn serve`, built in M2, live run pending; the web UI is
+  the HTTP server (`cairn serve`, built in M2, live run passed on 2026-11-02; the web UI is
   M3), the hook helper and the admin tool. The M1 commands are `init`, `status`, `doctor`,
   `export task` and `hook session-start`; the CLI proper is planned for M4. Go
   and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
-  D11). `cairn serve` is built in M2, and its live run is pending. `cairn mcp`
+  D11). `cairn serve` is built in M2, and its live run passed on 2026-11-02. `cairn mcp`
   and the M1 commands need `server` in `.cairn.toml` or `CAIRN_SERVER`, and an API key in `CAIRN_API_KEY`
   or `~/.config/cairn/client.env`. `cairn mcp` refuses to start without a server
   or a key. `cairn init` writes that file in the project directory, and does
