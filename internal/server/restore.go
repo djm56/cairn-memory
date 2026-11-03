@@ -71,7 +71,8 @@ type move struct {
 //     the file alone holds the state (store.ExclusiveLock.Consolidate). A file that is not
 //     readable is not checkpointed. Then the files of the set that exist (the database, -wal and
 //     -shm) are moved to pre-restore names, each reported, and never deleted. An absent database
-//     with a stray -wal or -shm beside it has those moved the same way;
+//     with a stray -wal or -shm beside its path is refused before step 2, and nothing is moved
+//     (14-W3: the operator moves those files aside, by hand, and runs the restore again);
 //  6. the checked copy is renamed to the database path, and the database is opened, which
 //     migrates it to this build's schema.
 //
@@ -116,6 +117,14 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	}
 	if exists && os.SameFile(di, bi) {
 		return fmt.Errorf("the backup %s is the database itself: restore from a copy made by cairn backup", o.Backup)
+	}
+	// 14-W3. With no database at the path, a -wal or -shm beside it belongs to a database that is
+	// not there. SQLite replays a -wal it finds beside the file it opens, so the restore refuses
+	// rather than move the file, and changes nothing. The operator decides what to do with it.
+	if !exists {
+		if strays := presentSuffixes(o.DB, []string{"-wal", "-shm"}); len(strays) > 0 {
+			return strayRefusal(o.DB, strays)
+		}
 	}
 
 	// 2. Stage and verify the copy. It sits beside the database, so the final rename stays on one
@@ -166,10 +175,6 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	}
 	stamp := o.Now().UTC().Format(preRestoreStamp)
 	pre := o.DB + ".pre-restore-" + stamp
-	strays := []string(nil)
-	if !exists {
-		strays = presentSuffixes(o.DB, []string{"-wal", "-shm"})
-	}
 
 	// 4. A person confirms, at a terminal, by typing the path.
 	if exists {
@@ -182,9 +187,6 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		}
 	} else {
 		fmt.Fprintf(o.Out, "No database is at %s now. This creates it from the backup %s.\n", o.DB, o.Backup)
-		if len(strays) > 0 {
-			fmt.Fprintf(o.Out, "A -wal or -shm is at that path with no database beside it: it is moved to %s first. Nothing is deleted.\n", pre)
-		}
 	}
 	fmt.Fprintf(o.Out, "To confirm, type the database path exactly as given: ")
 	typed, err := readLine(o.Input)
@@ -282,6 +284,21 @@ func presentSuffixes(db string, suffixes []string) []string {
 		}
 	}
 	return out
+}
+
+// strayRefusal is the refusal for a -wal or -shm beside a database path that has no database (14-W3).
+// It names each file, and says what the operator does with them: check them, then move them aside
+// by hand. Nothing is moved or deleted here. The command to move them is quoted, so a path with a
+// space or a quote in it is still one argument.
+func strayRefusal(db string, strays []string) error {
+	paths := make([]string, len(strays))
+	quoted := make([]string, len(strays))
+	for i, s := range strays {
+		paths[i] = db + s
+		quoted[i] = shellQuote(db + s)
+	}
+	return fmt.Errorf("no database is at %s, but a -wal or -shm is beside it with no database to belong to: %s. Nothing was changed. SQLite replays a -wal that it finds beside a database it opens, so a restore here could mix in another database's changes. Check these files, then move them aside yourself to a folder of your own, for example: mkdir -p -- <folder> && mv -- %s <folder>/ . Then run restore again. Nothing is deleted (README, If a restore fails)",
+		db, strings.Join(paths, ", "), strings.Join(quoted, " "))
 }
 
 // checkFree refuses when a pre-restore name for one of the suffixes given, each of which has a

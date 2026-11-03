@@ -329,9 +329,11 @@ func setCaller(ctx context.Context, h http.Header) error {
 // failure reads the error of an answer that is not a success. When the answer
 // carries a core error kind, the error is the core.Error it names. A no_route
 // answer names the base URL the client was given, since a mis-set base is the
-// usual cause. Anything else, such as an internal failure or an answer that is
-// not the wire form, is a plain error that names the route and the status, and is
-// not a core.Error.
+// usual cause. So does a 404 whose body is not the wire form, such as a reverse
+// proxy's page, which is the same fault. The 404 message says the body was not a
+// cairn answer. Anything else, such as an internal failure, is a plain error that
+// names the route and the status, and is not a core.Error. A redirect is refused
+// with its own message, and its Location is not printed.
 func failure(base, route string, resp *http.Response) error {
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		// The redirect is not followed, and its Location is not printed: it may carry what the

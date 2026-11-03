@@ -97,8 +97,9 @@ func ensureProject(ctx context.Context, q store.Querier, project string, now tim
 
 // ensureReadProject makes sure the caller's project exists before a read. A
 // read usually finds the row and writes nothing. Only the first read of a new
-// project by an agent opens a write transaction. A viewer may not create the
-// row: its read of a project no agent has written to is not_found, and writes
+// project by any caller who is not a viewer opens a write transaction, whatever
+// the role or scope of that caller. A viewer may not create the row: its read of
+// a project no agent has written to is not_found, and writes
 // nothing (CONTRACT §1.1, §9 item 44). The viewer is the least-trusted scope,
 // and the project name comes from the client, so the viewer must not be able to
 // mint project rows.

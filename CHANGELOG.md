@@ -133,6 +133,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   proxy: the upgrade and its rollback, the headers and cookie, and the exit-check flow.
   Linked from the README's Web UI section and from DEPLOY.md.
 - Docs: DEPLOY.md's same-host setup (b) now adds `--behind-proxy` through a unit override, since the shipped unit does not pass it and the web UI refuses every form without it.
+- Docs, M3 follow-ups (#138, #168): DEPLOY.md says that the `listening` line's `active_keys` is the count at start time, and that log times are UTC. Setup (b) offers `docs/deploy/cairn-behind-proxy.conf`, a systemd drop-in with `--behind-proxy`, as an alternative to `systemctl edit`. The shipped unit is unchanged.
+- Docs, M3 follow-ups: CONTRACT §8 scopes "does not create a project" to the two operator calls, and §1.1 says an operator-role read still creates the row. The web UI's pre-check only chooses the response form (DESIGN §5.5).
 
 ### Changed
 
@@ -142,8 +144,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Behaviour change, M3 follow-ups (#136): `cairn key add`, `list` and `revoke` with no `--db` name the systemd unit's database, `/var/lib/cairn/cairn.db`, in the message and in `--help`.
 - Behaviour change, M3 follow-ups (#137): the server's log lines carry UTC times, as `cairn export` and `cairn key list` do. Before, they carried the host's offset.
 - Behaviour change, M3 follow-ups (#160): the server's internal-failure log line quotes the route path and cuts it to 200 bytes, as the web UI's log lines do. A path with a line break can no longer start a second log line.
-- Docs, M3 follow-ups (#138, #168): DEPLOY.md says that the `listening` line's `active_keys` is the count at start time, and that log times are UTC. Setup (b) offers `docs/deploy/cairn-behind-proxy.conf`, a systemd drop-in with `--behind-proxy`, as an alternative to `systemctl edit`. The shipped unit is unchanged.
-- Docs, M3 follow-ups: CONTRACT §8 scopes "does not create a project" to the two operator calls, and §1.1 says an operator-role read still creates the row. The web UI's pre-check only chooses the response form (DESIGN §5.5).
+- Behaviour change, M3 follow-ups (#129): `cairn backup` makes its copy in a directory it creates beside the output, and gives the copy its name by a hard link, which refuses any existing name, a symbolic link included. A link placed at the output name while the copy is made is refused, and nothing is written through it. Before, the copy was written by name after an empty file was made, so a link put in that gap could redirect it. The output is still owner-only and is never overwritten.
+- Behaviour change, M3 follow-ups (#140, 14-W3): `cairn restore` into a path with no database refuses when a `-wal` or `-shm` is beside that path, and names the files. It no longer moves them aside. Nothing is moved or deleted; the refusal says to check the files and move them out of the folder by hand, then run the restore again.
+- Behaviour change, M3 follow-ups (#140, 14b-W3): the refusal to create a database over the files of an earlier restore now says how to start fresh: check the files, move them out of the folder yourself, then start `cairn serve` again. Nothing is deleted. The refusal is otherwise unchanged.
+- Behaviour change, M3 follow-ups (#141, 16b-W2): `cairn key add` into a folder that does not exist gets the plain missing-folder error. Before, it got the message about an interrupted restore.
 - M3 web UI: `/ui/tasks` filters on every repeated `status` in its query, as DESIGN §5.5
   gives it. Before, it read the first one only.
 - Behaviour change, M3: a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.

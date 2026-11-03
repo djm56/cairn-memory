@@ -82,6 +82,11 @@ func refuseNewOverRestore(path string) error {
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		// A folder that does not exist is not a restore that was interrupted. Its error is returned
+		// as it is, so the operator sees the missing folder and not a restore message (16b-W2).
+		if errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 		return fmt.Errorf("look for the files of an interrupted restore beside %s: %w", path, err)
 	}
 	prefix := base + ".pre-restore-"
@@ -99,11 +104,24 @@ func refuseNewOverRestore(path string) error {
 		// Only -wal or -shm files are beside the path (a restore with the database absent moves
 		// just those). None is a database, so no mv is offered: putting one at the database path
 		// would be wrong (16-S2).
-		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere, and move these files aside before you start cairn serve here (README, If a restore fails)",
-			path, strings.Join(stamps, ", "), joinNames(dir, found), base)
+		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere. %s (README, If a restore fails)",
+			path, strings.Join(stamps, ", "), joinNames(dir, found), base, startFresh(dir, found))
 	}
-	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairn serve, move any file now at %s aside, then run: mv -- %s %s (README, If a restore fails)",
-		path, filepath.Join(dir, newest.name), newest.stamp, strings.Join(stamps, ", "), joinNames(dir, found), path, shellQuote(filepath.Join(dir, newest.name)), shellQuote(path))
+	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairn serve, move any file now at %s aside, then run: mv -- %s %s. %s (README, If a restore fails)",
+		path, filepath.Join(dir, newest.name), newest.stamp, strings.Join(stamps, ", "), joinNames(dir, found), path, shellQuote(filepath.Join(dir, newest.name)), shellQuote(path), startFresh(dir, found))
+}
+
+// startFresh is the text for an operator who wants a new, empty database instead of putting one
+// back. The files of the earlier restore are checked, then moved out of the folder by hand. Each
+// one is named and quoted, so the mv command runs as printed once the folder is filled in. Nothing
+// is deleted, and nothing is moved onto the database path (16-S2).
+func startFresh(dir string, names []string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = shellQuote(filepath.Join(dir, n))
+	}
+	return fmt.Sprintf("To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own: mkdir -p -- <folder> && mv -- %s <folder>/ . Then start cairn serve again. Nothing is deleted.",
+		strings.Join(quoted, " "))
 }
 
 // preRestoreFile is a file beside a database that a restore moved aside: its name and the UTC

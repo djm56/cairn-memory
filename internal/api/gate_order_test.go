@@ -10,13 +10,19 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// operatorRouteList is the four calls of CONTRACT §8, by their route constants.
-var operatorRouteList = []string{
-	api.RouteLearningDecide,
-	api.RouteDirectiveRatify,
-	api.RouteDirectiveRetire,
-	api.RouteProjectSettingsSet,
-}
+// operatorRouteList is every call only an operator key may make (CONTRACT §8): the routes the
+// route table marks OperatorOnly, read from api.Routes. It is derived, not typed out, so a call
+// added to the table is tested here without a change to this file. The test below fails on an
+// empty list, since an empty list would pass every check.
+var operatorRouteList = func() []string {
+	var out []string
+	for _, r := range api.Routes() {
+		if r.OperatorOnly {
+			out = append(out, r.Route)
+		}
+	}
+	return out
+}()
 
 // TestOperatorRouteRefusesAnAgentBeforeTheBody checks the order of CONTRACT §1.2 on
 // the wire: the role is refused before the body is decoded. An agent key that sends a
@@ -30,6 +36,9 @@ func TestOperatorRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 	h := keyedHandler(st, core.NewLocal(st))
 	agent := addKey(t, st, "ci", auth.ScopeAgent)
 	operator := addKey(t, st, "ops", auth.ScopeOperator)
+	if len(operatorRouteList) == 0 {
+		t.Fatal("the route table marks no operator route: the list is empty, so nothing is tested")
+	}
 
 	bodies := []struct {
 		what        string
@@ -78,7 +87,8 @@ var readerRouteList = []string{
 // TestReaderRouteRefusesAnAgentBeforeTheBody checks the order of CONTRACT §1.2 and §8.1 on the
 // web UI reads: an agent key is refused with operator_only before the body is read, for every
 // body shape. A viewer key passes the role gate, so the same bodies reach the decoder and get
-// the decoder's answer (400, or 415 for a body that is not JSON). An operator key passes too.
+// the decoder's answer: 400 for a malformed body, an unknown field or a body of the wrong type,
+// 413 for an oversized body, and 415 for a body that is not JSON. An operator key passes too.
 func TestReaderRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 	st := openKeyStore(t)
 	h := keyedHandler(st, core.NewLocal(st))
@@ -94,6 +104,8 @@ func TestReaderRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 		{"a malformed body", `{"code":`, "application/json", http.StatusBadRequest},
 		{"an unknown field", `{"no_such_field":1}`, "application/json", http.StatusBadRequest},
 		{"a body that is not JSON", `code=D-0001`, "text/plain", http.StatusUnsupportedMediaType},
+		{"an oversized body", `{"code":"` + strings.Repeat("x", api.MaxBodyBytes) + `"}`, "application/json", http.StatusRequestEntityTooLarge},
+		{"a body of the wrong type", `[1,2]`, "application/json", http.StatusBadRequest},
 	}
 	for _, route := range readerRouteList {
 		for _, b := range bodies {

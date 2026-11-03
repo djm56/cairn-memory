@@ -158,7 +158,11 @@ any file now at `<db>` aside, then run `mv <db>.pre-restore-<UTC time> <db>`, an
 for a `-shm` the same with `-shm` added to both names. A server that finds no
 database at its path, with a `<db>.pre-restore-*` file beside it, refuses to start
 and says so: that is an interrupted restore, and it does not create an empty
-database over it. Put the files back as above, then start the server.
+database over it. Put the files back as above, then start the server. To start a new,
+empty database instead, check those files, move every one of them out of the folder
+yourself, and start the server again: nothing is deleted. A restore into a path with no
+database also refuses while a `-wal` or `-shm` is beside it; move those out by hand, then
+run the restore again.
 
 The rules and the order of the steps are in
 [DESIGN.md §5.2](docs/DESIGN.md#52-commands).
