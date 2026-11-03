@@ -1,8 +1,8 @@
 # Cairn Memory — Build Plan
 
-<!-- cairn-milestone: M3 -->
+<!-- cairn-milestone: M4 -->
 
-**Status as of 2026-11-03: M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and
 their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
 §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
