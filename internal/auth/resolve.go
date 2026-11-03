@@ -71,6 +71,24 @@ func (r *Resolver) Resolve(ctx context.Context, header string) (Key, error) {
 	if !ok {
 		return Key{}, ErrUnauthenticated
 	}
+	k, err := r.Find(ctx, raw)
+	if err != nil {
+		return Key{}, err
+	}
+	r.touch(ctx, k.ID)
+	return k, nil
+}
+
+// Find returns the active key whose plaintext is raw, without moving last_used_at.
+// It is the check of Resolve with the header already taken off, for a caller that
+// must decide on the key before it counts as used (the web UI's sign-in refuses an
+// agent key, and an agent key is not used by being refused). A malformed raw, an
+// unknown key and a revoked one are ErrUnauthenticated. Any other error is a failure
+// of the lookup.
+func (r *Resolver) Find(ctx context.Context, raw string) (Key, error) {
+	if !wellFormed(raw) {
+		return Key{}, ErrUnauthenticated
+	}
 	k, err := r.lookup.FindActive(ctx, HashKey(raw))
 	if errors.Is(err, ErrUnknownKey) {
 		return Key{}, ErrUnauthenticated
@@ -81,8 +99,13 @@ func (r *Resolver) Resolve(ctx context.Context, header string) (Key, error) {
 	if !ValidScope(k.Scope) {
 		return Key{}, fmt.Errorf("auth: key %s has scope %q, which is none of the three", k.Name, k.Scope)
 	}
-	r.touch(ctx, k.ID)
 	return k, nil
+}
+
+// TouchKey sets last_used_at of the key with id, under the same once-a-minute rule
+// as Resolve. A failed write goes to the failure hook and refuses nothing.
+func (r *Resolver) TouchKey(ctx context.Context, id int64) {
+	r.touch(ctx, id)
 }
 
 // touch writes last_used_at for the key with id, unless it was written less than
