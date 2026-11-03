@@ -794,6 +794,9 @@ only a core test checks it. An item with no check of its own is marked
     `directive_reaffirmations` row in the same transaction. A retired directive
     is `refused`. This amends the M2 statement in §8 that no call changes the
     `review_by` of an active directive. The code, rule and source learning stay.
+    On the wire it is `/v1/operator/directive_reaffirm` (DESIGN §5.4). It is a write
+    route for an operator key: a viewer key is refused with `read_only`, and an agent key
+    with `operator_only`, as the other operator calls are.
     *Bishop default, pending operator approval.*
 53. **The UI's operator name is the key's name (2026-11-03).** An operator call
     made from the web UI passes the signed-in key's name, from `api_keys.name`,

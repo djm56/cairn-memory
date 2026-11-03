@@ -109,17 +109,33 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M3 web UI read pages (DESIGN §5.5): the dashboard, the tasks list and a task's
   record, learnings for one project and across projects, the directives, the project
   list and each project's settings. The pages read through core in process, for an
-  operator and a viewer alike. None renders an action form yet; the actions arrive in
-  a later step. A project page checks its project first and answers 404 for a name with
+  operator and a viewer alike. The action forms are listed below. A project page checks its project first and answers 404 for a name with
   no row, and creates none. Stored text is escaped, and multi-line text keeps its line
   breaks. Every page has the header, with the signed-in key, its role, a link to each
   page, and sign-out.
+- M3 web UI actions (DESIGN §5.5): an operator can decide a proposed learning, ratify a
+  directive (from an accepted learning, by a link on it, or from scratch), retire a
+  directive with a confirmation, reaffirm its review day, and save a project's display
+  name, parallel-task setting and close policy. A viewer sees no action form and gets
+  `403` `read_only` on each action and on the ratify form. Every action form carries a
+  CSRF field. A ratify into a project, and a settings save, name a project that must
+  already exist, so a misspelt name creates no project.
+- M3 `DirectiveReaffirm` (CONTRACT §8, §9 item 52, D26): an operator sets the `review_by`
+  of an active directive in place. The code, rule and ratification stay, and one history
+  row is written in the same transaction. A retired directive is refused, and an expired
+  one is reaffirmed. On the wire it is `/v1/operator/directive_reaffirm`.
+- M3 exit check (PLAN M3): a lead sees a proposed finding, accepts it, ratifies a
+  directive from it, and the next session's `task_current` returns that directive. A
+  viewer key sees every page and is refused every action. The check runs over a real
+  listener, store and core.
 
 ### Changed
 
-- Behaviour change, M3 review fix (step 6 review W1): a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.
+- M3 web UI: `/ui/tasks` filters on every repeated `status` in its query, as DESIGN §5.5
+  gives it. Before, it read the first one only.
+- Behaviour change, M3: a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.
 
-- M3 review fixes for the web UI sign-in (step 4 review): a path the mux cleans first,
+- M3 fixes for the web UI sign-in: a path the mux cleans first,
   such as `//ui/x`, now carries the UI's headers on the mux's own redirect. The UI's
   log lines quote the path, and the redacted cause of a render failure is logged
   without any key. The role check of a form fails closed. The departures of DESIGN §5.5 are written down, and migration 0007 indexes
