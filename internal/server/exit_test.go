@@ -106,8 +106,8 @@ var writeRoutes = []string{
 }
 
 // operatorPrefix is the path every operator call lives under (CONTRACT §8, api.go). The
-// operator routes are the routes under it, and routeClasses checks the table's Operator mark
-// against the prefix in both directions.
+// operator routes are the routes under it, and routeClasses checks the table's OperatorOnly and
+// WebRead marks against the prefix in both directions.
 const operatorPrefix = "/operator/"
 
 // routeClasses returns the write routes and the read routes of the route table, and the
@@ -131,9 +131,15 @@ func routeClasses(t *testing.T) (writes, reads, operators []api.RouteInfo) {
 		if isWrite != r.Write {
 			t.Errorf("%s: the table marks write=%v, the write list says %v", r.Route, r.Write, isWrite)
 		}
+		// A route under the prefix is either operator-only or a web UI read, never both, and
+		// a route outside the prefix is neither.
 		isOperator := strings.HasPrefix(r.Route, operatorPrefix)
-		if isOperator != r.Operator {
-			t.Errorf("%s: the table marks operator=%v, the operator prefix says %v", r.Route, r.Operator, isOperator)
+		if r.OperatorOnly && r.WebRead {
+			t.Errorf("%s: the table marks it both operator-only and a web UI read", r.Route)
+		}
+		if isOperator != (r.OperatorOnly || r.WebRead) {
+			t.Errorf("%s: the table marks operator-only=%v web-read=%v, the operator prefix says %v",
+				r.Route, r.OperatorOnly, r.WebRead, isOperator)
 		}
 		if isWrite {
 			writes = append(writes, r)
