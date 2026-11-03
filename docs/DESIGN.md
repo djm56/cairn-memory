@@ -1,6 +1,6 @@
 # Cairn Memory — Design
 
-**Status as of 2026-11-03: M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and
 their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
@@ -490,7 +490,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 |---|---|
 | `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
-| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is M3. |
+| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is placed in M4 (D22). |
@@ -1348,5 +1348,5 @@ status; they only recommend.
   become a write on every call.
 - An agent key cannot reach operator routes. The web UI asks for an operator
   or a viewer key (§5.5). A viewer key sees every page and gets 403 on every
-  action (planned, M3).
+  action (built in M3).
 - Request bodies are capped on every route.

@@ -187,7 +187,19 @@ Two rules for the proxy:
   server caps each call at 1 MiB and refuses more; the proxy is the place to cap
   earlier.
 
-The web UI at `/ui/` adds three things to check. DESIGN.md §5.5 sets each one.
+The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
+
+- **Sign-in takes an operator key or a viewer key.** The sign-in page takes the key
+  once, and the browser keeps only a session cookie. An agent key is refused there.
+  A viewer key reads every page and is refused every change, so a viewer can look
+  but cannot act.
+- **Behind a proxy the cookie is always `Secure`.** The server sets the flag whenever
+  `--behind-proxy` is given, so the cookie is `__Secure-cairn_ui`, and a browser keeps
+  it only for an https page. Open the UI at the proxy's https address. Over plain
+  `http` the browser refuses the cookie, and sign-in does not stick.
+- **Rate-limit `POST /ui/signin` at the proxy or the firewall, per client address.**
+  The server has no rate cap of its own. A key has 256 random bits, so guessing one
+  is not the risk, and the limit is there against floods of attempts.
 
 - **The proxy must pass `Host` through unchanged.** The UI refuses a form POST whose
   `Origin` does not match the request's `Host`. A proxy that rewrites `Host` makes

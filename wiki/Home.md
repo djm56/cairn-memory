@@ -1,6 +1,6 @@
 # Cairn
 
-_Status as of 2026-11-03: M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 Cairn is an operating record for coding agents. An agent records the task it is on, the steps it takes, what happened and what it learned. The next agent reads that back before it starts. An operator turns the best lessons into rules that every agent follows.
 
@@ -20,8 +20,9 @@ Cairn is one binary, `cairn`. It uses SQLite with full-text search. Clients use 
 - **Phases 0 to 2:** done, and their exit checks passed.
 - **M1, Server-mode MCP:** exit check passed (MCP stdio flow test, recorded 2026-11-03).
 - **M2, Server:** exit check passed on 2026-11-02 (live run, #19).
-- **M3, Web UI + dashboard:** current.
-- **M4 to M8, and Later:** planned. See the [Roadmap](Roadmap) and the [milestones](https://github.com/djm56/cairn-memory/milestones) for live progress.
+- **M3, Web UI + dashboard:** exit check passed (web UI exit-check test, recorded 2026-11-03).
+- **M4, Hooks + CLI:** current.
+- **M5 to M8, and Later:** planned. See the [Roadmap](Roadmap) and the [milestones](https://github.com/djm56/cairn-memory/milestones) for live progress.
 - **Version 1** is the scope of M1 to M8: a central server, the web UI and dashboard, hooks and a CLI, the Claude Code plugin, the import from bishop-memory, a pilot, and the roll-out.
 
 ## Where things live

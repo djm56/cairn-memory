@@ -128,6 +128,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   directive from it, and the next session's `task_current` returns that directive. A
   viewer key sees every page and is refused every action. The check runs over a real
   listener, store and core.
+- Docs: M3's exit check passed and was recorded on 2026-11-03, and M4 Hooks + CLI is current.
 
 ### Changed
 

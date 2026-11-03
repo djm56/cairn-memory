@@ -8,9 +8,9 @@ every agent follows.
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
 in Cairn leaves the same kind of marker.
 
-<!-- cairn-milestone: M3 -->
+<!-- cairn-milestone: M4 -->
 
-> **Status as of 2026-11-03:** M3 (Web UI + dashboard) is current, and the exit checks for M1 (the MCP stdio flow test) and M2 (the live run, #19) have passed. Phases 0 to 2 are
+> **Status as of 2026-11-03:** M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are
 > done, and their exit checks passed. Live progress is on the
 > [milestones](https://github.com/djm56/cairn-memory/milestones)
 > and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
@@ -44,8 +44,8 @@ in Cairn leaves the same kind of marker.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
-  the HTTP server (`cairn serve`, built in M2, live run passed on 2026-11-02; the web UI is
-  M3), the hook helper and the admin tool. The M1 commands are `init`, `status`, `doctor`,
+  the HTTP server (`cairn serve`, built in M2, live run passed on 2026-11-02; the web UI,
+  built in M3), the hook helper and the admin tool. The M1 commands are `init`, `status`, `doctor`,
   `export task` and `hook session-start`; the CLI proper is planned for M4. Go
   and SQLite with full-text search; no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
@@ -193,6 +193,32 @@ write is refused, and the client says `chmod 600`. A line may also read
 is never sent to a second address. `cairn doctor` reports where the key was
 found, and whether the server accepted it. It warns when a key would go over
 plain `http` to a host that is not loopback, and it never prints the key.
+
+### Web UI
+
+`cairn serve` also serves a web UI at `/ui/`, from the same process and address as
+the API. Open it in a browser and paste an operator key or a viewer key on the
+sign-in page. An agent key is refused there. The session ends when it expires or
+when you sign out.
+
+- **Dashboard** (`/ui/`): what is running, what waits on you, the quality figures for
+  30 days, the monthly trend, and the count and oldest age of active directives.
+- **Tasks** (`/ui/tasks`, `/ui/p/<project>/tasks/<id>`): the tasks across projects,
+  filtered by status. A task page shows its brief, steps, journal and close record.
+- **Learnings** (`/ui/learnings`, `/ui/p/<project>/learnings`): proposed findings,
+  with accept, reject and supersede. Each decision takes a note.
+- **Directives** (`/ui/directives`): the active and retired directives, with their scope
+  and review date. An operator can ratify a learning into a directive, reaffirm
+  a review date, or retire a directive.
+- **Projects** (`/ui/projects`): each project's settings, including its close policy
+  and whether it allows parallel tasks.
+
+A viewer key reads every page and is refused every action. Viewers are read-only.
+Operator keys make the changes.
+
+The design is in [DESIGN.md §5.5](docs/DESIGN.md#55-the-web-ui). The proxy, cookie
+and rate-limit rules for a server that other machines reach are in
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Documentation
 
