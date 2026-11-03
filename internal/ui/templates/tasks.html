@@ -1,0 +1,15 @@
+{{define "body"}}{{with .Page}}<h1>Tasks</h1>
+<form method="get" action="/ui/tasks" class="filter">
+<label>Project <input type="text" name="project" value="{{.Project}}" maxlength="64"></label>
+<label>Status <select name="status">{{range .StatusOptions}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+<button type="submit">Filter</button>
+</form>
+{{if .Tasks}}<table>
+<thead><tr><th>Task</th><th>Project</th><th>Title</th><th>Status</th><th>Priority</th><th>Updated</th></tr></thead>
+<tbody>
+{{range .Tasks}}<tr><td>{{if .Href}}<a href="{{.Href}}">{{.ID}}</a>{{else}}{{.ID}}{{end}}</td><td>{{.Project}}</td><td>{{.Title}}</td><td>{{.Status}}</td><td>{{.Priority}}</td><td>{{.UpdatedAt}}</td></tr>
+{{end}}</tbody>
+</table>
+{{with .Next}}<p><a href="{{.}}">Next page</a></p>{{end}}
+{{else}}<p class="muted">No task matches these filters.</p>{{end}}
+{{end}}{{end}}

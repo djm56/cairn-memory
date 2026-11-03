@@ -106,8 +106,18 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   refused with `operator_only`. None creates a project row. `learning_list` with
   `all_projects` needs no project for an operator or a viewer. Migration 0007 adds
   the indexes these reads use. The client implements the four reads.
+- M3 web UI read pages (DESIGN §5.5): the dashboard, the tasks list and a task's
+  record, learnings for one project and across projects, the directives, the project
+  list and each project's settings. The pages read through core in process, for an
+  operator and a viewer alike. None renders an action form yet; the actions arrive in
+  a later step. A project page checks its project first and answers 404 for a name with
+  no row, and creates none. Stored text is escaped, and multi-line text keeps its line
+  breaks. Every page has the header, with the signed-in key, its role, a link to each
+  page, and sign-out.
 
 ### Changed
+
+- Behaviour change, M3 review fix (step 6 review W1): a project whose stored settings are `'{}'`, or leave a close-policy switch out, now has the missing switches on in `task_close`, as `project_list` already showed them. Before, the close rules read a missing switch as off, so a close with no summary could pass on such a project. Every switch the stored object does set keeps its value. The one decoder is shared by the reads and the close rules (DESIGN §3.6, CONTRACT §8.1). New rows are stored with the full object, so only a row written by hand or a test seed is affected.
 
 - M3 review fixes for the web UI sign-in (step 4 review): a path the mux cleans first,
   such as `//ui/x`, now carries the UI's headers on the mux's own redirect. The UI's

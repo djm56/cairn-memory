@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,9 +16,10 @@ const dashboardRunningLimit = 20
 // (CONTRACT §8.1, quality_30d).
 const dashboardWindowDays = 30
 
-// readerOnlyMessage is the message of an agent's refused web UI read. Its wording is
-// the one the wire form uses for the same refusal, so the two answers read the same.
-const readerOnlyMessage = "this read is for the web UI: only an operator or a viewer key may make it"
+// ReaderOnlyMessage is the message of an agent's refused web UI read. The wire form
+// (internal/api) gives this same text, so the two answers read the same. One constant
+// holds it, so the two cannot drift apart (step 6 review S3).
+const ReaderOnlyMessage = "this read is for the web UI: only an operator or a viewer key may make it"
 
 // readerFor returns the caller of a web UI read (CONTRACT §8.1, §9 item 50). The role is
 // checked first, before anything else in the call. Only the operator and viewer roles
@@ -28,7 +28,7 @@ const readerOnlyMessage = "this read is for the web UI: only an operator or a vi
 func readerFor(ctx context.Context) (Caller, error) {
 	c, ok := CallerFrom(ctx)
 	if !ok || !isReader(c.Role) {
-		return c, OperatorOnly(readerOnlyMessage)
+		return c, OperatorOnly(ReaderOnlyMessage)
 	}
 	return c, nil
 }
@@ -38,13 +38,12 @@ func isReader(role Role) bool {
 	return role == RoleOperator || role == RoleViewer
 }
 
-// projectFromRow converts a stored project to the core form. A settings value of
-// '{}', the column default, reads as DefaultSettings: the defaults are filled in
-// before the stored object is decoded, so every switch the object leaves out keeps its
-// default (CONTRACT §8.1, project_list).
+// projectFromRow converts a stored project to the core form. Its settings are read by
+// decodeSettings, the reader the close rules use too, so a '{}' value reads as
+// DefaultSettings here and in enforcement (CONTRACT §8.1, project_list).
 func projectFromRow(r store.ProjectRow) (Project, error) {
-	settings := DefaultSettings()
-	if err := json.Unmarshal([]byte(r.Settings), &settings); err != nil {
+	settings, err := decodeSettings(r.Settings)
+	if err != nil {
 		return Project{}, fmt.Errorf("core: settings of project %s: %w", r.Name, err)
 	}
 	return Project{

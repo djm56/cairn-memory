@@ -29,3 +29,17 @@ button, a { font: inherit; }
 }
 /* Multi-line stored text keeps its line breaks, with no style attribute. */
 .pre { white-space: pre-wrap; }
+.main-nav, .projects { margin-top: 0.5rem; }
+.main-nav a, .projects a { margin-right: 0.9rem; }
+.main-nav .who { margin-right: 0.9rem; color: #555; }
+.muted { color: #555; }
+.plain { list-style: none; padding-left: 0; }
+table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+th, td { text-align: left; vertical-align: top; padding: 0.35rem 0.6rem; border-bottom: 1px solid #e2e2e6; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; }
+.facts dt { font-weight: 600; }
+.facts dd { margin: 0; }
+.filter { margin: 0.75rem 0; }
+.filter label { display: inline-block; margin: 0 1rem 0 0; }
+.item { border-top: 1px solid #e2e2e6; padding-top: 0.5rem; margin-top: 0.75rem; }
+.item h2, .item h3 { margin: 0.25rem 0; font-size: 1.05rem; }

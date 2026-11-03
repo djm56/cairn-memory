@@ -40,7 +40,7 @@ func setSecureHeaders(h http.Header, hsts bool) {
 
 // CoverPaths wraps next, the server's mux, so that every answer for a path under /ui
 // carries the headers, including the redirect the mux makes for an unclean path before it
-// routes anything: //ui/x, /ui/./x and /ui//x (DESIGN §5.5, step 4 review W1). The path is
+// routes anything: //ui/x, /ui/./x and /ui//x (DESIGN §5.5, Routes). The path is
 // cleaned the way the mux cleans it, so the test here is the test the mux's redirect uses.
 // hsts is as Config.HSTS.
 func CoverPaths(hsts bool, next http.Handler) http.Handler {

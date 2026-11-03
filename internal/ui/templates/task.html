@@ -1,0 +1,83 @@
+{{define "body"}}{{with .Page}}<p class="muted">{{with .LearningsHref}}<a href="{{.}}">{{$.Page.Project}} learnings</a>{{end}}</p>
+<h1>{{.Title}}</h1>
+<p class="muted">{{.ID}} · {{.Project}}</p>
+
+<dl class="facts">
+<dt>Status</dt><dd>{{.Status}}</dd>
+<dt>Priority</dt><dd>{{.Priority}}</dd>
+{{with .Owner}}<dt>Owner</dt><dd>{{.}}</dd>{{end}}
+<dt>Opened</dt><dd>{{.OpenedAt}}</dd>
+{{with .StartedAt}}<dt>Started</dt><dd>{{.}}</dd>{{end}}
+{{with .ClosedAt}}<dt>Closed</dt><dd>{{.}}</dd>{{end}}
+<dt>Updated</dt><dd>{{.UpdatedAt}}</dd>
+</dl>
+{{with .NextAction}}<h2>Next action</h2><div class="pre">{{.}}</div>{{end}}
+{{with .Blockers}}<h2>Blockers</h2><div class="pre">{{.}}</div>{{end}}
+
+<section aria-labelledby="brief">
+<h2 id="brief">Brief</h2>
+{{with .Goal}}<h3>Goal</h3><div class="pre">{{.}}</div>{{end}}
+{{with .Context}}<h3>Context</h3><div class="pre">{{.}}</div>{{end}}
+{{with .Constraints}}<h3>Constraints</h3><div class="pre">{{.}}</div>{{end}}
+{{if .Criteria}}<h3>Criteria</h3>
+<table>
+<thead><tr><th>#</th><th>Criterion</th><th>Result</th><th>Evidence</th></tr></thead>
+<tbody>{{range .Criteria}}<tr><td>{{.Ord}}</td><td><div class="pre">{{.Criterion}}</div></td><td>{{.Result}}</td><td><div class="pre">{{.Evidence}}</div></td></tr>
+{{end}}</tbody>
+</table>{{end}}
+{{if .KeyFiles}}<h3>Key files</h3>
+<ul class="plain">{{range .KeyFiles}}<li><code>{{.Path}}</code>{{with .Note}} — <span class="pre">{{.}}</span>{{end}}</li>
+{{end}}</ul>{{end}}
+</section>
+
+<section aria-labelledby="steps">
+<h2 id="steps">Steps</h2>
+{{if .Steps}}<table>
+<thead><tr><th>#</th><th>Step</th><th>Agent</th><th>Status</th><th>Attempts</th><th>Summary</th></tr></thead>
+<tbody>{{range .Steps}}<tr><td>{{.Number}}</td><td>{{.Title}}</td><td>{{.Agent}}</td><td>{{.Status}}</td><td>{{.Attempts}}</td><td><div class="pre">{{.Summary}}</div></td></tr>
+{{end}}</tbody>
+</table>
+{{else}}<p class="muted">No step is planned.</p>{{end}}
+</section>
+
+<section aria-labelledby="journal">
+<h2 id="journal">Journal</h2>
+{{range .Events}}<article class="item">
+<p class="muted">{{.At}} · {{.Kind}} · {{.Agent}}{{with .Step}} · {{.}}{{end}}</p>
+{{if .IsReview}}<p>Verdict: {{.Verdict}}{{with .Counts}} ({{.}}){{end}}</p>{{end}}
+<div class="pre">{{.Text}}</div>
+</article>
+{{else}}<p class="muted">The journal has no entry.</p>
+{{end}}
+{{with .EventsNext}}<p><a href="{{.}}">Older entries</a></p>{{end}}
+</section>
+
+<section aria-labelledby="close">
+<h2 id="close">Close record</h2>
+{{if .HasClose}}
+<dl class="facts">
+<dt>Outcome</dt><dd>{{.Status}}</dd>
+{{with .OutcomeSummary}}<dt>Summary</dt><dd><div class="pre">{{.}}</div></dd>{{end}}
+</dl>
+{{if .Lessons}}<h3>Lessons</h3>
+{{range .Lessons}}<article class="item">
+<p class="muted">{{.Kind}}</p>
+<div class="pre">{{.Text}}</div>
+{{with .Why}}<p>Why: <span class="pre">{{.}}</span></p>{{end}}
+{{with .Correction}}<p>Correction: <span class="pre">{{.}}</span></p>{{end}}
+</article>
+{{end}}{{else}}{{with .NoLessonsReason}}<p>No lessons: <span class="pre">{{.}}</span></p>{{else}}<p class="muted">No lesson is recorded.</p>{{end}}{{end}}
+{{if .Mistakes}}<h3>Mistakes</h3>
+{{range .Mistakes}}<article class="item">
+<p class="muted">{{.Agent}} · impact {{.Impact}}</p>
+<div class="pre">{{.Mistake}}</div>
+{{with .Correction}}<p>Correction: <span class="pre">{{.}}</span></p>{{end}}
+{{with .Prevention}}<p>Prevention: <span class="pre">{{.}}</span></p>{{end}}
+</article>
+{{end}}{{end}}
+{{if .Deliverables}}<h3>Deliverables</h3>
+<ul class="plain">{{range .Deliverables}}<li><code>{{.Path}}</code>{{with .Note}} — <span class="pre">{{.}}</span>{{end}}</li>
+{{end}}</ul>{{end}}
+{{else}}<p class="muted">This task has no close record.</p>{{end}}
+</section>
+{{end}}{{end}}

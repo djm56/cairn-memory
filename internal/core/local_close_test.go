@@ -1,9 +1,12 @@
 package core_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/store"
 )
 
 // completeClose is a close that meets the default policy for a task with two
@@ -91,6 +94,52 @@ func TestCloseShapeRefusals(t *testing.T) {
 			}
 			if core.KindOf(err) != c.want {
 				t.Errorf("error %v, want kind %s", err, c.want)
+			}
+		})
+	}
+}
+
+// TestStoredSettingsReadTheSameInTheReadAndTheRules checks step 6 review W1: a stored settings
+// object that is '{}', or that leaves switches out, reads its missing switches as the defaults,
+// both in project_list and in the close rules. A switch the object sets to false stays off in
+// both. The row is written first, with the object under test, so the first call does not
+// replace it with the defaults.
+func TestStoredSettingsReadTheSameInTheReadAndTheRules(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		// summaryRequired is what both the read and the close rule must say of the summary switch.
+		summaryRequired bool
+	}{
+		{"the column default", "{}", true},
+		{"parallel tasks only", `{"parallel_tasks":false}`, true},
+		{"summary switch stored off", `{"close_policy":{"require_summary":false}}`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s, st := openLocal(t)
+			at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+			if err := store.EnsureProject(context.Background(), st, store.ProjectRow{
+				Name: "acme-api", CreatedAt: at, LastSeenAt: at, Settings: c.raw,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			ctx := agent("acme-api", "main")
+			res := must(s.TaskStart(ctx, core.TaskStartRequest{Title: "t", Goal: "g"}))(t)
+
+			list := must(s.ProjectList(op(), core.ProjectListRequest{Project: "acme-api"}))(t)
+			if shown := list.Projects[0].Settings.ClosePolicy.RequireSummary; shown != c.summaryRequired {
+				t.Errorf("project_list shows require_summary %v, want %v", shown, c.summaryRequired)
+			}
+
+			// No summary and no criteria: the summary switch alone decides whether this close is refused.
+			close := completeClose(res.ID)
+			close.Summary = ""
+			close.Criteria = nil
+			_, err := s.TaskClose(ctx, close)
+			refused := core.KindOf(err) == core.KindRefused
+			if refused != c.summaryRequired {
+				t.Errorf("close without a summary: refused %v (error %v), want refused %v", refused, err, c.summaryRequired)
 			}
 		})
 	}

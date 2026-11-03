@@ -124,13 +124,3 @@ func (u *ui) signout(w http.ResponseWriter, r *http.Request) {
 	}
 	redirectToSignin(w, r)
 }
-
-// dashboard is the placeholder dashboard: who is signed in, and the sign-out link. The
-// figures of CONTRACT §8.1 replace it in a later step.
-func (u *ui) dashboard(w http.ResponseWriter, _ *http.Request, s signedIn) {
-	u.render(w, http.StatusOK, "dashboard", view{
-		Title: "Dashboard",
-		Name:  s.Key.Name,
-		Role:  string(s.Key.Scope),
-	})
-}

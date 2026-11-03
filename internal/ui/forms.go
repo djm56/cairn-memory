@@ -136,6 +136,11 @@ func (u *ui) form(h func(http.ResponseWriter, *http.Request, signedIn)) http.Han
 			u.fail(w, http.StatusForbidden, msgFormRefused)
 			return
 		}
+		// The check is "not operator", not "is viewer", so it fails closed: any scope other than
+		// operator is refused here. The session check has already refused every scope but
+		// operator and viewer, so no request reaches this line with another scope, and no test
+		// can make this branch fail on a scope it refuses. It is defence in depth, kept on
+		// purpose.
 		if s.Key.Scope != auth.ScopeOperator {
 			u.fail(w, http.StatusForbidden, msgReadOnly)
 			return

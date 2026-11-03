@@ -346,6 +346,12 @@ ui_sessions     (schema 6, M3) token_hash PK, key_id, created_at, expires_at,
 Schema 6 (M3, migration 0006) adds `ui_sessions` here and `directive_reaffirmations`
 in §3.4.
 
+A stored `settings` value is decoded onto the defaults of §3.7. A switch the stored object
+leaves out reads as its default, and `'{}'`, the column default, reads as the defaults all
+round. The reads (`project_list`, CONTRACT §8.1) and the close rules (`task_close`, §3.7)
+decode it the same way, so a page shows the policy that is enforced. Every write stores the
+whole object (CONTRACT §8, `project_settings_set`).
+
 The step-review rule is deferred to Later (#41).
 
 ### 3.7 The close policy
@@ -775,7 +781,7 @@ holds migration 0006 and its queries. `internal/server/handler.go` mounts the UI
 beside `/healthz` and `/`. The `/ui/` pattern is longer than `/`, and no API
 route starts with `/ui/`, so the two cannot collide.
 
-**Exported API the UI relies on (step 4 review, departures 5 and 6).** Two additions
+**Exported API the UI relies on.** Two additions
 to the shapes §5.3 and §5.5 first gave.
 
 - `auth.Resolver` has `Find(ctx, raw)`, the check of `Resolve` with the header already
@@ -821,8 +827,9 @@ permanent redirect to `/ui/`. The `/ui/` pattern matches every path below it, so
 the dashboard answers only the exact path `/ui/`, and the UI's own router answers
 any other unlisted path. A path the mux must clean first, such as `//ui/x`,
 `/ui/./x` or `/ui//x`, gets the mux's own redirect to the cleaned path before the
-UI routes it. That redirect is `307` in the Go release this module builds with,
-and it carries the headers of Headers below, as every other answer under `/ui/`
+UI routes it. The status of that redirect is the standard library's, and it can change
+with the Go release, so the tests accept a `301` or a `307` and check the
+headers. It carries the headers of Headers below, as every other answer under `/ui/`
 does. The header middleware wraps the whole subtree, including those answers and
 the `/ui` redirect (see Headers). Every page answers a request with no session
 by redirecting to `/ui/signin`, with no `next` parameter, so a link cannot carry
@@ -848,6 +855,13 @@ a browser to another address.
 | POST | `/ui/directives/{code}/retire` | `DirectiveRetire`. Field `confirm` must be `yes`. | operator |
 | POST | `/ui/directives/{code}/reaffirm` | `DirectiveReaffirm` (CONTRACT §8). Field: `review_by`, optional. | operator |
 | POST | `/ui/projects/{project}/settings` | `ProjectSettingsSet`. Fields: `display_name`, `parallel_tasks`, and the five close-policy switches. | operator |
+
+**Built so far.** The read routes above are built, with every page of the table
+except the ratify form. The action routes (the POST rows, and `/ui/directives/new`) are
+not registered yet: until the actions arrive, a POST to a read route is `405`, and any
+other unlisted path is `404`. So a viewer's GET of `/ui/directives/new` is `404` for now,
+not the `403` the table gives, and that changes with the actions. No page renders an
+action form for any role.
 
 Each POST that changes state answers with a redirect to the page that shows
 the result (post, then redirect), so a reload does not repeat it. A POST that

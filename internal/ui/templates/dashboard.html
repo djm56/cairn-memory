@@ -1,3 +1,52 @@
-{{define "body"}}<h1>Dashboard</h1>
-<p>Signed in as {{.Name}} ({{.Role}}).</p>
-<p><a href="/ui/signout">Sign out</a></p>{{end}}
+{{define "body"}}{{with .Page}}<h1>Dashboard</h1>
+
+<section aria-labelledby="waiting">
+<h2 id="waiting">Waiting</h2>
+<ul class="plain">
+<li><a href="{{.RunningHref}}">Running tasks: {{.RunningCount}}</a></li>
+<li><a href="{{.ProposedHref}}">Proposed learnings: {{.Proposed}}</a></li>
+<li><a href="{{.BlockedHref}}">Blocked tasks: {{.Blocked}}</a></li>
+<li><a href="{{.ExpiredHref}}">Expired directives: {{.Expired}}</a></li>
+</ul>
+</section>
+
+<section aria-labelledby="running">
+<h2 id="running">Running</h2>
+{{if .Running}}<table>
+<thead><tr><th>Task</th><th>Project</th><th>Title</th><th>Priority</th><th>Updated</th></tr></thead>
+<tbody>
+{{range .Running}}<tr><td>{{if .Href}}<a href="{{.Href}}">{{.ID}}</a>{{else}}{{.ID}}{{end}}</td><td>{{.Project}}</td><td>{{.Title}}</td><td>{{.Priority}}</td><td>{{.UpdatedAt}}</td></tr>
+{{end}}</tbody>
+</table>
+{{if gt .RunningCount (len .Running)}}<p class="muted">The first {{len .Running}} of {{.RunningCount}} running tasks. <a href="{{.RunningHref}}">All running tasks</a>.</p>{{end}}
+{{else}}<p class="muted">No task is running.</p>{{end}}
+</section>
+
+<section aria-labelledby="quality">
+<h2 id="quality">Quality, the last 30 days</h2>
+<ul class="plain">
+<li>Closed: {{.Closed}}{{if .Closed}}, done {{.Done}}{{with .DonePct}} ({{.}}){{end}}{{end}}</li>
+<li>Criteria met: {{.CriteriaMet}} of {{.CriteriaTotal}}{{with .CriteriaPct}} ({{.}}){{end}}</li>
+<li>High-impact mistakes: {{.HighImpact}}</li>
+</ul>
+</section>
+
+<section aria-labelledby="months">
+<h2 id="months">Six months</h2>
+<table>
+<thead><tr><th>Month</th><th>Closed</th><th>Done</th><th>High-impact mistakes</th><th>Directives ratified</th></tr></thead>
+<tbody>
+{{range .Monthly}}<tr><td>{{.Month}}</td><td>{{.Closed}}</td><td>{{.Done}}{{with .DonePct}} ({{.}}){{end}}</td><td>{{.HighImpact}}</td><td>{{.Ratified}}</td></tr>
+{{end}}</tbody>
+</table>
+</section>
+
+<section aria-labelledby="directives">
+<h2 id="directives">Directives</h2>
+<ul class="plain">
+<li>Active: {{.Active}}</li>
+{{with .OldestReview}}<li>Earliest review due: {{.}}</li>{{end}}
+{{with .OldestRatified}}<li>Earliest ratified: {{.}}</li>{{end}}
+</ul>
+</section>
+{{end}}{{end}}

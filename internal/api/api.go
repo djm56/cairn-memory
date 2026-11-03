@@ -157,10 +157,13 @@ var routeAccess = map[string]access{
 type RouteInfo struct {
 	Route string // the route, relative to Prefix: the call's path is Prefix+Route
 	Write bool   // a viewer key is refused on a write route (DESIGN.md §5.4)
-	// Operator is true for a route under /operator/, which an agent key is refused. Only
-	// the write calls of CONTRACT §8 are operator-only: a viewer key is refused them too.
-	// The reads of CONTRACT §8.1 are under /operator/ as well, and a viewer key may make them.
-	Operator bool
+	// OperatorOnly is true for a route that only an operator key may make: the write
+	// calls of CONTRACT §8. A viewer key is refused them too.
+	OperatorOnly bool
+	// WebRead is true for a web UI read (CONTRACT §8.1). An operator key and a viewer
+	// key may make it, and an agent key is refused with operator_only. Its path is under
+	// /operator/ for grouping only.
+	WebRead bool
 }
 
 // Routes returns every route of the table, sorted by path. It reads the same marks
@@ -170,7 +173,7 @@ func Routes() []RouteInfo {
 	for route, a := range routeAccess {
 		out = append(out, RouteInfo{
 			Route: route, Write: a == accessWrite,
-			Operator: operatorRoutes[route] || uiReadRoutes[route],
+			OperatorOnly: operatorRoutes[route], WebRead: uiReadRoutes[route],
 		})
 	}
 	slices.SortFunc(out, func(a, b RouteInfo) int { return strings.Compare(a.Route, b.Route) })
@@ -224,10 +227,6 @@ func specOf(route string) routeSpec {
 // operatorOnlyMessage is the message of an agent key's refused operator call. It is
 // the message core gives for the same refusal, so the two answers read the same.
 const operatorOnlyMessage = "this call is an operator decision, and only an operator may make it"
-
-// readerOnlyMessage is the message of an agent key's refused web UI read. It is the
-// message core gives for the same refusal (CONTRACT §8.1).
-const readerOnlyMessage = "this read is for the web UI: only an operator or a viewer key may make it"
 
 // CallerFunc derives the caller of a request. The role must come from the
 // server's own knowledge of the request, never from what the client sends: the
@@ -346,7 +345,7 @@ func call[Req any, Res any](caller CallerFunc, onFailure FailureHook, spec route
 			return
 		}
 		if spec.reader && c.Role != core.RoleOperator && c.Role != core.RoleViewer {
-			writeError(w, http.StatusForbidden, &core.Error{Kind: core.KindOperatorOnly, Message: readerOnlyMessage})
+			writeError(w, http.StatusForbidden, &core.Error{Kind: core.KindOperatorOnly, Message: core.ReaderOnlyMessage})
 			return
 		}
 		var req Req

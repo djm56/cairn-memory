@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/auth"
+	"github.com/djm56/cairn-memory/internal/core"
 )
 
 // The tests here keep to the package's own rule: no store, no server, no httptest. So the
@@ -202,7 +203,7 @@ func newHarness(t *testing.T, secure, hsts bool) *harness {
 	sessions := auth.NewSessions(st, auth.NewResolver(st, nil), c.now, func(err error) {
 		hr.failures = append(hr.failures, err)
 	})
-	hr.cfg = Config{Sessions: sessions, Secure: secure, HSTS: hsts, Logger: logger}
+	hr.cfg = Config{Sessions: sessions, Service: stubService{}, Secure: secure, HSTS: hsts, Logger: logger}
 	hr.h = New(hr.cfg)
 	hr.u = newUI(hr.cfg)
 	return hr
@@ -284,7 +285,23 @@ func csrfFor(c *http.Cookie) string {
 var (
 	_ auth.Lookup       = (*fakeStore)(nil)
 	_ auth.SessionStore = (*fakeStore)(nil)
+	_ core.Service      = stubService{}
 )
+
+// stubService is the core the UI's own tests give the UI. Its reads answer with nothing: the
+// tests here check the frame of a page, its status and its headers. The pages over the real
+// core and store are tested in internal/server, where a stored value can be read back.
+type stubService struct{ core.Unimplemented }
+
+// ProjectList answers with no project, so the header's switcher is empty.
+func (stubService) ProjectList(context.Context, core.ProjectListRequest) (*core.ProjectList, error) {
+	return &core.ProjectList{Projects: []core.Project{}}, nil
+}
+
+// Dashboard answers with no figure.
+func (stubService) Dashboard(context.Context) (*core.Dashboard, error) {
+	return &core.Dashboard{Monthly: []core.DashboardMonth{}}, nil
+}
 
 // bodyTrap is a request body that fails the test if anything reads it. It proves a
 // refusal that comes before the body is read.

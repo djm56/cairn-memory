@@ -249,9 +249,9 @@ func TestUIHeadersCoverTheMuxAnswersThroughTheWholeHandler(t *testing.T) {
 	}
 }
 
-// TestUncleanUIPathsCarryTheHeaders pins step 4 review W1. A path the mux must clean before it
-// routes (//ui/x, /ui/./x, /ui//x) gets the mux's own 301 to the cleaned path, and that answer
-// is not the UI's. It must carry the headers of DESIGN §5.5 all the same, and HSTS when the
+// TestUncleanUIPathsCarryTheHeaders pins the headers of DESIGN §5.5 (Routes). A path the mux
+// must clean before it routes (//ui/x, /ui/./x, /ui//x) gets the mux's own redirect to the
+// cleaned path, and that answer is not the UI's. It must carry the headers of DESIGN §5.5 all the same, and HSTS when the
 // server serves TLS on a non-loopback address. GET and HEAD both.
 func TestUncleanUIPathsCarryTheHeaders(t *testing.T) {
 	st := openStore(t)

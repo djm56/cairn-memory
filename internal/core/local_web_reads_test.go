@@ -260,6 +260,89 @@ func TestDirectiveBrowsePagesActiveByReviewBy(t *testing.T) {
 	}
 }
 
+// TestDirectiveBrowseRetiredPagesInOrder checks step 6 review W3: retired directives are ordered
+// by retired_at descending, then code ascending, and a page that ends inside a tie on retired_at
+// resumes at the next code. Two directives share one retired_at, and the third is later.
+func TestDirectiveBrowseRetiredPagesInOrder(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	d1 := ratifyGlobal(t, s, "first")
+	d2 := ratifyGlobal(t, s, "second")
+	d3 := ratifyGlobal(t, s, "third")
+	early, late := t0.Add(time.Hour), t0.Add(2*time.Hour)
+	clockAt(s, early)
+	must(s.DirectiveRetire(opCtx(), core.DirectiveRetireRequest{Code: d1.Code}))(t)
+	must(s.DirectiveRetire(opCtx(), core.DirectiveRetireRequest{Code: d3.Code}))(t)
+	clockAt(s, late)
+	must(s.DirectiveRetire(opCtx(), core.DirectiveRetireRequest{Code: d2.Code}))(t)
+
+	// The later retirement comes first, then the tie in code order: d2, then d1 and d3.
+	want := []string{d2.Code, d1.Code, d3.Code}
+	var got []string
+	cursor := ""
+	for pages := 0; pages < 10; pages++ {
+		page := must(s.DirectiveBrowse(viewerCtx(), core.DirectiveBrowseRequest{
+			State: core.DirectiveRetired, Limit: 1, Cursor: cursor,
+		}))(t)
+		for _, d := range page.Directives {
+			if d.Expired {
+				t.Errorf("retired directive %s flagged expired", d.Code)
+			}
+			got = append(got, d.Code)
+		}
+		if page.Next == "" {
+			break
+		}
+		cursor = page.Next
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("retired codes paged one at a time = %v, want %v", got, want)
+	}
+}
+
+// TestExpiryAtReviewByAgreesAcrossTheReads checks step 6 review W3: a directive whose review_by is
+// exactly now is live, and one a nanosecond later is expired. directive_list, the dashboard's
+// expired figure and directive_browse's flag must say the same at both instants. The three read
+// the rule in different code (Go in directive_list and directive_browse, SQL in the dashboard), so
+// a change to one of them alone fails here.
+func TestExpiryAtReviewByAgreesAcrossTheReads(t *testing.T) {
+	s, _ := openLocal(t)
+	clockAt(s, t0)
+	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{
+		Scope: core.ScopeGlobal, Title: "due", Rule: "r", ReviewBy: "2026-11-10",
+	}))(t)
+	due := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+
+	cases := []struct {
+		label   string
+		at      time.Time
+		expired bool
+	}{
+		{"at review_by", due, false},
+		{"a nanosecond after review_by", due.Add(time.Nanosecond), true},
+	}
+	for _, c := range cases {
+		clockAt(s, c.at)
+		list := must(s.DirectiveList(agent("acme-api", "main"), core.DirectiveListRequest{}))(t)
+		if got := list.Expired == 1; got != c.expired {
+			t.Errorf("%s: directive_list expired = %d, want expired %v", c.label, list.Expired, c.expired)
+		}
+		if got := len(list.Directives) == 0; got != c.expired {
+			t.Errorf("%s: directive_list lists %d, want the directive left out %v", c.label, len(list.Directives), c.expired)
+		}
+
+		dash := must(s.Dashboard(viewerCtx()))(t)
+		if got := dash.Waiting.ExpiredDirectives == 1; got != c.expired {
+			t.Errorf("%s: dashboard expired_directives = %d, want expired %v", c.label, dash.Waiting.ExpiredDirectives, c.expired)
+		}
+
+		browse := must(s.DirectiveBrowse(viewerCtx(), core.DirectiveBrowseRequest{}))(t)
+		if len(browse.Directives) != 1 || browse.Directives[0].Expired != c.expired {
+			t.Errorf("%s: directive_browse = %+v, want one directive with expired %v", c.label, browse.Directives, c.expired)
+		}
+	}
+}
+
 // TestLearningListAllProjectsForReaders checks CONTRACT §9 item 50 for learning_list: with
 // AllProjects, an operator or a viewer with no project reads every project's learnings and
 // creates no row. An operator with a project and AllProjects creates none either. The other

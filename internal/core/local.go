@@ -88,8 +88,8 @@ func ensureProject(ctx context.Context, q store.Querier, project string, now tim
 	if err != nil {
 		return ProjectSettings{}, err
 	}
-	var s ProjectSettings
-	if err := json.Unmarshal([]byte(row.Settings), &s); err != nil {
+	s, err := decodeSettings(row.Settings)
+	if err != nil {
 		return ProjectSettings{}, fmt.Errorf("core: settings of project %s: %w", project, err)
 	}
 	return s, nil

@@ -306,6 +306,19 @@ func DefaultSettings() ProjectSettings {
 	}
 }
 
+// decodeSettings reads a stored settings object. Every reader of the column uses it,
+// project_list and the close rules alike, so the settings the UI shows are the ones the
+// close policy enforces (step 6 review W1). The object is decoded onto DefaultSettings:
+// a switch it leaves out keeps its default, and '{}', the column default, reads as the
+// defaults (CONTRACT §8.1). A value that is not a JSON object is an error.
+func decodeSettings(raw string) (ProjectSettings, error) {
+	s := DefaultSettings()
+	if err := json.Unmarshal([]byte(raw), &s); err != nil {
+		return ProjectSettings{}, err
+	}
+	return s, nil
+}
+
 // Project is created on its first agent call; nothing registers it first.
 type Project struct {
 	Name        string          `json:"name"`
