@@ -1,0 +1,31 @@
+/* The one stylesheet of the web UI (docs/DESIGN.md §5.5). It is embedded and served
+   at /ui/static/app.css; the page policy allows no other source of style. */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  color: #1d1d1f;
+  background: #fafafa;
+}
+.top {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #d0d0d4;
+  background: #fff;
+}
+.brand { font-weight: 600; }
+main { padding: 1.5rem; max-width: 60rem; }
+label { display: block; margin: 0.75rem 0; }
+input[type="password"] {
+  display: block;
+  width: 24rem;
+  max-width: 100%;
+  padding: 0.4rem;
+  font: inherit;
+}
+button, a { font: inherit; }
+.error {
+  color: #8a1c1c;
+  border-left: 3px solid #8a1c1c;
+  padding-left: 0.6rem;
+}
+/* Multi-line stored text keeps its line breaks, with no style attribute. */
+.pre { white-space: pre-wrap; }
