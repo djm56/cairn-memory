@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -81,21 +82,33 @@ func signInCookie(t *testing.T, base, key string) *http.Cookie {
 // used by the escaping test.
 type pageText struct {
 	display, title, goal, body, rule string
+	// context and constraints are the brief's fields, evidence is a criterion's, lesson is a
+	// lesson's text, and journal is a journal entry's text (#157).
+	context, constraints, evidence, lesson, journal string
 }
 
 // plainText is the text of the ordinary fixture.
 var plainText = pageText{
 	display: "Acme API", title: "Ship the reads", goal: "Show the reads",
 	body: "A learning body", rule: "A directive rule",
+	context: "The context of the brief", constraints: "The constraints",
+	evidence: "the run passed", lesson: "A learning body", journal: "The plan was read.",
 }
 
-// markupText is the text of the escaping fixture: markup, a quote, and a javascript: URL.
+// markupText is the text of the escaping fixture: markup, a quote, and a javascript: URL. Every
+// field the fixture writes carries it, so each one is checked for escaping.
 var markupText = pageText{
-	display: `<script>alert(1)</script> "quoted" javascript:alert(1)`,
-	title:   `<script>alert(1)</script> "quoted" javascript:alert(1)`,
-	goal:    `<script>alert(1)</script> "quoted" javascript:alert(1)`,
-	body:    `<script>alert(1)</script> "quoted" javascript:alert(1)`,
-	rule:    `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	// Each widened field ends in its own name, so a raw field is named by the check that finds it.
+	display:     `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	title:       `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	goal:        `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	body:        `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	rule:        `<script>alert(1)</script> "quoted" javascript:alert(1)`,
+	context:     `<script>alert(1)</script> "quoted" javascript:alert(1) field-context`,
+	constraints: `<script>alert(1)</script> "quoted" javascript:alert(1) field-constraints`,
+	evidence:    `<script>alert(1)</script> "quoted" javascript:alert(1) field-evidence`,
+	lesson:      `<script>alert(1)</script> "quoted" javascript:alert(1) field-lesson`,
+	journal:     `<script>alert(1)</script> "quoted" javascript:alert(1) field-journal`,
 }
 
 // pageFixture is a store seeded through core: two projects, a closed task with a close record,
@@ -116,7 +129,7 @@ func seedPages(t *testing.T, st *store.Store, tx pageText) pageFixture {
 	opCtx := core.WithCaller(ctx, core.Caller{Agent: "ops", Role: core.RoleOperator})
 
 	closed, err := svc.TaskStart(agentCtx("acme-api"), core.TaskStartRequest{
-		Title: tx.title, Goal: tx.goal, Context: "The context of the brief", Constraints: "The constraints",
+		Title: tx.title, Goal: tx.goal, Context: tx.context, Constraints: tx.constraints,
 		Criteria: []string{"the reads answer"}, Steps: []core.StepInput{{Title: "build it"}},
 	})
 	if err != nil {
@@ -124,8 +137,8 @@ func seedPages(t *testing.T, st *store.Store, tx pageText) pageFixture {
 	}
 	if _, err := svc.TaskClose(agentCtx("acme-api"), core.TaskCloseRequest{
 		ID: closed.ID, Outcome: core.TaskDone, Summary: "Done, with the close record.",
-		Criteria: []core.CriterionOutcome{{Ord: 1, Result: core.CriterionMet, Evidence: "the run passed"}},
-		Lessons:  []core.Lesson{{Kind: core.LessonReuse, Text: tx.body, Why: "it holds"}},
+		Criteria: []core.CriterionOutcome{{Ord: 1, Result: core.CriterionMet, Evidence: tx.evidence}},
+		Lessons:  []core.Lesson{{Kind: core.LessonReuse, Text: tx.lesson, Why: "it holds"}},
 		Mistakes: []core.Mistake{{Agent: "main", Mistake: "a slip", Impact: core.ImpactHigh}},
 	}); err != nil {
 		t.Fatalf("task_close: %v", err)
@@ -136,7 +149,7 @@ func seedPages(t *testing.T, st *store.Store, tx pageText) pageFixture {
 		t.Fatalf("task_start active: %v", err)
 	}
 	if _, err := svc.EventLog(agentCtx("acme-api"), core.EventLogRequest{
-		TaskID: active.ID, Kind: core.EventReview, Text: "The plan was read.",
+		TaskID: active.ID, Kind: core.EventReview, Text: tx.journal,
 		Data: []byte(`{"verdict":"approved","critical":0,"warnings":1}`),
 	}); err != nil {
 		t.Fatalf("event_log review: %v", err)
@@ -318,6 +331,63 @@ func TestStoredTextIsEscapedOnEveryPage(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestEachWidenedFieldIsEscaped checks each field the fixture widened, on the page that shows it.
+// TestStoredTextIsEscapedOnEveryPage proves the markup is escaped somewhere; this one proves it for
+// each field, so one escaped field cannot hide a raw one. The raw markup must not appear, and the
+// escaped form must.
+func TestEachWidenedFieldIsEscaped(t *testing.T) {
+	st := openStore(t)
+	f := seedPages(t, st, markupText)
+	s := startPages(t, st)
+	c := noRedirect()
+	closed := "/ui/p/acme-api/tasks/" + f.closedID
+	active := "/ui/p/acme-api/tasks/" + f.activeID
+	cases := []struct{ path, field, text string }{
+		{closed, "context", markupText.context},
+		{closed, "constraints", markupText.constraints},
+		{closed, "criterion evidence", markupText.evidence},
+		{closed, "lesson text", markupText.lesson},
+		{active, "journal text", markupText.journal},
+	}
+	for _, tc := range cases {
+		for who, cookie := range map[string]*http.Cookie{"operator": s.ops, "viewer": s.viewers} {
+			_, body := readPage(t, c, s.base+tc.path, cookie)
+			label := tc.field + " on " + tc.path + " as " + who
+			if strings.Contains(body, tc.text) {
+				t.Errorf("%s: the raw markup reached the page", label)
+			}
+			if want := html.EscapeString(tc.text); !strings.Contains(body, want) {
+				t.Errorf("%s: the stored text is not shown escaped as %q", label, want)
+			}
+		}
+	}
+}
+
+// TestQueryValueReflectedInAnInvalidMessageIsEscaped checks markup that reaches a core invalid
+// message through a query value. The learnings page passes its status filter to core, and core's
+// invalid message quotes the value ("unknown learning status %q"), so the markup comes back in the
+// message. The page answers 400 with that message, and the markup must show as text, not as markup.
+func TestQueryValueReflectedInAnInvalidMessageIsEscaped(t *testing.T) {
+	st := openStore(t)
+	seedPages(t, st, plainText)
+	s := startPages(t, st)
+	path := "/ui/learnings?status=" + url.QueryEscape(markupText.title)
+	resp, body := readPage(t, noRedirect(), s.base+path, s.ops)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("%s: status %d, want 400 from core's invalid message", path, resp.StatusCode)
+	}
+	if !strings.Contains(body, "unknown learning status") {
+		t.Fatalf("%s: the page does not carry core's invalid message:\n%s", path, body)
+	}
+	if strings.Contains(body, "<script") {
+		t.Errorf("%s: a raw <script reached the page through the invalid message", path)
+	}
+	if want := html.EscapeString(fmt.Sprintf("%q", markupText.title)); !strings.Contains(body, want) {
+		t.Errorf("%s: the invalid message does not show the query value escaped as %q", path, want)
+	}
+	checkPageHeaders(t, path, resp)
 }
 
 // TestPagingAndInvalidCursor checks the paging of the lists: the first page holds 20 tasks and a

@@ -510,12 +510,18 @@ output's name by a hard link. A link already at that name, even one that points 
 is refused, and nothing is written through it (#129). Keep the backup directory 0700 and
 owned by `cairn` anyway: the copies are then readable by that user only, and no other user
 can rename the directory `backup` is working in. Do not point backups at a shared
-directory such as `/tmp`, where another user could.
+directory such as `/tmp`, where another user could. The output directory must not be
+writable by other users: the copy is written by name while it is made, so a user who
+could write there could redirect it for the length of the copy.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
-never overwrites one. Nothing deletes old copies. Prune them yourself, and keep enough
-to cover the window you need. Check that a copy restores: restore one to a scratch path
-on another host, not over the live database.
+never overwrites one. `backup` needs a filesystem that supports hard links, and fails
+with a message saying so on one that does not. A killed backup can leave a hidden
+`.cairn-backup-*` directory beside the output, with a partial copy. Check it, then
+remove it by hand; `backup` does not remove it on the next run. Nothing deletes old
+copies. Prune them yourself, and keep enough to cover the window you need. Check that
+a copy restores: restore one to a scratch path on another host, not over the live
+database.
 
 ## Restore
 

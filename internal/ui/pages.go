@@ -19,15 +19,18 @@ import (
 // before any other read (DESIGN §5.5, Choosing a project). No page here writes, and no
 // page renders an action form: the forms arrive with the actions.
 
-// The fixed messages of a page's error. None carries a stored value or core's internal text.
-const (
-	msgNotFound     = "Nothing is recorded at this address."
-	msgOperatorOnly = "This page is for an operator or a viewer key."
-)
+// msgNotFound is the fixed message of a page's 404. It carries no stored value or core's internal
+// text.
+const msgNotFound = "Nothing is recorded at this address."
 
 // pageSize is how many rows a list page asks core for: its default, so the page and the
 // call agree on the size of a page (CONTRACT §1.3).
 const pageSize = 20
+
+// switcherSize is how many project names the header's switcher lists. The switcher is read on
+// every signed-in page, so its read is bounded to this many; the full list is the projects page,
+// which the switcher links to (#156).
+const switcherSize = 10
 
 // taskIDPattern is the form of a task id, task-YYYYMMDD-NN (CONTRACT §1.3). A path part
 // that does not match is a missing task, and is not sent to core.
@@ -45,10 +48,13 @@ func readerCtx(r *http.Request, s signedIn, project string) context.Context {
 }
 
 // navView is the header of a signed-in page: the key's name and role, and the project
-// switcher, which lists every project name from project_list (CONTRACT §8.1).
+// switcher, which lists the first switcherSize project names from project_list (CONTRACT §8.1).
 type navView struct {
 	Name, Role string
 	Projects   []string
+	// More is set when the switcher is short of the projects there are. The header then links to
+	// the full projects page.
+	More bool
 	// Operator is set for an operator's key. Only then does a page render an action form.
 	Operator bool
 	// CSRF is the value each action form carries in its hidden csrf field (DESIGN §5.5).
@@ -62,33 +68,28 @@ func (u *ui) navFor(ctx context.Context, s signedIn) *navView {
 		Name: s.Key.Name, Role: string(s.Key.Scope),
 		Operator: s.Key.Scope == auth.ScopeOperator, CSRF: csrfToken(s.token),
 	}
-	names, err := u.projectNames(ctx)
+	names, more, err := u.switcher(ctx)
 	if err != nil {
 		u.log.Error("project switcher failed", "cause", u.redacted(err))
 		return nav
 	}
-	nav.Projects = names
+	nav.Projects, nav.More = names, more
 	return nav
 }
 
-// projectNames returns the name of every project, in name order, read a page of MaxLimit at a
-// time. It creates no project row.
-func (u *ui) projectNames(ctx context.Context) ([]string, error) {
-	var names []string
-	cursor := ""
-	for {
-		page, err := u.cfg.Service.ProjectList(ctx, core.ProjectListRequest{Limit: core.MaxLimit, Cursor: cursor})
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range page.Projects {
-			names = append(names, p.Name)
-		}
-		if page.Next == "" {
-			return names, nil
-		}
-		cursor = page.Next
+// switcher returns the names of the first switcherSize projects, in name order, and whether
+// more projects follow. It is one bounded read, so a page costs the same however many projects
+// there are. It creates no project row.
+func (u *ui) switcher(ctx context.Context) ([]string, bool, error) {
+	page, err := u.cfg.Service.ProjectList(ctx, core.ProjectListRequest{Limit: switcherSize})
+	if err != nil {
+		return nil, false, err
 	}
+	names := make([]string, 0, len(page.Projects))
+	for _, p := range page.Projects {
+		names = append(names, p.Name)
+	}
+	return names, page.Next != "", nil
 }
 
 // project returns the project named name, or core's not_found when it has no row. It is the
@@ -104,31 +105,42 @@ func (u *ui) project(ctx context.Context, name string) (core.Project, error) {
 	return list.Projects[0], nil
 }
 
+// coreError returns the core error that err wraps, or nil when it wraps none. Every answer of the
+// UI that shows a core message reads it through here, so the unwrap is written once (#162).
+func coreError(err error) *core.Error {
+	var ce *core.Error
+	if errors.As(err, &ce) {
+		return ce
+	}
+	return nil
+}
+
 // pageFail answers a signed-in page with an error page, with the header. It is for the
 // failures the page itself finds: a bad path part, a missing project or task.
-func (u *ui) pageFail(w http.ResponseWriter, ctx context.Context, s signedIn, status int, msg string) {
+func (u *ui) pageFail(ctx context.Context, w http.ResponseWriter, s signedIn, status int, msg string) {
 	u.render(w, status, "error", view{Title: http.StatusText(status), Message: msg, Nav: u.navFor(ctx, s)})
 }
 
 // pageError answers a failed core read on a signed-in page, with the status DESIGN §5.5 gives
 // the kind: 404 for not_found, and 400 for invalid, which shows core's own message, since core
-// writes that for the caller. Any other kind is internal: the page says so, and the cause goes
-// to the log, redacted.
-func (u *ui) pageError(w http.ResponseWriter, r *http.Request, ctx context.Context, s signedIn, err error) {
-	var ce *core.Error
-	if !errors.As(err, &ce) {
+// writes that for the caller. A refused kind is 409, with core's message too. Any other kind,
+// operator_only included, is internal: the page says so, and the cause goes to the log, redacted.
+// operator_only has no page of its own. Both the form and the operator page check the key's scope
+// before core is called, and reads are not operator calls, so core never refuses a call of these
+// pages for its role.
+func (u *ui) pageError(ctx context.Context, w http.ResponseWriter, r *http.Request, s signedIn, err error) {
+	ce := coreError(err)
+	if ce == nil {
 		u.internal(w, r, err)
 		return
 	}
 	switch ce.Kind {
 	case core.KindNotFound:
-		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+		u.pageFail(ctx, w, s, http.StatusNotFound, msgNotFound)
 	case core.KindInvalid:
-		u.pageFail(w, ctx, s, http.StatusBadRequest, ce.Message)
+		u.pageFail(ctx, w, s, http.StatusBadRequest, ce.Message)
 	case core.KindRefused:
-		u.pageFail(w, ctx, s, http.StatusConflict, ce.Message)
-	case core.KindOperatorOnly:
-		u.pageFail(w, ctx, s, http.StatusForbidden, msgOperatorOnly)
+		u.pageFail(ctx, w, s, http.StatusConflict, ce.Message)
 	default:
 		u.internal(w, r, err)
 	}
@@ -261,7 +273,7 @@ func (u *ui) dashboard(w http.ResponseWriter, r *http.Request, s signedIn) {
 	ctx := readerCtx(r, s, "")
 	d, err := u.cfg.Service.Dashboard(ctx)
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	u.render(w, http.StatusOK, "dashboard", view{Title: "Dashboard", Nav: u.navFor(ctx, s), Page: dashboardOf(d)})
@@ -332,11 +344,11 @@ func (u *ui) tasks(w http.ResponseWriter, r *http.Request, s signedIn) {
 	project := q.Get("project")
 	if project != "" {
 		if !core.ValidProjectName(project) {
-			u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+			u.pageFail(ctx, w, s, http.StatusNotFound, msgNotFound)
 			return
 		}
 		if _, err := u.project(ctx, project); err != nil {
-			u.pageError(w, r, ctx, s, err)
+			u.pageError(ctx, w, r, s, err)
 			return
 		}
 		req.Project = project
@@ -356,7 +368,7 @@ func (u *ui) tasks(w http.ResponseWriter, r *http.Request, s signedIn) {
 	}
 	page, err := u.cfg.Service.TaskBrowse(ctx, req)
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	out := tasksPage{
@@ -437,24 +449,24 @@ func (u *ui) task(w http.ResponseWriter, r *http.Request, s signedIn) {
 	project, id := r.PathValue("project"), r.PathValue("task")
 	ctx := readerCtx(r, s, "")
 	if !core.ValidProjectName(project) || !taskIDPattern.MatchString(id) {
-		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+		u.pageFail(ctx, w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	pctx := readerCtx(r, s, project)
 	if _, err := u.project(pctx, project); err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	detail, err := u.cfg.Service.TaskGet(pctx, core.TaskGetRequest{ID: id})
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	journal, err := u.cfg.Service.TaskGet(pctx, core.TaskGetRequest{
 		ID: id, Section: core.SectionEvents, Limit: pageSize, Cursor: r.URL.Query().Get("cursor"),
 	})
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	out := taskPageOf(detail, journal)
@@ -577,7 +589,7 @@ type learningsPage struct {
 func (u *ui) projectLearnings(w http.ResponseWriter, r *http.Request, s signedIn) {
 	project := r.PathValue("project")
 	if !core.ValidProjectName(project) {
-		u.pageFail(w, readerCtx(r, s, ""), s, http.StatusNotFound, msgNotFound)
+		u.pageFail(readerCtx(r, s, ""), w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	u.renderLearnings(w, r, s, project, failed{})
@@ -595,16 +607,16 @@ func (u *ui) renderLearnings(w http.ResponseWriter, r *http.Request, s signedIn,
 	ctx := readerCtx(r, s, project)
 	if project != "" {
 		if _, err := u.project(ctx, project); err != nil {
-			u.pageError(w, r, readerCtx(r, s, ""), s, err)
+			u.pageError(readerCtx(r, s, ""), w, r, s, err)
 			return
 		}
 	}
-	u.learningsList(w, r, s, ctx, project == "", project, f)
+	u.learningsList(ctx, w, r, s, project == "", project, f)
 }
 
 // learningsList answers a learnings page. The status defaults to proposed, and "all" lifts the
 // status filter. The kind is one of the three kinds, or every kind.
-func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, ctx context.Context, all bool, project string, f failed) {
+func (u *ui) learningsList(ctx context.Context, w http.ResponseWriter, r *http.Request, s signedIn, all bool, project string, f failed) {
 	q := r.URL.Query()
 	status := q.Get("status")
 	if status == "" {
@@ -620,7 +632,7 @@ func (u *ui) learningsList(w http.ResponseWriter, r *http.Request, s signedIn, c
 	}
 	list, err := u.cfg.Service.LearningList(ctx, req)
 	if err != nil {
-		u.pageError(w, r, readerCtx(r, s, ""), s, err)
+		u.pageError(readerCtx(r, s, ""), w, r, s, err)
 		return
 	}
 	base := "/ui/learnings"
@@ -726,14 +738,14 @@ func (u *ui) renderDirectives(w http.ResponseWriter, r *http.Request, s signedIn
 	}
 	d, err := u.cfg.Service.Dashboard(ctx)
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	browse, err := u.cfg.Service.DirectiveBrowse(ctx, core.DirectiveBrowseRequest{
 		State: core.DirectiveStatus(state), Cursor: q.Get("cursor"), Limit: pageSize,
 	})
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	operator := s.Key.Scope == auth.ScopeOperator
@@ -826,7 +838,7 @@ func (u *ui) projects(w http.ResponseWriter, r *http.Request, s signedIn) {
 		Cursor: r.URL.Query().Get("cursor"), Limit: pageSize,
 	})
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	out := projectsPage{Next: pageHref(r, "/ui/projects", list.Next)}
@@ -888,12 +900,12 @@ func (u *ui) projectSettings(w http.ResponseWriter, r *http.Request, s signedIn)
 func (u *ui) renderSettings(w http.ResponseWriter, r *http.Request, s signedIn, name string, f failed) {
 	ctx := readerCtx(r, s, "")
 	if !core.ValidProjectName(name) {
-		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+		u.pageFail(ctx, w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	p, err := u.project(ctx, name)
 	if err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	c := p.Settings.ClosePolicy

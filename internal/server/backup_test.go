@@ -251,3 +251,55 @@ func TestBackupRefusesAFileThatIsNotACairnDatabase(t *testing.T) {
 		t.Errorf("a refused backup left %s behind", out)
 	}
 }
+
+// TestBackupRefusesAStagingDirectorySwappedDuringTheCopy plays the attack of W1 (#129). While the
+// copy is made, the staging directory is renamed and a symbolic link is put at its name, pointing
+// at a directory that holds a sentinel file. VACUUM INTO follows the link and writes the copy into
+// that directory. The backup must be refused, the output must not exist, the sentinel must survive
+// the cleanup, and the copy written into the swapped-in directory must be owner-only.
+func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "cairn.db")
+	createDB(t, db)
+	out := filepath.Join(dir, "backup.db")
+	victim := filepath.Join(dir, "victim")
+	if err := os.Mkdir(victim, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(victim, "sentinel.txt")
+	if err := os.WriteFile(sentinel, []byte("keep me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prev := copyBackup
+	copyBackup = func(ctx context.Context, st *store.Store, path string) error {
+		stage := filepath.Dir(path)
+		if err := os.Rename(stage, stage+".moved"); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(victim, stage); err != nil {
+			t.Fatal(err)
+		}
+		return prev(ctx, st, path)
+	}
+	t.Cleanup(func() { copyBackup = prev })
+
+	_, err := Backup(context.Background(), db, out)
+	if err == nil || !strings.Contains(err.Error(), "was replaced") {
+		t.Fatalf("Backup with the staging directory swapped during the copy: err = %v, want the replaced refusal", err)
+	}
+	if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
+		t.Errorf("a refused backup left the output %s behind", out)
+	}
+	got, rerr := os.ReadFile(sentinel)
+	if rerr != nil || string(got) != "keep me" {
+		t.Errorf("the sentinel in the swapped-in directory did not survive: %q, %v", got, rerr)
+	}
+	info, serr := os.Stat(filepath.Join(victim, copyName))
+	if serr != nil {
+		t.Fatalf("the copy VACUUM INTO wrote through the link is not where the test expects it: %v", serr)
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		t.Errorf("the copy written into the swapped-in directory has mode %04o, want no group or other bits", mode)
+	}
+}

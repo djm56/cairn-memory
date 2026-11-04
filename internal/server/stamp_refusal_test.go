@@ -14,7 +14,7 @@ import (
 // is deleted.
 var startFreshText = []string{
 	"To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own",
-	"mkdir -p -- <folder> && mv -- ",
+	"mkdir -p -- /path/to/folder && mv -- ",
 	"Then start cairn serve again. Nothing is deleted.",
 }
 

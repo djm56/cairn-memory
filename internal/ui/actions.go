@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,10 +18,14 @@ import (
 // values, at the status DESIGN §5.5 gives the kind (Errors).
 
 // The fixed messages of the actions. None carries a stored value, and none repeats a typed one.
+// The messages that do repeat a typed value are the project message in directiveRatify, and the
+// invalid and refused messages core writes, which can quote a typed value. Those are the only
+// messages that echo input, and the UI relies on the template escaping them.
 const (
 	msgNoteNeeded    = "A decision needs a note: say why the learning is decided this way."
 	msgSupersededBy  = "superseded_by is the id of the learning that replaces this one: a whole number."
 	msgLearningID    = "from_learning is the id of an accepted learning: a whole number."
+	msgLearningNone  = "from_learning names no learning: give the id of an accepted learning, or clear the field."
 	msgConfirmNeeded = "Retiring a directive is final. Tick the box to confirm. To keep the rule, reaffirm the directive instead."
 	msgSwitchNeeded  = "Each switch is on or off."
 )
@@ -78,7 +81,7 @@ func (u *ui) operatorPage(h func(http.ResponseWriter, *http.Request, signedIn)) 
 			return
 		}
 		if s.Key.Scope != auth.ScopeOperator {
-			u.pageFail(w, readerCtx(r, s, ""), s, http.StatusForbidden, msgReadOnly)
+			u.pageFail(readerCtx(r, s, ""), w, s, http.StatusForbidden, msgReadOnly)
 			return
 		}
 		h(w, r, s)
@@ -99,7 +102,7 @@ func operatorCtx(r *http.Request, s signedIn) context.Context {
 
 // failedAction answers a core error of an action. An invalid or refused call goes to again, which
 // re-renders the form, at 400 or 409 (DESIGN §5.5, Errors). Any other kind is answered by pageError:
-// not_found is 404, operator_only is 403, and anything else is internal.
+// not_found is 404, and anything else is internal (pageError).
 func (u *ui) failedAction(w http.ResponseWriter, r *http.Request, s signedIn, err error, again func(int, string)) {
 	switch core.KindOf(err) {
 	case core.KindInvalid:
@@ -107,15 +110,14 @@ func (u *ui) failedAction(w http.ResponseWriter, r *http.Request, s signedIn, er
 	case core.KindRefused:
 		again(http.StatusConflict, coreMessage(err))
 	default:
-		u.pageError(w, r, readerCtx(r, s, ""), s, err)
+		u.pageError(readerCtx(r, s, ""), w, r, s, err)
 	}
 }
 
 // coreMessage returns the message of a core error, which core writes for the caller to read. It
 // is "" for any other error.
 func coreMessage(err error) string {
-	var ce *core.Error
-	if errors.As(err, &ce) {
+	if ce := coreError(err); ce != nil {
 		return ce.Message
 	}
 	return ""
@@ -191,7 +193,7 @@ func (u *ui) directiveRatify(w http.ResponseWriter, r *http.Request, s signedIn)
 	if req.Scope == core.ScopeProject && core.ValidProjectName(req.Project) {
 		if _, err := u.project(ctx, req.Project); err != nil {
 			if core.KindOf(err) != core.KindNotFound {
-				u.pageError(w, r, ctx, s, err)
+				u.pageError(ctx, w, r, s, err)
 				return
 			}
 			again(http.StatusBadRequest, "There is no project named "+req.Project+". A project is created by its first agent call: check the name.")
@@ -199,6 +201,13 @@ func (u *ui) directiveRatify(w http.ResponseWriter, r *http.Request, s signedIn)
 		}
 	}
 	if _, err := u.cfg.Service.DirectiveRatify(operatorCtx(r, s), req); err != nil {
+		// A from_learning with no learning behind it is core's not_found. It re-renders the form with
+		// the typed values, as the other refusals do, instead of answering 404 (#161). The project
+		// is checked above, so a not_found here is the learning.
+		if req.FromLearning != nil && core.KindOf(err) == core.KindNotFound {
+			again(http.StatusBadRequest, msgLearningNone)
+			return
+		}
 		u.failedAction(w, r, s, err, again)
 		return
 	}
@@ -212,7 +221,7 @@ func (u *ui) directiveRatify(w http.ResponseWriter, r *http.Request, s signedIn)
 func (u *ui) learningDecide(w http.ResponseWriter, r *http.Request, s signedIn) {
 	id, ok := parseID(r.PathValue("id"))
 	if !ok {
-		u.pageFail(w, readerCtx(r, s, ""), s, http.StatusNotFound, msgNotFound)
+		u.pageFail(readerCtx(r, s, ""), w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	f := r.PostForm
@@ -257,7 +266,7 @@ func (u *ui) learningDecide(w http.ResponseWriter, r *http.Request, s signedIn) 
 func (u *ui) directiveRetire(w http.ResponseWriter, r *http.Request, s signedIn) {
 	code := r.PathValue("code")
 	if !core.ValidDirectiveCode(code) {
-		u.pageFail(w, readerCtx(r, s, ""), s, http.StatusNotFound, msgNotFound)
+		u.pageFail(readerCtx(r, s, ""), w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	again := func(status int, msg string) {
@@ -280,7 +289,7 @@ func (u *ui) directiveRetire(w http.ResponseWriter, r *http.Request, s signedIn)
 func (u *ui) directiveReaffirm(w http.ResponseWriter, r *http.Request, s signedIn) {
 	code := r.PathValue("code")
 	if !core.ValidDirectiveCode(code) {
-		u.pageFail(w, readerCtx(r, s, ""), s, http.StatusNotFound, msgNotFound)
+		u.pageFail(readerCtx(r, s, ""), w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	reviewBy := r.PostForm.Get("review_by")
@@ -306,11 +315,11 @@ func (u *ui) projectSettingsSet(w http.ResponseWriter, r *http.Request, s signed
 	name := r.PathValue("project")
 	ctx := readerCtx(r, s, "")
 	if !core.ValidProjectName(name) {
-		u.pageFail(w, ctx, s, http.StatusNotFound, msgNotFound)
+		u.pageFail(ctx, w, s, http.StatusNotFound, msgNotFound)
 		return
 	}
 	if _, err := u.project(ctx, name); err != nil {
-		u.pageError(w, r, ctx, s, err)
+		u.pageError(ctx, w, r, s, err)
 		return
 	}
 	f := r.PostForm
