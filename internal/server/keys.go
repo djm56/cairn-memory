@@ -74,8 +74,8 @@ func AddKey(ctx context.Context, db, name string, scope auth.Scope) (string, err
 
 // checkKeyName refuses a name that is not a key name: one of the shape keyNamePattern gives,
 // or one that begins with the key prefix, which is a key pasted into the name position. The
-// message gives the rule and never the name, so a key given as a name is not printed back
-// (step 8 review W6). AddKey and RevokeKey both check the name here, before any database
+// message gives the rule and never the name, so a key given as a name is not printed back.
+// AddKey and RevokeKey both check the name here, before any database
 // lookup, so the two cannot disagree about what a name is.
 func checkKeyName(name string) error {
 	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) {

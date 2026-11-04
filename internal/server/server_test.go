@@ -339,7 +339,7 @@ func TestRedactRemovesKeysAndBearerCredentials(t *testing.T) {
 
 // TestRedactRemovesTruncatedKeys checks the pattern does not need a whole key. A key cut
 // short in a cause, or one with extra characters, still leaves no fragment of the key in
-// the logged text (6-S8). The text around it stays.
+// the logged text. The text around it stays.
 func TestRedactRemovesTruncatedKeys(t *testing.T) {
 	key, err := auth.NewKey()
 	if err != nil {
@@ -535,7 +535,7 @@ func TestRunPrintsTheNoKeyLineOnLoopback(t *testing.T) {
 // TestRunListensAtTheCheckedAddress starts a server on "localhost", which resolves to
 // loopback addresses, and checks that it listens at the first one the bind rule read. The
 // rule and the listener then agree on the address, so a name that resolves to a LAN
-// address as well cannot widen the bind (6-S5). It binds loopback only, and stops at the
+// address as well cannot widen the bind. It binds loopback only, and stops at the
 // deadline.
 func TestRunListensAtTheCheckedAddress(t *testing.T) {
 	ips, err := ResolveHost(context.Background(), "localhost")
@@ -552,7 +552,7 @@ func TestRunListensAtTheCheckedAddress(t *testing.T) {
 
 	// The test waits for the listening line, not for a deadline: the bind rule, the store and
 	// the migrations all run before the listener, and a clock that starts before them fails on
-	// a slow machine (8-W5). A Run that returns first has refused the bind.
+	// a slow machine. A Run that returns first has refused the bind.
 	var addr string
 	deadline := time.Now().Add(10 * time.Second)
 	for addr == "" {

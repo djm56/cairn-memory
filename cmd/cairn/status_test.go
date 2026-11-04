@@ -92,7 +92,7 @@ func TestStatusTakesNoArguments(t *testing.T) {
 }
 
 // assertNoCredentials fails when any text carries the user name or password a test
-// puts in a server URL (step 10 review W5).
+// puts in a server URL.
 func assertNoCredentials(t *testing.T, texts ...string) {
 	t.Helper()
 	for _, text := range texts {

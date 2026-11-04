@@ -45,7 +45,7 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	fmt.Fprintf(w, "project     %s (from %s)\n", t.project.Name, projectSource(t.project))
 	// The URL goes without its credentials, and each server-derived text is one
-	// printable line, as the hook prints it (step 10 review W3, W5).
+	// printable line, as the hook prints it.
 	fmt.Fprintf(w, "server      %s (from %s)\n", client.DisplayURL(t.url), serverSource())
 	if cur.Task == nil {
 		fmt.Fprintln(w, "task        none active")
@@ -64,10 +64,10 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	}
 	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
 	// The CLI names no agent role, so the server counts only directives that are not scoped to
-	// one. That is said here, not left for a person to infer (14-W4).
+	// one. That is said here, not left for a person to infer.
 	fmt.Fprintf(w, "            %s\n", noRoleNote)
 	// The two counts are shown only when there is one, so a clean project reads as before
-	// (step 12 review 12-W2). A directive left out is named, not dropped without a word.
+	// A directive left out is named, not dropped without a word.
 	if cur.Expired > 0 {
 		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)
 	}

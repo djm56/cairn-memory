@@ -15,7 +15,7 @@ import (
 
 // doctorTimeout bounds the one reachability call of cairn doctor, so a server that
 // does not answer ends the check, not the command. It is a variable so a test can wait
-// on a server that never answers for less than the real five seconds (step 12 review 12-S3).
+// on a server that never answers for less than the real five seconds.
 var doctorTimeout = 5 * time.Second
 
 // check is one line of cairn doctor: what was checked, its status and the detail.
@@ -83,7 +83,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 }
 
 // anyFailed reports whether a check failed. Only "fail" fails the command: "warn" is printed
-// and does not change the exit code (10-S6).
+// and does not change the exit code.
 func anyFailed(checks []check) bool {
 	for _, c := range checks {
 		if c.status == "fail" {

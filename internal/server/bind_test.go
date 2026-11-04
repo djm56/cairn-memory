@@ -113,7 +113,7 @@ func TestRequireKeys(t *testing.T) {
 	}
 }
 
-// TestCleartextLine checks when the proxy warning is printed (6-S2). It is printed only for
+// TestCleartextLine checks when the proxy warning is printed. It is printed only for
 // a non-loopback bind that has no TLS of its own and says a proxy terminates TLS. Every
 // other bind gets no line, so the warning means something when it appears.
 func TestCleartextLine(t *testing.T) {

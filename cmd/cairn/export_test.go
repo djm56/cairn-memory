@@ -240,7 +240,7 @@ func TestExitCheckMCPFlowThenExport(t *testing.T) {
 	}
 }
 
-// TestExportFoldsServerText is step 10 review W3 through export. A title with a carriage
+// TestExportFoldsServerText checks, through export, that a title with a carriage
 // return and a Markdown heading stays one heading line. A goal keeps its line break, as
 // a paragraph does, and loses its escape sequence. A key file's path and its note are one
 // line each, with the separator and the control character gone.
@@ -287,7 +287,7 @@ func TestExportFoldsServerText(t *testing.T) {
 	}
 }
 
-// TestExportCodeSpanHoldsABacktick is step 12 review S5. A backtick in a key file's path
+// TestExportCodeSpanHoldsABacktick checks that a backtick in a key file's path
 // does not end the code span the path sits in: the fence is longer than any run of
 // backticks in the path, and a path that begins or ends with one is padded.
 func TestExportCodeSpanHoldsABacktick(t *testing.T) {

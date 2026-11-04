@@ -46,7 +46,7 @@ func testAPIKey(t *testing.T) string {
 
 // assertNoAncestorProjectFile fails the test when a .cairn.toml sits above the temporary
 // directory. A walk up from a test directory reaches the temporary directory's ancestors,
-// so such a file would be read by the test and change what it sees (step 10 review S9).
+// so such a file would be read by the test and change what it sees.
 // The test says so, rather than passing for the wrong reason.
 func assertNoAncestorProjectFile(t *testing.T) {
 	t.Helper()

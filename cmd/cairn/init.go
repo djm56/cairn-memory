@@ -32,7 +32,7 @@ type projectFile struct {
 const fileHeader = "# Cairn project file (docs/DESIGN.md §2.1). Commit it. It holds no key.\n"
 
 // writeContent puts the bytes of a new project file into its temporary file. It is a
-// variable so a test can make the write fail part way (step 10 review W4).
+// variable so a test can make the write fail part way.
 var writeContent = func(w io.Writer, content []byte) error {
 	_, err := w.Write(content)
 	return err
@@ -43,17 +43,17 @@ var writeContent = func(w io.Writer, content []byte) error {
 // server: the project is registered by its first call, as CONTRACT §1.1 says.
 //
 // The project directory is the one identity starts from: CLAUDE_PROJECT_DIR when Claude
-// Code sets it, else the working directory (step 10 review W6). So the file init writes
+// Code sets it, else the working directory. So the file init writes
 // is the one every other command finds, from any directory of the project. A run from a
 // directory outside CLAUDE_PROJECT_DIR is refused, since it would write into that
-// project (step 12 review W5).
+// project.
 //
 // It is idempotent (#69). Run again with the same values, it changes nothing and
 // says so, here or in a directory below a project file that has the same values. It
 // never changes a value the file already has: a different value is refused, with the
 // reason and the fix, and the file is left as it was. There is no flag to overwrite,
 // since none is in the issue. Its messages name no destructive command (#70), and it
-// never prints the server URL with a user name or password (step 10 review W5).
+// never prints the server URL with a user name or password.
 //
 // Exit codes: 0 for a written or unchanged file, 1 for a refusal of the file, 2 for
 // a usage error. `--help` prints to stdout and exits 0.
@@ -147,7 +147,7 @@ func writeInitHelp(w io.Writer, fl *flag.FlagSet) {
 }
 
 // initDir is the directory cairn init writes into: the one identity starts its walk
-// from, so the file is the one every command finds (step 10 review W6).
+// from, so the file is the one every command finds.
 func initDir() (string, error) {
 	if dir := os.Getenv(identity.EnvProjectDir); dir != "" {
 		return filepath.Abs(dir)
@@ -155,8 +155,7 @@ func initDir() (string, error) {
 	return workDir()
 }
 
-// checkProjectDir refuses an init run from outside CLAUDE_PROJECT_DIR (step 12 review
-// W5). The variable is set by Claude Code and inherited by the shells it starts, so a
+// checkProjectDir refuses an init run from outside CLAUDE_PROJECT_DIR. The variable is set by Claude Code and inherited by the shells it starts, so a
 // cd into another project would otherwise write that project's file into the first
 // one's root, and exit 0. Both directories are resolved through their symlinks before
 // they are compared, and the comparison is by path elements, so a sibling whose name
@@ -195,7 +194,7 @@ func checkProjectDir() error {
 
 // shownServer describes a server value read from an existing file, for a message. A
 // string is shown through client.DisplayURL, so a user name or a password in it is never
-// printed (step 10 review W5; step 12 review W6). A value of another type is described as
+// printed. A value of another type is described as
 // shown describes it.
 func shownServer(v any) string {
 	if s, ok := v.(string); ok {
@@ -286,8 +285,7 @@ func fileAbove(dir string) (string, bool) {
 }
 
 // linkFile makes a second name for an existing file. It is os.Link, and a variable so a
-// test can make the link fail the way a filesystem without hard links does (step 12
-// review W4).
+// test can make the link fail the way a filesystem without hard links does.
 var linkFile = os.Link
 
 // writeNew creates path with the project and server keys, all at once or not at all.
@@ -295,13 +293,12 @@ var linkFile = os.Link
 // is then linked to path. A link fails when path exists, so an existing file is never
 // replaced, even one that appears after the check, and the link is atomic. The
 // temporary file is removed in every case, so a write that fails part way leaves no
-// partial .cairn.toml behind (step 10 review W4).
+// partial .cairn.toml behind.
 //
 // A filesystem with no hard links refuses the link with an errno that says so. Then the
 // file is created at path directly, with O_EXCL, which keeps the no-overwrite rule but
 // is not atomic: a failure part way removes the partial file. Every other link failure,
-// and an existing name, are returned as they are and never fall back (step 12 review
-// W4). Errors name path, and never the temporary file.
+// and an existing name, are returned as they are and never fall back. Errors name path, and never the temporary file.
 func writeNew(path, project, server string) error {
 	content, err := projectContent(project, server)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// startFreshText is the step every refusal over pre-restore files gives (14b-W3). The test pins
+// startFreshText is the step every refusal over pre-restore files gives. The test pins
 // each part of it: the check, the move by hand out of the folder, the start over, and that nothing
 // is deleted.
 var startFreshText = []string{
@@ -18,7 +18,7 @@ var startFreshText = []string{
 	"Then start cairn serve again. Nothing is deleted.",
 }
 
-// TestRefusalsTellTheOperatorHowToStartFresh pins the text of 14b-W3 in both refusals over pre-restore
+// TestRefusalsTellTheOperatorHowToStartFresh pins the text in both refusals over pre-restore
 // files: the one with a main file beside the path, and the one with only -wal and -shm files. Each
 // names every file it found, quoted, in the mv command.
 func TestRefusalsTellTheOperatorHowToStartFresh(t *testing.T) {
@@ -64,7 +64,7 @@ func TestRefusalsTellTheOperatorHowToStartFresh(t *testing.T) {
 	}
 }
 
-// TestRefusalForAMissingFolderIsNotAnInterruptedRestore is the proof for 16b-W2. The folder the path
+// TestRefusalForAMissingFolderIsNotAnInterruptedRestore is the proof that a missing folder is not taken for an interrupted restore. The folder the path
 // is in does not exist, so no restore could have left files there. The error is the plain missing-
 // folder error, which wraps fs.ErrNotExist and does not talk of an interrupted restore. The key
 // command goes through openDatabase, which is where the operator sees it.
@@ -84,7 +84,7 @@ func TestRefusalForAMissingFolderIsNotAnInterruptedRestore(t *testing.T) {
 	}
 }
 
-// TestRefusalNamesTheNewestOfTwoStamps is the proof for 14b-W3. Two restores left pre-restore files
+// TestRefusalNamesTheNewestOfTwoStamps is the proof that the refusal names the newest of two stamps. Two restores left pre-restore files
 // beside an absent database: an old stamp with its -shm, and a newer stamp. The refusal names the
 // newer file as the one to put back, lists both stamps, and says it may be history. The old file
 // is not named as the database to recover.
@@ -124,7 +124,7 @@ func TestRefusalNamesTheNewestOfTwoStamps(t *testing.T) {
 	}
 }
 
-// TestRefusalSkipsAStraysOnlyNewestStamp is the proof for 16-S2. The newest stamp holds only a
+// TestRefusalSkipsAStraysOnlyNewestStamp is the proof that a stray-only newest stamp is skipped. The newest stamp holds only a
 // -wal and a -shm, as a restore with the database absent leaves. The refusal names the newest
 // stamp that has a main file, never the -wal, and its mv command puts a main file at the path.
 func TestRefusalSkipsAStraysOnlyNewestStamp(t *testing.T) {
@@ -156,7 +156,7 @@ func TestRefusalSkipsAStraysOnlyNewestStamp(t *testing.T) {
 	}
 }
 
-// TestRefusalOffersNoMvWhenOnlyStraysRemain is the other half of 16-S2: with no main file of any
+// TestRefusalOffersNoMvWhenOnlyStraysRemain is the other half of the stray-only case: with no main file of any
 // stamp beside the path, the refusal still stops the server but prints no mv command.
 func TestRefusalOffersNoMvWhenOnlyStraysRemain(t *testing.T) {
 	dir := t.TempDir()

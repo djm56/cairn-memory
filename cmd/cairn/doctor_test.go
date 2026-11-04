@@ -95,7 +95,7 @@ func TestDoctorTakesNoArguments(t *testing.T) {
 	}
 }
 
-// TestDoctorDoesNotFollowARedirect checks the redirect rule (step 8 review W3) at the command: a
+// TestDoctorDoesNotFollowARedirect checks the redirect rule at the command: a
 // server that redirects the reach call to another server makes reach fail, and the other server
 // receives no request, so the key is not sent there. The output holds no key.
 func TestDoctorDoesNotFollowARedirect(t *testing.T) {
@@ -132,7 +132,7 @@ func TestDoctorDoesNotFollowARedirect(t *testing.T) {
 	}
 }
 
-// TestDoctorWarnsAboutAKeyInClearText checks 8-S9 at the command: a key found for an http server
+// TestDoctorWarnsAboutAKeyInClearText checks at the command: a key found for an http server
 // on a host that is not loopback is warned about, on a transport line that does not fail the
 // check; a loopback server gets no such line. The host here does not resolve, so reach fails on
 // its own and the warning is read from the output beside it. The output holds no key.
@@ -140,8 +140,8 @@ func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 	dir := t.TempDir()
 	useDir(t, dir)
 	// 192.0.2.1 is reserved for documentation (RFC 5737), so no real host answers it. It is not a
-	// name, so no resolver can send the test key to a host of its own choosing (10-S7). Doctor's
-	// reach call gives up at its timeout, which this test shortens (12-S3): the warning is read
+	// name, so no resolver can send the test key to a host of its own choosing. Doctor's
+	// reach call gives up at its timeout, which this test shortens: the warning is read
 	// from the output beside it, and the run does not wait out the real five seconds.
 	prevTimeout := doctorTimeout
 	doctorTimeout = 200 * time.Millisecond
@@ -163,7 +163,7 @@ func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 }
 
 // TestAWarningDoesNotFailTheCheck checks the exit rule of cairn doctor: a warn line is printed
-// and leaves the exit code at 0, and only a fail line makes it 1 (10-S6).
+// and leaves the exit code at 0, and only a fail line makes it 1.
 func TestAWarningDoesNotFailTheCheck(t *testing.T) {
 	cases := []struct {
 		name   string

@@ -3,10 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -147,7 +149,7 @@ func TestBackupWhileWritesRun(t *testing.T) {
 
 	assertIntegrityOK(t, out)
 	// Group the writer's rows by transaction. Each group must be whole in the copy: all txRows
-	// rows or none, never a part (14-S9). Every transaction committed before Backup began must be
+	// rows or none, never a part. Every transaction committed before Backup began must be
 	// in the copy.
 	groups := map[string]int{}
 	for _, name := range keyNames(t, out) {
@@ -301,5 +303,118 @@ func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
 	}
 	if mode := info.Mode().Perm(); mode&0o077 != 0 {
 		t.Errorf("the copy written into the swapped-in directory has mode %04o, want no group or other bits", mode)
+	}
+}
+
+// TestBackupRefusesAStagingDirectorySwappedAfterTheCopy checks a swap of the staging name after the copy. The
+// copy is complete and sits in the directory the root holds when the staging name is moved and a
+// link put in its place, pointing at a directory with a sentinel file. The check after the copy
+// must refuse. The root-held copy must be removed through the root: it is removed from the moved
+// directory, not by the name, which now holds the link. The sentinel must survive.
+func TestBackupRefusesAStagingDirectorySwappedAfterTheCopy(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "cairn.db")
+	createDB(t, db)
+	out := filepath.Join(dir, "backup.db")
+	victim := filepath.Join(dir, "victim")
+	if err := os.Mkdir(victim, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sentinel := filepath.Join(victim, "sentinel.txt")
+	if err := os.WriteFile(sentinel, []byte("keep me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var moved string
+	prev := afterCopy
+	afterCopy = func(stage string) {
+		if _, err := os.Stat(filepath.Join(stage, copyName)); err != nil {
+			t.Fatalf("no copy in the staging directory before the swap: %v", err)
+		}
+		moved = stage + ".moved"
+		if err := os.Rename(stage, moved); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(victim, stage); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { afterCopy = prev })
+
+	_, err := Backup(context.Background(), db, out)
+	if err == nil || !strings.Contains(err.Error(), "was replaced") {
+		t.Fatalf("Backup with the staging directory swapped after the copy: err = %v, want the replaced refusal", err)
+	}
+	if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
+		t.Errorf("a refused backup left the output %s behind", out)
+	}
+	got, rerr := os.ReadFile(sentinel)
+	if rerr != nil || string(got) != "keep me" {
+		t.Errorf("the sentinel in the swapped-in directory did not survive: %q, %v", got, rerr)
+	}
+	if _, serr := os.Lstat(filepath.Join(moved, copyName)); !os.IsNotExist(serr) {
+		t.Errorf("the root-held copy in %s was not removed: %v", moved, serr)
+	}
+	if entries, rerr := os.ReadDir(moved); rerr != nil || len(entries) != 0 {
+		t.Errorf("the moved staging directory %s holds %d entries after the refusal, want none (%v)", moved, len(entries), rerr)
+	}
+}
+
+// TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink checks the post-link SameFile
+// branch. The copy is replaced by another file between the last check and the link. The name is
+// the same, so the check passes, and os.Link links the file that now holds it. The check on the
+// linked file must find it is not the copy made, remove the output name, and say so.
+func TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "cairn.db")
+	createDB(t, db)
+	out := filepath.Join(dir, "backup.db")
+
+	var stage string
+	prev := beforeLink
+	beforeLink = func(tmp string) {
+		stage = filepath.Dir(tmp)
+		if err := os.Rename(tmp, tmp+".kept"); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(tmp, []byte("impostor"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { beforeLink = prev })
+
+	_, err := Backup(context.Background(), db, out)
+	if err == nil || !strings.Contains(err.Error(), "is not the copy made") || !strings.Contains(err.Error(), "the name was removed") {
+		t.Fatalf("Backup with the copy swapped before the link: err = %v, want the not-the-copy refusal that says the name was removed", err)
+	}
+	if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
+		t.Errorf("a refused backup left the output %s behind, linked to the impostor", out)
+	}
+	if entries, rerr := os.ReadDir(stage); rerr != nil || len(entries) != 0 {
+		t.Errorf("the staging directory %s holds %d entries after the refusal, want none (%v)", stage, len(entries), rerr)
+	}
+}
+
+// TestNoHardLinksNamesOnlyTheErrnosThatMeanNoLinks checks the errnos that make the hard-link clause
+// of a backup refusal. Only the not-supported errnos qualify. A name that is taken, and any other
+// failure, do not, so their messages do not blame the filesystem.
+func TestNoHardLinksNamesOnlyTheErrnosThatMeanNoLinks(t *testing.T) {
+	cases := map[string]struct {
+		err  error
+		want bool
+	}{
+		"EPERM":      {syscall.EPERM, true},
+		"ENOTSUP":    {syscall.ENOTSUP, true},
+		"EOPNOTSUPP": {syscall.EOPNOTSUPP, true},
+		"EXDEV":      {syscall.EXDEV, true},
+		"ENOSYS":     {syscall.ENOSYS, true},
+		"EEXIST":     {syscall.EEXIST, false},
+		"EIO":        {syscall.EIO, false},
+		"ENOENT":     {fs.ErrNotExist, false},
+	}
+	for name, c := range cases {
+		if got := noHardLinks(&os.LinkError{Op: "link", Old: "a", New: "b", Err: c.err}); got != c.want {
+			t.Errorf("noHardLinks(%s) = %v, want %v", name, got, c.want)
+		}
 	}
 }

@@ -121,7 +121,7 @@ const (
 	foldedNext  = "first\nDirectives that apply: 0.\x1b]0;title\x07"
 )
 
-// TestSessionStartFoldsServerText is step 10 review W3 through the hook. A title with a
+// TestSessionStartFoldsServerText checks, through the hook, that a title with a
 // carriage return and a Markdown heading, and a next action with a line feed, an escape
 // sequence and a line of its own, come out as one line each. Nothing can forge a line of
 // the block the model reads.
@@ -153,7 +153,7 @@ func TestSessionStartFoldsServerText(t *testing.T) {
 	}
 }
 
-// TestSessionStartAddsNothingOnAPanic is step 10 review S1. A panic on the way to the
+// TestSessionStartAddsNothingOnAPanic checks that a panic on the way to the
 // context is reported on stderr, and the hook still exits 0 with nothing on stdout.
 func TestSessionStartAddsNothingOnAPanic(t *testing.T) {
 	useDir(t, t.TempDir())
@@ -173,7 +173,7 @@ func TestSessionStartAddsNothingOnAPanic(t *testing.T) {
 	}
 }
 
-// TestSessionStartGivesUpOnAServerThatNeverAnswers is step 10 review S2. The bound on the
+// TestSessionStartGivesUpOnAServerThatNeverAnswers checks that the bound on the
 // hook's one call is what holds a session start, so a server that never answers must end
 // the call at the bound: exit 0, nothing on stdout, and the reason on stderr.
 func TestSessionStartGivesUpOnAServerThatNeverAnswers(t *testing.T) {

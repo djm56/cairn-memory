@@ -54,7 +54,7 @@ func ValidProjectName(name string) bool {
 }
 
 // CheckCaller refuses an agent, client or session name that the wire form cannot
-// carry unchanged (step 8 review W3; step 10 review S4 for the session). The name
+// carry unchanged, and the session name too. The name
 // must hold no control character and no space at either end. An HTTP header value
 // cannot carry a control character, and loses its edge spaces on the way, so a name
 // that passed here would reach the server as a different name. A blank name is no

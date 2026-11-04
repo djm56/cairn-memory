@@ -326,6 +326,18 @@ func TestPOSTToAReadPathWithNoSessionIs405(t *testing.T) {
 	}
 }
 
+// TestPOSTToDirectivesWithNoSessionRedirectsToSignIn is the case the comment above sets aside: the
+// ratify form, /ui/directives, takes a POST, so with no session it is redirected to sign-in like the
+// other forms, not answered 405. The redirect carries no next parameter (DESIGN §5.5, Routes).
+func TestPOSTToDirectivesWithNoSessionRedirectsToSignIn(t *testing.T) {
+	hr := newHarness(t, false, false)
+	rec := hr.do(http.MethodPost, "/ui/directives", "csrf=x", nil, nil)
+	if rec.status() != http.StatusSeeOther || rec.Header().Get("Location") != "/ui/signin" {
+		t.Errorf("POST /ui/directives with no session: status %d, location %q, want 303 to /ui/signin",
+			rec.status(), rec.Header().Get("Location"))
+	}
+}
+
 // TestRevokedKeyEndsItsSessionAtTheNextRequest checks that revoking a key ends the session
 // of the browser that signed in with it, at its next request.
 func TestRevokedKeyEndsItsSessionAtTheNextRequest(t *testing.T) {

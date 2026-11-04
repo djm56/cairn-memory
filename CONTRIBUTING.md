@@ -13,6 +13,7 @@ make test        # go test -race ./...
 make vet         # go vet ./...
 make fmt         # gofmt -w .
 make fmt-check   # fails if any file is not gofmt-formatted
+make scan-invisible  # fails if a tracked file holds a bidirectional or invisible character
 ```
 
 CI runs build, `vet`, `fmt-check` and `test` on every pull request. Run the

@@ -40,14 +40,14 @@ func checkBackupOut(out string) error {
 // The copy is never written at out. It is made in a directory of its own, created beside out by
 // os.MkdirTemp: that directory is 0700 and its name is unpredictable. The directory is opened once
 // as an os.Root, and everything removed from it is removed through that root, so the removal stays
-// bound to the directory made and never follows a name that has been swapped (#129, W1). The copy
+// bound to the directory made and never follows a name that has been swapped (#129). The copy
 // is then given the name out with os.Link, which fails if any entry holds the name, a symbolic link
 // included. So a copy cannot be written through a link at out (#129), and nothing is overwritten.
 // The staging name is removed once the copy is linked, and the directory of out is flushed.
 //
 // The swap guard. Whoever may write to the output directory may rename the staging directory and
 // put a link at its name. checkStage refuses that: it compares the name, and the directory the root
-// holds, with the directory made. It runs before the copy, before the flush, and before the link.
+// holds, with the directory made. It runs before the copy, after the copy, and before the link.
 // Two windows are narrowed, not closed. VACUUM INTO takes a path, so the copy is written by name:
 // a swap during the copy sends the bytes to the directory swapped in. copyOwnerOnly sets the
 // umask to 077 for that copy, so the file is owner-only wherever it lands, and the copy is then
@@ -58,6 +58,10 @@ func checkBackupOut(out string) error {
 //
 // Consistency under concurrent writes is the store's (store.Store.Backup): the copy holds every
 // commit that finished before the call and none that did not, in one piece.
+//
+// Backup must be called one at a time, and never from serve. The copy sets the process umask
+// (copyOwnerOnly), which is process-wide, so two calls at once would interleave their set and
+// restore. The set and restore pair is not re-entrant. The cairn backup command is the only caller.
 func Backup(ctx context.Context, db, out string) (int64, error) {
 	if err := checkBackupOut(out); err != nil {
 		return 0, err
@@ -106,13 +110,14 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	if err := copyOwnerOnly(ctx, st, tmp); err != nil {
 		return 0, errors.Join(err, removeStage(sr, stage, made))
 	}
+	afterCopy(stage)
 	if err := checkStage(sr, stage, made); err != nil {
 		return 0, errors.Join(err, removeEntries(sr))
 	}
 	if err := sr.Chmod(copyName, dbFileMode); err != nil {
 		return 0, errors.Join(fmt.Errorf("set the mode of the backup copy for %s: %w", out, err), removeStage(sr, stage, made))
 	}
-	// The copy is on disk before its name is made (14-S7). A copy that cannot be flushed is not linked.
+	// The copy is on disk before its name is made. A copy that cannot be flushed is not linked.
 	if err := syncPath(tmp); err != nil {
 		return 0, errors.Join(fmt.Errorf("flush the backup file %s: %w", out, err), removeStage(sr, stage, made))
 	}
@@ -125,11 +130,16 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	if err := checkStage(sr, stage, made); err != nil {
 		return 0, errors.Join(err, removeEntries(sr))
 	}
+	beforeLink(tmp)
 	if err := os.Link(tmp, out); err != nil {
 		if errors.Is(err, fs.ErrExist) {
 			return 0, errors.Join(errExistsBackup(out), removeStage(sr, stage, made))
 		}
-		return 0, errors.Join(fmt.Errorf("create the backup file %s: %w (the backup needs a filesystem that supports hard links, and the output directory must be on one)", out, err), removeStage(sr, stage, made))
+		lerr := fmt.Errorf("create the backup file %s: %w", out, err)
+		if noHardLinks(err) {
+			lerr = fmt.Errorf("%w (this filesystem does not support hard links, which the backup needs: the output directory must be on one that does)", lerr)
+		}
+		return 0, errors.Join(lerr, removeStage(sr, stage, made))
 	}
 	// The name holds whatever tmp named at the link. It must be the copy made above, or the link
 	// followed a swapped staging directory (see Backup). Then the name is removed, and nothing is
@@ -144,7 +154,7 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 		_ = os.Remove(out)
 		return 0, fmt.Errorf("remove the staging copy of the backup %s: the staging directory %s may be left with a partial copy: %w", out, stage, err)
 	}
-	// The new name is durable before the backup is reported made (14-S7).
+	// The new name is durable before the backup is reported made.
 	if err := syncPath(filepath.Dir(out)); err != nil {
 		_ = os.Remove(out)
 		return 0, fmt.Errorf("flush the directory of the backup file %s: %w", out, err)
@@ -210,12 +220,36 @@ func removeStage(sr *os.Root, stage string, made os.FileInfo) error {
 
 // copyOwnerOnly makes the copy at path with copyBackup, under a umask of 077, so the file
 // VACUUM INTO creates is owner-only whatever the default mode is. The umask is process-wide, so
-// it is set for the copy alone and put back when the copy returns.
+// it is set for the copy alone and put back when the copy returns. On a platform with no umask
+// (setOwnerOnlyUmask) the copy is not owner-only until the chmod that follows it.
 func copyOwnerOnly(ctx context.Context, st *store.Store, path string) error {
-	prev := syscall.Umask(0o077)
-	defer syscall.Umask(prev)
+	restore := setOwnerOnlyUmask()
+	defer restore()
 	return copyBackup(ctx, st, path)
 }
+
+// noHardLinks reports whether a failed link means the filesystem cannot make one: EPERM (FAT and
+// exFAT on macOS), ENOTSUP and EOPNOTSUPP, EXDEV, and ENOSYS. It is false for EEXIST and every
+// other failure. The list is the one cmd/cairn's noHardLinks uses (init.go). The two are kept in
+// step by hand, because package main cannot be imported.
+func noHardLinks(err error) bool {
+	for _, errno := range []syscall.Errno{syscall.EPERM, syscall.ENOTSUP, syscall.EOPNOTSUPP, syscall.EXDEV, syscall.ENOSYS} {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
+	return false
+}
+
+// afterCopy runs once the copy is in place, before the check that follows it. It does nothing. A
+// test replaces it to move the staging name while the root-held copy is still there, so the check
+// can be shown to refuse the swap, and puts it back when it ends.
+var afterCopy = func(stage string) {}
+
+// beforeLink runs after the check before the link, and before the link itself, with the name of
+// the copy. It does nothing. A test replaces it to swap the copy between the last check and the
+// link, so the check on the linked file can be shown to refuse the swap.
+var beforeLink = func(tmp string) {}
 
 // copyBackup writes the copy of st to path, a name that does not exist yet in a directory this
 // call made. It is st.Backup. A test replaces it to make the copy fail part way, or to place a
@@ -233,7 +267,7 @@ var syncFile = func(f *os.File) error { return f.Sync() }
 //
 // Some file systems refuse a sync of a directory with EINVAL or ENOTSUP (certain network and FUSE
 // mounts do). On those, a directory sync cannot be made, so this call treats the directory as
-// synced and carries on rather than failing every backup and restore on that mount (14b-S5). The
+// synced and carries on rather than failing every backup and restore on that mount. The
 // tolerance is for directories only: a file that cannot be flushed is still an error, and so is
 // any other error from a directory sync.
 func syncPath(p string) error {

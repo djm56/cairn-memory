@@ -13,7 +13,7 @@ import (
 // sessionStartTimeout bounds the one call a session start makes. A hook that waits
 // on a server that does not answer holds up the session, so it gives up well before
 // the client's default of 30 seconds. It is a variable so a test can wait on a server
-// that never answers, rather than the real five seconds (step 10 review S2).
+// that never answers, rather than the real five seconds.
 var sessionStartTimeout = 5 * time.Second
 
 // runHook is the sub-command `cairn hook <event>`: the output a client's hook reads
@@ -42,8 +42,7 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 // Once its arguments are right, it exits 0 whatever happens after. A hook that fails
 // the session start is worse than a missing context line. So when the project or the
 // server is not there, or does not answer, nothing is printed on stdout and the reason
-// goes to stderr. A panic is the same: it is reported on stderr, and the session starts
-// (step 10 review S1). It writes nothing: its one call is a read.
+// goes to stderr. A panic is the same: it is reported on stderr, and the session starts. It writes nothing: its one call is a read.
 func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 	if len(args) > 0 {
 		fmt.Fprintf(stderr, "cairn hook session-start: takes no arguments, got %q\n", args)
@@ -85,7 +84,7 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
 		return
 	}
 	// Every server-derived text goes through plain: the block is read by a model, so a
-	// title or next action cannot end its line or start one of its own (W3).
+	// title or next action cannot end its line or start one of its own.
 	task := cur.Task
 	fmt.Fprintf(w, "Cairn task: \"%s\" (%s, %s) in %s.\n", plain(task.Title), plain(task.ID), plain(string(task.Status)), project)
 	if next := plain(task.NextAction); next != "" {
@@ -103,9 +102,9 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
 	}
 	fmt.Fprintf(w, "Directives that apply: %d.\n", len(cur.Directives))
 	// The same note as cairn status: the CLI names no role, so no agent-scoped directive is
-	// counted (14-W4).
+	// counted.
 	fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
-	// The agent reads this block, so a directive left out is said so, with the reason (12-W2).
+	// The agent reads this block, so a directive left out is said so, with the reason.
 	if cur.Expired > 0 {
 		fmt.Fprintf(w, "Directives expired and left out (past review_by): %d.\n", cur.Expired)
 	}

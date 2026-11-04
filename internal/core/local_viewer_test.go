@@ -13,7 +13,7 @@ import (
 // viewerReads are the seven read calls of CONTRACT §1, each with a request that is valid on
 // its own, so the project check is what answers. Every one of them runs ensureReadProject
 // before it reads, and the table checks each, so a read added later that skips the check
-// fails here (6-S4).
+// fails here.
 var viewerReads = []struct {
 	name string
 	call func(context.Context, core.Service) error

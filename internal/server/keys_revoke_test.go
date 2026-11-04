@@ -12,7 +12,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/auth"
 )
 
-// TestRevokeKeyRefusesAKeyPastedAsAName checks 8-W6: a key given where a name belongs is refused
+// TestRevokeKeyRefusesAKeyPastedAsAName checks that a key given where a name belongs is refused
 // by the name rule, the refusal does not print the key, and no key is revoked by the call. The
 // check runs before the database is opened, as add's does.
 func TestRevokeKeyRefusesAKeyPastedAsAName(t *testing.T) {
@@ -57,7 +57,7 @@ func TestRevokeKeyRefusesABadNameBeforeTheLookup(t *testing.T) {
 	}
 }
 
-// TestDanglingLinkAtTheDatabaseIsRefused checks 8-S3: a symbolic link at the database path to a
+// TestDanglingLinkAtTheDatabaseIsRefused checks that a symbolic link at the database path to a
 // file that does not exist is refused by name, and nothing is created at its target. A link to a
 // file that exists is opened, as it was before.
 func TestDanglingLinkAtTheDatabaseIsRefused(t *testing.T) {

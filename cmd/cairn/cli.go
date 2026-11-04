@@ -23,7 +23,7 @@ const cliClient = "cairn-cli"
 // noRoleNote is the line status prints under its directive count. The CLI's caller names no
 // agent role, and nothing supplies one: identity reads no CAIRN_AGENT and no .cairn.toml key
 // for it. So the server counts only directives not scoped to a role, and the line says so
-// (14-W4). It goes away only when a role source is added to the CLI.
+// It goes away only when a role source is added to the CLI.
 const noRoleNote = "agent-scoped directives not counted: no agent role is set"
 
 // target is what a command needs to call the server for the project it runs in.
@@ -86,7 +86,7 @@ func loadKey() (client.Key, error) {
 
 // reason is the text of err for a person: the message of a core.Error, without its
 // kind, and the error's own text for any other failure. The message is server text, so
-// it goes through plain (step 10 review W3, step 12 review W3): one printable line,
+// it goes through plain: one printable line,
 // capped at maxLineRunes, with no control or format character. Every print of reason's
 // result is a print of server text or of an error that may carry it, so all of them
 // get the same rule.

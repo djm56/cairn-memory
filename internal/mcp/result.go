@@ -28,7 +28,7 @@ func answer(v any) *mcp.CallToolResult {
 
 // compact encodes v as one line of JSON, without the HTML escapes json.Marshal
 // writes. A task's brief and an event carry code and shell, such as "&&" and "->",
-// and the escapes are noise a model reads for no gain (step 8 review S1). The
+// and the escapes are noise a model reads for no gain. The
 // trailing newline the encoder adds is removed.
 func compact(v any) ([]byte, error) {
 	var buf bytes.Buffer

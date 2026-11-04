@@ -271,7 +271,7 @@ func TestDoctorReportsWhereTheKeyCameFrom(t *testing.T) {
 	}
 	// noKey fails the case when the output holds the key. It runs after every invocation, so
 	// each case's output is checked, including the cases where the key is sent and the ones
-	// where it is refused (step 8 review W1).
+	// where it is refused.
 	noKey := func(what, out string) {
 		t.Helper()
 		if strings.Contains(out, envKey) {

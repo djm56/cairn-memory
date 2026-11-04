@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestStatusAndHookSayNoRoleWasCounted checks 14-W4. The CLI's caller names no agent role, and
+// TestStatusAndHookSayNoRoleWasCounted checks that status and the hook say no agent role was set. The CLI's caller names no agent role, and
 // identity supplies none, so the server counts only directives that are not scoped to a role. The
 // status block and the session-start block both say that agent-scoped directives were not counted,
 // so the count is not read as the whole of what applies.

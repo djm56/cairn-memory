@@ -512,7 +512,10 @@ owned by `cairn` anyway: the copies are then readable by that user only, and no 
 can rename the directory `backup` is working in. Do not point backups at a shared
 directory such as `/tmp`, where another user could. The output directory must not be
 writable by other users: the copy is written by name while it is made, so a user who
-could write there could redirect it for the length of the copy.
+could write there could redirect it for the length of the copy. If a swap happens, the
+copy can be left in the other directory it was redirected to, owner-only but a full database
+copy, and the backup is refused. Such a swap can also leave an empty `.moved` directory or
+a symlink beside the output.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
 never overwrites one. `backup` needs a filesystem that supports hard links, and fails

@@ -14,7 +14,7 @@ func countsTask() *core.TaskCurrent {
 	return &core.TaskCurrent{Task: &core.Task{ID: "task-20261031-01", Title: "Count", Status: core.TaskActive}}
 }
 
-// TestSessionStartNamesExpiredAndOmittedDirectives is 12-W2: the block the agent reads says
+// TestSessionStartNamesExpiredAndOmittedDirectives checks that the block the agent reads says
 // how many directives were left out, and why. With none left out, the block has no such line.
 func TestSessionStartNamesExpiredAndOmittedDirectives(t *testing.T) {
 	cur := countsTask()
@@ -37,7 +37,7 @@ func TestSessionStartNamesExpiredAndOmittedDirectives(t *testing.T) {
 	}
 }
 
-// TestStatusNamesExpiredAndOmittedDirectives is 12-W2 for cairn status: the two counts are
+// TestStatusNamesExpiredAndOmittedDirectives checks cairn status: the two counts are
 // printed when they are not zero, and not otherwise.
 func TestStatusNamesExpiredAndOmittedDirectives(t *testing.T) {
 	cur := countsTask()

@@ -227,7 +227,7 @@ func TestWriteNewNeverReplacesAFile(t *testing.T) {
 	}
 }
 
-// TestInitWritesAtomicallyOrNotAtAll is step 10 review W4. A write that fails part way
+// TestInitWritesAtomicallyOrNotAtAll checks that a write that fails part way
 // leaves no .cairn.toml and no temporary file: the file appears whole, or it does not
 // appear.
 func TestInitWritesAtomicallyOrNotAtAll(t *testing.T) {
@@ -277,7 +277,7 @@ func TestInitLeavesOnlyTheFile(t *testing.T) {
 	}
 }
 
-// TestInitRefusesCredentialsInTheServerURL is step 10 review W5. A user name or password
+// TestInitRefusesCredentialsInTheServerURL checks that a user name or password
 // in the server URL is refused, since the file is committed, and the refusal does not
 // print any part of the URL.
 func TestInitRefusesCredentialsInTheServerURL(t *testing.T) {
@@ -299,7 +299,7 @@ func TestInitRefusesCredentialsInTheServerURL(t *testing.T) {
 	}
 }
 
-// TestInitWritesWhereIdentityLooks is step 10 review W6. With CLAUDE_PROJECT_DIR set,
+// TestInitWritesWhereIdentityLooks checks that, with CLAUDE_PROJECT_DIR set,
 // init writes the file in that directory, even when it runs from a subdirectory, and the
 // project resolves from the subdirectory to the value it wrote.
 func TestInitWritesWhereIdentityLooks(t *testing.T) {
@@ -326,8 +326,8 @@ func TestInitWritesWhereIdentityLooks(t *testing.T) {
 	}
 }
 
-// TestInitBelowAFileWithTheSameValuesChangesNothing is step 10 review W6, the second
-// half: init in a directory below a project file that has the same values answers that
+// TestInitBelowAFileWithTheSameValuesChangesNothing checks that the second half of the
+// identity rule holds: init in a directory below a project file that has the same values answers that
 // nothing changed, and writes nothing; different values are still refused.
 func TestInitBelowAFileWithTheSameValuesChangesNothing(t *testing.T) {
 	root := t.TempDir()
@@ -352,7 +352,7 @@ func TestInitBelowAFileWithTheSameValuesChangesNothing(t *testing.T) {
 	}
 }
 
-// TestInitHelpGoesToStdout is step 10 review S7. init --help is the usage, on stdout,
+// TestInitHelpGoesToStdout checks that init --help is the usage, on stdout,
 // and exits 0. Nothing is written to stderr.
 func TestInitHelpGoesToStdout(t *testing.T) {
 	useDir(t, t.TempDir())
@@ -368,7 +368,7 @@ func TestInitHelpGoesToStdout(t *testing.T) {
 }
 
 // stubLink makes every link fail with err, as a filesystem with no hard links does, and
-// puts os.Link back when the test ends (step 12 review W4).
+// puts os.Link back when the test ends.
 func stubLink(t *testing.T, err error) {
 	t.Helper()
 	prev := linkFile
@@ -392,7 +392,7 @@ func dirNames(t *testing.T, dir string) []string {
 	return names
 }
 
-// TestInitFallsBackWhenTheFilesystemHasNoHardLinks is step 12 review W4. A filesystem
+// TestInitFallsBackWhenTheFilesystemHasNoHardLinks checks that a filesystem
 // that refuses a hard link gets the file written directly, with the same content, and
 // no temporary file is left behind. Each errno that means no hard links takes the
 // fallback.
@@ -495,7 +495,7 @@ func TestInitDoesNotFallBackOnOtherLinkFailures(t *testing.T) {
 	}
 }
 
-// TestInitErrorsNameTheProjectFileNotTheTemporaryOne is step 12 review W4: a link failure
+// TestInitErrorsNameTheProjectFileNotTheTemporaryOne checks that a link failure
 // that is not a missing hard link is reported against .cairn.toml, never against the
 // temporary file the write made.
 func TestInitErrorsNameTheProjectFileNotTheTemporaryOne(t *testing.T) {
@@ -518,7 +518,7 @@ func TestInitErrorsNameTheProjectFileNotTheTemporaryOne(t *testing.T) {
 	}
 }
 
-// TestInitRefusesToRunOutsideTheProjectDirectory is step 12 review W5. With
+// TestInitRefusesToRunOutsideTheProjectDirectory checks that, with
 // CLAUDE_PROJECT_DIR set, a run from a directory outside it is refused with exit 1: the
 // message names both directories and says to unset the variable or cd into the project,
 // and no file is written in either.
@@ -586,7 +586,7 @@ func TestInitOutsideTheProjectDirectoryCompares(t *testing.T) {
 	}
 }
 
-// TestInitDoesNotPrintACredentialFromAnExistingFile is step 12 review W6. A file that
+// TestInitDoesNotPrintACredentialFromAnExistingFile checks that a file that
 // already names a server with a user name and a password is refused by a run with other
 // values, and the refusal shows the server without them.
 func TestInitDoesNotPrintACredentialFromAnExistingFile(t *testing.T) {

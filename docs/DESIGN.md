@@ -514,8 +514,9 @@ The copy is given the name `<out>` by `os.Link`, which fails on any existing
 entry, a symbolic link included, so nothing is written over and nothing is written
 through a link at `<out>`. The copy is made under umask 077 and is set to mode
 0600. The staging directory is opened once as an `os.Root`, and its entries are
-removed through that root. Before the copy, the link and the removal, the staging
-name is compared with the directory made, and a swap is refused (#129, W1). A hard
+removed through that root. Before the copy, after it, and before the link, the
+staging name is compared with the directory made, and a swap is refused (#129, W1).
+A hard
 link is required: on a filesystem without one the backup is refused, and the
 message says the filesystem must support hard links. `VACUUM INTO` takes a path,
 so the copy itself is written by name, and that window is narrowed, not closed:
@@ -850,10 +851,9 @@ headers. It carries the headers of Headers below, as every other answer under `/
 does. The header middleware wraps the whole subtree, including those answers and
 the `/ui` redirect (see Headers). Every page answers a request with no session
 by redirecting to `/ui/signin`, with no `next` parameter, so a link cannot carry
-a browser to another address. A POST to a read path with no session (the
-dashboard, tasks, learnings, projects) is answered with the mux's `405`, and is
-not redirected: no read path takes a POST, and the mux matches the method before
-any session is checked. The paths that take a POST are in the table below, and a
+a browser to another address. A POST to any path in the table without a POST row
+is answered with the mux's `405`, and is not redirected: the mux matches the
+method before any session is checked. The paths that take a POST are in the table below, and a
 POST to one of them with no session is redirected like any form (#159).
 
 | Method | Path | Does | Role |

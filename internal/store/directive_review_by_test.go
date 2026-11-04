@@ -10,7 +10,7 @@ import (
 )
 
 // TestMigration0005ReviewByBackfill upgrades a database at version 4 that holds
-// directives, and checks the backfill of schema v5 (12-W3). Every active directive
+// directives, and checks the backfill of schema v5. Every active directive
 // is due 90 days after the upgrade runs, whatever its ratified_at: one ratified
 // long before the upgrade is not expired by it. A retired directive keeps NULL.
 func TestMigration0005ReviewByBackfill(t *testing.T) {

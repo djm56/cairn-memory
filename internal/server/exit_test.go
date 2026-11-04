@@ -50,7 +50,6 @@ func realListener(t *testing.T, db string) string {
 	}()
 	// ready is set once the listener has logged its address. Before that, a Run that ended
 	// has already been reported by the t.Fatalf below, so the cleanup must not report it again
-	// (10-S7).
 	ready := false
 	t.Cleanup(func() {
 		cancel()
@@ -317,7 +316,7 @@ func TestConformanceOverRealListener(t *testing.T) {
 }
 
 // forged returns the call headers with X-Cairn-Role set to role, as a client sends when it
-// claims a role its key does not hold (10-W2). The server must take the role from the key,
+// claims a role its key does not hold. The server must take the role from the key,
 // so a forged header changes nothing. The header is set on a copy, so h is not changed.
 func forged(h map[string]string, role string) map[string]string {
 	out := map[string]string{api.HeaderRole: role}

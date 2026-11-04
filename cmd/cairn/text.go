@@ -14,7 +14,7 @@ const maxLineRunes = 200
 // plain returns a server-derived text as one printable line, capped at maxLineRunes.
 // Line breaks become spaces, control characters, format characters and escape sequences
 // are dropped, and a text that is too long is cut with an ellipsis. Every text the hook or status
-// prints from the server goes through it (step 10 review W3), so a title cannot end a
+// prints from the server goes through it, so a title cannot end a
 // line and start another, or move a terminal's cursor, or carry a line into a model's
 // context that the hook did not write.
 func plain(s string) string {

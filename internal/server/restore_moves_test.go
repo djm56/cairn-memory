@@ -94,7 +94,7 @@ func readBytes(t *testing.T, path string) []byte {
 	return data
 }
 
-// TestRestoreFoldsTheWALIntoTheKeptDatabase is the proof for 14-C1. The database has a row that
+// TestRestoreFoldsTheWALIntoTheKeptDatabase is the proof that a -wal is folded into the kept database, not lost. The database has a row that
 // lives only in its -wal ("gamma"). After the restore, the pre-restore main file on its own, copied
 // to a new directory with no -wal beside it, holds that row. The directory listing shows exactly
 // the files that exist, and the report names every file moved.
@@ -296,7 +296,7 @@ func TestRestoreFailedReleaseNamesTheOldDatabase(t *testing.T) {
 	}
 }
 
-// TestRestoreRefusesASymbolicLinkDatabase checks 14-S2: a --db that is a link is refused, and the
+// TestRestoreRefusesASymbolicLinkDatabase checks that a --db that is a link is refused, and the
 // file it points to is not moved or touched.
 func TestRestoreRefusesASymbolicLinkDatabase(t *testing.T) {
 	dir := t.TempDir()
@@ -318,7 +318,7 @@ func TestRestoreRefusesASymbolicLinkDatabase(t *testing.T) {
 	assertKeys(t, real, "beta")
 }
 
-// TestRestoreMovesAFileThatIsNotADatabaseAsItIs covers 14-W2. A target that cannot be read as
+// TestRestoreMovesAFileThatIsNotADatabaseAsItIs covers a target that cannot be read as
 // SQLite at all, from garbage or from a damaged header, is not refused. After the typed
 // confirmation its files are moved aside as they are: no checkpoint, the bytes unchanged, every
 // move reported, and the output says it was not a readable database.
@@ -357,7 +357,7 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 			if !strings.Contains(out.String(), "is not a readable SQLite database") {
 				t.Errorf("the report %q does not say the target was not a readable database", out.String())
 			}
-			// 14b-W1: the prompt says the lock could not be checked, and that serve must be stopped.
+			// The prompt says the lock could not be checked, and that serve must be stopped.
 			if !strings.Contains(out.String(), "The lock could not be checked") || !strings.Contains(out.String(), "Stop cairn serve") {
 				t.Errorf("the prompt %q does not say the lock could not be checked and to stop cairn serve", out.String())
 			}
@@ -373,7 +373,7 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 	}
 }
 
-// TestRestoreRefusesAStrayFileAtAnAbsentPath is the proof for 14-W3. The database is absent, but a
+// TestRestoreRefusesAStrayFileAtAnAbsentPath is the proof that a stray file at an absent path is refused. The database is absent, but a
 // -wal or -shm from another database is beside its path. The restore refuses before the prompt,
 // before anything is staged or moved: the file keeps its name and its bytes, no database and no
 // pre-restore file is made, and the refusal names the file and says to move it aside by hand.
@@ -441,7 +441,7 @@ func TestRestoreIntoAnAbsentPathAfterTheStrayIsMovedAside(t *testing.T) {
 	assertKeys(t, target, "alpha")
 }
 
-// TestRestoreRefusesANonTerminalBeforeTheLock checks 14-S1: a restore that cannot be confirmed
+// TestRestoreRefusesANonTerminalBeforeTheLock checks that a restore that cannot be confirmed
 // reports that first, so a database held open by a server is not what the operator is told.
 func TestRestoreRefusesANonTerminalBeforeTheLock(t *testing.T) {
 	dir := t.TempDir()
@@ -460,7 +460,7 @@ func TestRestoreRefusesANonTerminalBeforeTheLock(t *testing.T) {
 	}
 }
 
-// TestRestoreRemovesTheStagedCopyOnACorruptBackup covers 14-W1. A corrupt backup is refused in the
+// TestRestoreRemovesTheStagedCopyOnACorruptBackup covers a corrupt backup, which is refused in the
 // staging step, and the directory afterwards holds exactly what it held before: no staged .tmp,
 // .tmp-wal or .tmp-shm is left beside the database.
 //

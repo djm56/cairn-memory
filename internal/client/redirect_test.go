@@ -76,7 +76,7 @@ func tlsOrigin(t *testing.T, h http.Handler) *httptest.Server {
 	return s
 }
 
-// TestTheKeyIsNeverSentAfterARedirect is 8-W3. A server that answers a call with 307 or 308,
+// TestTheKeyIsNeverSentAfterARedirect checks that a server which answers a call with 307 or 308,
 // to another host, to another port on the same host, or to another scheme, must not get the
 // key from the client. The client refuses the redirect and answers it as a plain error that
 // does not print the Location, and the target receives no request at all. The same-host,
@@ -134,7 +134,7 @@ func TestTheKeyIsNeverSentAfterARedirect(t *testing.T) {
 
 // reachable checks that the redirect target answers a plain request made by this test, and
 // that the request reaches the recorder. Without it, a zero count after a refused call would
-// not show a refusal: the target could simply be unreachable from here (10-W4). It fails the
+// not show a refusal: the target could simply be unreachable from here. It fails the
 // test when the target does not answer, so the case cannot pass for that reason.
 func reachable(t *testing.T, target *recorder, url string) {
 	t.Helper()

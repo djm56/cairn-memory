@@ -9,7 +9,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/client"
 )
 
-// TestASymlinkIsJudgedByItsTarget checks 8-S1: a client.env that is a link is read and refused
+// TestASymlinkIsJudgedByItsTarget checks that a client.env that is a link is read and refused
 // by the mode of the file it names. A link to a file any other user can read is refused, and a
 // link to an owner-only file is accepted. The refusal names the link's path, not the target's key.
 func TestASymlinkIsJudgedByItsTarget(t *testing.T) {
@@ -58,7 +58,7 @@ func TestASymlinkIsJudgedByItsTarget(t *testing.T) {
 	}
 }
 
-// TestAnExportLineIsAccepted checks 8-S2: a client.env line that begins with "export " is read as
+// TestAnExportLineIsAccepted checks that a client.env line that begins with "export " is read as
 // the CAIRN_API_KEY line it is, as a shell would read it, and not skipped.
 func TestAnExportLineIsAccepted(t *testing.T) {
 	key := newKey(t)
