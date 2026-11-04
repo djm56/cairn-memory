@@ -144,7 +144,7 @@ func serveStyles(w http.ResponseWriter, _ *http.Request) {
 // internal answers a failure whose cause the browser must not see. The page says
 // "internal error", and the cause goes to the log, redacted.
 func (u *ui) internal(w http.ResponseWriter, r *http.Request, err error) {
-	u.log.Error("internal failure", "method", r.Method, "path", quoted(r.URL.Path), "cause", u.redacted(err))
+	u.log.Error("internal failure", "method", r.Method, "path", LogValue(r.URL.Path), "cause", u.redacted(err))
 	u.fail(w, http.StatusInternalServerError, "internal error")
 }
 

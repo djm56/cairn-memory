@@ -354,6 +354,12 @@ func failure(base, route string, resp *http.Response) error {
 			return body.Error
 		}
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		// A 404 that is not the wire form is usually another server's page, such as a reverse
+		// proxy's, so the base URL is the likely fault (#121). It names the base URL the client
+		// was given, as the no_route answer does, and says the body was not a cairn answer.
+		return fmt.Errorf("client: %s: the server answered HTTP 404 with a body that is not a cairn answer: check the server base URL, which the client was given as %s", route, DisplayURL(base))
+	}
 	return fmt.Errorf("client: %s: the server answered HTTP %d", route, resp.StatusCode)
 }
 

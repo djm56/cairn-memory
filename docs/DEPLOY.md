@@ -177,6 +177,13 @@ ExecStart=
 ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788 --behind-proxy
 ```
 
+The same override ships as [deploy/cairn-behind-proxy.conf](deploy/cairn-behind-proxy.conf).
+To install it as a file instead of with `systemctl edit`, run
+`install -D -m 0644 docs/deploy/cairn-behind-proxy.conf /etc/systemd/system/cairn.service.d/cairn-behind-proxy.conf`,
+then run the same `systemctl daemon-reload` and `systemctl restart cairn`. Use the file
+for this setup only. The flag makes the session cookie `Secure` and the expected origin
+`https`, which breaks a plain-HTTP setup such as the SSH tunnel below.
+
 If the proxy is **not on this host**, the server must listen on a non-loopback address
 with `--behind-proxy`, and then it needs a key before it starts. Use this order
 instead: steps 1 and 2; then step 4 (the key); then install the unit and this
@@ -449,6 +456,14 @@ crash, and a clean stop stays stopped.
 Logs go to the journal: `journalctl -u cairn`, as root or as a member of the
 `systemd-journal` group. The server logs the method, the route path and the cause of
 each internal failure. It never logs a header, a body or a key.
+
+The time on each log line is UTC, as `cairn export` and `cairn key list` print theirs, so
+the lines line up with those without a conversion (#137).
+
+The `listening` line's `active_keys` is the count of keys that were active when the server
+started. A key added while the server runs is not in that count, so the line can read
+`active_keys=0` while a key exists. To see the keys as they are now, run
+`cairn key list` (#138).
 
 ## Keys
 

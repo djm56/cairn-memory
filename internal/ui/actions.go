@@ -297,10 +297,11 @@ func (u *ui) directiveReaffirm(w http.ResponseWriter, r *http.Request, s signedI
 	http.Redirect(w, r, pathDirectives, http.StatusSeeOther)
 }
 
-// projectSettingsSet replaces a project's settings and display name (CONTRACT §8). The settings
-// call creates a row for a name that has none, so the page checks the project first: a name with no
-// row is 404, and nothing is written (DESIGN §5.5). Every switch must be sent on or off, since the
-// call replaces the whole object. Success redirects to the project's settings page.
+// projectSettingsSet replaces a project's settings and display name (CONTRACT §8). Core refuses a
+// name with no row, and writes nothing, so the settings call cannot create a project. The page
+// checks the project first only to choose the response form: a name with no row is answered with
+// the UI's 404, and the call is not made (DESIGN §5.5). Every switch must be sent on or off, since
+// the call replaces the whole object. Success redirects to the project's settings page.
 func (u *ui) projectSettingsSet(w http.ResponseWriter, r *http.Request, s signedIn) {
 	name := r.PathValue("project")
 	ctx := readerCtx(r, s, "")

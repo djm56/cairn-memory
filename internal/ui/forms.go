@@ -71,13 +71,14 @@ func (u *ui) originOK(r *http.Request) bool {
 // refusedOrigin logs one refused origin check. The values are quoted and cut to logCap,
 // so a hostile header cannot put a line break or a long string into the log.
 func (u *ui) refusedOrigin(r *http.Request, origin, reason string) {
-	u.log.Warn("form refused", "reason", reason, "path", quoted(r.URL.Path),
-		"host", quoted(r.Host), "origin", quoted(origin))
+	u.log.Warn("form refused", "reason", reason, "path", LogValue(r.URL.Path),
+		"host", LogValue(r.Host), "origin", LogValue(origin))
 }
 
-// quoted returns s as a quoted Go string, cut to logCap bytes first. A cut is marked with
-// "...", so the log shows that the value was longer.
-func quoted(s string) string {
+// LogValue returns s as a quoted Go string, cut to logCap bytes first, for a log line. A cut is
+// marked with "...", so the log shows that the value was longer. The server's failure hook uses it
+// too, so the two log the same way (#160).
+func LogValue(s string) string {
 	if len(s) > logCap {
 		s = s[:logCap] + "..."
 	}

@@ -89,7 +89,7 @@ func Run(ctx context.Context, o Options) error {
 		return fmt.Errorf("cairn serve: listen on %s: %w", listenAddr, err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(o.Log, nil))
+	logger := newLogger(o.Log)
 	logger.Info("listening", "addr", ln.Addr().String(), "db", o.DB,
 		"tls", tlsOn, "behind_proxy", o.BehindProxy, "active_keys", keys)
 
@@ -151,6 +151,22 @@ func LoadTLS(certFile, keyFile string) (*tls.Config, error) {
 		return nil, fmt.Errorf("load the TLS certificate: %w", err)
 	}
 	return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12}, nil
+}
+
+// newLogger returns the server's logger, writing text lines to w. The time of each line is in
+// UTC, as cairn export and cairn key list print theirs, so a reader lines the log up with them
+// without converting (#137).
+func newLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{ReplaceAttr: utcTime}))
+}
+
+// utcTime is the ReplaceAttr that puts a log line's time in UTC. Other attributes are left as
+// they are.
+func utcTime(_ []string, a slog.Attr) slog.Attr {
+	if a.Key == slog.TimeKey && a.Value.Kind() == slog.KindTime {
+		return slog.Time(a.Key, a.Value.Time().UTC())
+	}
+	return a
 }
 
 // Serve serves h on ln until ctx is done, then shuts down. In-flight calls get

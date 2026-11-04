@@ -20,10 +20,11 @@ var operatorRouteList = []string{
 
 // TestOperatorRouteRefusesAnAgentBeforeTheBody checks the order of CONTRACT §1.2 on
 // the wire: the role is refused before the body is decoded. An agent key that sends a
-// malformed body, an unknown field, or a body that is not JSON to an operator route gets
-// 403 operator_only, not 400 or 415. The operator key with the same body gets 400, so
-// the decoder still runs for a caller that may make the call. The key is stored and
-// resolved as on a served call, not stubbed.
+// malformed body, an unknown field, a body that is not JSON, an oversized body (413
+// for the decoder) or a body of the wrong type (400 for the decoder) to an operator
+// route gets 403 operator_only, not 400, 413 or 415 (#144). The operator key with the
+// same malformed body gets 400, so the decoder still runs for a caller that may make
+// the call. The key is stored and resolved as on a served call, not stubbed.
 func TestOperatorRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 	st := openKeyStore(t)
 	h := keyedHandler(st, core.NewLocal(st))
@@ -38,6 +39,8 @@ func TestOperatorRouteRefusesAnAgentBeforeTheBody(t *testing.T) {
 		{"a malformed body", `{"code":`, "application/json"},
 		{"an unknown field", `{"no_such_field":1}`, "application/json"},
 		{"a body that is not JSON", `code=D-0001`, "text/plain"},
+		{"an oversized body", `{"code":"` + strings.Repeat("x", api.MaxBodyBytes) + `"}`, "application/json"},
+		{"a body of the wrong type", `[1,2]`, "application/json"},
 	}
 	for _, route := range operatorRouteList {
 		for _, b := range bodies {

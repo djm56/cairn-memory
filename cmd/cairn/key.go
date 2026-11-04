@@ -26,8 +26,13 @@ const keyUsage = `Usage: cairn key <action> --db <file> [flags]
   cairn key revoke --db <file> --name <name>
 
 The key add prints is shown once, on stdout, and cannot be shown again: store it when it
-appears. The database must be the one cairn serve keeps its data in.
+appears. The database must be the one cairn serve keeps its data in. For the systemd unit
+in docs/deploy, that is /var/lib/cairn/cairn.db.
 `
+
+// unitDatabase is the database the systemd unit serves (docs/deploy/cairn.service). It is the
+// documented default, not a host detail, so the --db message names it (#136).
+const unitDatabase = "/var/lib/cairn/cairn.db"
 
 // runKey is the sub-command `cairn key` (DESIGN.md §5.2, §8): it makes, lists and revokes the
 // API keys of a server's database. It parses the flags and hands them to the server package,
@@ -85,6 +90,10 @@ func keyFlags(action string, args []string, stdout, stderr io.Writer, flags []ke
 	}
 	for _, f := range flags {
 		if *f.value == "" {
+			if f.name == "db" {
+				fmt.Fprintf(stderr, "cairn key %s: needs --db <file>: the database the server keeps its data in; the systemd unit's is %s\n", action, unitDatabase)
+				return 2
+			}
 			fmt.Fprintf(stderr, "cairn key %s: needs --%s\n", action, f.name)
 			return 2
 		}
