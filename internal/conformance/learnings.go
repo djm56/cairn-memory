@@ -155,6 +155,8 @@ var learningCases = []Case{
 			}
 			return d
 		}
+		seedProject(t, s, projA)
+		seedProject(t, s, projB)
 		ratify(core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "global", Rule: "r"})
 		ratify(core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "project-a", Rule: "r"})
 		ratify(core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projB, Title: "project-b", Rule: "r"})
@@ -195,6 +197,7 @@ var learningCases = []Case{
 	{"directive/operator_retires_other_project", func(t T, s core.Service) {
 		// CONTRACT §9 item 25: an operator finds a project-scoped directive of
 		// another project by its code. Agent calls in projA could not see it.
+		seedProject(t, s, projB)
 		d := must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projB, Title: "project-b only", Rule: "r"}))(t)
 		got := must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
 		if got.Status != core.DirectiveRetired || got.RetiredAt == nil {

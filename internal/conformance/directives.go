@@ -46,6 +46,7 @@ var directiveCapCases = []Case{
 		// CONTRACT §5: agent-scoped first, then project, then global, and newest
 		// first within each scope. Ratifications are in time order, so newest
 		// first is the reverse of ratification order inside a scope.
+		seedProject(t, s, projA)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "g1", Rule: "r"}))(t)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p1", Rule: "r"}))(t)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeAgent, Agent: "main", Title: "a1", Rule: "r"}))(t)
@@ -65,6 +66,7 @@ var directiveCapCases = []Case{
 		// scope of the caller's own role. Twelve reviewer directives do not push out
 		// the project and global ones of a main session, and a caller with no role
 		// gets none of them.
+		seedProject(t, s, projA)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeGlobal, Title: "g1", Rule: "r"}))(t)
 		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p1", Rule: "r"}))(t)
 		for i := 1; i <= 12; i++ {
@@ -177,5 +179,30 @@ var directiveCapCases = []Case{
 		must(s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: d.Code}))(t)
 		_, err = s.DirectiveReaffirm(op(), core.DirectiveReaffirmRequest{Code: d.Code, ReviewBy: "2100-01-01"})
 		wantKind(t, err, core.KindRefused, "reaffirm of a retired directive")
+	}},
+	{"directive/retire_checks_the_code_form", func(t T, s core.Service) {
+		// CONTRACT §8 (issue #163): retire checks a code's form as reaffirm does, so a
+		// malformed code is invalid. A well-formed code with no row is not_found.
+		for _, code := range []string{"nope", "D-1"} {
+			_, err := s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: code})
+			wantKind(t, err, core.KindInvalid, "retire of malformed code "+code)
+		}
+		_, err := s.DirectiveRetire(op(), core.DirectiveRetireRequest{Code: "D-9999"})
+		wantKind(t, err, core.KindNotFound, "retire of an unknown code")
+	}},
+	{"directive/operator_calls_need_a_project_row", func(t T, s core.Service) {
+		// CONTRACT §8 (issue #164): a project-scope ratify and a settings save that name a
+		// project with no row are not_found, and create no row. An agent's first call
+		// creates the row, and the same calls then succeed.
+		_, err := s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p", Rule: "r"})
+		wantKind(t, err, core.KindNotFound, "project directive ratified for a project with no row")
+		_, err = s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()})
+		wantKind(t, err, core.KindNotFound, "settings saved for a project with no row")
+		_, err = s.ProjectList(op(), core.ProjectListRequest{Project: projA})
+		wantKind(t, err, core.KindNotFound, "the refused calls left no project row")
+
+		seedProject(t, s, projA)
+		must(s.DirectiveRatify(op(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p", Rule: "r"}))(t)
+		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: core.DefaultSettings().AsInput()}))(t)
 	}},
 }

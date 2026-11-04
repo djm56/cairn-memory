@@ -404,6 +404,7 @@ func policySwitchCase(name, key string, sw func(p *core.ClosePolicy) *bool, give
 	return Case{Name: name, Run: func(t T, s core.Service) {
 		var p core.ProjectSettings
 		*sw(&p.ClosePolicy) = true
+		seedProject(t, s, projA)
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: p.AsInput()}))(t)
 		res := must(s.TaskStart(mainCtx(), core.TaskStartRequest{
 			Title: "t", Goal: "g", Criteria: []string{"c"}, Steps: []core.StepInput{{Title: "one"}},
@@ -570,6 +571,7 @@ var closeCases = []Case{
 	}},
 	{"close/policy_is_project_settings", func(t T, s core.Service) {
 		lax := core.ProjectSettings{} // every requirement off
+		seedProject(t, s, projA)
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: lax.AsInput()}))(t)
 		res := startTask(t, s, mainCtx(), "t", "one")
 		must(s.StepUpdate(mainCtx(), core.StepUpdateRequest{TaskID: res.ID, Step: core.NumberRef(1), Action: core.StepStart}))(t)
@@ -635,6 +637,7 @@ var closeCases = []Case{
 		// close requirement off and parallel tasks off as well.
 		parallel := core.DefaultSettings()
 		parallel.ParallelTasks = true
+		seedProject(t, s, projA)
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: parallel.AsInput()}))(t)
 		_, err := s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA})
 		wantKind(t, err, core.KindInvalid, "project_settings_set without settings")
@@ -652,6 +655,7 @@ var closeCases = []Case{
 		// quietly lift one requirement, so each partial object is refused.
 		whole := core.DefaultSettings()
 		whole.ParallelTasks = true
+		seedProject(t, s, projA)
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: whole.AsInput()}))(t)
 
 		noParallel := whole.AsInput()

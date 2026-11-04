@@ -111,6 +111,7 @@ var taskCases = []Case{
 	{"task/parallel_when_project_allows", func(t T, s core.Service) {
 		settings := core.DefaultSettings()
 		settings.ParallelTasks = true
+		seedProject(t, s, projA)
 		must(s.ProjectSettingsSet(op(), core.ProjectSettingsRequest{Project: projA, Settings: settings.AsInput()}))(t)
 		startTask(t, s, mainCtx(), "first")
 		second := startTask(t, s, mainCtx(), "second")

@@ -135,6 +135,15 @@ func op() context.Context {
 	return core.WithCaller(context.Background(), core.Caller{Agent: operator, Role: core.RoleOperator})
 }
 
+// seedProject gives project a row, as its first agent call does: an agent's read creates
+// the row when there is none (CONTRACT §1.1). An operator call that names a project needs
+// the row to exist already (CONTRACT §8), so a case that ratifies to, or saves settings for,
+// a project seeds it first.
+func seedProject(t T, s core.Service, project string) {
+	t.Helper()
+	must(s.TaskCurrent(as(project, "main")))(t)
+}
+
 // must takes a call's results and returns a check: must(s.TaskGet(...))(t)
 // fails the case when the call returned an error, and returns its value
 // otherwise. (Go cannot pass a multi-value call next to another argument.)

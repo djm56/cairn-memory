@@ -33,7 +33,8 @@ func ratifyGlobal(t *testing.T, s core.Service, title string) *core.Directive {
 // Directives ratified at the same instant tie on ratified_at, and the higher id
 // comes first (decision D16).
 func TestDirectiveRankingAcrossScopes(t *testing.T) {
-	s, _ := openLocal(t)
+	s, st := openLocal(t)
+	seedProject(t, st, projA)
 	clockAt(s, t0)
 	ratifyGlobal(t, s, "g1")
 	must(s.DirectiveRatify(opCtx(), core.DirectiveRatifyRequest{Scope: core.ScopeProject, Project: projA, Title: "p1", Rule: "r"}))(t)
@@ -202,7 +203,8 @@ func ratifyAgent(t *testing.T, s core.Service, role, title string) {
 // its own, gets its twelve first. directive_list with no agent is the explicit listing of
 // every role, so there the reviewer's directives do fill the cap: that is pinned too.
 func TestOtherRoleDirectivesDoNotCrowdTheCap(t *testing.T) {
-	s, _ := openLocal(t)
+	s, st := openLocal(t)
+	seedProject(t, st, projA)
 	clockAt(s, t0)
 	ratifyGlobal(t, s, "g1")
 	ratifyGlobal(t, s, "g2")
