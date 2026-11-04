@@ -16,8 +16,9 @@ make fmt-check   # fails if any file is not gofmt-formatted
 make scan-invisible  # fails if a tracked file holds a bidirectional or invisible character
 ```
 
-CI runs build, `vet`, `fmt-check` and `test` on every pull request. Run the
-same four before you push.
+CI runs build, `vet`, `fmt-check`, `test`, `scan-invisible` and the Windows and macOS
+cross-builds (`GOOS=windows go build ./...` and `GOOS=darwin go build ./...`) on every pull
+request. Run the same checks before you push.
 
 ### Mutation testing
 

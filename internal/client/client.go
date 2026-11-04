@@ -87,10 +87,10 @@ func keyedClient(hc *http.Client) *http.Client {
 	return &c
 }
 
-// DisplayURL returns a server URL as it may be printed: with its user name and
-// password removed. A server URL with credentials must not reach a terminal, a log or
-// a committed file, so every message that names the URL goes through here. A URL that does not parse is shown as a fixed phrase, since its
-// credentials cannot be told apart from the rest.
+// DisplayURL returns a server URL as it may be printed: with its user name and password
+// removed. A server URL with credentials must not reach a terminal, a log or a committed
+// file, so every message that names the URL goes through here. A URL that does not parse is
+// shown as a fixed phrase, since its credentials cannot be told apart from the rest.
 func DisplayURL(base string) string {
 	u, err := url.Parse(base)
 	if err != nil {

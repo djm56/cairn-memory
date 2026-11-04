@@ -104,10 +104,10 @@ func assertNoCredentials(t *testing.T, texts ...string) {
 	}
 }
 
-// TestStatusFoldsServerTextAndHidesCredentials checks W3 and W5 through status: the
-// task's title and next action print as one line each, with no control character, and
-// the server URL prints without its user name and password, from the environment and
-// on the failure path.
+// TestStatusFoldsServerTextAndHidesCredentials checks, through status, that server text is
+// folded and credentials are hidden: the task's title and next action print as one line
+// each, with no control character, and the server URL prints without its user name and
+// password, from the environment and on the failure path.
 func TestStatusFoldsServerTextAndHidesCredentials(t *testing.T) {
 	local, url := newServer(t, nil)
 	dir := t.TempDir()
@@ -145,9 +145,9 @@ func TestStatusFoldsServerTextAndHidesCredentials(t *testing.T) {
 	assertNoCredentials(t, stdout, stderr)
 }
 
-// TestDoctorHidesCredentials checks W5 through doctor: the server line and the reach
-// check print the URL without its user name and password, when the server answers and
-// when it does not.
+// TestDoctorHidesCredentials checks, through doctor, that credentials are hidden: the
+// server line and the reach check print the URL without its user name and password, when
+// the server answers and when it does not.
 func TestDoctorHidesCredentials(t *testing.T) {
 	_, url := newServer(t, nil)
 	useDir(t, t.TempDir())

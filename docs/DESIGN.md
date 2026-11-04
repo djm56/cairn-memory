@@ -515,10 +515,9 @@ entry, a symbolic link included, so nothing is written over and nothing is writt
 through a link at `<out>`. The copy is made under umask 077 and is set to mode
 0600. The staging directory is opened once as an `os.Root`, and its entries are
 removed through that root. Before the copy, after it, and before the link, the
-staging name is compared with the directory made, and a swap is refused (#129, W1).
-A hard
-link is required: on a filesystem without one the backup is refused, and the
-message says the filesystem must support hard links. `VACUUM INTO` takes a path,
+staging name is compared with the directory made, and a swap is refused (#129). A hard
+link is required: on a filesystem without one the backup is refused, and the message says
+the filesystem must support hard links. `VACUUM INTO` takes a path,
 so the copy itself is written by name, and that window is narrowed, not closed:
 the output directory must not be writable by other users, as `docs/DEPLOY.md`
 requires (mode 0700, owned by the service user). An existing

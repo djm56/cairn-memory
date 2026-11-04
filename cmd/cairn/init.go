@@ -155,11 +155,12 @@ func initDir() (string, error) {
 	return workDir()
 }
 
-// checkProjectDir refuses an init run from outside CLAUDE_PROJECT_DIR. The variable is set by Claude Code and inherited by the shells it starts, so a
-// cd into another project would otherwise write that project's file into the first
-// one's root, and exit 0. Both directories are resolved through their symlinks before
-// they are compared, and the comparison is by path elements, so a sibling whose name
-// starts the same way is outside. With no variable set there is nothing to check.
+// checkProjectDir refuses an init run from outside CLAUDE_PROJECT_DIR. The variable is set
+// by Claude Code and inherited by the shells it starts, so a cd into another project would
+// otherwise write that project's file into the first one's root, and exit 0. Both
+// directories are resolved through their symlinks before they are compared, and the
+// comparison is by path elements, so a sibling whose name starts the same way is outside.
+// With no variable set there is nothing to check.
 func checkProjectDir() error {
 	env := os.Getenv(identity.EnvProjectDir)
 	if env == "" {
@@ -298,7 +299,8 @@ var linkFile = os.Link
 // A filesystem with no hard links refuses the link with an errno that says so. Then the
 // file is created at path directly, with O_EXCL, which keeps the no-overwrite rule but
 // is not atomic: a failure part way removes the partial file. Every other link failure,
-// and an existing name, are returned as they are and never fall back. Errors name path, and never the temporary file.
+// and an existing name, are returned as they are and never fall back. Errors name path,
+// and never the temporary file.
 func writeNew(path, project, server string) error {
 	content, err := projectContent(project, server)
 	if err != nil {

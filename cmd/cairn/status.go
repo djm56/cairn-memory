@@ -66,7 +66,7 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	// The CLI names no agent role, so the server counts only directives that are not scoped to
 	// one. That is said here, not left for a person to infer.
 	fmt.Fprintf(w, "            %s\n", noRoleNote)
-	// The two counts are shown only when there is one, so a clean project reads as before
+	// The two counts are shown only when there is one, so a clean project reads as before.
 	// A directive left out is named, not dropped without a word.
 	if cur.Expired > 0 {
 		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)

@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// TestInitLeavesTheUmaskInCharge checks that the umask has the last word on the mode. The file is created at 0644 and the
-// umask takes its share, on the link path and on the direct write of the fallback. A
-// umask of 077 leaves 0600; the file is not chmodded past it.
+// TestInitLeavesTheUmaskInCharge checks that the umask has the last word on the mode. The
+// file is created at 0644 and the umask takes its share, on the link path and on the direct
+// write of the fallback. A umask of 077 leaves 0600; the file is not chmodded past it.
 func TestInitLeavesTheUmaskInCharge(t *testing.T) {
 	prev := syscall.Umask(0o077)
 	t.Cleanup(func() { syscall.Umask(prev) })

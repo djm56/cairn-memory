@@ -175,8 +175,9 @@ func TestOversizedAnswerIsAnError(t *testing.T) {
 	}
 }
 
-// TestNonJSONDataIsRefusedBeforeTheCall checks W1: data that is not JSON never
-// reaches the server, and the caller gets core's own message for it, as invalid.
+// TestNonJSONDataIsRefusedBeforeTheCall checks that data which is not JSON is refused
+// before the call: it never reaches the server, and the caller gets core's own message
+// for it, as invalid.
 // The server here fails the test if it is reached.
 func TestNonJSONDataIsRefusedBeforeTheCall(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

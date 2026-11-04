@@ -187,8 +187,10 @@ for this setup only. The flag makes the session cookie `Secure` and the expected
 If the proxy is **not on this host**, the server must listen on a non-loopback address
 with `--behind-proxy`, and then it needs a key before it starts. Use this order
 instead: steps 1 and 2; then step 4 (the key); then install the unit and this
-override (`systemctl edit cairn`), and start it. The `<address>` is the LAN address the
-proxy reaches:
+override (`systemctl edit cairn`), run `systemctl daemon-reload`, and then
+`systemctl restart cairn`. Use `restart`, not `start`: `start` does nothing to a unit that
+is already running, so the override would not take effect. The `<address>` is the LAN
+address the proxy reaches:
 
 ```ini
 [Service]
@@ -436,8 +438,8 @@ WantedBy=multi-user.target
 **The unit was started under systemd in the M2 live run.** On 2026-11-02, on Ubuntu 24.04,
 it was installed from `cairn` `c4e9444` and started with `systemctl enable --now cairn`,
 and `systemctl status` showed `active (running)`. `systemd-analyze verify` printed
-nothing, and `systemd-analyze security` gave `Overall exposure level for cairn.service:
-3.2 OK`. Run the same three checks on your own host:
+nothing. `systemd-analyze security` gave a score of 3.2 for the unit, which the tool
+marks OK. Run the same three checks on your own host:
 
 ```bash
 systemd-analyze verify /etc/systemd/system/cairn.service
@@ -481,9 +483,13 @@ sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
 `--scope` is `operator` for decisions and ratification, `agent` for the MCP tools, or
 `viewer` for read-only access. `key add` prints the key once, on stdout. Copy it then,
 to the place the client needs it. It is shown once and never again: the database keeps
-only a hash. A key that was lost is revoked and replaced:
+only a hash. A key that was lost is replaced: make the new key first, then revoke the old
+one. Revoke last. A server that listens beyond loopback refuses to start with no active
+key, so revoking the only key and then restarting the service leaves it failing, and
+`Restart=on-failure` keeps retrying:
 
 ```bash
+sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name laptop-claude-2 --scope agent
 sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name laptop-claude
 ```
 
@@ -512,10 +518,12 @@ owned by `cairn` anyway: the copies are then readable by that user only, and no 
 can rename the directory `backup` is working in. Do not point backups at a shared
 directory such as `/tmp`, where another user could. The output directory must not be
 writable by other users: the copy is written by name while it is made, so a user who
-could write there could redirect it for the length of the copy. If a swap happens, the
-copy can be left in the other directory it was redirected to, owner-only but a full database
-copy, and the backup is refused. Such a swap can also leave an empty `.moved` directory or
-a symlink beside the output.
+could write there could redirect it for the length of the copy. If the staging name is swapped during the
+copy, the backup is refused and nothing at that name is removed, so the directory the backup
+made, emptied first, can be left beside the output renamed by whoever swapped it, a symlink
+can stay at the staging name, and the copy may be in the other directory it was redirected
+to, owner-only but a full database copy. The operator may remove an empty `.cairn-backup-*`
+directory after checking.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
 never overwrites one. `backup` needs a filesystem that supports hard links, and fails

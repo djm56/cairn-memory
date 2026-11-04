@@ -294,7 +294,10 @@ new one.
 
 - [ ] **6.1 Revoke the test key** on the server, once the run is pasted back. Use the
   block that matches the run from 1.2 and 1.3. A revoked key stops working at its next
-  call, and its name is not reused.
+  call, and its name is not reused. Make another key before you revoke this one: a server
+  that listens beyond loopback refuses to start with no active key (`RequireKeys`), so a
+  restart after the last key is revoked fails. The replacement is made with `key add`, as
+  in step 1.2.
 
   *For the unit:*
 

@@ -132,10 +132,11 @@ func TestDoctorDoesNotFollowARedirect(t *testing.T) {
 	}
 }
 
-// TestDoctorWarnsAboutAKeyInClearText checks at the command: a key found for an http server
-// on a host that is not loopback is warned about, on a transport line that does not fail the
-// check; a loopback server gets no such line. The host here does not resolve, so reach fails on
-// its own and the warning is read from the output beside it. The output holds no key.
+// TestDoctorWarnsAboutAKeyInClearText checks, through the doctor command, that a key found
+// for an http server on a host that is not loopback is warned about, on a transport line
+// that does not fail the check; a loopback server gets no such line. The host here does
+// not resolve, so reach fails on its own and the warning is read from the output beside
+// it. The output holds no key.
 func TestDoctorWarnsAboutAKeyInClearText(t *testing.T) {
 	dir := t.TempDir()
 	useDir(t, dir)
