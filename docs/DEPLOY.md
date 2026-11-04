@@ -505,8 +505,11 @@ install -d -m 0700 -o cairn -g cairn /var/backups/cairn
 30 2 * * * cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/cairn-$(date -u +\%Y\%m\%dT\%H\%M\%SZ).db"
 ```
 
-That directory being 0700 and owned by `cairn` is what closes the symlink race of #129
-in practice: only that user can plant a link in it. Do not point backups at a shared
+`backup` makes each copy in a directory of its own beside the output, then gives it the
+output's name by a hard link. A link already at that name, even one that points nowhere,
+is refused, and nothing is written through it (#129). Keep the backup directory 0700 and
+owned by `cairn` anyway: the copies are then readable by that user only, and no other user
+can rename the directory `backup` is working in. Do not point backups at a shared
 directory such as `/tmp`, where another user could.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
@@ -538,6 +541,11 @@ database path, and it never deletes anything: the old database is moved aside.
    systemctl start cairn
    journalctl -u cairn -n 20
    ```
+
+A restore into a path with no database refuses when a `-wal` or `-shm` file is beside that
+path. It names the files and changes nothing: SQLite would replay a `-wal` it finds beside a
+database it opens. Check those files, move them out of the folder yourself, and run the
+restore again.
 
 The old database stays at `/var/lib/cairn/cairn.db.pre-restore-<UTC time>`. Keep it
 until the restored server checks out, then delete it yourself.

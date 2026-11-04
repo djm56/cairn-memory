@@ -373,34 +373,70 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 	}
 }
 
-// TestRestoreMovesAStrayWALAsideFromAnAbsentPath is the proof for 14-W3. The database is absent,
-// but a -wal from another database is beside its path. The restore moves that -wal aside under the
-// pre-restore name, reports it, and the restored database does not replay it.
-func TestRestoreMovesAStrayWALAsideFromAnAbsentPath(t *testing.T) {
+// TestRestoreRefusesAStrayFileAtAnAbsentPath is the proof for 14-W3. The database is absent, but a
+// -wal or -shm from another database is beside its path. The restore refuses before the prompt,
+// before anything is staged or moved: the file keeps its name and its bytes, no database and no
+// pre-restore file is made, and the refusal names the file and says to move it aside by hand.
+func TestRestoreRefusesAStrayFileAtAnAbsentPath(t *testing.T) {
+	for _, suffix := range []string{"-wal", "-shm"} {
+		t.Run(suffix, func(t *testing.T) {
+			dir := t.TempDir()
+			backup := makeBackup(t, dir, "alpha")
+			other := filepath.Join(dir, "other.db")
+			seedDB(t, other, "delta")
+			leaveWAL(t, other, "epsilon")
+			stray := readBytes(t, other+suffix)
+			target := filepath.Join(dir, "cairn.db")
+			if err := os.WriteFile(target+suffix, stray, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			before := listDir(t, dir)
+
+			opts, out := restoreRun(target, backup, target+"\n", true)
+			err := Restore(context.Background(), opts)
+			if err == nil || !strings.Contains(err.Error(), target+suffix) || !strings.Contains(err.Error(), "move them aside") {
+				t.Fatalf("Restore into an absent path with a stray %s: err = %v, want the refusal naming the file and the move aside", suffix, err)
+			}
+			if !strings.Contains(err.Error(), "Nothing was changed") || !strings.Contains(err.Error(), "Nothing is deleted") {
+				t.Errorf("the refusal %q does not say nothing was changed or deleted", err)
+			}
+			if out.Len() != 0 {
+				t.Errorf("the refusal printed a prompt %q, want none: it comes before the prompt", out.String())
+			}
+			if got := readBytes(t, target+suffix); string(got) != string(stray) {
+				t.Errorf("the stray %s was changed", suffix)
+			}
+			if after := listDir(t, dir); !slices.Equal(after, before) {
+				t.Errorf("directory changed by a refused restore: %v, was %v", after, before)
+			}
+		})
+	}
+}
+
+// TestRestoreIntoAnAbsentPathAfterTheStrayIsMovedAside checks that the refusal is the only thing
+// standing in the way: once the operator has moved the stray file out of the folder by hand, the
+// same restore runs and creates the database.
+func TestRestoreIntoAnAbsentPathAfterTheStrayIsMovedAside(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
 	other := filepath.Join(dir, "other.db")
 	seedDB(t, other, "delta")
 	leaveWAL(t, other, "epsilon")
-	stray := readBytes(t, other+"-wal")
 	target := filepath.Join(dir, "cairn.db")
-	if err := os.WriteFile(target+"-wal", stray, 0o600); err != nil {
+	if err := os.WriteFile(target+"-wal", readBytes(t, other+"-wal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	kept := filepath.Join(t.TempDir(), "kept")
+	if err := os.Mkdir(kept, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(target+"-wal", filepath.Join(kept, "cairn.db-wal")); err != nil {
 		t.Fatal(err)
 	}
 
-	opts, out := restoreRun(target, backup, target+"\n", true)
+	opts, _ := restoreRun(target, backup, target+"\n", true)
 	if err := Restore(context.Background(), opts); err != nil {
-		t.Fatalf("Restore into an absent path with a stray -wal: %v", err)
-	}
-	if !strings.Contains(out.String(), "No database is at "+target) {
-		t.Errorf("the prompt does not say no database is there: %q", out.String())
-	}
-	assertReportNamesMoves(t, target, out.String())
-	if got := readBytes(t, preRestoreName(target)+"-wal"); string(got) != string(stray) {
-		t.Errorf("the moved stray -wal is not the bytes that were there")
-	}
-	if _, err := os.Lstat(target + "-wal"); err == nil {
-		t.Errorf("a -wal is still at %s after the restore", target+"-wal")
+		t.Fatalf("Restore after the stray was moved aside: %v", err)
 	}
 	assertKeys(t, target, "alpha")
 }
@@ -504,6 +540,86 @@ func TestBackupRemovesAPartialCopy(t *testing.T) {
 	}
 	if _, err := os.Lstat(out); err == nil {
 		t.Errorf("a partial copy is left at %s", out)
+	}
+	// The staging directory and the partial file in it are removed too (#129).
+	if got := listDir(t, dir); !slices.Equal(got, []string{"cairn.db"}) {
+		t.Errorf("the directory after a failed copy = %v, want only the database: a staging file was left", got)
+	}
+}
+
+// TestBackupLeavesOnlyTheCopy checks a backup that succeeds: the copy is at its name, owner-only,
+// and the staging directory it was made in is gone, so the directory holds the database and the copy.
+func TestBackupLeavesOnlyTheCopy(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "cairn.db")
+	seedDB(t, db, "alpha")
+	out := filepath.Join(dir, "backup.db")
+	if _, err := Backup(context.Background(), db, out); err != nil {
+		t.Fatalf("Backup: %v", err)
+	}
+	if got := listDir(t, dir); !slices.Equal(got, []string{"backup.db", "cairn.db"}) {
+		t.Errorf("the directory after a backup = %v, want the database and the copy only", got)
+	}
+	info, err := os.Stat(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != dbFileMode {
+		t.Errorf("backup mode = %04o, want %04o", mode, dbFileMode)
+	}
+	assertKeys(t, out, "alpha")
+}
+
+// TestBackupRefusesANameThatAppearsDuringTheCopy is the in-window proof for #129. The name at out
+// is free when the copy starts, and the seam places a link (or a file) there while the copy is
+// being made, which is the window the race needed. The backup is refused, the link target is never
+// created, the file that was placed is left as it was, and no staging file is left behind.
+func TestBackupRefusesANameThatAppearsDuringTheCopy(t *testing.T) {
+	cases := map[string]func(t *testing.T, out, elsewhere string){
+		"a symbolic link": func(t *testing.T, out, elsewhere string) {
+			if err := os.Symlink(elsewhere, out); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"a file": func(t *testing.T, out, _ string) {
+			if err := os.WriteFile(out, []byte("kept"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}
+	for name, place := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			db := filepath.Join(dir, "cairn.db")
+			seedDB(t, db, "alpha")
+			out := filepath.Join(dir, "backup.db")
+			elsewhere := filepath.Join(dir, "elsewhere.db")
+
+			prev := copyBackup
+			copyBackup = func(ctx context.Context, st *store.Store, path string) error {
+				place(t, out, elsewhere)
+				return prev(ctx, st, path)
+			}
+			t.Cleanup(func() { copyBackup = prev })
+
+			_, err := Backup(context.Background(), db, out)
+			if err == nil || !strings.Contains(err.Error(), "already exists") {
+				t.Fatalf("Backup with %s placed during the copy: err = %v, want the already-exists refusal", name, err)
+			}
+			if _, serr := os.Lstat(elsewhere); serr == nil {
+				t.Errorf("the link target %s was created through a link", elsewhere)
+			}
+			if name == "a file" {
+				if got := string(readBytes(t, out)); got != "kept" {
+					t.Errorf("the file placed at %s was changed to %q", out, got)
+				}
+			} else if fi, lerr := os.Lstat(out); lerr != nil || fi.Mode()&os.ModeSymlink == 0 {
+				t.Errorf("the link placed at %s was changed or removed", out)
+			}
+			if got := listDir(t, dir); !slices.Equal(got, []string{"backup.db", "cairn.db"}) {
+				t.Errorf("the directory after the refusal = %v: a staging file was left", got)
+			}
+		})
 	}
 }
 
