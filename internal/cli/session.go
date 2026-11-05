@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
@@ -81,4 +82,38 @@ func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role strin
 		fmt.Fprintf(w, "Directives omitted (beyond the cap of %d): %d. Call %s for all.\n", core.DirectiveCap, cur.Omitted, omittedCall)
 	}
 	fmt.Fprintln(w, pointer)
+}
+
+// StepWarning writes the one-line warning the stop hook prints: a step of the active task that is active
+// with no summary. Only two fields are read, the step's status and its summary. A step is named when its
+// status is active and its summary is blank once trimmed. The summary is the latest result, and a step that
+// starts again after a failure keeps the summary of its failed attempt, so such a step is not named; the
+// fields do not say which attempt a summary belongs to.
+//
+// With one such step the warning names it. With more, it gives the count and names the first. It writes
+// nothing when no task is active or when every active step has a summary.
+func StepWarning(w io.Writer, cur *core.TaskCurrent) {
+	if cur.Task == nil {
+		return
+	}
+	n := 0
+	first := -1
+	for i, s := range cur.Steps {
+		if s.Status == core.StepActive && strings.TrimSpace(s.Summary) == "" {
+			if first < 0 {
+				first = i
+			}
+			n++
+		}
+	}
+	if n == 0 {
+		return
+	}
+	s := cur.Steps[first]
+	// The title is server text, so it goes through Plain: it cannot end the line or start one.
+	if n == 1 {
+		fmt.Fprintf(w, "Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", s.Number, len(cur.Steps), Plain(s.Title))
+		return
+	}
+	fmt.Fprintf(w, "Cairn warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with step_update when each is done.\n", n, s.Number, len(cur.Steps), Plain(s.Title))
 }

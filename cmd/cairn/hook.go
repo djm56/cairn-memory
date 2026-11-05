@@ -21,8 +21,8 @@ var hookTimeout = 5 * time.Second
 type hookWriter func(w io.Writer, t *target, cur *core.TaskCurrent)
 
 // runHook is the sub-command `cairn hook <event>`: the output a client's hook reads (DESIGN.md §4.1 and
-// §5.2). session-start and pre-compact are built and print the same block. stop is M4 and is named as not
-// built.
+// §5.2). session-start and pre-compact print the same block. stop prints a warning only when a step is
+// active with no summary (D15).
 func runHook(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn hook: name the event, as cairn hook session-start")
@@ -32,10 +32,9 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 	case "session-start", "pre-compact":
 		return runContextHook(args[0], args[1:], stdout, stderr, writeContextBlock)
 	case "stop":
-		fmt.Fprintf(stderr, "cairn hook: %s is not built yet\n", args[0])
-		return 2
+		return runContextHook(args[0], args[1:], stdout, stderr, writeStepWarning)
 	}
-	fmt.Fprintf(stderr, "cairn hook: unknown event %q: use session-start or pre-compact\n", args[0])
+	fmt.Fprintf(stderr, "cairn hook: unknown event %q: use session-start, pre-compact or stop\n", args[0])
 	return 2
 }
 
@@ -83,6 +82,12 @@ func runContextHook(event string, args []string, stdout, stderr io.Writer, write
 // task, with the role the counts were read for.
 func writeContextBlock(w io.Writer, t *target, cur *core.TaskCurrent) {
 	writeSessionStart(w, t.project.Name, cur, t.role, t.roleRefused)
+}
+
+// writeStepWarning is what stop prints: the one-line warning for an active step with no summary, and
+// nothing otherwise.
+func writeStepWarning(w io.Writer, _ *target, cur *core.TaskCurrent) {
+	cli.StepWarning(w, cur)
 }
 
 // writeSessionStart writes the session-start block for cur, with the hook's closing line. The block is

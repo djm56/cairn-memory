@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,10 +10,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// hookEvents are the events cairn hook answers with the block. The tests that hold for every event run over them.
-var hookEvents = []string{"session-start", "pre-compact"}
+// hookEvents are the three events cairn hook answers. The tests that hold for every event run over them.
+var hookEvents = []string{"session-start", "pre-compact", "stop"}
 
 // TestSessionStartPrintsTheActiveTask checks the block a session start gets: the
 // task, its next action, its current step, the directive count and the line that
@@ -137,6 +141,57 @@ func TestPreCompactWithNoActiveTaskIsOneLine(t *testing.T) {
 	}
 }
 
+// TestStopWarnsOnAnActiveStepWithNoSummary pins the warning stop prints for a seeded task, whose first step
+// is active with no summary. It is one line, and it is one call, a read.
+func TestStopWarnsOnAnActiveStepWithNoSummary(t *testing.T) {
+	var seen []string
+	local, url := newServer(t, &seen)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	seedTask(t, local, "acme-api")
+	seen = nil
+
+	code, stdout, stderr := runCmd(t, "hook", "stop")
+	want := fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", 1, 2, "Read the schema")
+	if code != 0 || stderr != "" || stdout != want {
+		t.Errorf("exit %d, stderr %q, stdout %q: want 0, nothing on stderr and the warning %q", code, stderr, stdout, want)
+	}
+	if len(seen) != 1 || !strings.HasPrefix(seen[0], "/v1/agent/task_current") {
+		t.Errorf("the hook made calls %q, want one task_current read", seen)
+	}
+}
+
+// TestStopIsSilentWhenNoStepIsActive finishes the active step with a summary, so no step is active, and
+// checks that stop prints nothing and exits 0.
+func TestStopIsSilentWhenNoStepIsActive(t *testing.T) {
+	local, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	id := seedTask(t, local, "acme-api")
+	finishStep(t, local, "acme-api", id, 1, "Schema read.")
+
+	code, stdout, stderr := runCmd(t, "hook", "stop")
+	if code != 0 || stderr != "" || stdout != "" {
+		t.Errorf("exit %d, stderr %q, stdout %q: want 0 and nothing at all", code, stderr, stdout)
+	}
+}
+
+// TestStopIsSilentWithNoActiveTask checks that stop prints nothing for a project with no active task. Unlike
+// the other two events it has no no-task line.
+func TestStopIsSilentWithNoActiveTask(t *testing.T) {
+	_, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+
+	code, stdout, stderr := runCmd(t, "hook", "stop")
+	if code != 0 || stderr != "" || stdout != "" {
+		t.Errorf("exit %d, stderr %q, stdout %q: want 0 and nothing at all", code, stderr, stdout)
+	}
+}
+
 // TestSessionStartAddsNothingWhenUnconfigured checks, for every event, that a session with no project, no
 // server, or an unreachable server starts: exit 0, nothing on stdout, and the reason on stderr.
 func TestSessionStartAddsNothingWhenUnconfigured(t *testing.T) {
@@ -176,20 +231,24 @@ func TestSessionStartAddsNothingWhenUnconfigured(t *testing.T) {
 }
 
 // TestHookEventsAndArguments checks the events and the usage errors: no event, an unknown event, and any
-// argument after an event, which takes none. All exit 2.
+// argument after an event, which takes none. All exit 2. The unknown-event message names the three events,
+// and none of the three is named as not built.
 func TestHookEventsAndArguments(t *testing.T) {
 	code, stdout, stderr := runCmd(t, "hook")
 	if code != 2 || stdout != "" || stderr == "" {
 		t.Errorf("hook with no event: exit %d, stdout %q, stderr %q: want 2, no stdout and a message", code, stdout, stderr)
 	}
 	code, stdout, stderr = runCmd(t, "hook", "widget")
-	if code != 2 || stdout != "" || !strings.Contains(stderr, "use session-start or pre-compact") {
-		t.Errorf("hook widget: exit %d, stdout %q, stderr %q: want 2, no stdout and the events named", code, stdout, stderr)
+	if code != 2 || stdout != "" || !strings.Contains(stderr, "use session-start, pre-compact or stop") {
+		t.Errorf("hook widget: exit %d, stdout %q, stderr %q: want 2, no stdout and the three events named", code, stdout, stderr)
 	}
 	for _, event := range hookEvents {
 		code, stdout, stderr := runCmd(t, "hook", event, "extra")
 		if code != 2 || stdout != "" || stderr == "" {
 			t.Errorf("hook %s extra: exit %d, stdout %q, stderr %q: want 2, no stdout and a message", event, code, stdout, stderr)
+		}
+		if strings.Contains(stderr, "not built") {
+			t.Errorf("hook %s: stderr %q still says the event is not built", event, stderr)
 		}
 	}
 }
@@ -294,5 +353,15 @@ func TestHooksGiveUpOnAServerThatNeverAnswers(t *testing.T) {
 				t.Errorf("stderr %q does not say no context was added", stderr)
 			}
 		})
+	}
+}
+
+// finishStep finishes step number of task id in project with summary, as an agent does when the step is
+// done. It fails the test when the server refuses the call.
+func finishStep(t *testing.T, local *core.Local, project, id string, number int, summary string) {
+	t.Helper()
+	ctx := core.WithCaller(context.Background(), core.Caller{Project: project, Agent: "main", Role: core.RoleAgent})
+	if _, err := local.StepUpdate(ctx, core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(number), Action: core.StepFinish, Summary: summary}); err != nil {
+		t.Fatalf("finish step %d: %v", number, err)
 	}
 }
