@@ -11,8 +11,8 @@ import (
 // be run and its outcome read back: the suite's own tests use it against the
 // stub, and RunWith uses it to see whether a deferred case would pass.
 type recorder struct {
-	failed bool
-	first  string
+	failed   bool
+	failures []string
 }
 
 func (r *recorder) Helper()                   {}
@@ -23,11 +23,10 @@ func (r *recorder) Fatalf(f string, a ...any) {
 	runtime.Goexit()
 }
 
-// fail records a failure, keeping the first message.
+// fail records a failure. Every message is kept, in the order the case made them, so a deferred case can
+// be checked against each of its failures.
 func (r *recorder) fail(f string, a ...any) {
-	if !r.failed {
-		r.first = fmt.Sprintf(f, a...)
-	}
+	r.failures = append(r.failures, fmt.Sprintf(f, a...))
 	r.failed = true
 }
 
@@ -49,10 +48,11 @@ func runCase(c Case, s core.Service) *recorder {
 	return r
 }
 
-// probe runs c against s and reports whether it passed. When it did not, first
-// is its first failure. RunWith uses it on a deferred case: a case that passes
-// is one the deferral map should no longer name.
-func probe(c Case, s core.Service) (passes bool, first string) {
+// probe runs c against s and reports whether it passed. When it did not, failures
+// holds each of its failure messages, in order. RunWith uses it on a deferred case:
+// a case that passes is one the deferral map should no longer name, and each
+// failure must be one the deferral names (unmatchedFailures).
+func probe(c Case, s core.Service) (passes bool, failures []string) {
 	r := runCase(c, s)
-	return !r.failed, r.first
+	return !r.failed, r.failures
 }

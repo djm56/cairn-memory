@@ -17,14 +17,14 @@ func TestUnknownDeferredNamesFail(t *testing.T) {
 	if want := []string{"a/alpha", "a/zeta"}; !slices.Equal(got, want) {
 		t.Errorf("unknownDeferred = %v, want %v", got, want)
 	}
-	if got := unknownDeferred(cases, nil); len(got) != 0 {
+	if got := unknownDeferred[string](cases, nil); len(got) != 0 {
 		t.Errorf("unknownDeferred with no deferrals = %v, want none", got)
 	}
 }
 
 // TestProbeReportsWhetherCasePasses checks what RunWith reads from a deferred
-// case: a case that passes is reported as passing, and a failing one gives its
-// first failure.
+// case: a case that passes is reported as passing, and a failing one gives each
+// of its failures, in order.
 func TestProbeReportsWhetherCasePasses(t *testing.T) {
 	passing := Case{Name: "passes", Run: func(T, core.Service) {}}
 	if passes, _ := probe(passing, core.Unimplemented{}); !passes {
@@ -35,12 +35,44 @@ func TestProbeReportsWhetherCasePasses(t *testing.T) {
 		t.Errorf("first problem")
 		t.Errorf("second problem")
 	}}
-	passes, first := probe(failing, core.Unimplemented{})
+	passes, failures := probe(failing, core.Unimplemented{})
 	if passes {
 		t.Errorf("a failing case reported as passing")
 	}
-	if first != "first problem" {
-		t.Errorf("first failure = %q, want the first one", first)
+	if want := []string{"first problem", "second problem"}; !slices.Equal(failures, want) {
+		t.Errorf("failures = %q, want every failure in order, %q", failures, want)
+	}
+}
+
+// TestUnmatchedFailuresNamesEachOtherFault checks the rule a deferred case is held to: each failure must contain
+// one of the substrings its deferral names. A failure that contains none is reported, in order, and a failure
+// that contains one is not.
+func TestUnmatchedFailuresNamesEachOtherFault(t *testing.T) {
+	failures := []string{
+		"step add: an empty after reference has no flag",
+		"step update: a usage error, which carries no kind",
+		"unexpected error: the store is locked",
+	}
+	match := []string{"has no flag", "carries no kind"}
+	if got, want := unmatchedFailures(match, failures), []string{"unexpected error: the store is locked"}; !slices.Equal(got, want) {
+		t.Errorf("unmatchedFailures = %q, want %q", got, want)
+	}
+	if got := unmatchedFailures(match, nil); len(got) != 0 {
+		t.Errorf("unmatchedFailures with no failures = %q, want none", got)
+	}
+}
+
+// TestMatchFaultRefusesAnEmptyMatch checks that a deferral with no substring, or with an empty one, is refused,
+// since an empty substring matches every failure and would hide a different fault.
+func TestMatchFaultRefusesAnEmptyMatch(t *testing.T) {
+	if msg := matchFault("a/case", nil); msg == "" {
+		t.Errorf("a deferral with no substring was accepted")
+	}
+	if msg := matchFault("a/case", []string{"cannot carry", ""}); msg == "" {
+		t.Errorf("a deferral with an empty substring was accepted")
+	}
+	if msg := matchFault("a/case", []string{"cannot carry"}); msg != "" {
+		t.Errorf("a usable deferral was refused: %q", msg)
 	}
 }
 
@@ -66,8 +98,8 @@ func TestDeferredFailureOutcomes(t *testing.T) {
 // read as failing, so it stays deferred rather than failing the run.
 func TestProbeCountsPanicAsFailure(t *testing.T) {
 	panicking := Case{Name: "panics", Run: func(T, core.Service) { panic("boom") }}
-	passes, first := probe(panicking, core.Unimplemented{})
-	if passes || first != "panic: boom" {
-		t.Errorf("probe of a panicking case = %v, %q; want failing with panic: boom", passes, first)
+	passes, failures := probe(panicking, core.Unimplemented{})
+	if passes || !slices.Equal(failures, []string{"panic: boom"}) {
+		t.Errorf("probe of a panicking case = %v, %q; want failing with panic: boom", passes, failures)
 	}
 }
