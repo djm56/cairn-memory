@@ -5,7 +5,7 @@ APP=cairn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt fmt-check scan-invisible run mutation
+.PHONY: build test vet fmt fmt-check scan-invisible scan-local-paths run mutation
 
 build:
 	mkdir -p bin
@@ -27,20 +27,34 @@ fmt-check:
 	  echo "Not gofmt-formatted (run 'make fmt'):"; echo "$$unformatted"; exit 1; \
 	fi
 
-# Fails and lists the files when a tracked file holds a bidirectional override or isolate
-# (U+202A to U+202E, U+2066 to U+2069), a zero-width or invisible character (U+200B to U+200F,
-# U+2060 to U+2064), or a byte-order mark (U+FEFF). A byte-order mark is refused anywhere, even at
-# the start of a file. Such characters can make source read differently from the bytes that run.
-# git grep exits 0 on a match and 1 on none, so the result is inverted here. The locale must be
-# UTF-8, or \x{...} is read as a byte and is too large; C.UTF-8 exists on the CI runner. CI runs
-# this on every pull request.
+# Fails and lists the files when a tracked file holds a bidirectional override, isolate or mark
+# (U+202A to U+202E, U+2066 to U+2069, U+061C), a zero-width or invisible character (U+200B to
+# U+200F, U+2060 to U+2065, U+180E, U+00AD), a tag character (U+E0000 to U+E007F), or a
+# byte-order mark (U+FEFF). A byte-order mark is refused anywhere, even at the start of a file.
+# Such characters can make source read differently from the bytes that run. git grep exits 0 on a
+# match and 1 on none, so the result is inverted here. The locale must be UTF-8, or \x{...} is read
+# as a byte and is too large; C.UTF-8 exists on the CI runner. CI runs this on every pull request.
 scan-invisible:
-	@hits="$$(LC_ALL=C.UTF-8 git grep -I -l -P '[\x{202A}-\x{202E}\x{2060}-\x{2069}\x{200B}-\x{200F}\x{FEFF}]')"; \
+	@hits="$$(LC_ALL=C.UTF-8 git grep -I -l -P '[\x{202A}-\x{202E}\x{2060}-\x{2069}\x{200B}-\x{200F}\x{FEFF}\x{061C}\x{180E}\x{00AD}\x{E0000}-\x{E007F}]')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
 	  echo "Bidirectional or invisible characters found in these tracked files:"; echo "$$hits"; exit 1; \
 	elif [ $$status -ne 1 ]; then \
 	  echo "scan-invisible: git grep failed (exit $$status)"; exit $$status; \
+	fi
+
+# Fails and lists the lines when a tracked file holds a local home-directory path: a macOS or
+# Linux home directory, which names a user and a machine layout. The placeholder user "you" is
+# allowed, so docs can show where a file goes (/Users/you/ and /home/you/). The whole tree is
+# scanned; no file is excluded. git grep exits 0 on a match and 1 on none, so the result is
+# inverted here. CI runs this on every pull request.
+scan-local-paths:
+	@hits="$$(git grep -I -n -P '/(Users|home)/(?!you/)')"; \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+	  echo "Local home-directory paths found in these tracked files:"; echo "$$hits"; exit 1; \
+	elif [ $$status -ne 1 ]; then \
+	  echo "scan-local-paths: git grep failed (exit $$status)"; exit $$status; \
 	fi
 
 # ARGS is passed to the binary: make run ARGS=version

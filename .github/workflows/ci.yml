@@ -49,3 +49,8 @@ jobs:
       - name: Invisible and bidirectional characters
         # Refuses a tracked file that holds one, including a byte-order mark (Makefile, scan-invisible).
         run: make scan-invisible
+
+      - name: Local home-directory paths
+        # Refuses a tracked file that names a local home directory, other than the placeholder user
+        # "you" (Makefile, scan-local-paths).
+        run: make scan-local-paths
