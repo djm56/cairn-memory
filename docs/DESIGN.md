@@ -134,12 +134,16 @@ refuses one, and no command prints a URL with them.
 else in the working directory. Where `CLAUDE_PROJECT_DIR` is set, it refuses to
 run from a working directory outside it (exit 1): the variable is inherited by
 the shells Claude Code starts, and a `cd` into another project would otherwise
-write that project's file into the first one's root. Both directories are
+write that project's file into the first one's root. It also exits 1 when
+`CLAUDE_PROJECT_DIR`, or the working directory, cannot be resolved, for example
+when the variable names a directory that does not exist. Both directories are
 resolved through their symlinks before they are compared. It never overwrites a
 file. Where the filesystem has hard links it writes the file whole or not at all
-(a temporary file, then a link). On a filesystem without them it writes the file
-directly, with `O_EXCL`, which still refuses an existing name, but a crash can
-leave the file partly written. The file is created with mode 0644 before the
+(a temporary file, then a link). On a filesystem that cannot make a hard link,
+which the link reports as EPERM, ENOTSUP, EOPNOTSUPP, EXDEV or ENOSYS, it writes
+the file directly, with `O_EXCL`. That still refuses an existing name, but a
+crash can leave the file partly written. Any other link failure is returned, and
+nothing is written directly. The file is created with mode 0644 before the
 umask.
 
 The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
