@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -31,7 +32,8 @@ type installedHook struct {
 // project's .claude/settings.json, then the user's ~/.claude/settings.json. It reports each cairn hook it finds under
 // its event, with the file it is in and its matcher. A hook that is not installed is a warning, not a failure: the
 // hooks are optional, and a project that has not run enable is not broken. A file that enable would refuse is a
-// warning with its reason, and the other files are still read. wd is the directory the command runs from, which finds
+// warning with its reason, and the other files are still read. A file that is a link, is not a regular file, or is
+// larger than maxSettingsBytes is not read at all. wd is the directory the command runs from, which finds
 // the project as the other commands do.
 func claudeCodeChecks(wd string) []check {
 	var checks []check
@@ -52,7 +54,7 @@ func claudeCodeChecks(wd string) []check {
 	for _, path := range files {
 		hooks, err := readSettingsHooks(path)
 		if err != nil {
-			checks = append(checks, check{name: "settings", status: "warn", detail: path + " " + err.Error() + ": cairn enable refuses it and leaves it as it is"})
+			checks = append(checks, check{name: "settings", status: "warn", detail: path + " " + err.Error()})
 			continue
 		}
 		found = append(found, hooks...)
@@ -139,29 +141,36 @@ func firstLine(b []byte) string {
 	return line
 }
 
+// maxSettingsBytes caps the read of one settings file. A settings file is a few kilobytes, so a larger one is not read,
+// and the check says so.
+const maxSettingsBytes = 1 << 20
+
+// tailRefused ends the message for a settings file that enable refuses as well, so the check says what enable does.
+const tailRefused = ": cairn enable refuses it and leaves it as it is"
+
 // readSettingsHooks reads the settings file at path and returns each cairn hook under the three events. A file that is
-// not there has none. The refusals are the ones enable makes before it merges, so a file enable would refuse gets the
-// same reason here. An error's text completes the sentence "<path> ...". A file that cannot be read says so, with the
-// error. Entries that are not shaped as the settings format gives them are not matches, as in enable.
+// not there has none. A file that cannot be read, or that enable refuses, is an error whose text completes the sentence
+// "<path> ...": readSettingsFile gives the reasons for the file itself, and the merge refusals are enable's own. Entries
+// that are not shaped as the settings format gives them are not matches, as in enable.
 func readSettingsHooks(path string) ([]installedHook, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readSettingsFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not be read: %w", err)
+		return nil, err
 	}
 	if !json.Valid(raw) {
-		return nil, errors.New("is not valid JSON")
+		return nil, errors.New("is not valid JSON" + tailRefused)
 	}
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {
-		return nil, errors.New("is not a JSON object")
+		return nil, errors.New("is not a JSON object" + tailRefused)
 	}
 	var byEvent map[string]json.RawMessage
 	if hooksRaw, ok := doc["hooks"]; ok {
 		if err := json.Unmarshal(hooksRaw, &byEvent); err != nil || byEvent == nil {
-			return nil, errors.New(`has a "hooks" key that is not a JSON object`)
+			return nil, errors.New(`has a "hooks" key that is not a JSON object` + tailRefused)
 		}
 	}
 	var found []installedHook
@@ -172,13 +181,56 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 		}
 		var entries []json.RawMessage
 		if err := json.Unmarshal(eventRaw, &entries); err != nil || entries == nil {
-			return nil, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array`, h.event)
+			return nil, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array%s`, h.event, tailRefused)
 		}
 		for _, matcher := range commandMatchers(entries, h.cmdline) {
 			found = append(found, installedHook{path: path, event: h.event, matcher: matcher})
 		}
 	}
 	return found, nil
+}
+
+// readSettingsFile returns the bytes of the settings file at path, or the reason doctor does not read it. The path is
+// looked at with Lstat before it is opened, so a symbolic link, a FIFO, a device or a directory is not opened: opening a
+// FIFO or a device can block, and a link would take doctor to a file enable does not touch. The open file is checked
+// again, and the read stops one byte past the cap, so a file that changes between the two looks is still refused. A file
+// that is not there is fs.ErrNotExist, unchanged, so the caller can treat it as having no hooks.
+func readSettingsFile(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+	}
+	switch {
+	case info.Mode()&fs.ModeSymlink != 0:
+		return nil, errors.New("is a symbolic link, which doctor does not follow" + tailRefused)
+	case !info.Mode().IsRegular():
+		return nil, errors.New("is not a regular file" + tailRefused)
+	case info.Size() > maxSettingsBytes:
+		return nil, fmt.Errorf("is larger than %d bytes, so doctor does not read it", maxSettingsBytes)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+	}
+	defer f.Close()
+	opened, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+	}
+	if !opened.Mode().IsRegular() {
+		return nil, errors.New("is not a regular file" + tailRefused)
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, maxSettingsBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+	}
+	if len(raw) > maxSettingsBytes {
+		return nil, fmt.Errorf("is larger than %d bytes, so doctor does not read it", maxSettingsBytes)
+	}
+	return raw, nil
 }
 
 // hookLine is the line for one cairn hook found in a settings file. A SessionStart hook whose matcher does not name

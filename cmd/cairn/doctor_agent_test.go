@@ -210,6 +210,76 @@ func TestDoctorAgentReportsAMalformedFile(t *testing.T) {
 	}
 }
 
+// assertSettingsWarning fails the test unless checks holds a settings warning whose detail is exactly want.
+func assertSettingsWarning(t *testing.T, checks []check, want string) {
+	t.Helper()
+	for _, c := range checks {
+		if c.name == "settings" && c.status == "warn" && c.detail == want {
+			return
+		}
+	}
+	t.Errorf("no settings warning %q in %v", want, checks)
+}
+
+// checkNamed returns the check with the name, or nil when there is none.
+func checkNamed(checks []check, name string) *check {
+	for i := range checks {
+		if checks[i].name == name {
+			return &checks[i]
+		}
+	}
+	return nil
+}
+
+// TestDoctorAgentDoesNotReadALinkOrANonRegularFile checks a settings file that is a symbolic link, or a directory. Each is
+// a warning with its reason, and the file it names is not read: the link's target holds a Stop hook, which is then not
+// found.
+func TestDoctorAgentDoesNotReadALinkOrANonRegularFile(t *testing.T) {
+	t.Run("a symbolic link", func(t *testing.T) {
+		dir := agentProject(t)
+		target := writeFile(t, dir, "elsewhere.json", stopEntry)
+		path := settingsIn(dir)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, path); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		checks := claudeCodeChecks(dir)
+		assertSettingsWarning(t, checks, path+" is a symbolic link, which doctor does not follow"+tailRefused)
+		if stop := checkNamed(checks, "Stop"); stop == nil || stop.status != "warn" {
+			t.Errorf("Stop is %+v, want a warning: the link's target is not read", stop)
+		}
+	})
+	t.Run("a directory", func(t *testing.T) {
+		dir := agentProject(t)
+		path := settingsIn(dir)
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		assertSettingsWarning(t, claudeCodeChecks(dir), path+" is not a regular file"+tailRefused)
+	})
+}
+
+// TestDoctorAgentDoesNotReadAFileLargerThanTheCap checks the cap. A file of exactly maxSettingsBytes is read, with no
+// warning. One byte more is a warning that says doctor does not read it, and enable is not named as refusing it.
+func TestDoctorAgentDoesNotReadAFileLargerThanTheCap(t *testing.T) {
+	dir := agentProject(t)
+	local := settingsIn(dir)
+
+	writeSettings(t, local, `{`+strings.Repeat(" ", maxSettingsBytes-2)+`}`)
+	for _, c := range claudeCodeChecks(dir) {
+		if c.name == "settings" {
+			t.Errorf("a file at the cap is refused: %+v", c)
+		}
+	}
+
+	writeSettings(t, local, `{`+strings.Repeat(" ", maxSettingsBytes-1)+`}`)
+	assertSettingsWarning(t, claudeCodeChecks(dir), local+" is larger than 1048576 bytes, so doctor does not read it")
+}
+
 // TestDoctorAgentWithNoProjectReadsTheUsersFile checks a directory with no project file: the project's settings are
 // skipped with the reason, the user's file is still read, and nothing fails.
 func TestDoctorAgentWithNoProjectReadsTheUsersFile(t *testing.T) {
