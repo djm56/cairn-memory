@@ -34,8 +34,10 @@ type Opener func() (Session, error)
 // (CONTRACT §2). A write takes its agent from --agent, or from CAIRN_AGENT.
 //
 // The text form is a summary for a person. It prints each section the call read, folds every
-// text to one line, and leaves out what --json keeps: the timestamps, the event and step ids,
-// and the fields of a lesson or a mistake beyond the ones shown. --json is the whole object.
+// text to one line, and leaves out what --json keeps: the task's opened, started, closed and
+// updated times, the ids of events and steps, a step's attempts and times, the agent of each
+// event, and the fields of a lesson or a mistake beyond the ones shown. Event lines do show the
+// time to the minute. --json is the whole object.
 //
 // Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
