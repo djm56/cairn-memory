@@ -50,13 +50,13 @@ scan-invisible:
 	  echo "scan-invisible: git grep failed (exit $$status)"; exit $$status; \
 	fi
 
-# Fails and lists the lines when a tracked file holds a local home-directory path: a macOS or
-# Linux home directory, which names a user and a machine layout. The placeholder user "you" is
-# allowed, so docs can show where a file goes (/Users/you/ and /home/you/). The whole tree is
-# scanned; no file is excluded. git grep exits 0 on a match and 1 on none, so the result is
-# inverted here. CI runs this on every pull request.
+# Fails and lists the lines when a tracked file holds a local path that names a user or a machine
+# layout: a macOS, Linux or root home directory, a mounted volume, or a Windows user directory. The
+# placeholder user "you" is allowed, so docs can show where a file goes (/Users/you/ and /home/you/).
+# The whole tree is scanned; no file is excluded. git grep exits 0 on a match and 1 on none, so the
+# result is inverted here. CI runs this on every pull request.
 scan-local-paths:
-	@hits="$$(git grep -I -n -P '/(Users|home)/(?!you/)')"; \
+	@hits="$$(git grep -I -n -P '/(Users|home|root|Volumes)/(?!you/)|C:\\Users\\(?!you\\)')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
 	  echo "Local home-directory paths found in these tracked files:"; echo "$$hits"; exit 1; \
