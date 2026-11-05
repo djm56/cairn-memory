@@ -606,6 +606,32 @@ func TestPiUpdatesAnOlderCairnBlock(t *testing.T) {
 	assertExperimental(t, "pi", stdout)
 }
 
+// TestPiReplacesMarkersInsideAFencedBlock pins what happens when a user's code fence holds cairn's exact start line and end
+// marker, each on a line of its own. The recogniser reads lines, not fences, so those lines are cairn's block: the text between
+// them is replaced by the current block, with the original copied to the backup first, and the fence lines and the text around
+// them are kept byte for byte.
+func TestPiReplacesMarkersInsideAFencedBlock(t *testing.T) {
+	dir := enableProject(t)
+	original := "# Notes\n\n```markdown\n" + piBeginLine + "\nmy own edits inside the fence\n" + piEnd + "\n```\n\nKeep the tests green.\n"
+	writeSettings(t, piAgentsFile(dir), original)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct"}}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	want := "# Notes\n\n```markdown\n" + strings.TrimSuffix(piBlock(), "\n") + "\n```\n\nKeep the tests green.\n"
+	if got := string(readBytes(t, piAgentsFile(dir))); got != want {
+		t.Errorf("AGENTS.md is not the fence around the current block:\n%q", got)
+	}
+	if backup := piBackupOf(t, "AGENTS.md"); !bytes.Equal(readBytes(t, backup), []byte(original)) {
+		t.Errorf("the backup is not the original file:\n%q", readBytes(t, backup))
+	}
+	if !strings.Contains(stdout, reportLine("instructions", "updated", piAgents+" block")) {
+		t.Errorf("stdout does not report the update:\n%s", stdout)
+	}
+}
+
 // markerInProse is AGENTS.md text that mentions both markers, once each and in order, in the middle of a paragraph. Neither
 // mention is a whole line, so the file is not cairn's block.
 const markerInProse = "# Notes\n\nThe cairn block runs from <!-- cairn:begin --> down to <!-- cairn:end -->, and enable keeps it there.\n\nKeep the tests green.\n"
