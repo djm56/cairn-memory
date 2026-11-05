@@ -189,12 +189,9 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "cairn enable: read %s: %v\n", path, err)
 			return 1
 		}
-		// The size and modification time taken after the read are what the rename must still find.
-		read, err = os.Lstat(path)
-		if err != nil {
-			fmt.Fprintf(stderr, "cairn enable: look for %s: %v\n", path, err)
-			return 1
-		}
+		// The rename must find the file as the stat before the read saw it. A save between that stat and the read is then
+		// a change, and the rename is refused. A stat taken after the read would record such a save as the baseline.
+		read = info
 		mode = info.Mode().Perm()
 	}
 
