@@ -15,8 +15,8 @@ described here.
 > removes `note_put`, `note_get`, `review_record` and `event_list` from this
 > contract, `internal/core` and `internal/conformance`, in one change: `event_list`
 > folds into `task_get` with `section=events`, and a review is recorded as a
-> `review` event through `event_log` (§4, §9 item 39). CLI equivalents per tool come
-> with `internal/cli` in M4. In M2, the directive cap (12 per call, ranked,
+> `review` event through `event_log` (§4, §9 item 39). CLI equivalents per tool are in
+> `internal/cli`, built in M4. In M2, the directive cap (12 per call, ranked,
 > decision D16) and `review_by` are built, and documented on `task_current`,
 > `directive_list`, `recall` and `DirectiveRatify`.
 

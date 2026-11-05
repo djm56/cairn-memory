@@ -80,9 +80,10 @@ Ten rules from Plan v1 (2026-10-30), added to the rules above.
 1. **Boring storage.** SQLite stays. A new store passes the conformance suite
    before it is mentioned in docs. A migration never renames or removes its
    source before import succeeds, and always has `--dry-run`.
-2. **No destructive advice in error text.** A refusal names only a safe fix. A
-   CI test, not yet written, fails on `--force`, `rm`, `reset`, or any `init`
-   other than `cairn init`, in an error string.
+2. **No destructive advice in error text.** A refusal names only a safe fix. The
+   error-text audit in `internal/core` (`TestErrorTextNamesOnlySafeFix`) fails on
+   `--force`, `rm` or `reset` in an error string, and runs in `make test`. A check
+   that fails on any `init` other than `cairn init` is not yet written.
 3. **One source of truth.** Exports are exports; nothing reads an export back
    except `import` on an explicit command.
 4. **Hooks remind, tools record.** Every task-loop step the skill asks for has a

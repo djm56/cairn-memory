@@ -385,7 +385,7 @@ the read tools `recall` and `search` (15 names). The table below lists all 15.
 Until M1, the contract and `internal/core` still carried `event_list`,
 `review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
 removes them, and `event_list` folds into `task_get` (`section: events`). Each
-tool also has a CLI command over the same HTTP API (`internal/cli`, M4), which
+tool also has a CLI command over the same HTTP API (`internal/cli`, built in M4), which
 is how every harness other than Claude Code reaches Cairn.
 
 In M1, `internal/mcp` registers the fifteen tools of the table below, each one
