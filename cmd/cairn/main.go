@@ -27,21 +27,23 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"version": {summary: "Print the cairn version", run: runVersion},
-		"help":    {summary: "List the sub-commands", run: runHelp},
-		"mcp":     {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
-		"init":    {summary: "Write .cairn.toml: the project name and the server", run: runInit},
-		"export":  {summary: "Print a task as Markdown: export task [id]", run: runExport},
-		"hook":    {summary: "Output for a client hook: session-start", run: runHook},
-		"status":  {summary: "Show the server, the project and the active task", run: runStatus},
-		"task":    {summary: "Read or write a task: task current|get|list|start|update|close, each with --json", run: runTask},
-		"step":    {summary: "Add, update or plan the steps of a task: step add|update|plan, each with --json", run: runStep},
-		"event":   {summary: "Log an event on a task: event log, with --json", run: runEvent},
-		"doctor":  {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
-		"serve":   {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
-		"key":     {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
-		"backup":  {summary: "Copy the server's database to a new file: backup --db <file> <out>", run: runBackup},
-		"restore": {summary: "Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup>", run: runRestore},
+		"version":   {summary: "Print the cairn version", run: runVersion},
+		"help":      {summary: "List the sub-commands", run: runHelp},
+		"mcp":       {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
+		"init":      {summary: "Write .cairn.toml: the project name and the server", run: runInit},
+		"export":    {summary: "Print a task as Markdown: export task [id]", run: runExport},
+		"hook":      {summary: "Output for a client hook: session-start", run: runHook},
+		"status":    {summary: "Show the server, the project and the active task", run: runStatus},
+		"task":      {summary: "Read or write a task: task current|get|list|start|update|close, each with --json", run: runTask},
+		"step":      {summary: "Add, update or plan the steps of a task: step add|update|plan, each with --json", run: runStep},
+		"event":     {summary: "Log an event on a task: event log, with --json", run: runEvent},
+		"learning":  {summary: "Propose a learning or list them: learning add|list, each with --json", run: runLearning},
+		"directive": {summary: "List the directives that apply: directive list, with --json", run: runDirective},
+		"doctor":    {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
+		"serve":     {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
+		"key":       {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
+		"backup":    {summary: "Copy the server's database to a new file: backup --db <file> <out>", run: runBackup},
+		"restore":   {summary: "Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup>", run: runRestore},
 	}
 }
 
