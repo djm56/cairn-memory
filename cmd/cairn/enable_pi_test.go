@@ -540,6 +540,7 @@ func TestEnableHelpSaysWhatTheExperimentalClientsWrite(t *testing.T) {
 		"adds the cairn MCP server to opencode.json",
 		"adds the cairn MCP server to .pi/mcp.json with exposure direct",
 		"pi reads .pi/mcp.json only after the project is trusted",
+		"The instruction path, .cairn/instructions.md, is taken relative to the project root",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("help lacks %q:\n%s", want, stdout)
