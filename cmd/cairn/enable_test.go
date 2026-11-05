@@ -313,8 +313,8 @@ func TestEnableMatchesTheCommandNotTheMatcher(t *testing.T) {
 }
 
 // TestEnableReportsAMatcherThatDiffers checks the line for an existing SessionStart entry. An entry with the matcher
-// enable writes gets the bare "already present". An entry with no matcher gets the matcher named as (none). Either way
-// the entry is kept as it was.
+// enable writes gets the bare "already present". A matcher that still covers compact is named, without "not": no
+// matcher, "*" and a reordering. A matcher that does not cover it is named with "not". Every entry is kept as it was.
 func TestEnableReportsAMatcherThatDiffers(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -322,7 +322,10 @@ func TestEnableReportsAMatcherThatDiffers(t *testing.T) {
 		want  string
 	}{
 		{"the same matcher", `{"matcher":"startup|resume|clear|compact","hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present"},
-		{"no matcher", `{"hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is (none), not startup|resume|clear|compact"},
+		{"no matcher", `{"hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is (none)"},
+		{"a wildcard", `{"matcher":"*","hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is *"},
+		{"a reordering that names compact", `{"matcher":"compact|startup","hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is compact|startup"},
+		{"a matcher without compact", `{"matcher":"startup","hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is startup, not startup|resume|clear|compact"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

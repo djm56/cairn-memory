@@ -68,7 +68,8 @@ var claudeHooks = []claudeHook{
 
 // hookResult is what enable found for one hook: added to the file, or already registered under its event. When it
 // was already there, matcher is the matcher of the entry that runs it, and differs is set when the hook names a
-// matcher and that entry has another. enable reports such an entry and leaves it as it is.
+// matcher and that entry has another. enable reports such an entry and leaves it as it is. A matcher that still
+// covers compact (coversCompact) is reported without the word "not", since doctor reads it as a working entry.
 type hookResult struct {
 	hook    claudeHook
 	added   bool
@@ -275,6 +276,9 @@ func hookLines(results []hookResult) string {
 		switch {
 		case r.added:
 			state = "added"
+		case r.differs && coversCompact(r.matcher):
+			// The entry still does what the hook is for, so it is named, and not called a fault.
+			state = fmt.Sprintf("already present, matcher is %s", shownMatcher(r.matcher))
 		case r.differs:
 			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
 		}
