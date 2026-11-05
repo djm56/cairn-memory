@@ -170,17 +170,22 @@ func TestMalformedAnswerIsAnError(t *testing.T) {
 	}
 }
 
-// TestOversizedAnswerIsAnError checks that a success larger than MaxResponseBytes
-// is refused, and is not a result.
+// TestOversizedAnswerIsAnError pins the bound of MaxResponseBytes: a success one byte
+// over the limit is refused with the size error, and is not a result.
 //
-// The body is one byte over the limit, and it sets its own Content-Length. The client therefore
-// reads the whole body, and the size check is the only thing that can fail the call. The earlier
-// body was 16 MiB, and the client stopped reading part way through it. A transport error on that
-// connection, under load, carries a different text and would fail this test for the wrong reason
-// (#126).
+// The extra bytes are trailing spaces after the closing brace, so the body is valid JSON
+// as it stands. Only the size check can fail it: a read that stopped at the limit would
+// return the valid JSON with one space dropped, and this test would fail on that result.
+// The body sets its own Content-Length, so the client reads all of it. The earlier body
+// was 16 MiB, and the client stopped reading part way through it. A transport error on
+// that connection, under load, carries a different text and would fail this test for the
+// wrong reason (#126).
 func TestOversizedAnswerIsAnError(t *testing.T) {
-	const prefix, suffix = `{"task":{"id":"`, `"}}`
-	big := prefix + strings.Repeat("x", client.MaxResponseBytes+1-len(prefix)-len(suffix)) + suffix
+	const prefix, suffix, pad = `{"task":{"id":"`, `"}}`, "  "
+	big := prefix + strings.Repeat("x", client.MaxResponseBytes+1-len(prefix)-len(suffix)-len(pad)) + suffix + pad
+	if len(big) != client.MaxResponseBytes+1 {
+		t.Fatalf("the body is %d bytes, want exactly %d", len(big), client.MaxResponseBytes+1)
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(big)))
 		_, _ = w.Write([]byte(big))
@@ -196,10 +201,11 @@ func TestOversizedAnswerIsAnError(t *testing.T) {
 	}
 }
 
-// TestMaxResponseBytesAtTheLimitIsRead checks the other side of the limit: a success of
-// exactly MaxResponseBytes is read whole and decoded into the result. With
-// TestOversizedAnswerIsAnError it pins the limit to the byte, so a check that refused at
-// the limit itself, or a read that stopped short of it, fails here.
+// TestMaxResponseBytesAtTheLimitIsRead checks that a success of exactly MaxResponseBytes
+// is read whole and decoded into the result. It does not pin the bound by itself: a read
+// bounded at MaxResponseBytes also reads a body of that size whole. TestOversizedAnswerIsAnError
+// pins the bound. This test catches a check that refuses at the limit itself, and a read
+// that stops short of it.
 func TestMaxResponseBytesAtTheLimitIsRead(t *testing.T) {
 	const prefix, suffix = `{"task":{"id":"`, `"}}`
 	id := strings.Repeat("x", client.MaxResponseBytes-len(prefix)-len(suffix))
