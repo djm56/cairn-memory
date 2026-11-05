@@ -2,10 +2,11 @@
 
 package server
 
-// The probe is built for the systems it was checked against: Linux, macOS, FreeBSD and OpenBSD.
-// Each has F_GETLK with the struct flock this file fills in, and runs SQLite's unix VFS with the
-// lock offsets below. Other unix systems take the stub in inuse_other.go, which reports that the
-// lock cannot be checked, until the probe is checked on them.
+// The probe is built for Linux, macOS, FreeBSD and OpenBSD. Its tests run on Linux (CI) and macOS;
+// FreeBSD and OpenBSD are built and vetted, not run. Each has F_GETLK with the struct flock this
+// file fills in, and runs SQLite's unix VFS with the lock offsets below. Other unix systems take
+// the stub in inuse_other.go, which reports that the lock cannot be checked, until the probe is
+// added for them.
 
 import (
 	"errors"
