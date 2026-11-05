@@ -581,8 +581,8 @@ nothing changed unless the step says otherwise:
    in rollback-journal mode holds no lock. Where the probe cannot run, the output
    says the lock could not be checked. The probe runs again just before the first
    move. It is built for Linux, macOS, FreeBSD and OpenBSD. Its tests run on Linux,
-   the CI runner, and on macOS, which CI does not run; FreeBSD and OpenBSD are built
-   and vetted, not run. On any other system the lock cannot be checked. The file is
+   the CI runner, and are run by the developer on macOS, which CI does not run; FreeBSD
+   and OpenBSD are built and vetted, not run. On any other system the lock cannot be checked. The file is
    moved as it is at step 5, and the operator confirms that `cairn serve` is
    stopped. A readable database must not be
    in use. An exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
