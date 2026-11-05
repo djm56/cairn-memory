@@ -60,7 +60,7 @@ _Design: [DESIGN.md §5.1](https://github.com/djm56/cairn-memory/blob/main/docs/
 
 ## Clients
 
-Claude Code comes first, as a plugin in M5. Other clients use the CLI over the same HTTP API (M4). Any MCP client can run `cairn mcp` over stdio, against a server. Bishop will become a crew pack in its own repository.
+Claude Code comes first, as a plugin in M5. Other clients use the CLI over the same HTTP API, built in M4. Any MCP client can run `cairn mcp` over stdio, against a server. Bishop will become a crew pack in its own repository.
 
 _Design: [DESIGN.md §6](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#6-clients)._
 
