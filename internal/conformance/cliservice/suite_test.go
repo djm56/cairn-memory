@@ -19,9 +19,7 @@ var deferrals = []deferral{
 	{"identity/client_name_refused", "the caller's client name is not carried: the CLI names itself cairn-cli"},
 	{"identity/session_name_refused", "the caller's session is not carried: the CLI sends no session"},
 
-	{"step/insert_without_renumbering", "step add --after by id: --after takes a step number, so a step named by id cannot be carried"},
-	{"step/empty_ref_is_invalid", "step add --after an empty step reference: an absent --after means last, so no flag carries an empty reference"},
-	{"step/ref_gives_exactly_one", "step add --after by id, or by id 0: --after takes a step number, so these cannot be carried"},
+	{"step/empty_ref_is_invalid", "step add --after an empty step reference: an absent --after means last, so no flag carries an empty reference; and step update on number 0 is refused by the CLI as a usage error before the call, which carries no kind"},
 
 	{"event/step_refs_must_name_a_step", "an empty step reference on event log, and task get by a step id: the CLI cannot carry either, since --step takes a number and an absent --step means the task"},
 

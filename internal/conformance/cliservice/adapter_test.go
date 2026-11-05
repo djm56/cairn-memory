@@ -25,10 +25,10 @@
 //   - The CLI calls as an agent. It names itself cairn-cli, and it sends no session. The adapter does not
 //     carry the caller's Client or Session, and it refuses a caller whose role is not agent, since
 //     running that call as an agent would change its meaning.
-//   - Some request shapes have no flag: a step named by id in step add --after or task get, an empty
-//     step reference, a learning list over all projects, a lone "-" as a text value (the CLI reads it as
-//     standard input), and a nil step list in step plan. The adapter refuses each of these rather than
-//     sending a different request.
+//   - Some request shapes have no flag: an empty step reference, since an absent --after, --step or --step
+//     means the default and not a reference, a learning list over all projects, a lone "-" as a text value
+//     (the CLI reads it as standard input), and a nil step list in step plan. The adapter refuses each of
+//     these rather than sending a different request. A step named by id is sent as --after-id, --step-id.
 package cliservice
 
 import (
@@ -309,8 +309,9 @@ func (s *Service) TaskStart(ctx context.Context, req core.TaskStartRequest) (*co
 	return call[core.TaskStartResult](s, ctx, a, body)
 }
 
-// TaskGet runs `cairn task get`. A step is named by number, since --step takes one; a step named by id
-// is refused.
+// TaskGet runs `cairn task get`. A step is named by number, with --step, or by id, with --step-id. A
+// reference that gives both is sent as both, so the CLI refuses it as a usage error that names the flags.
+// An empty reference has no flag, since an absent --step means the task, so it is refused.
 func (s *Service) TaskGet(ctx context.Context, req core.TaskGetRequest) (*core.TaskDetail, error) {
 	a := newArgv("task", "get", req.ID)
 	if req.Section != "" {
@@ -323,10 +324,14 @@ func (s *Service) TaskGet(ctx context.Context, req core.TaskGetRequest) (*core.T
 		a.flag("cursor", req.Cursor)
 	}
 	if req.Step != nil {
-		if req.Step.ID != nil || req.Step.Number == nil {
-			a.inexpressible("task get --step takes a step number only")
-		} else {
+		if req.Step.Number == nil && req.Step.ID == nil {
+			a.inexpressible("task get: an empty step reference has no flag, since an absent --step means the task")
+		}
+		if req.Step.Number != nil {
 			a.flag("step", strconv.Itoa(*req.Step.Number))
+		}
+		if req.Step.ID != nil {
+			a.flag("step-id", strconv.FormatInt(*req.Step.ID, 10))
 		}
 	}
 	return call[core.TaskDetail](s, ctx, a, nil)
@@ -433,17 +438,22 @@ func (s *Service) StepPlan(ctx context.Context, req core.StepPlanRequest) (*core
 	return call[core.StepList](s, ctx, a, body)
 }
 
-// StepAdd runs `cairn step add`. --after takes a step number, so a reference by id, an empty reference,
-// or one with both is refused. Number 0 is "first", as the CLI reads it.
+// StepAdd runs `cairn step add`. --after takes a step number and --after-id a step id; a reference with both
+// is sent as both, so the CLI refuses it as a usage error that names the flags. An empty reference has no
+// flag, since an absent --after means the step goes last, so it is refused. Number 0 is "first", as the CLI reads it.
 func (s *Service) StepAdd(ctx context.Context, req core.StepAddRequest) (*core.Step, error) {
 	a := newArgv("step", "add", req.TaskID)
 	a.agent(ctx)
 	a.text("title", req.Title)
 	if req.After != nil {
-		if req.After.ID != nil || req.After.Number == nil {
-			a.inexpressible("step add --after takes a step number only")
-		} else {
+		if req.After.Number == nil && req.After.ID == nil {
+			a.inexpressible("step add: an empty after reference has no flag, since an absent --after means the step goes last")
+		}
+		if req.After.Number != nil {
 			a.flag("after", strconv.Itoa(*req.After.Number))
+		}
+		if req.After.ID != nil {
+			a.flag("after-id", strconv.FormatInt(*req.After.ID, 10))
 		}
 	}
 	if req.Agent != "" {

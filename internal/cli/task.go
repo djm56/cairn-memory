@@ -109,15 +109,17 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// taskGet is `cairn task get <id> [--section s] [--limit n] [--cursor c] [--json]`: one task.
-// Without --section every part is read; --limit and --cursor page the events, as the
-// server counts them (CONTRACT §2).
+// taskGet is `cairn task get <id> [--section s] [--limit n] [--cursor c] [--step n | --step-id id] [--json]`:
+// one task. Without --section every part is read; --limit and --cursor page the events, as the server counts
+// them (CONTRACT §2). The events of one step are named by its number, with --step, or by its id, with
+// --step-id, and not both (CONTRACT §1.4).
 func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	fl, asJSON := newFlags("cairn task get")
 	section := fl.String("section", "", "one part of the task: brief, steps, events or close; empty for all")
 	limit := fl.Int("limit", 0, "events only: the page size: 20 by default, 100 at most; leave it out for the default")
 	cursor := fl.String("cursor", "", "events only: the next value from the last page")
 	step := fl.Int("step", 0, "events only: the events of one step, by its number as the steps list shows it")
+	stepID := fl.Int64("step-id", 0, "events only: the events of one step, by its id, instead of its number")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
@@ -127,6 +129,14 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	if given(fl, "step") && *step < 1 {
 		fmt.Fprintln(stderr, "cairn task get: --step must be a step number, 1 or more; leave it out for every step")
+		return 2
+	}
+	if given(fl, "step-id") && *stepID < 1 {
+		fmt.Fprintln(stderr, "cairn task get: --step-id must be a step id, 1 or more; leave it out for every step")
+		return 2
+	}
+	if given(fl, "step") && given(fl, "step-id") {
+		fmt.Fprintln(stderr, "cairn task get: give the step by --step or by --step-id, not both")
 		return 2
 	}
 	if len(pos) != 1 {
@@ -140,6 +150,10 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	req := core.TaskGetRequest{ID: pos[0], Section: core.TaskSection(*section), Limit: *limit, Cursor: *cursor}
 	if given(fl, "step") {
 		ref := core.NumberRef(*step)
+		req.Step = &ref
+	}
+	if given(fl, "step-id") {
+		ref := core.IDRef(*stepID)
 		req.Step = &ref
 	}
 	d, err := s.Svc.TaskGet(s.Ctx, req)

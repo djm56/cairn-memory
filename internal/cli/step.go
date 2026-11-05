@@ -33,15 +33,17 @@ func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 	return 2
 }
 
-// stepAdd is `cairn step add <task-id> --title t [--after n] [--assignee a] [--agent a] [--json]`:
-// one step inserted into the plan (CONTRACT §3, step_add). Left out, --after puts the step last;
-// 0 puts it first. --assignee is the agent the step is for, and --agent is the caller.
+// stepAdd is `cairn step add <task-id> --title t [--after n | --after-id id] [--assignee a] [--agent a] [--json]`:
+// one step inserted into the plan (CONTRACT §3, step_add). Left out, the position puts the step last; --after 0
+// puts it first. The step to insert after is named by its number, with --after, or by its id, with --after-id,
+// and not both (CONTRACT §1.4). --assignee is the agent the step is for, and --agent is the caller.
 func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	const verb = "cairn step add"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	title := fl.String("title", "", "what the step does; - reads standard input")
 	after := fl.Int("after", 0, "insert after the step with this number; 0 puts it first; left out, it goes last")
+	afterID := fl.Int64("after-id", 0, "insert after the step with this id, instead of its number; left out, it goes last")
 	assignee := fl.String("assignee", "", "the agent the step is for")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
@@ -53,6 +55,14 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	if given(fl, "after") && *after < 0 {
 		fmt.Fprintln(stderr, verb+": --after must be a step number, 0 or more; leave it out to add the step last")
+		return 2
+	}
+	if given(fl, "after-id") && *afterID < 1 {
+		fmt.Fprintln(stderr, verb+": --after-id must be a step id, 1 or more; leave it out to add the step last")
+		return 2
+	}
+	if given(fl, "after") && given(fl, "after-id") {
+		fmt.Fprintln(stderr, verb+": give the position by --after or by --after-id, not both")
 		return 2
 	}
 	name, ok := agentName(fl, *agent, true, verb, stderr)
@@ -67,6 +77,10 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	if given(fl, "after") {
 		ref := core.NumberRef(*after)
+		req.After = &ref
+	}
+	if given(fl, "after-id") {
+		ref := core.IDRef(*afterID)
 		req.After = &ref
 	}
 	s, err := open()
