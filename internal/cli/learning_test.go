@@ -136,8 +136,8 @@ func TestLearningAddRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeLearning{err: core.NotFound("task task-20261105-99 not found")}
 	code, out, errOut, _ := learningRun(svc, strings.NewReader(""),
 		"add", "--kind", "finding", "--title", "t", "--body", "b", "--task-id", "task-20261105-99", "--agent", "hicks")
-	if code != 1 || out != "" || errOut != "cairn learning add: task task-20261105-99 not found\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 4 || out != "" || errOut != "cairn learning add: task task-20261105-99 not found\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 4 (not_found) with the refusal on stderr", code, out, errOut)
 	}
 }
 
@@ -292,10 +292,10 @@ func TestLearningListEmptyJSON(t *testing.T) {
 // TestLearningListRefusedThroughTheFake checks that a refusal of the server exits 1 with the reason
 // on stderr and nothing on stdout.
 func TestLearningListRefusedThroughTheFake(t *testing.T) {
-	svc := &fakeLearning{err: core.Refused("the limit is over the page size")}
+	svc := &fakeLearning{err: core.Invalid("the limit is over the page size")}
 	code, out, errOut, _ := learningRun(svc, strings.NewReader(""), "list")
-	if code != 1 || out != "" || errOut != "cairn learning list: the limit is over the page size\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 3 || out != "" || errOut != "cairn learning list: the limit is over the page size\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 3 (invalid) with the refusal on stderr", code, out, errOut)
 	}
 }
 

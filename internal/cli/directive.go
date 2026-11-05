@@ -17,8 +17,8 @@ import (
 // expired and omitted counts when they are not zero. It leaves out a directive's applies-when,
 // rationale, reviewer check, example, ratification and review date, which --json keeps.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a usage
-// error.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call
+// failed (ExitCodeFor), 2 for a usage error.
 func Directive(open Opener, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn directive: name what to do: cairn directive list")
@@ -61,11 +61,11 @@ func directiveList(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	list, err := s.Svc.DirectiveList(s.Ctx, core.DirectiveListRequest{Agent: *agent})
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, list)

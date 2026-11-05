@@ -17,10 +17,11 @@
 //
 // Three things about the CLI shape the mapping, and each is a gap the suite can show:
 //
-//   - A failure exits 1 for every kind, and prints only the message. A usage error exits 2. The adapter
-//     reads exit 2 as core's KindInvalid, since the CLI refuses those before it calls the server. Exit 1
-//     carries no kind, so a case that checks a kind fails on it. The Missing list of a refused close is
-//     not carried either.
+//   - A failed call writes its error to stdout as one JSON object (the --json form), and exits with the
+//     code of its kind (cli.ExitCodeFor). The adapter reads the kind, the message and the missing list
+//     back into core's error, and checks that the exit code is the one the table gives that kind. A usage
+//     error exits 2 with no object. The adapter reads it as core's KindInvalid only when its message names
+//     a flag the call set; see usageNamesFlag.
 //   - The CLI calls as an agent. It names itself cairn-cli, and it sends no session. The adapter does not
 //     carry the caller's Client or Session, and it refuses a caller whose role is not agent, since
 //     running that call as an agent would change its meaning.
@@ -46,6 +47,7 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/api"
+	"github.com/djm56/cairn-memory/internal/cli"
 	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
 )
@@ -188,7 +190,7 @@ func call[R any](s *Service, ctx context.Context, a *argv, stdin []byte) (*R, er
 		if !errors.As(err, &exit) {
 			return nil, fmt.Errorf("cliservice: run cairn: %w", err)
 		}
-		return nil, failure(exit.ExitCode(), stderr.String())
+		return nil, failure(exit.ExitCode(), a.args, stdout.Bytes(), stderr.String())
 	}
 	var out R
 	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
@@ -197,19 +199,58 @@ func call[R any](s *Service, ctx context.Context, a *argv, stdin []byte) (*R, er
 	return &out, nil
 }
 
-// failure is the error of a call the CLI did not complete. Exit 2 is the CLI's usage class, which it
-// reports before any call; the adapter reads it as core's KindInvalid. Exit 1 is every failure of the
-// call itself, and it carries no kind, so the error has none. A Go panic also exits 2, and the CLI
-// prints it as a panic, so a panic is not read as a usage error.
-func failure(code int, stderr string) error {
+// failure is the error of a call the CLI did not complete. A failed call answers with its error object on
+// stdout, and that object's kind and missing list are core's: the error is the object's core.Error. Its exit
+// code must be the one cli.ExitCodeFor gives the kind, so a table that drifts from the CLI fails here.
+// Exit 2 is the CLI's usage class, which it reports before any call and with no object: see usageNamesFlag.
+// A Go panic also exits 2, and the CLI prints it as a panic, so a panic is not read as a usage error.
+func failure(code int, argv []string, stdout []byte, stderr string) error {
 	msg := strings.TrimSuffix(stderr, "\n")
 	if strings.HasPrefix(stderr, "panic:") || strings.Contains(stderr, "\ngoroutine ") {
 		return fmt.Errorf("cliservice: the CLI crashed: %s", msg)
 	}
-	if code == 2 {
-		return &core.Error{Kind: core.KindInvalid, Message: msg}
+	if code == cli.ExitUsage {
+		if usageNamesFlag(argv, stderr) {
+			return &core.Error{Kind: core.KindInvalid, Message: msg}
+		}
+		return fmt.Errorf("cliservice: the CLI refused its arguments with a usage error, which carries no kind: %s", msg)
 	}
-	return fmt.Errorf("cliservice: the CLI exit %d, which carries no error kind: %s", code, msg)
+	var body api.ErrorBody
+	if err := json.Unmarshal(stdout, &body); err != nil || body.Error == nil || body.Error.Kind == "" {
+		return fmt.Errorf("cliservice: the CLI exit %d with no error object: %s", code, msg)
+	}
+	if want := cli.ExitCodeFor(body.Error.Kind); want != code {
+		return fmt.Errorf("cliservice: the CLI exit %d for kind %q, which the exit table gives %d", code, body.Error.Kind, want)
+	}
+	return body.Error
+}
+
+// callerNameMarks are the words of the CLI's refusals of the calling agent's name: "no agent name" when the
+// call has none, and "the name from" the flag or the variable when the name is refused. The caller's name is
+// a value the case sets through the caller, so these refusals are about a value the call set, as a flag is.
+var callerNameMarks = []string{"no agent name", "the name from "}
+
+// usageNamesFlag reports whether a usage error is about a value the call set: its message names one of the
+// flags in argv, or it is one of the caller's name refusals (callerNameMarks). The adapter counts such a
+// refusal as core's KindInvalid, since the CLI refuses the value before the call, as core refuses it as
+// invalid. A usage error that names neither is not counted, so a case cannot pass on a request the adapter
+// built wrong. The flag package's own parse errors end in "for the flags" and are never counted: they name
+// the argument the adapter mis-built.
+func usageNamesFlag(argv []string, stderr string) bool {
+	if strings.Contains(stderr, "for the flags") {
+		return false
+	}
+	for _, mark := range callerNameMarks {
+		if strings.Contains(stderr, mark) {
+			return true
+		}
+	}
+	for _, word := range argv {
+		if strings.HasPrefix(word, "--") && word != "--json" && strings.Contains(stderr, word) {
+			return true
+		}
+	}
+	return false
 }
 
 // startInput is the --json-input body of task start: the criteria, the key files and the plan.

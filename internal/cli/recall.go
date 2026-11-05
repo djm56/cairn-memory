@@ -24,7 +24,8 @@ import (
 // each lesson, mistake and task, and the empty-list line for each part with none. --json keeps every
 // field of each part, including the task id and project of a lesson, which the summary leaves out.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a usage error.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call failed
+// (ExitCodeFor), 2 for a usage error.
 func Recall(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	const verb = "cairn recall"
 	fl, asJSON := newFlags(verb)
@@ -57,11 +58,11 @@ func Recall(open Opener, args []string, stdin io.Reader, stdout, stderr io.Write
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	res, err := s.Svc.Recall(s.Ctx, core.RecallRequest{Goal: text, Agent: name, Limit: *limit})
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, res)

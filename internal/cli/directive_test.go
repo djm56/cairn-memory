@@ -149,8 +149,8 @@ func TestDirectiveListAgentFlag(t *testing.T) {
 func TestDirectiveListRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeDirectives{err: core.Refused("the directives could not be read")}
 	code, out, errOut, _ := directiveRun(svc, "list")
-	if code != 1 || out != "" || errOut != "cairn directive list: the directives could not be read\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 5 || out != "" || errOut != "cairn directive list: the directives could not be read\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }
 

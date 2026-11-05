@@ -10,7 +10,7 @@ import (
 // no hook, the same block the hook prints and the active task (the command is in internal/cli). The
 // project and the server are resolved only once the arguments pass the usage check.
 //
-// Exit codes: 0 when the answer was printed, 1 when the project, the server or the call failed, 2 for a
+// Exit codes: 0 when the answer was printed, the code of the error kind when the project, the server or the call failed (cli.ExitCodeFor), 2 for a
 // usage error.
 func runPrime(args []string, stdout, stderr io.Writer) int {
 	return cli.Prime(openSession, args, stdout, stderr)

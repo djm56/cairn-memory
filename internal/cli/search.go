@@ -24,7 +24,8 @@ import (
 // adds, not text of the row. --json keeps the snippet as the server gives it, and the task id of each hit,
 // which the summary leaves out.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a usage error.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call failed
+// (ExitCodeFor), 2 for a usage error.
 func Search(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	const verb = "cairn search"
 	fl, asJSON := newFlags(verb)
@@ -62,13 +63,13 @@ func Search(open Opener, args []string, stdin io.Reader, stdout, stderr io.Write
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	res, err := s.Svc.Search(s.Ctx, core.SearchRequest{
 		Query: text, Kinds: kinds.vals, AllProjects: *allProjects, Limit: *limit, Cursor: *cursor,
 	})
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, res)

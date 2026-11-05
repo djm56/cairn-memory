@@ -346,8 +346,8 @@ func TestPrimeServerRefusal(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeTasks{err: core.Refused("the task could not be read")}
 	code, out, errOut, _ := primeRun(svc)
-	if code != 1 || out != "" || errOut != "cairn prime: the task could not be read\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 5 || out != "" || errOut != "cairn prime: the task could not be read\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }
 

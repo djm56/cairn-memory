@@ -13,7 +13,7 @@ import (
 // once the arguments pass the usage check, so `cairn task` with no verb prints the usage whether or
 // not a project is set. No store is opened: the calls go through internal/client.
 //
-// Exit codes: 0 when the answer was printed, 1 when the project, the server or the call failed,
+// Exit codes: 0 when the answer was printed, the code of the error kind when the project, the server or the call failed (cli.ExitCodeFor),
 // 2 for a usage error.
 func runTask(args []string, stdout, stderr io.Writer) int {
 	return cli.Task(openSession, args, os.Stdin, stdout, stderr)

@@ -143,8 +143,8 @@ func TestSearchAcceptsEveryKind(t *testing.T) {
 func TestSearchRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeSearch{err: core.Refused("the cursor is from another search")}
 	code, out, errOut, _ := searchRun(svc, strings.NewReader(""), "--query", "g", "--cursor", "x")
-	if code != 1 || out != "" || errOut != "cairn search: the cursor is from another search\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 5 || out != "" || errOut != "cairn search: the cursor is from another search\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }
 

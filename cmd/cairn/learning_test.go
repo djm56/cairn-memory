@@ -117,8 +117,8 @@ func TestLearningAndDirectiveThroughTheServer(t *testing.T) {
 
 	code, _, errOut = runCmd(t, "learning", "add", "--kind", "finding", "--title", "t", "--body", "b",
 		"--task-id", "task-20261105-99", "--agent", "hicks")
-	if code != 1 || !strings.HasPrefix(errOut, "cairn learning add: ") {
-		t.Errorf("learning add with an unknown task: exit %d, stderr %q; want exit 1 with the refusal", code, errOut)
+	if code != 4 || !strings.HasPrefix(errOut, "cairn learning add: ") {
+		t.Errorf("learning add with an unknown task: exit %d, stderr %q; want exit 4 (not_found) with the refusal", code, errOut)
 	}
 
 	code, out, errOut = runCmd(t, "directive", "list")

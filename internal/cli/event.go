@@ -14,7 +14,7 @@ import (
 // only a shell (issue #87). Its verb is log, a write through event_log (CONTRACT §4). Each verb
 // takes --json, which writes the result as one line of JSON, the object the MCP tool returns.
 //
-// Exit codes: 0 when the event was written, 1 when the open or the call failed, 2 for a usage
+// Exit codes: 0 when the event was written, the code of the error kind when the open or the call failed (ExitCodeFor), 2 for a usage
 // error.
 func Event(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -93,11 +93,11 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	ev, err := s.Svc.EventLog(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, ev)

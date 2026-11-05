@@ -185,8 +185,8 @@ func TestRecallRefusedThroughTheFake(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeRecall{err: core.Refused("the goal could not be read")}
 	code, out, errOut, _ := recallRun(svc, strings.NewReader(""), "--goal", "g")
-	if code != 1 || out != "" || errOut != "cairn recall: the goal could not be read\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 with the refusal on stderr", code, out, errOut)
+	if code != 5 || out != "" || errOut != "cairn recall: the goal could not be read\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }
 

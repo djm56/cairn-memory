@@ -79,7 +79,7 @@ func TestEventLogByStepID(t *testing.T) {
 }
 
 // TestEventLogByStepIDJSONAndRefusal checks the --json output of an event on a step named by its id,
-// and that a refusal of the server is one line on stderr, exit 1.
+// and that a refusal of the server is one line on stderr, with the exit code of its kind (4 here).
 func TestEventLogByStepIDJSONAndRefusal(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{event: &core.Event{ID: 9, Kind: core.EventNote, Text: "started"}}
@@ -93,8 +93,8 @@ func TestEventLogByStepIDJSONAndRefusal(t *testing.T) {
 	}
 	svc.err = core.NotFound("step 412 is not in task task-20261030-01")
 	code, out, errOut = runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--step-id", "412", "--agent", "hicks")
-	if code != 1 || out != "" || errOut != "cairn event log: step 412 is not in task task-20261030-01\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the one-line refusal", code, out, errOut)
+	if code != 4 || out != "" || errOut != "cairn event log: step 412 is not in task task-20261030-01\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 4 (not_found) and the one-line refusal", code, out, errOut)
 	}
 }
 
@@ -164,13 +164,13 @@ func TestEventLogDataFromStandardInputMustBeAJSONObject(t *testing.T) {
 	}
 }
 
-// TestEventLogRefusedByServer checks a refusal of the server: one line on stderr, exit 1.
+// TestEventLogRefusedByServer checks a refusal of the server: one line on stderr, exit 3 (invalid).
 func TestEventLogRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Invalid("an agent may not log started: the server writes it")}
 	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "started", "--text", "x", "--agent", "hicks")
-	if code != 1 || out != "" || errOut != "cairn event log: an agent may not log started: the server writes it\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the refusal", code, out, errOut)
+	if code != 3 || out != "" || errOut != "cairn event log: an agent may not log started: the server writes it\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 3 (invalid) and the refusal", code, out, errOut)
 	}
 }
 

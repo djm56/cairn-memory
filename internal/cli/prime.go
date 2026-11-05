@@ -27,8 +27,8 @@ type primeResult struct {
 // takes no positional argument. --json writes one line: the project, the role ("" when none), and the
 // task current result.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, or the session names no
-// project, 2 for a usage error.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call failed
+// (ExitCodeFor), 1 when the session names no project, 2 for a usage error.
 func Prime(open Opener, args []string, stdout, stderr io.Writer) int {
 	const verb = "cairn prime"
 	fl, asJSON := newFlags(verb)
@@ -47,7 +47,7 @@ func Prime(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	// The project names the block and the JSON. A session with none is a fault in the opener, not a
 	// usage error, and it is refused before the call so no answer is printed for an unnamed project.
@@ -61,7 +61,7 @@ func Prime(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	cur, err := s.Svc.TaskCurrent(ctx)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, primeResult{Project: s.Project, Role: name, Current: cur})

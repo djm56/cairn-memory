@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/djm56/cairn-memory/internal/api"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
@@ -44,8 +45,9 @@ type Opener func() (Session, error)
 // event, and the fields of a lesson or a mistake beyond the ones shown. Event lines do show the
 // time to the minute. --json is the whole object.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a
-// usage error. A failure is printed to stderr, as one line, in the words reason gives it.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call
+// failed (ExitCodeFor, the table in exit.go), 2 for a usage error. A failure is printed to stderr, as one
+// line, in the words reason gives it; with --json it is one JSON object on stdout instead.
 func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start|update|close")
@@ -90,7 +92,7 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, "cairn task current", err)
+		return fail(stdout, stderr, "cairn task current", *asJSON, err)
 	}
 	ctx := s.Ctx
 	if name != "" {
@@ -98,7 +100,7 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	cur, err := s.Svc.TaskCurrent(ctx)
 	if err != nil {
-		return fail(stderr, "cairn task current", err)
+		return fail(stdout, stderr, "cairn task current", *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, "cairn task current", cur)
@@ -133,7 +135,7 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, "cairn task get", err)
+		return fail(stdout, stderr, "cairn task get", *asJSON, err)
 	}
 	req := core.TaskGetRequest{ID: pos[0], Section: core.TaskSection(*section), Limit: *limit, Cursor: *cursor}
 	if given(fl, "step") {
@@ -142,7 +144,7 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	d, err := s.Svc.TaskGet(s.Ctx, req)
 	if err != nil {
-		return fail(stderr, "cairn task get", err)
+		return fail(stdout, stderr, "cairn task get", *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, "cairn task get", d)
@@ -172,11 +174,11 @@ func taskList(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, "cairn task list", err)
+		return fail(stdout, stderr, "cairn task list", *asJSON, err)
 	}
 	list, err := s.Svc.TaskList(s.Ctx, core.TaskListRequest{Status: statuses, Limit: *limit, Cursor: *cursor})
 	if err != nil {
-		return fail(stderr, "cairn task list", err)
+		return fail(stdout, stderr, "cairn task list", *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, "cairn task list", list)
@@ -242,11 +244,34 @@ func takesValue(fl *flag.FlagSet, a string) bool {
 	return !(ok && bf.IsBoolFlag())
 }
 
-// fail prints the reason of err on one line to stderr, prefixed with the command, and
-// returns the exit code of a failed call.
-func fail(stderr io.Writer, command string, err error) int {
+// fail reports the failure err of a call of command, and returns the exit code of its kind (ExitCodeFor).
+// With asJSON the failure is one line of JSON on stdout, the error object the HTTP API answers with
+// (CONTRACT §1.2), and stderr is left empty. Otherwise it is one line on stderr, prefixed with the
+// command, as before. A failure with no core kind is reported as kind internal.
+func fail(stdout, stderr io.Writer, command string, asJSON bool, err error) int {
+	ce := errorOf(err)
+	if asJSON {
+		if b, encErr := encodeJSON(api.ErrorBody{Error: ce}); encErr == nil {
+			if _, werr := stdout.Write(b); werr != nil {
+				fmt.Fprintf(stderr, "%s: write the error: %v\n", command, werr)
+				return ExitFailure
+			}
+			return ExitCodeFor(ce.Kind)
+		}
+	}
 	fmt.Fprintf(stderr, "%s: %s\n", command, Reason(err))
-	return 1
+	return ExitCodeFor(ce.Kind)
+}
+
+// errorOf returns err as the core error a failed call answers with: err itself when it is one, a server's
+// refusal or a local one such as the project's, and otherwise an internal failure whose message is the text
+// of err (CONTRACT §1.2: any other error is an internal failure).
+func errorOf(err error) *core.Error {
+	var ce *core.Error
+	if errors.As(err, &ce) {
+		return ce
+	}
+	return &core.Error{Kind: api.KindInternal, Message: err.Error()}
 }
 
 // writeJSON writes v as one line of JSON, with no HTML escapes, and returns the exit code.
@@ -257,12 +282,12 @@ func fail(stderr io.Writer, command string, err error) int {
 func writeJSON(stdout, stderr io.Writer, command string, v any) int {
 	b, err := encodeJSON(v)
 	if err != nil {
-		return fail(stderr, command, err)
+		return fail(stdout, stderr, command, false, err)
 	}
 	if _, err := stdout.Write(b); err != nil {
-		return fail(stderr, command, err)
+		return fail(stdout, stderr, command, false, err)
 	}
-	return 0
+	return ExitOK
 }
 
 // encodeJSON returns v as one line of JSON, with the encoding writeJSON gives it: no HTML escapes, and

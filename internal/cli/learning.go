@@ -18,8 +18,8 @@ import (
 // form of list is a summary: one line per learning, with its id, status, kind, title and target.
 // --json is the whole object.
 //
-// Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a usage
-// error.
+// Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call
+// failed (ExitCodeFor), 2 for a usage error.
 func Learning(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn learning: name what to do: cairn learning add|list")
@@ -100,11 +100,11 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	l, err := s.Svc.LearningAdd(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, l)
@@ -150,13 +150,13 @@ func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	list, err := s.Svc.LearningList(s.Ctx, core.LearningListRequest{
 		Status: statuses.vals, Kind: kinds.vals, Target: *target, Limit: *limit, Cursor: *cursor,
 	})
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, list)

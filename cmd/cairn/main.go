@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"sort"
+
+	"github.com/djm56/cairn-memory/internal/cli"
 )
 
 // version is set at build time with -ldflags "-X main.version=..." from
@@ -99,4 +101,6 @@ func usage(w io.Writer) {
 	for _, name := range names {
 		fmt.Fprintf(w, "  %-10s %s\n", name, commands[name].summary)
 	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, cli.ExitCodeHelp)
 }

@@ -14,7 +14,7 @@ import (
 // as the steps list shows it (CONTRACT §1.4). Each verb takes --json, which writes the result as one
 // line of JSON, the object the MCP tool of the same name returns (CONTRACT §3).
 //
-// Exit codes: 0 when the step was written, 1 when the open or the call failed, 2 for a usage error.
+// Exit codes: 0 when the step was written, the code of the error kind when the open or the call failed (ExitCodeFor), 2 for a usage error.
 func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn step: name what to do: cairn step add|update|plan")
@@ -71,11 +71,11 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	step, err := s.Svc.StepAdd(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, step)
@@ -120,11 +120,11 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	step, err := s.Svc.StepUpdate(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, step)
@@ -210,11 +210,11 @@ func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	list, err := s.Svc.StepPlan(withAgent(s.Ctx, name), core.StepPlanRequest{TaskID: pos[0], Steps: body.Steps})
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, list)

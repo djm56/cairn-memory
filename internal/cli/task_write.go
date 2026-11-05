@@ -68,11 +68,11 @@ func taskStart(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	res, err := s.Svc.TaskStart(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, res)
@@ -134,11 +134,11 @@ func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	t, err := s.Svc.TaskClose(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, t)
@@ -231,11 +231,11 @@ func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	t, err := s.Svc.TaskUpdate(withAgent(s.Ctx, name), req)
 	if err != nil {
-		return fail(stderr, verb, err)
+		return fail(stdout, stderr, verb, *asJSON, err)
 	}
 	if *asJSON {
 		return writeJSON(stdout, stderr, verb, t)
