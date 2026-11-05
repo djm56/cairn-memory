@@ -179,6 +179,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 conformance (#88): the conformance suite runs its agent calls through the `cairn` binary, and an exit check runs an agent with only bash that starts, works and closes a task through the CLI. The CLI carries each error's kind and the close policy's missing list, so 98 of the 106 cases pass through it. The other 8 are deferred, each with the text its failure must contain, and three of them are properties of a CLI that stay deferred.
 
 - Docs, M4 exit check: `docs/M4-HAND-CHECK.md`, an optional hand-check guide for the `/compact` exit check on Claude Code, and for the OpenCode and pi registrations, which are EXPERIMENTAL and have not been run. Linked from the README's CLI section.
+- Docs, M4: the README, DESIGN and the wiki describe the CLI verbs, the three hooks, `enable --agent claude-code` (hooks only), `doctor --agent` and `export project` as built, with the OpenCode and pi registrations marked EXPERIMENTAL. The DESIGN command table has the exit codes in §5.2.2. The status lines are unchanged, since the M4 exit check has not passed.
 
 ### Changed
 
