@@ -357,9 +357,10 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 			if !strings.Contains(out.String(), "is not a readable SQLite database") {
 				t.Errorf("the report %q does not say the target was not a readable database", out.String())
 			}
-			// The prompt says the lock could not be checked, and that serve must be stopped.
-			if !strings.Contains(out.String(), "The lock could not be checked") || !strings.Contains(out.String(), "Stop cairn serve") {
-				t.Errorf("the prompt %q does not say the lock could not be checked and to stop cairn serve", out.String())
+			// No holder is running here, so the read-only probe finds none, and the prompt says so and
+			// still says that serve must be stopped.
+			if !strings.Contains(out.String(), "A read-only probe found no lock on") || !strings.Contains(out.String(), "Stop cairn serve") {
+				t.Errorf("the prompt %q does not say the probe found no lock and to stop cairn serve", out.String())
 			}
 			assertReportNamesMoves(t, target, out.String())
 			if got := readBytes(t, preRestoreName(target)); string(got) != string(origMain) {

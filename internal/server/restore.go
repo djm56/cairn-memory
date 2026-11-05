@@ -65,7 +65,9 @@ type move struct {
 //     integrity_check, and its schema is not newer than this build's migrations;
 //  3. the database, if it exists, is not in use: an exclusive lock is taken, and an idle server
 //     holding it is enough to refuse (store.AcquireExclusive). A file that is not a readable
-//     SQLite database cannot be in use, so it takes no lock and goes to step 5 as bytes;
+//     SQLite database cannot be opened as one, so no lock is taken. A read-only probe of its lock
+//     bytes (rawInUse) refuses it when another process holds them; otherwise it goes to step 5 as
+//     bytes, and the prompt says whether the probe found no holder or could not tell;
 //  4. the operator types the database path exactly as given;
 //  5. for a database that is readable, its -wal is folded into it and it leaves WAL mode, so
 //     the file alone holds the state (store.ExclusiveLock.Consolidate). A file that is not
@@ -152,11 +154,24 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	// The readability check is read-only: a read-write open of a file that cannot be read makes
 	// SQLite delete the -wal beside it on close, so an unreadable file is never opened that way.
 	raw := false
+	// rawProbed says the read-only probe of the lock bytes ran and found no holder. It stays false
+	// when the probe could not tell, and the prompt then keeps the plain warning.
+	rawProbed := false
 	if exists {
 		err = checkReadable(ctx, o.DB)
 		switch {
 		case errors.Is(err, store.ErrNotDatabase):
 			raw = true
+			// No connection can be opened to ask a file that is not a database, so its lock bytes are
+			// read instead: no change to the file, no lock taken. A holder refuses here, before anything
+			// moves.
+			held, perr := rawInUse(o.DB)
+			switch {
+			case held:
+				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+			case perr == nil:
+				rawProbed = true
+			}
 		case err != nil:
 			return checkFailure(o.DB, err)
 		default:
@@ -182,8 +197,14 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		fmt.Fprintf(o.Out, "The database there now is moved to %s, after its -wal is folded into it, with any -shm beside it. Nothing is deleted.\n", pre)
 		if raw {
 			fmt.Fprintf(o.Out, "%s is not a readable SQLite database: its files are moved as they are, with no checkpoint.\n", o.DB)
-			// A file that cannot be read cannot be locked, so a server holding it is not seen.
-			fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
+			if rawProbed {
+				// The probe cannot see an idle connection in rollback-journal mode, which holds no lock,
+				// so the operator is still told to stop the server.
+				fmt.Fprintf(o.Out, "A read-only probe found no lock on %s. The probe cannot see every holder: Stop cairn serve before you type the path if it runs against this file.\n", o.DB)
+			} else {
+				// The probe could not tell, so a server holding the file is not seen.
+				fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
+			}
 		}
 	} else {
 		fmt.Fprintf(o.Out, "No database is at %s now. This creates it from the backup %s.\n", o.DB, o.Backup)
