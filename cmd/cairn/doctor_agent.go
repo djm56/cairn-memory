@@ -189,7 +189,7 @@ func hookLine(f installedHook) check {
 	where := "installed in " + f.path + ", "
 	matcher := "no matcher"
 	if f.matcher != "" {
-		matcher = "matcher " + f.matcher
+		matcher = "matcher " + shownMatcher(f.matcher)
 	}
 	switch {
 	case f.event == "SessionStart" && !coversCompact(f.matcher):

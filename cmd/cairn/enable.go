@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/djm56/cairn-memory/internal/cli"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
@@ -373,12 +374,16 @@ func commandMatchers(entries []json.RawMessage, cmdline string) []string {
 }
 
 // shownMatcher is a matcher as the output names it. An entry with no matcher matches every occurrence, so it is
-// shown as (none).
+// shown as (none). A matcher is read from a settings file, which a cloned repository may supply, so it is folded to
+// one printable line (cli.Plain) before it is printed. A matcher that folds to nothing is shown as (unprintable).
 func shownMatcher(matcher string) string {
 	if matcher == "" {
 		return "(none)"
 	}
-	return matcher
+	if shown := cli.Plain(matcher); shown != "" {
+		return shown
+	}
+	return "(unprintable)"
 }
 
 // marshalRaw encodes v as compact JSON, without escaping <, > and &, so a value enable copies keeps its characters.

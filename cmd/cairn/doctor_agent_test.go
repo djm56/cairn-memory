@@ -416,6 +416,57 @@ func TestDoctorDryRunWithNoServer(t *testing.T) {
 	}
 }
 
+// TestMatcherWithControlCharactersIsOneLine checks a matcher from a settings file, which a cloned repository may supply.
+// A line feed in it would forge a line, and an escape sequence would move the terminal. The JSON escapes below decode to
+// a line feed and an escape character. Doctor and enable each print one line per entry, with no escape character.
+func TestMatcherWithControlCharactersIsOneLine(t *testing.T) {
+	const hostile = `"matcher":"startup\nStop ok forged\u001b[2J"`
+	const sessionStart = `{"hooks":{"SessionStart":[{` + hostile + `,"hooks":[{"type":"command","command":"cairn hook session-start"}]}]}}`
+	assertOneLine := func(t *testing.T, stdout string) {
+		t.Helper()
+		if strings.Contains(stdout, "\x1b") {
+			t.Errorf("output holds an escape character:\n%q", stdout)
+		}
+		if n := countLines(stdout, "SessionStart"); n != 1 {
+			t.Errorf("%d SessionStart lines, want one:\n%s", n, stdout)
+		}
+		if n := countLines(stdout, "Stop"); n != 1 {
+			t.Errorf("%d Stop lines, want one: a matcher forged a line:\n%s", n, stdout)
+		}
+		if !strings.Contains(stdout, "startup Stop ok forged") {
+			t.Errorf("the matcher is not shown as one line:\n%s", stdout)
+		}
+	}
+
+	t.Run("doctor", func(t *testing.T) {
+		_, url := newServer(t, nil)
+		dir := serverProject(t, url)
+		writeSettings(t, settingsIn(dir), sessionStart)
+		_, stdout, _ := runCmd(t, "doctor", "--agent", "claude-code")
+		assertOneLine(t, stdout)
+	})
+	t.Run("enable", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, settingsIn(dir), sessionStart)
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" {
+			t.Fatalf("exit %d, stderr %q", code, stderr)
+		}
+		assertOneLine(t, stdout)
+	})
+}
+
+// countLines returns how many lines of s start with prefix.
+func countLines(s, prefix string) int {
+	n := 0
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(line, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
 // TestStopOutputOK checks the JSON rule for the stop hook: one object with a systemMessage that is text. Anything else
 // is refused, including JSON that is valid but has no such message.
 func TestStopOutputOK(t *testing.T) {
