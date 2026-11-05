@@ -28,9 +28,10 @@ type Session struct {
 type Opener func() (Session, error)
 
 // Task is the sub-command `cairn task`: the reads of a task, for a person or an agent with
-// only a shell (issue #87). The verbs built so far are current, get and list. Each takes
-// --json, which writes the result as one line of JSON: the object the MCP tool of the same
-// name returns, with the same field names (CONTRACT §2).
+// only a shell (issue #87). The reads are current, get and list; start is the first write,
+// and update and close follow. Each takes --json, which writes the result as one line of
+// JSON: the object the MCP tool of the same name returns, with the same field names
+// (CONTRACT §2). A write takes its agent from --agent, or from CAIRN_AGENT.
 //
 // The text form is a summary for a person. It prints each section the call read, folds every
 // text to one line, and leaves out what --json keeps: the timestamps, the event and step ids,
@@ -40,7 +41,7 @@ type Opener func() (Session, error)
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
 func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list")
+		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -51,8 +52,10 @@ func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return taskGet(open, rest, stdout, stderr)
 	case "list":
 		return taskList(open, rest, stdout, stderr)
+	case "start":
+		return taskStart(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list\n", verb)
+	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start\n", verb)
 	return 2
 }
 
