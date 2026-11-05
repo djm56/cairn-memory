@@ -122,7 +122,7 @@ func runExportProject(args []string, stdout, stderr io.Writer) int {
 	for i, task := range tasks {
 		detail, events, err := fetchTask(t, task.ID)
 		if err != nil {
-			fmt.Fprintf(stderr, "cairn export project: %s\n", reason(err))
+			fmt.Fprintf(stderr, "cairn export project: task %s: %s\n", task.ID, reason(err))
 			return 1
 		}
 		if i > 0 {
