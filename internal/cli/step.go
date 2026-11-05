@@ -139,8 +139,14 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 // false when the arguments do not give exactly one of the two.
 func stepUpdateRef(fl *flag.FlagSet, pos []string, verb string, id int64, stderr io.Writer) (ref core.StepRef, ok bool) {
 	if given(fl, "step-id") {
-		if len(pos) != 1 {
-			fmt.Fprintln(stderr, verb+": name the task id, and give the step by --step-id or by its number, not both: cairn step update <task-id> --step-id 412 --action start")
+		// No task id is one fault and a number beside the id is another. Each gets its own message,
+		// so the reader is not told to drop a form they did not give.
+		if len(pos) == 0 {
+			fmt.Fprintln(stderr, verb+": name the task id first: cairn step update <task-id> --step-id 412 --action start")
+			return core.StepRef{}, false
+		}
+		if len(pos) > 1 {
+			fmt.Fprintln(stderr, verb+": give the step by --step-id or by its number, not both: cairn step update <task-id> --step-id 412 --action start")
 			return core.StepRef{}, false
 		}
 		if id < 1 {

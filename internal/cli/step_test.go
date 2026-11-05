@@ -60,7 +60,7 @@ func TestStepUpdateStepUsageErrors(t *testing.T) {
 	}{
 		{"number and id together", []string{"update", "task-20261030-01", "1", "--step-id", "412", "--action", "start", "--agent", "hicks"}, "not both"},
 		{"neither number nor id", []string{"update", "task-20261030-01", "--action", "start", "--agent", "hicks"}, "a step number"},
-		{"id with no task id", []string{"update", "--step-id", "412", "--action", "start", "--agent", "hicks"}, "not both"},
+		{"id with no task id", []string{"update", "--step-id", "412", "--action", "start", "--agent", "hicks"}, "name the task id first"},
 		{"id below one", []string{"update", "task-20261030-01", "--step-id", "0", "--action", "start", "--agent", "hicks"}, "--step-id must be a step id"},
 	}
 	for _, c := range cases {
