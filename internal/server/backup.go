@@ -146,8 +146,21 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	// followed a swapped staging directory (see Backup). Then the name is removed, and nothing is
 	// reported made.
 	if now, err := os.Lstat(out); err != nil || !os.SameFile(now, copyInfo) {
-		_ = os.Remove(out)
-		return 0, errors.Join(fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name was removed", out, stage), removeEntries(sr))
+		// This call made the name, so it removes it. A name already gone is not a failure. The
+		// refusal reports the removal's real result, so it never says the name was removed when it
+		// was not.
+		rerr := os.Remove(out)
+		if errors.Is(rerr, fs.ErrNotExist) {
+			rerr = nil
+		}
+		refusal := fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name was removed", out, stage)
+		if rerr != nil {
+			refusal = fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name could not be removed: %w", out, stage, rerr)
+		}
+		// The staging directory goes as on every other refusal, through the root. Where its name has
+		// been swapped, removeStage refuses to remove by name and says so. Its entries are removed in
+		// either case.
+		return 0, errors.Join(refusal, removeStage(sr, stage, made))
 	}
 	// out holds the copy now. The staging name goes. If it cannot be removed, the backup is not
 	// reported made, so out, which this call created, is removed as well.

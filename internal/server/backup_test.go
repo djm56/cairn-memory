@@ -390,8 +390,60 @@ func TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink(t *testing.T) {
 	if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
 		t.Errorf("a refused backup left the output %s behind, linked to the impostor", out)
 	}
-	if entries, rerr := os.ReadDir(stage); rerr != nil || len(entries) != 0 {
-		t.Errorf("the staging directory %s holds %d entries after the refusal, want none (%v)", stage, len(entries), rerr)
+	if _, serr := os.Lstat(stage); !os.IsNotExist(serr) {
+		t.Errorf("the staging directory %s was not removed after the refusal: %v", stage, serr)
+	}
+}
+
+// TestBackupRemovesItsNameWhenTheStagingDirectoryIsSwappedBeforeTheLink swaps the staging
+// directory itself, not a file in it, between the last check and the link. The staging name is
+// moved aside, and a directory holding an impostor copy and a sentinel is put in its place. The
+// link takes the impostor's copy by name, the check on the linked file finds it is not the copy
+// made, and the output name is removed. The refusal must also report that the staging directory was
+// replaced, so the caller is told the directory made was not removed by name. The sentinel in the
+// swapped-in directory must survive, and the directory made must be emptied through its root.
+func TestBackupRemovesItsNameWhenTheStagingDirectoryIsSwappedBeforeTheLink(t *testing.T) {
+	dir := t.TempDir()
+	db := filepath.Join(dir, "cairn.db")
+	createDB(t, db)
+	out := filepath.Join(dir, "backup.db")
+
+	var stage, moved string
+	prev := beforeLink
+	beforeLink = func(tmp string) {
+		stage = filepath.Dir(tmp)
+		moved = stage + ".moved"
+		if err := os.Rename(stage, moved); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(stage, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(stage, copyName), []byte("impostor"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(stage, "sentinel.txt"), []byte("keep me"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { beforeLink = prev })
+
+	_, err := Backup(context.Background(), db, out)
+	if err == nil || !strings.Contains(err.Error(), "is not the copy made") || !strings.Contains(err.Error(), "the name was removed") {
+		t.Fatalf("Backup with the staging directory swapped before the link: err = %v, want the not-the-copy refusal that says the name was removed", err)
+	}
+	if !strings.Contains(err.Error(), "was replaced") {
+		t.Errorf("the refusal %q does not report that the staging directory was replaced", err)
+	}
+	if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
+		t.Errorf("a refused backup left the output %s behind, linked to the impostor", out)
+	}
+	got, rerr := os.ReadFile(filepath.Join(stage, "sentinel.txt"))
+	if rerr != nil || string(got) != "keep me" {
+		t.Errorf("the sentinel in the swapped-in directory did not survive: %q, %v", got, rerr)
+	}
+	if entries, rerr := os.ReadDir(moved); rerr != nil || len(entries) != 0 {
+		t.Errorf("the staging directory made, at %s, holds %d entries after the refusal, want none (%v)", moved, len(entries), rerr)
 	}
 }
 
