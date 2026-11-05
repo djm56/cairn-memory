@@ -758,6 +758,40 @@ func TestEnableWritesToTheProjectAboveTheWorkingDirectory(t *testing.T) {
 	}
 }
 
+// TestEnableFollowsALinkToADirectoryInsideTheProject checks a directory that is a link to another directory of the same
+// project: enable follows it, the file lands in the directory the link names, and the link is left as it is. It runs for
+// each directory enable writes into: .pi for pi, .cairn for OpenCode and .claude for Claude Code.
+func TestEnableFollowsALinkToADirectoryInsideTheProject(t *testing.T) {
+	cases := []struct {
+		name, link, target, agent, file string
+	}{
+		{"pi, through .pi", ".pi", "pi-config", "pi", "mcp.json"},
+		{"opencode, through .cairn", ".cairn", "cairn-store", "opencode", "instructions.md"},
+		{"claude code, through .claude", ".claude", "claude-config", "claude-code", settingsName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			if err := os.MkdirAll(filepath.Join(dir, tc.target), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(tc.target, filepath.Join(dir, tc.link)); err != nil {
+				t.Skipf("this system cannot make a symbolic link: %v", err)
+			}
+
+			if code, _, stderr := runCmd(t, "enable", "--agent", tc.agent); code != 0 {
+				t.Fatalf("exit %d, stderr %q: want 0, a link that stays inside the project is allowed", code, stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, tc.target, tc.file)); err != nil {
+				t.Errorf("the file did not land in the directory the link names: %v", err)
+			}
+			if info, err := os.Lstat(filepath.Join(dir, tc.link)); err != nil || info.Mode()&fs.ModeSymlink == 0 {
+				t.Errorf("the link %s was replaced: %v, %v", tc.link, info, err)
+			}
+		})
+	}
+}
+
 // TestEnableRefusesASettingsPathThatIsADirectory checks a directory where the project's settings file goes: enable refuses it
 // while it plans the file, so exit 1 comes with nothing written and the refusal names the path.
 func TestEnableRefusesASettingsPathThatIsADirectory(t *testing.T) {
