@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 // Session is what a command runs with: the service it calls and the caller's context,
@@ -71,7 +72,7 @@ func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 // since that is an answer, not a failure.
 func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	fl, asJSON := newFlags("cairn task current")
-	agent := fl.String("agent", "", "the calling agent's role, such as main or reviewer; names its agent-scoped directives; left out, "+EnvAgent+" is used")
+	agent := fl.String("agent", "", "the calling agent's role, such as main or reviewer; names its agent-scoped directives; left out, "+identity.EnvAgent+" is used")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code

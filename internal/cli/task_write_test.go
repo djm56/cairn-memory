@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 // startedResult is the answer of task_start for a task with the two steps of twoSteps.
@@ -16,7 +17,7 @@ func startedResult() *core.TaskStartResult {
 // TestTaskStartHuman checks the human output of task start: the id and status, then the plan,
 // and that the request carries the brief and the agent the flag named.
 func TestTaskStartHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	code, out, errOut := runWrite(t, Task, svc, "", "start", "--agent", "hicks",
 		"--title", "Add rate limit", "--goal", "Requests over 100/min get 429.")
@@ -42,7 +43,7 @@ func TestTaskStartHuman(t *testing.T) {
 // TestTaskStartJSON checks the --json output of task start: one line, decoding to the result of
 // task_start with the new id.
 func TestTaskStartJSON(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	code, out, errOut := runWrite(t, Task, svc, "", "start", "--agent", "hicks", "--title", "t", "--goal", "g", "--json")
 	if code != 0 || errOut != "" {
@@ -60,7 +61,7 @@ func TestTaskStartJSON(t *testing.T) {
 // TestTaskStartSendsTheJSONInput checks that --json-input carries the criteria, the key files and
 // the plan with their assignees, from standard input.
 func TestTaskStartSendsTheJSONInput(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	stdin := `{"criteria": ["429 after 100 requests", "limit configurable"],
 		"key_files": [{"path": "internal/limit/limit.go", "note": "the limiter"}],
@@ -84,7 +85,7 @@ func TestTaskStartSendsTheJSONInput(t *testing.T) {
 // TestTaskStartTextFromStandardInput checks that a text flag set to "-" carries standard input
 // as its text, with the line breaks it has.
 func TestTaskStartTextFromStandardInput(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	code, _, errOut := runWrite(t, Task, svc, "Requests over 100/min\nget 429.\n",
 		"start", "--agent", "hicks", "--title", "t", "--goal", "-")
@@ -98,7 +99,7 @@ func TestTaskStartTextFromStandardInput(t *testing.T) {
 
 // TestTaskStartPriorityAndQueue checks that --priority and --queue reach the request.
 func TestTaskStartPriorityAndQueue(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	if code, _, errOut := runWrite(t, Task, svc, "", "start", "--agent", "hicks", "--title", "t", "--goal", "g", "--priority", "high", "--queue"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
@@ -111,13 +112,13 @@ func TestTaskStartPriorityAndQueue(t *testing.T) {
 // TestTaskStartNeedsAnAgent checks the usage error of a write with no agent: it names the flag and
 // the variable, and makes no call.
 func TestTaskStartNeedsAnAgent(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{start: startedResult()}
 	code, out, errOut := runWrite(t, Task, svc, "", "start", "--title", "t", "--goal", "g")
 	if code != 2 || out != "" || svc.calls != 0 {
 		t.Errorf("exit %d, stdout %q, calls %d; want a usage error and no call", code, out, svc.calls)
 	}
-	for _, want := range []string{"cairn task start: no agent name", "--agent", EnvAgent} {
+	for _, want := range []string{"cairn task start: no agent name", "--agent", identity.EnvAgent} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr %q lacks %q", errOut, want)
 		}
@@ -126,20 +127,20 @@ func TestTaskStartNeedsAnAgent(t *testing.T) {
 
 // TestTaskStartAgentFromTheVariable checks that CAIRN_AGENT names the agent when --agent is left out.
 func TestTaskStartAgentFromTheVariable(t *testing.T) {
-	t.Setenv(EnvAgent, "hicks")
+	t.Setenv(identity.EnvAgent, "hicks")
 	svc := &fakeWrites{start: startedResult()}
 	if code, _, errOut := runWrite(t, Task, svc, "", "start", "--title", "t", "--goal", "g"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
 	}
 	if got := agentOf(t, svc.ctx); got != "hicks" {
-		t.Errorf("the call ran as %q, want hicks from %s", got, EnvAgent)
+		t.Errorf("the call ran as %q, want hicks from %s", got, identity.EnvAgent)
 	}
 }
 
 // TestTaskStartRefusedByTheServer checks a refusal of the server: its words on stderr, one line,
 // nothing on stdout, exit 1.
 func TestTaskStartRefusedByTheServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("another task is active in this project")}
 	code, out, errOut := runWrite(t, Task, svc, "", "start", "--agent", "hicks", "--title", "t", "--goal", "g")
 	if code != 1 || out != "" || errOut != "cairn task start: another task is active in this project\n" {
@@ -151,7 +152,7 @@ func TestTaskStartRefusedByTheServer(t *testing.T) {
 // flags that read standard input, a key --json-input does not name, and a blank agent. Each exits
 // 2 and makes no call.
 func TestTaskStartUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string
@@ -185,7 +186,7 @@ func closedTask() *core.Task {
 // TestTaskCloseHuman checks the human output of task close: the closed task with its outcome, and
 // that the request carries the outcome and the summary, with no list, since none was given.
 func TestTaskCloseHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{task: closedTask()}
 	code, out, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--summary", "limit shipped", "--agent", "hicks")
 	if code != 0 || errOut != "" {
@@ -208,7 +209,7 @@ func TestTaskCloseHuman(t *testing.T) {
 // TestTaskCloseJSONInputKeepsAbsentAndEmpty checks the rule of CONTRACT §2 through the input: a list
 // given as [] reaches the request as empty, and a list left out reaches it as absent.
 func TestTaskCloseJSONInputKeepsAbsentAndEmpty(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{task: closedTask()}
 	stdin := `{"criteria": [{"ord": 1, "result": "met", "evidence": "test ok"}], "lessons": [],` +
 		` "deliverables": [{"path": "docs/limit.md", "note": "write-up"}]}`
@@ -234,7 +235,7 @@ func TestTaskCloseJSONInputKeepsAbsentAndEmpty(t *testing.T) {
 // TestTaskCloseNoLessonsReason checks that --no-lessons-reason reaches the request, for a close
 // whose lessons are [].
 func TestTaskCloseNoLessonsReason(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{task: closedTask()}
 	if code, _, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--summary", "s", "--no-lessons-reason", "nothing new came up", "--agent", "hicks"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
@@ -247,7 +248,7 @@ func TestTaskCloseNoLessonsReason(t *testing.T) {
 // TestTaskCloseRefusedByServer checks a refusal of the close policy: the server's message on stderr
 // as one line, exit 1, and nothing on stdout.
 func TestTaskCloseRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	refusal := core.Refused("close policy not met: summary, lessons, mistakes")
 	refusal.Missing = []string{core.MissingSummary, core.MissingLessons, core.MissingMistakes}
 	svc := &fakeWrites{err: refusal}
@@ -260,7 +261,7 @@ func TestTaskCloseRefusedByServer(t *testing.T) {
 // TestTaskCloseUsageErrors checks the usage errors of task close: no task id, two flags that read
 // standard input, a key --json-input does not name, and no agent. Each exits 2 and makes no call.
 func TestTaskCloseUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string
@@ -286,7 +287,7 @@ func TestTaskCloseUsageErrors(t *testing.T) {
 // TestTaskUpdateHuman checks the human output of task update: the task in its layout, with the
 // field it set, and that the request sets that field and no other.
 func TestTaskUpdateHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--next-action", "write the test", "--agent", "hicks")
@@ -308,7 +309,7 @@ func TestTaskUpdateHuman(t *testing.T) {
 // TestTaskUpdateStatusAndReason checks that a status and its reason reach the request, and that a
 // flag given blank clears its field rather than leaving it out.
 func TestTaskUpdateStatusAndReason(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	if code, _, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--status", "blocked", "--reason", "waiting on review", "--blockers", "", "--agent", "hicks"); code != 0 {
@@ -325,7 +326,7 @@ func TestTaskUpdateStatusAndReason(t *testing.T) {
 
 // TestTaskUpdatePriority checks that --priority reaches the request as a priority.
 func TestTaskUpdatePriority(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	if code, _, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--priority", "urgent", "--agent", "hicks"); code != 0 {
@@ -339,7 +340,7 @@ func TestTaskUpdatePriority(t *testing.T) {
 // TestTaskUpdateBriefListsReplaceOrKeep checks the rule of CONTRACT §2 through the input: a list
 // given as [] replaces the list with none, and a list left out is not sent, so the task keeps it.
 func TestTaskUpdateBriefListsReplaceOrKeep(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	if code, _, errOut := runWrite(t, Task, svc, `{"criteria": [], "key_files": [{"path": "internal/limit/limit.go"}]}`,
@@ -363,7 +364,7 @@ func TestTaskUpdateBriefListsReplaceOrKeep(t *testing.T) {
 
 // TestTaskUpdateTextFromStandardInput checks that a text flag set to "-" carries standard input.
 func TestTaskUpdateTextFromStandardInput(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	if code, _, errOut := runWrite(t, Task, svc, "write the failing test\n", "update", "task-20261030-01", "--next-action", "-", "--agent", "hicks"); code != 0 {
@@ -376,7 +377,7 @@ func TestTaskUpdateTextFromStandardInput(t *testing.T) {
 
 // TestTaskUpdateJSON checks the --json output of task update: one line, decoding to the task.
 func TestTaskUpdateJSON(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
 	svc := &fakeWrites{task: &task}
 	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--priority", "high", "--agent", "hicks", "--json")
@@ -392,7 +393,7 @@ func TestTaskUpdateJSON(t *testing.T) {
 // TestTaskUpdateRefusedByServer checks a refusal of the server, such as a second active task: one
 // line on stderr, exit 1.
 func TestTaskUpdateRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("another task is active in this project")}
 	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--status", "active", "--agent", "hicks")
 	if code != 1 || out != "" || errOut != "cairn task update: another task is active in this project\n" {
@@ -403,7 +404,7 @@ func TestTaskUpdateRefusedByServer(t *testing.T) {
 // TestTaskUpdateUsageErrors checks the usage errors of task update: no task id, a key --json-input
 // does not name, two flags that read standard input, and no agent. Each exits 2 and makes no call.
 func TestTaskUpdateUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string
@@ -432,7 +433,7 @@ func TestTaskUpdateUsageErrors(t *testing.T) {
 func TestTaskStartHelpNamesTheVariable(t *testing.T) {
 	svc := &fakeWrites{}
 	_, out, _ := runWrite(t, Task, svc, "", "start", "-h")
-	for _, want := range []string{EnvAgent, "-json-input", "reads standard input"} {
+	for _, want := range []string{identity.EnvAgent, "-json-input", "reads standard input"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the help lacks %q:\n%s", want, out)
 		}

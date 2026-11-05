@@ -11,21 +11,19 @@ import (
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
-
-// EnvAgent names the calling agent when a verb's --agent flag is left out. It is the agent's
-// name, such as hicks. A write needs an agent, so a write with neither the flag nor the variable
-// is a usage error. A read may run with none, and the reads that take an agent use it as the
-// caller's role (CONTRACT §1.1).
-const EnvAgent = "CAIRN_AGENT"
 
 // maxInputBytes caps what a text flag or --json-input reads from standard input. It is the
 // server's cap on a request body (api.MaxBodyBytes), so a larger input could not be sent.
 const maxInputBytes = 1 << 20
 
 // agentHelp is the help of the --agent flag of every verb that takes one. It names the
-// variable, so the fallback is written where a person reads the flags.
-const agentHelp = "the calling agent's name, such as hicks; left out, the " + EnvAgent + " variable is used"
+// variable, so the fallback is written where a person reads the flags. The variable is
+// identity.EnvAgent: a write needs an agent, so a write with neither the flag nor the variable
+// is a usage error. A read may run with none, and the reads that take an agent use it as the
+// caller's role (CONTRACT §1.1).
+const agentHelp = "the calling agent's name, such as hicks; left out, the " + identity.EnvAgent + " variable is used"
 
 // command is the entry point of a sub-command: its opener, its arguments, the standard input a
 // write may read, and the two output streams. Task, Step and Event have this shape.
@@ -41,12 +39,12 @@ func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, s
 	name = flagValue
 	source := "--agent"
 	if !given(fl, "agent") {
-		name = os.Getenv(EnvAgent)
-		source = EnvAgent
+		name = os.Getenv(identity.EnvAgent)
+		source = identity.EnvAgent
 	}
 	if strings.TrimSpace(name) == "" {
 		if required {
-			fmt.Fprintf(stderr, "%s: no agent name: give --agent <name>, or set %s to one; a name of only spaces is no name\n", verb, EnvAgent)
+			fmt.Fprintf(stderr, "%s: no agent name: give --agent <name>, or set %s to one; a name of only spaces is no name\n", verb, identity.EnvAgent)
 			return "", false
 		}
 		return "", true

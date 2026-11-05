@@ -9,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 // TestAgentFlagBeatsTheVariable checks that --agent names the caller of a read when the
 // variable is set too: the flag is what the person typed for this call.
 func TestAgentFlagBeatsTheVariable(t *testing.T) {
-	t.Setenv(EnvAgent, "hicks")
+	t.Setenv(identity.EnvAgent, "hicks")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
 	if code, _, errOut := runTask(t, svc, "current", "--agent", "reviewer"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
@@ -27,20 +28,20 @@ func TestAgentFlagBeatsTheVariable(t *testing.T) {
 // TestAgentVariableIsTheReadFallback checks that a read with no --agent takes the agent from
 // CAIRN_AGENT, so the agent-scoped directives of that role are named.
 func TestAgentVariableIsTheReadFallback(t *testing.T) {
-	t.Setenv(EnvAgent, "hicks")
+	t.Setenv(identity.EnvAgent, "hicks")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
 	if code, _, errOut := runTask(t, svc, "current"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
 	}
 	if c, _ := core.CallerFrom(svc.gotCtx); c.Agent != "hicks" {
-		t.Errorf("the caller agent is %q, want hicks from %s", c.Agent, EnvAgent)
+		t.Errorf("the caller agent is %q, want hicks from %s", c.Agent, identity.EnvAgent)
 	}
 }
 
 // TestBlankAgentIsNoAgentForARead checks that a name of only spaces is no name, and that a read
 // still runs, with no agent, as CONTRACT §1.1 says.
 func TestBlankAgentIsNoAgentForARead(t *testing.T) {
-	t.Setenv(EnvAgent, "   ")
+	t.Setenv(identity.EnvAgent, "   ")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
 	code, _, errOut := runTask(t, svc, "current")
 	if code != 0 {
@@ -55,7 +56,7 @@ func TestBlankAgentIsNoAgentForARead(t *testing.T) {
 // names the flag and the variable, and a blank flag is refused rather than replaced by the
 // variable.
 func TestAgentNameForAWriteNamesBothSources(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	fl := flag.NewFlagSet("cairn task start", flag.ContinueOnError)
 	agent := fl.String("agent", "", "")
 	if err := fl.Parse(nil); err != nil {
@@ -65,13 +66,13 @@ func TestAgentNameForAWriteNamesBothSources(t *testing.T) {
 	if _, ok := agentName(fl, *agent, true, "cairn task start", &stderr); ok {
 		t.Fatal("a write with no agent was accepted")
 	}
-	for _, want := range []string{"cairn task start: no agent name", "--agent", EnvAgent} {
+	for _, want := range []string{"cairn task start: no agent name", "--agent", identity.EnvAgent} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("stderr %q lacks %q", stderr.String(), want)
 		}
 	}
 
-	t.Setenv(EnvAgent, "reviewer")
+	t.Setenv(identity.EnvAgent, "reviewer")
 	fl2 := flag.NewFlagSet("cairn task start", flag.ContinueOnError)
 	blank := fl2.String("agent", "", "")
 	if err := fl2.Parse([]string{"--agent", "  "}); err != nil {
@@ -97,9 +98,9 @@ func TestAgentNameIsCheckedBeforeTheCall(t *testing.T) {
 		for _, source := range []string{"flag", "variable"} {
 			for _, verb := range []string{"write", "read"} {
 				t.Run(b.label+" from the "+source+" on a "+verb, func(t *testing.T) {
-					t.Setenv(EnvAgent, "")
+					t.Setenv(identity.EnvAgent, "")
 					if source == "variable" {
-						t.Setenv(EnvAgent, b.name)
+						t.Setenv(identity.EnvAgent, b.name)
 					}
 					var cmd command
 					var calls func() int
@@ -131,7 +132,7 @@ func TestAgentNameIsCheckedBeforeTheCall(t *testing.T) {
 					}
 					wantSource := "--agent"
 					if source == "variable" {
-						wantSource = EnvAgent
+						wantSource = identity.EnvAgent
 					}
 					if !strings.Contains(errOut.String(), wantSource) || !strings.Contains(errOut.String(), "is refused") {
 						t.Errorf("stderr %q does not name the source %s", errOut.String(), wantSource)
@@ -163,7 +164,7 @@ func (c *countingReader) Read(p []byte) (int, error) {
 // leave the person's piped text unsent, with no word about why. Each case gives a flag that reads
 // standard input, exits 2, reads no byte of it, and opens no project.
 func TestUsageErrorsBeforeStandardInput(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	const id = "task-20261030-01"
 	cases := []struct {
 		name string

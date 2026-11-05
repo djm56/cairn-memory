@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 // TestEventLogHuman checks the human output of event log: the entry's time, kind and text, and
 // that the request carries the step ref, the kind, the text and the caller.
 func TestEventLogHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	at := time.Date(2026, 10, 30, 9, 2, 0, 0, time.UTC)
 	svc := &fakeWrites{event: &core.Event{ID: 9, TaskID: "task-20261030-01", Kind: core.EventNote, Text: "started the step", OccurredAt: at}}
 	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started the step", "--step", "1", "--agent", "hicks")
@@ -30,7 +31,7 @@ func TestEventLogHuman(t *testing.T) {
 
 // TestEventLogJSON checks the --json output of event log: one line, decoding to the event.
 func TestEventLogJSON(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{event: &core.Event{ID: 9, Kind: core.EventNote, Text: "started"}}
 	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--agent", "hicks", "--json")
 	if code != 0 || errOut != "" || !oneLine(out) {
@@ -45,7 +46,7 @@ func TestEventLogJSON(t *testing.T) {
 // TestEventLogReviewData checks that a review's data reaches the request as the JSON object it
 // was given, from the flag and from standard input.
 func TestEventLogReviewData(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	const review = `{"verdict":"approved","critical":0,"warnings":2}`
 	svc := &fakeWrites{event: &core.Event{ID: 9, Kind: core.EventReview, Text: "reviewed"}}
 	if code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "reviewed", "--data", review, "--agent", "hicks"); code != 0 {
@@ -67,7 +68,7 @@ func TestEventLogReviewData(t *testing.T) {
 // array, a string, and a JSON object followed by more text. A JSON object with edge spaces is
 // accepted.
 func TestEventLogDataMustBeAJSONObject(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name string
 		data string
@@ -97,7 +98,7 @@ func TestEventLogDataMustBeAJSONObject(t *testing.T) {
 // TestEventLogDataFromStandardInputMustBeAJSONObject checks the same refusal for --data -: a
 // standard input that is not one JSON object is a usage error naming --data, and no call is made.
 func TestEventLogDataFromStandardInputMustBeAJSONObject(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{event: &core.Event{}}
 	code, _, errOut := runWrite(t, Event, svc, "not a review\n", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", "-", "--agent", "hicks")
 	if code != 2 || !strings.Contains(errOut, "--data") || svc.calls != 0 {
@@ -107,7 +108,7 @@ func TestEventLogDataFromStandardInputMustBeAJSONObject(t *testing.T) {
 
 // TestEventLogRefusedByServer checks a refusal of the server: one line on stderr, exit 1.
 func TestEventLogRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Invalid("an agent may not log started: the server writes it")}
 	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "started", "--text", "x", "--agent", "hicks")
 	if code != 1 || out != "" || errOut != "cairn event log: an agent may not log started: the server writes it\n" {
@@ -118,7 +119,7 @@ func TestEventLogRefusedByServer(t *testing.T) {
 // TestEventLogUsageErrors checks the usage errors of event log: no task id, a step below 1, no
 // agent, and two flags that read standard input. Each exits 2 and makes no call.
 func TestEventLogUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string

@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/identity"
 )
 
 // TestStepAddHuman checks the human output of step add: the new step with its number, status and
 // assignee, and that the request carries the position, the title, the assignee and the caller.
 func TestStepAddHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{ID: 43, Number: 2, Title: "Review", Status: core.StepPending, Agent: "reviewer"}}
 	code, out, errOut := runWrite(t, Step, svc, "", "add", "task-20261030-01", "--title", "Review", "--after", "1", "--assignee", "reviewer", "--agent", "hicks")
 	if code != 0 || errOut != "" || out != "2. [pending] Review (agent reviewer)\n" {
@@ -29,7 +30,7 @@ func TestStepAddHuman(t *testing.T) {
 // TestStepAddPositionFirstAndLast checks the position: --after 0 is the first place, a step ref
 // that names no step; left out, the step goes last and no ref is sent.
 func TestStepAddPositionFirstAndLast(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{Number: 1, Title: "Read", Status: core.StepPending}}
 	if code, _, errOut := runWrite(t, Step, svc, "", "add", "task-20261030-01", "--title", "Read", "--after", "0", "--agent", "hicks"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
@@ -47,7 +48,7 @@ func TestStepAddPositionFirstAndLast(t *testing.T) {
 
 // TestStepAddJSON checks the --json output of step add: one line, decoding to the step.
 func TestStepAddJSON(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{ID: 43, Number: 2, Title: "Review", Status: core.StepPending}}
 	code, out, errOut := runWrite(t, Step, svc, "", "add", "task-20261030-01", "--title", "Review", "--agent", "hicks", "--json")
 	if code != 0 || errOut != "" || !oneLine(out) {
@@ -61,7 +62,7 @@ func TestStepAddJSON(t *testing.T) {
 
 // TestStepAddRefusedByServer checks a refusal of the server: one line on stderr, exit 1.
 func TestStepAddRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("the task is done: no step can be added")}
 	code, out, errOut := runWrite(t, Step, svc, "", "add", "task-20261030-01", "--title", "Review", "--agent", "hicks")
 	if code != 1 || out != "" || errOut != "cairn step add: the task is done: no step can be added\n" {
@@ -72,7 +73,7 @@ func TestStepAddRefusedByServer(t *testing.T) {
 // TestStepAddUsageErrors checks the usage errors of step add: no task id, a negative --after, a
 // missing agent, and two flags that read standard input. Each exits 2 and makes no call.
 func TestStepAddUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string
@@ -97,7 +98,7 @@ func TestStepAddUsageErrors(t *testing.T) {
 // TestStepUpdateHuman checks the human output of step update: the step with its new status and its
 // summary, and that the request names the step by its number and the action.
 func TestStepUpdateHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{Number: 1, Title: "Write test", Status: core.StepDone, Summary: "passes"}}
 	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "1", "--action", "finish", "--summary", "passes", "--agent", "hicks")
 	if code != 0 || errOut != "" || out != "1. [done] Write test: passes\n" {
@@ -112,7 +113,7 @@ func TestStepUpdateHuman(t *testing.T) {
 // TestStepUpdateAssignee checks that --assignee reassigns the step, and that a step with no
 // --assignee keeps its assignee.
 func TestStepUpdateAssignee(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{Number: 2, Title: "Review", Status: core.StepPending}}
 	if code, _, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "2", "--action", "start", "--assignee", "reviewer", "--agent", "hicks"); code != 0 {
 		t.Fatalf("exit %d: %s", code, errOut)
@@ -130,7 +131,7 @@ func TestStepUpdateAssignee(t *testing.T) {
 
 // TestStepUpdateSummaryFromStandardInput checks that --summary - carries standard input.
 func TestStepUpdateSummaryFromStandardInput(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{step: &core.Step{Number: 1, Status: core.StepFailed}}
 	code, _, errOut := runWrite(t, Step, svc, "the build broke\n", "update", "task-20261030-01", "1", "--action", "fail", "--summary", "-", "--agent", "hicks")
 	if code != 0 {
@@ -143,7 +144,7 @@ func TestStepUpdateSummaryFromStandardInput(t *testing.T) {
 
 // TestStepUpdateRefusedByServer checks a refusal of the server for a transition that is not allowed.
 func TestStepUpdateRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("start needs an active task")}
 	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "1", "--action", "start", "--agent", "hicks")
 	if code != 1 || out != "" || errOut != "cairn step update: start needs an active task\n" {
@@ -155,7 +156,7 @@ func TestStepUpdateRefusedByServer(t *testing.T) {
 // 1 or more, a task id and a step are both needed, and an agent is needed. Each exits 2 and makes
 // no call.
 func TestStepUpdateUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name string
 		args []string
@@ -180,7 +181,7 @@ func TestStepUpdateUsageErrors(t *testing.T) {
 // TestStepPlanHuman checks the human output of step plan: the new plan as the steps list shows it,
 // and that the request carries the steps with their assignees, read from standard input.
 func TestStepPlanHuman(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{list: &core.StepList{Steps: twoSteps()}}
 	stdin := `{"steps": [{"title": "Write test", "agent": "hicks"}, {"title": "Implement"}]}`
 	code, out, errOut := runWrite(t, Step, svc, stdin, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
@@ -196,7 +197,7 @@ func TestStepPlanHuman(t *testing.T) {
 // TestStepPlanEmptyListRemovesPendingSteps checks that [] is sent as an empty plan, and that the
 // answer for a plan with no steps is said in words.
 func TestStepPlanEmptyListRemovesPendingSteps(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{list: &core.StepList{}}
 	code, out, errOut := runWrite(t, Step, svc, `{"steps": []}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
 	if code != 0 || errOut != "" || out != "no steps\n" {
@@ -209,7 +210,7 @@ func TestStepPlanEmptyListRemovesPendingSteps(t *testing.T) {
 
 // TestStepPlanJSON checks the --json output of step plan: one line, decoding to the step list.
 func TestStepPlanJSON(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{list: &core.StepList{Steps: twoSteps()}}
 	code, out, errOut := runWrite(t, Step, svc, `{"steps": [{"title": "Write test"}]}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks", "--json")
 	if code != 0 || errOut != "" || !oneLine(out) {
@@ -224,7 +225,7 @@ func TestStepPlanJSON(t *testing.T) {
 // TestStepPlanRefusedByServer checks the refusal of a pending step that an event refers to: the
 // server's words on stderr, exit 1.
 func TestStepPlanRefusedByServer(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("step 2 has a review: skip it first")}
 	code, out, errOut := runWrite(t, Step, svc, `{"steps": []}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
 	if code != 1 || out != "" || errOut != "cairn step plan: step 2 has a review: skip it first\n" {
@@ -236,7 +237,7 @@ func TestStepPlanRefusedByServer(t *testing.T) {
 // input with --json-input, the steps list must be present, and a task id is needed. Each exits 2
 // and makes no call.
 func TestStepPlanUsageErrors(t *testing.T) {
-	t.Setenv(EnvAgent, "")
+	t.Setenv(identity.EnvAgent, "")
 	cases := []struct {
 		name  string
 		stdin string

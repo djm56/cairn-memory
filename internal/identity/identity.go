@@ -35,6 +35,13 @@ const EnvProject = "CAIRN_PROJECT"
 // (DESIGN.md §2.1, D11). It is read before the server key of the file.
 const EnvServer = "CAIRN_SERVER"
 
+// EnvAgent is the environment variable that names the calling agent for the CLI's writes, and for
+// the reads that take it as the caller's role, when a verb's --agent flag is left out. It is
+// the agent's name, such as hicks. This package does not resolve it: the agent is the caller's
+// own field, and the CLI reads the variable (CONTRACT §1.1). It is named here beside the other
+// variables so that the list of them is in one place.
+const EnvAgent = "CAIRN_AGENT"
+
 // EnvProjectDir is the environment variable Claude Code sets for MCP servers.
 // When it is set, the .cairn.toml search starts there, not in the working directory.
 const EnvProjectDir = "CLAUDE_PROJECT_DIR"
