@@ -228,7 +228,9 @@ times in UTC, as you read them from your own clock. Do not estimate a time.
   where you ran them.
 - The operating system name and version. Not the host name.
 - For each numbered step: done, skipped (with the reason), or failed (with what you saw).
-- The `cairn doctor` output lines, verbatim, with every path replaced by `<project-dir>`.
+- The `cairn doctor` output lines, verbatim, with every path replaced by its placeholder
+  and the server address replaced by `<server-url>`. The doctor's server line carries the
+  address the client was given, so that line needs the replacement.
 - For section 3: the time of `/compact`, the agent's first reply after it (up to three
   lines), and the debug log's `SessionStart` entry, with paths redacted.
 - For sections 4 and 5: the path or prefix each client reported, and whether it matched
@@ -236,7 +238,8 @@ times in UTC, as you read them from your own clock. Do not estimate a time.
 - A verdict for sections 3, 4 and 5: pass, fail, or not run, with the reason.
 
 Redact every path you paste. Replace the home directory, the project directory and the
-log file path with the placeholders in the table above.
+log file path with the placeholders in the table above. Replace every server address,
+including the one in the doctor's server line, with `<server-url>`.
 
 ## 7. Cleanup
 
@@ -256,7 +259,9 @@ log file path with the placeholders in the table above.
 Paste these, in this order, in one message:
 
 1. The `cairn version` output and the client versions from section 6.
-2. The `cairn doctor --agent claude-code` output from 3.4, and the verdict for section 3.
+2. The `cairn doctor --agent claude-code` output from 3.4, with the server address as
+   `<server-url>` and the paths as their placeholders, as section 6 says, and the verdict
+   for section 3.
 3. The time of `/compact` and the agent's first reply after it, from 3.7 and 3.8.
 4. The `SessionStart` debug log entry from 3.9, redacted.
 5. The Stop warning from 3.10, if you ran it.
