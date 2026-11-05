@@ -358,6 +358,49 @@ func TestDoctorAgentDoesNotReadALinkOrANonRegularFile(t *testing.T) {
 	})
 }
 
+// TestDoctorAgentFollowsTheUsersSettingsLink checks the user's settings file when it is a link, as a dotfiles repository
+// makes it: the link is followed, and the hook in its target is found with no warning. A target that is not a regular file
+// is still a warning, and the warning does not say enable refuses the file, since enable never writes the user's file.
+func TestDoctorAgentFollowsTheUsersSettingsLink(t *testing.T) {
+	t.Run("a link to a file with a Stop hook", func(t *testing.T) {
+		dir := agentProject(t)
+		target := writeFile(t, dir, "dotfiles-settings.json", stopEntry)
+		user := userSettings(t)
+		if err := os.MkdirAll(filepath.Dir(user), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, user); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		checks := claudeCodeChecks(dir)
+		if stop := checkNamed(checks, "Stop"); stop == nil || stop.status != "ok" {
+			t.Errorf("Stop is %+v, want it found through the link", stop)
+		}
+		for _, c := range checks {
+			if c.name == "settings" {
+				t.Errorf("a link the user owns is warned about: %+v", c)
+			}
+		}
+	})
+	t.Run("a link to a directory", func(t *testing.T) {
+		dir := agentProject(t)
+		target := filepath.Join(dir, "a-directory")
+		if err := os.MkdirAll(target, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		user := userSettings(t)
+		if err := os.MkdirAll(filepath.Dir(user), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, user); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		assertSettingsWarning(t, claudeCodeChecks(dir), user+" is not a regular file")
+	})
+}
+
 // TestDoctorAgentDoesNotReadAFileLargerThanTheCap checks the cap. A file of exactly maxSettingsBytes is read, with no
 // warning. One byte more is a warning that says doctor does not read it, and enable is not named as refusing it.
 func TestDoctorAgentDoesNotReadAFileLargerThanTheCap(t *testing.T) {

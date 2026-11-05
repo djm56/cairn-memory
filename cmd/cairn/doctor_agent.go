@@ -20,6 +20,13 @@ import (
 // but a hook installed there runs, so doctor reads it.
 const settingsFileName = "settings.json"
 
+// settingsFile is one settings file doctor reads: its path, and whether it is the user's file, which doctor follows through a
+// link and whose refusals carry no note that enable refuses it, since enable never writes it.
+type settingsFile struct {
+	path string
+	user bool
+}
+
 // installedHook is one cairn hook found in a settings file: the file, the event it is registered under, and the
 // matcher of the entry that holds it. An entry with no matcher has "". notString is set when the entry has a matcher
 // that is not a string, which the settings format does not allow: doctor cannot read such a matcher, and says so.
@@ -35,17 +42,18 @@ type installedHook struct {
 // project's .claude/settings.json, then the user's ~/.claude/settings.json. It reports each cairn hook it finds under
 // its event, with the file it is in and its matcher. A hook that is not installed is a warning, not a failure: the
 // hooks are optional, and a project that has not run enable is not broken. A file that enable would refuse is a
-// warning with its reason, and the other files are still read. A file that is a link, is not a regular file, or is
-// larger than maxSettingsBytes is not read at all. wd is the directory the command runs from, which finds
-// the project as the other commands do.
+// warning with its reason, and the other files are still read. A project file that is a link, is not a regular file, or is
+// larger than maxSettingsBytes is not read at all. The user's file is the exception to the link rule: it is followed, since
+// the user owns that path and a dotfiles link is common, and its target must still be a regular file under the cap. wd is
+// the directory the command runs from, which finds the project as the other commands do.
 func claudeCodeChecks(wd string) []check {
 	var checks []check
-	var files []string
+	var files []settingsFile
 	project, err := identity.Resolve(wd)
 	switch {
 	case err == nil && project.Path != "":
 		root := filepath.Dir(project.Path)
-		files = append(files, filepath.Join(root, settingsDir, settingsName), filepath.Join(root, settingsDir, settingsFileName))
+		files = append(files, settingsFile{path: filepath.Join(root, settingsDir, settingsName)}, settingsFile{path: filepath.Join(root, settingsDir, settingsFileName)})
 	case err == nil:
 		// CAIRN_PROJECT names the project, and the project directory is found from a file, so with no file there is none.
 		checks = append(checks, check{name: "settings", status: "skip", detail: "CAIRN_PROJECT names the project, but there is no project file to find its settings from, so the project's settings are not read"})
@@ -55,16 +63,16 @@ func claudeCodeChecks(wd string) []check {
 		checks = append(checks, check{name: "settings", status: "skip", detail: "the project file could not be read, so the project's settings are not read: " + reason(err)})
 	}
 	if home, err := os.UserHomeDir(); err == nil {
-		files = append(files, filepath.Join(home, ".claude", settingsFileName))
+		files = append(files, settingsFile{path: filepath.Join(home, ".claude", settingsFileName), user: true})
 	} else {
 		checks = append(checks, check{name: "settings", status: "skip", detail: "no home directory, so the user's settings are not read"})
 	}
 
 	var found []installedHook
-	for _, path := range files {
-		hooks, err := readSettingsHooks(path)
+	for _, f := range files {
+		hooks, err := readSettingsHooks(f.path, f.user)
 		if err != nil {
-			checks = append(checks, check{name: "settings", status: "warn", detail: path + " " + err.Error()})
+			checks = append(checks, check{name: "settings", status: "warn", detail: f.path + " " + err.Error()})
 			continue
 		}
 		found = append(found, hooks...)
@@ -177,10 +185,15 @@ const tailRefused = ": cairn enable refuses it and leaves it as it is"
 
 // readSettingsHooks reads the settings file at path and returns each cairn hook under the three events. A file that is
 // not there has none. A file that cannot be read, or that enable refuses, is an error whose text completes the sentence
-// "<path> ...": readCheckedFile gives the reasons for the file itself, and the merge refusals are enable's own. Entries
-// that are not shaped as the settings format gives them are not matches, as in enable.
-func readSettingsHooks(path string) ([]installedHook, error) {
-	raw, err := readCheckedFile(path)
+// "<path> ...": readSettingsFile gives the reasons for the file itself, and the merge refusals are enable's own. For a
+// project file the refusals end by saying enable refuses the file; for the user's file they do not, since enable never
+// writes it. Entries that are not shaped as the settings format gives them are not matches, as in enable.
+func readSettingsHooks(path string, user bool) ([]installedHook, error) {
+	tail := tailRefused
+	if user {
+		tail = ""
+	}
+	raw, err := readSettingsFile(path, user)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -188,16 +201,16 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 		return nil, err
 	}
 	if !json.Valid(raw) {
-		return nil, errors.New("is not valid JSON" + tailRefused)
+		return nil, errors.New("is not valid JSON" + tail)
 	}
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {
-		return nil, errors.New("is not a JSON object" + tailRefused)
+		return nil, errors.New("is not a JSON object" + tail)
 	}
 	var byEvent map[string]json.RawMessage
 	if hooksRaw, ok := doc["hooks"]; ok {
 		if err := json.Unmarshal(hooksRaw, &byEvent); err != nil || byEvent == nil {
-			return nil, errors.New(`has a "hooks" key that is not a JSON object` + tailRefused)
+			return nil, errors.New(`has a "hooks" key that is not a JSON object` + tail)
 		}
 	}
 	var found []installedHook
@@ -208,7 +221,7 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 		}
 		var entries []json.RawMessage
 		if err := json.Unmarshal(eventRaw, &entries); err != nil || entries == nil {
-			return nil, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array%s`, h.event, tailRefused)
+			return nil, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array%s`, h.event, tail)
 		}
 		for _, e := range commandEntries(entries, h.cmdline) {
 			found = append(found, installedHook{path: path, event: h.event, matcher: e.matcher, notString: e.notString})
@@ -217,42 +230,57 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 	return found, nil
 }
 
-// readCheckedFile returns the bytes of the file at path, which enable merges, or the reason doctor does not read it. The path is
-// looked at with Lstat before it is opened, so a symbolic link, a FIFO, a device or a directory is not opened: opening a
-// FIFO or a device can block, and a link would take doctor to a file enable does not touch. The open file is checked
-// again, and the read stops one byte past the cap, so a file that changes between the two looks is still refused. A file
-// that is not there is fs.ErrNotExist, unchanged, so the caller can treat it as having no hooks.
+// readCheckedFile returns the bytes of the project file at path, which enable merges, or the reason doctor does not read it.
+// It is readSettingsFile for a file enable writes: a link is refused, and the refusal says so.
 func readCheckedFile(path string) ([]byte, error) {
-	info, err := os.Lstat(path)
+	return readSettingsFile(path, false)
+}
+
+// readSettingsFile returns the bytes of the file at path, or the reason doctor does not read it. The path is looked at with
+// Lstat before it is opened, so a symbolic link, a FIFO, a device or a directory is not opened: opening a FIFO or a device
+// can block, and a link would take doctor to a file enable does not touch. The open file is checked again, and the read
+// stops one byte past the cap, so a file that changes between the two looks is still refused. A file that is not there is
+// fs.ErrNotExist, unchanged, so the caller can treat it as having no hooks.
+//
+// For the user's file (user is set) the path is looked at with Stat instead, so a link is followed to its target, which must
+// still be a regular file under the cap. The refusals then carry no note that enable refuses the file.
+func readSettingsFile(path string, user bool) ([]byte, error) {
+	tail := tailRefused
+	stat := os.Lstat
+	if user {
+		tail = ""
+		stat = os.Stat
+	}
+	info, err := stat(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
-		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+		return nil, fmt.Errorf("could not be read: %w%s", err, tail)
 	}
 	switch {
 	case info.Mode()&fs.ModeSymlink != 0:
-		return nil, errors.New("is a symbolic link, which doctor does not follow" + tailRefused)
+		return nil, errors.New("is a symbolic link, which doctor does not follow" + tail)
 	case !info.Mode().IsRegular():
-		return nil, errors.New("is not a regular file" + tailRefused)
+		return nil, errors.New("is not a regular file" + tail)
 	case info.Size() > maxSettingsBytes:
 		return nil, fmt.Errorf("is larger than %d bytes, so doctor does not read it", maxSettingsBytes)
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+		return nil, fmt.Errorf("could not be read: %w%s", err, tail)
 	}
 	defer f.Close()
 	opened, err := f.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+		return nil, fmt.Errorf("could not be read: %w%s", err, tail)
 	}
 	if !opened.Mode().IsRegular() {
-		return nil, errors.New("is not a regular file" + tailRefused)
+		return nil, errors.New("is not a regular file" + tail)
 	}
 	raw, err := io.ReadAll(io.LimitReader(f, maxSettingsBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("could not be read: %w%s", err, tailRefused)
+		return nil, fmt.Errorf("could not be read: %w%s", err, tail)
 	}
 	if len(raw) > maxSettingsBytes {
 		return nil, fmt.Errorf("is larger than %d bytes, so doctor does not read it", maxSettingsBytes)
