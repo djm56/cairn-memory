@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -20,7 +19,7 @@ func stepWarningOf(cur *core.TaskCurrent) string {
 func TestStepWarningNamesAnActiveStepWithNoSummary(t *testing.T) {
 	task := activeTask()
 	cur := &core.TaskCurrent{Task: &task, Steps: twoSteps()}
-	want := fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", 1, 2, "Write test")
+	want := `Cairn warning: step 1 of 2, "Write test", is active with no summary. Record a summary with step_update when it is done.` + "\n"
 	if got := stepWarningOf(cur); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
@@ -76,7 +75,7 @@ func TestStepWarningCountsSeveralActiveSteps(t *testing.T) {
 		{Number: 2, Title: "Implement", Status: core.StepActive},
 		{Number: 3, Title: "Document", Status: core.StepActive, Summary: "Done."},
 	}
-	want := fmt.Sprintf("Cairn warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with step_update when each is done.\n", 2, 1, 3, "Write test")
+	want := `Cairn warning: 2 steps are active with no summary; the first is step 1 of 3, "Write test". Record a summary with step_update when each is done.` + "\n"
 	if got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps}); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
@@ -87,7 +86,7 @@ func TestStepWarningCountsSeveralActiveSteps(t *testing.T) {
 func TestStepWarningFoldsTheTitle(t *testing.T) {
 	task := activeTask()
 	steps := []core.Step{{Number: 1, Title: "Write" + string(rune(0x0a)) + "test" + string(rune(0x1b)) + "[31m now", Status: core.StepActive}}
-	want := fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", 1, 1, "Write test now")
+	want := `Cairn warning: step 1 of 1, "Write test now", is active with no summary. Record a summary with step_update when it is done.` + "\n"
 	if got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps}); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}

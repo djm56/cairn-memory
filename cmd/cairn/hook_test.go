@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -153,7 +152,7 @@ func TestStopWarnsOnAnActiveStepWithNoSummary(t *testing.T) {
 	seen = nil
 
 	code, stdout, stderr := runCmd(t, "hook", "stop")
-	want := fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", 1, 2, "Read the schema")
+	want := `Cairn warning: step 1 of 2, "Read the schema", is active with no summary. Record a summary with step_update when it is done.` + "\n"
 	if code != 0 || stderr != "" || stdout != want {
 		t.Errorf("exit %d, stderr %q, stdout %q: want 0, nothing on stderr and the warning %q", code, stderr, stdout, want)
 	}
