@@ -703,7 +703,7 @@ func TestStopOutputOK(t *testing.T) {
 func TestDoctorHelp(t *testing.T) {
 	for _, flag := range []string{"--help", "-h"} {
 		code, stdout, stderr := runCmd(t, "doctor", flag)
-		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: cairn doctor [--agent claude-code]") || !strings.Contains(stdout, "-agent string") {
+		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: cairn doctor [--agent claude-code|opencode|pi]") || !strings.Contains(stdout, "-agent string") {
 			t.Errorf("doctor %s: exit %d, stdout %q, stderr %q", flag, code, stdout, stderr)
 		}
 	}

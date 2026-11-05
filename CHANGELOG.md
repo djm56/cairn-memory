@@ -171,6 +171,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 enable and doctor, pi (EXPERIMENTAL): the block in `AGENTS.md` names pi's tool prefix, `mcp__cairn__`, and says the prefix OpenCode gives the same tools, `cairn_`, since OpenCode reads `AGENTS.md` too. A block that an earlier cairn wrote is updated to the current text, with a backup first, and the text outside its markers is not touched. `cairn doctor --agent pi` warns on such an older block.
 - M4 doctor, opencode and pi (EXPERIMENTAL): the cairn server entry is compared on the fields enable writes, its type and command for OpenCode and its command, args and exposure for pi. Another value a person set, such as a timeout or an extra key, is not called a fault. `cairn enable` still reports an entry whose fields differ as differing, and leaves it as it is.
 - M4 enable, all clients: a file over 1 MiB is refused and left as it is, as doctor does not read it. The limit applies to `settings.local.json`, `opencode.json`, `.pi/mcp.json` and `AGENTS.md`, so a file a clone supplies cannot make enable read a large file whole.
+- M4 doctor: the usage line names all three agents, `claude-code`, `opencode` and `pi`.
 
 ### Changed
 

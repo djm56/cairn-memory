@@ -33,10 +33,11 @@ type check struct {
 //
 // With --agent claude-code it adds a section after those checks: the cairn hooks
 // found in the Claude Code settings files, and a dry run of each hook (doctor_agent.go).
+// That dry run is not read-only on the server: the first read of a project the server
+// has not seen creates the project's row, as the hooks do.
 // With --agent opencode or pi it adds a section, EXPERIMENTAL, that reads whether the
 // registration and the instructions of that client are in the project (doctor_clients.go).
-// That section writes no file. Its dry run is not read-only on the server: the first
-// read of a project the server has not seen creates the project's row, as the hooks do.
+// That section writes no file, and it makes no dry run.
 //
 // Every check runs, even after one fails, so the output shows every fault. Exit
 // codes: 0 when no check failed, 1 when one did, 2 for a usage error. A usage error
@@ -137,7 +138,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 
 // writeDoctorHelp prints the usage of cairn doctor, and its flags, to w.
 func writeDoctorHelp(w io.Writer, fl *flag.FlagSet) {
-	fmt.Fprintln(w, "Usage: cairn doctor [--agent claude-code]")
+	fmt.Fprintln(w, "Usage: cairn doctor [--agent claude-code|opencode|pi]")
 	fmt.Fprintln(w, "Checks the binary, the project file, the server and whether it answers as a Cairn server. Without --agent it changes nothing.")
 	fmt.Fprintln(w, "With --agent claude-code it also lists the cairn hooks in the Claude Code settings files, and runs each hook once against the server. No file is written.")
 	fmt.Fprintln(w, "Each hook reads the active task. The first read of a project the server has not seen creates the project's row, as the hooks do.")
