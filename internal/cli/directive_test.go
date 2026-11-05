@@ -68,6 +68,26 @@ func TestDirectiveListHuman(t *testing.T) {
 	}
 }
 
+// TestDirectiveListCapsLongText checks that a title and a rule longer than one line are cut as Plain
+// cuts them, the cap that recall's other lines have. The cut keeps the first MaxLineRunes-1 runes and ends
+// in an ellipsis, so one directive cannot fill a context, and the summary stays one line per field.
+func TestDirectiveListCapsLongText(t *testing.T) {
+	long := strings.Repeat("x", MaxLineRunes+50)
+	capped := strings.Repeat("x", MaxLineRunes-1) + "…"
+	svc := &fakeDirectives{list: &core.DirectiveList{Directives: []core.Directive{
+		{ID: 1, Code: "D-0001", Scope: core.ScopeGlobal, Title: long, Rule: long, Status: core.DirectiveActive},
+	}}}
+	code, out, errOut, _ := directiveRun(svc, "list")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	pad := strings.Repeat(" ", 10)
+	want := "  D-0001  global  " + capped + "\n" + pad + capped + "\n"
+	if out != want {
+		t.Errorf("human output = %q, want the title and rule cut to %d runes", out, MaxLineRunes)
+	}
+}
+
 // TestDirectiveListEmpty checks that a list with no directive says so, and still prints its counts.
 func TestDirectiveListEmpty(t *testing.T) {
 	svc := &fakeDirectives{list: &core.DirectiveList{Directives: []core.Directive{}}}
