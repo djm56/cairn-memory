@@ -86,7 +86,8 @@ func TestRestoreHoldHelper(t *testing.T) {
 }
 
 // startHolder starts a helper process that holds the database at db in mode, and returns once the
-// helper says it holds it, or fails the test if it has not said so within holderReadyTimeout. The helper runs until the test ends, when its standard input closes.
+// helper says it holds it. It fails the test if the helper has not said so within
+// holderReadyTimeout. The helper runs until the test ends, when it is killed.
 // The holder must be another process: POSIX locks belong to the process that takes them, so a lock
 // held by this process is not one the probe can see.
 func startHolder(t *testing.T, mode, db string) {
@@ -106,7 +107,11 @@ func startHolder(t *testing.T, mode, db string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		// The helper is killed before it is waited for. A helper that printed something other
+		// than "ready" and then wedged would not see its standard input close, and Wait would
+		// hang the test. Killing an exited process does nothing.
 		_ = stdin.Close()
+		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 	})
 	// The handshake has a deadline, so a helper that wedges before it says "ready" fails the test
