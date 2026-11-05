@@ -441,14 +441,7 @@ func writeSteps(w io.Writer, steps []core.Step) {
 	}
 	fmt.Fprintln(w, "steps")
 	for _, s := range steps {
-		line := fmt.Sprintf("  %d. [%s] %s", s.Number, FoldLine(string(s.Status)), FoldLine(s.Title))
-		if s.Agent != "" {
-			line += " (agent " + FoldLine(s.Agent) + ")"
-		}
-		if s.Summary != "" {
-			line += ": " + FoldLine(s.Summary)
-		}
-		fmt.Fprintln(w, line)
+		fmt.Fprintln(w, "  "+stepLine(s))
 	}
 }
 
