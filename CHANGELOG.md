@@ -175,6 +175,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 enable, all clients: a directory enable writes into, such as `.pi` or `.claude`, is followed through a link before the write. A link that leads outside the project, or that leads nowhere, is refused, and nothing is written.
 - M4 enable: an existing Claude Code hook whose matcher is not a string is reported as `matcher is not a string`, not as `(none)`. The output for `--agent pi` says that pi reads `.pi/mcp.json` only after the project is trusted.
 - M4 enable help (EXPERIMENTAL): the OpenCode instruction path, `.cairn/instructions.md`, is taken relative to the project root, and no real OpenCode run has confirmed that yet.
+- M4 conformance (#88): the conformance suite runs its agent calls through the `cairn` binary, and an exit check runs an agent with only bash that starts, works and closes a task through the CLI. The CLI does not carry error kinds, so the cases that check them are listed as deferred, with their reasons.
 
 ### Changed
 
