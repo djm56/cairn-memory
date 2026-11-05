@@ -174,6 +174,115 @@ func TestTaskStartUsageErrors(t *testing.T) {
 	}
 }
 
+// closedTask is the answer of task_close for a task that finished done, with its summary.
+func closedTask() *core.Task {
+	task := activeTask()
+	task.Status = core.TaskDone
+	task.OutcomeSummary = "limit shipped"
+	return &task
+}
+
+// TestTaskCloseHuman checks the human output of task close: the closed task with its outcome, and
+// that the request carries the outcome and the summary, with no list, since none was given.
+func TestTaskCloseHuman(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{task: closedTask()}
+	code, out, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--summary", "limit shipped", "--agent", "hicks")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	for _, want := range []string{"task-20261030-01  done  normal  Add rate limit\n", "outcome     limit shipped\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	req := svc.gotClose
+	if req.ID != "task-20261030-01" || req.Outcome != core.TaskDone || req.Summary != "limit shipped" {
+		t.Errorf("the request was %+v, want the id, outcome done and the summary", req)
+	}
+	if req.Lessons != nil || req.Mistakes != nil || req.Criteria != nil {
+		t.Errorf("lists were sent though none was given: lessons %v, mistakes %v, criteria %v", req.Lessons, req.Mistakes, req.Criteria)
+	}
+}
+
+// TestTaskCloseJSONInputKeepsAbsentAndEmpty checks the rule of CONTRACT §2 through the input: a list
+// given as [] reaches the request as empty, and a list left out reaches it as absent.
+func TestTaskCloseJSONInputKeepsAbsentAndEmpty(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{task: closedTask()}
+	stdin := `{"criteria": [{"ord": 1, "result": "met", "evidence": "test ok"}], "lessons": [],` +
+		` "deliverables": [{"path": "docs/limit.md", "note": "write-up"}]}`
+	code, _, errOut := runWrite(t, Task, svc, stdin, "close", "task-20261030-01", "--outcome", "done", "--summary", "s", "--json-input", "--agent", "hicks")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	req := svc.gotClose
+	if len(req.Criteria) != 1 || req.Criteria[0].Result != core.CriterionMet || req.Criteria[0].Evidence != "test ok" {
+		t.Errorf("criteria %+v, want the one result given", req.Criteria)
+	}
+	if req.Lessons == nil || len(req.Lessons) != 0 {
+		t.Errorf("lessons %v, want an empty list, which says there are none", req.Lessons)
+	}
+	if req.Mistakes != nil {
+		t.Errorf("mistakes %v, want absent: the key was left out", req.Mistakes)
+	}
+	if len(req.Deliverables) != 1 || req.Deliverables[0].Path != "docs/limit.md" {
+		t.Errorf("deliverables %+v, want the one given", req.Deliverables)
+	}
+}
+
+// TestTaskCloseNoLessonsReason checks that --no-lessons-reason reaches the request, for a close
+// whose lessons are [].
+func TestTaskCloseNoLessonsReason(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{task: closedTask()}
+	if code, _, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--summary", "s", "--no-lessons-reason", "nothing new came up", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if svc.gotClose.NoLessonsReason != "nothing new came up" {
+		t.Errorf("no-lessons reason %q, want the one given", svc.gotClose.NoLessonsReason)
+	}
+}
+
+// TestTaskCloseRefusedByServer checks a refusal of the close policy: the server's message on stderr
+// as one line, exit 1, and nothing on stdout.
+func TestTaskCloseRefusedByServer(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	refusal := core.Refused("close policy not met: summary, lessons, mistakes")
+	refusal.Missing = []string{core.MissingSummary, core.MissingLessons, core.MissingMistakes}
+	svc := &fakeWrites{err: refusal}
+	code, out, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--agent", "hicks")
+	if code != 1 || out != "" || errOut != "cairn task close: close policy not met: summary, lessons, mistakes\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1, nothing on stdout and the refusal", code, out, errOut)
+	}
+}
+
+// TestTaskCloseUsageErrors checks the usage errors of task close: no task id, two flags that read
+// standard input, a key --json-input does not name, and no agent. Each exits 2 and makes no call.
+func TestTaskCloseUsageErrors(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	cases := []struct {
+		name  string
+		stdin string
+		args  []string
+		want  string
+	}{
+		{"no task id", "", []string{"close", "--outcome", "done", "--summary", "s", "--agent", "hicks"}, "name one task id"},
+		{"two flags read standard input", `{"lessons": []}`, []string{"close", "task-20261030-01", "--outcome", "done", "--summary", "-", "--json-input", "--agent", "hicks"}, "both read standard input"},
+		{"a key --json-input does not name", `{"lesson": []}`, []string{"close", "task-20261030-01", "--outcome", "done", "--summary", "s", "--json-input", "--agent", "hicks"}, "not the JSON object this call takes"},
+		{"no agent", "", []string{"close", "task-20261030-01", "--outcome", "done", "--summary", "s"}, "no agent name"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{task: closedTask()}
+			code, _, errOut := runWrite(t, Task, svc, c.stdin, c.args...)
+			if code != 2 || !strings.Contains(errOut, c.want) || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming %q and no call", code, errOut, svc.calls, c.want)
+			}
+		})
+	}
+}
+
 // TestTaskStartHelpNamesTheVariable checks that -h names the agent variable and the stdin forms,
 // so the fallback and the "-" are written where a person reads the flags.
 func TestTaskStartHelpNamesTheVariable(t *testing.T) {

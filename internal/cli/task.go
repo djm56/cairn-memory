@@ -41,7 +41,7 @@ type Opener func() (Session, error)
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
 func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start")
+		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start|close")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -54,8 +54,10 @@ func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return taskList(open, rest, stdout, stderr)
 	case "start":
 		return taskStart(open, rest, stdin, stdout, stderr)
+	case "close":
+		return taskClose(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start\n", verb)
+	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start|close\n", verb)
 	return 2
 }
 
@@ -370,8 +372,7 @@ func currentStep(steps []core.Step) *core.Step {
 // A label is one line, so a multi-line goal is folded; the JSON keeps the text whole.
 func writeDetail(w io.Writer, d *core.TaskDetail) {
 	t := d.Task
-	fmt.Fprintf(w, "%s  %s  %s  %s\n", FoldLine(t.ID), FoldLine(string(t.Status)), FoldLine(string(t.Priority)), FoldLine(t.Title))
-	writeBody(w, &t)
+	writeTask(w, &t)
 	writeCriteria(w, d.Criteria)
 	writeFiles(w, "key files", d.KeyFiles)
 	writeSteps(w, d.Steps)
@@ -391,6 +392,13 @@ func writeDetail(w io.Writer, d *core.TaskDetail) {
 		fmt.Fprintf(w, "mistake     %s (%s): %s\n", FoldLine(m.Agent), FoldLine(string(m.Impact)), FoldLine(m.Mistake))
 	}
 	writeFiles(w, "deliverables", d.Deliverables)
+}
+
+// writeTask prints one task for a person: its header, its id, status, priority and title, then the
+// labelled fields of its body. A write prints the task this way, and task get does too.
+func writeTask(w io.Writer, t *core.Task) {
+	fmt.Fprintf(w, "%s  %s  %s  %s\n", FoldLine(t.ID), FoldLine(string(t.Status)), FoldLine(string(t.Priority)), FoldLine(t.Title))
+	writeBody(w, t)
 }
 
 // writeBody prints the labelled fields of a task that both the summary and the detail share:

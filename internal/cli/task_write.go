@@ -81,6 +81,72 @@ func taskStart(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 	return 0
 }
 
+// closeInput is the JSON form of the structured fields of task_close (CONTRACT §2): the criteria
+// results, the lessons, the mistakes and the deliverables. A list that is left out is absent, which
+// the close policy refuses for lessons and mistakes; [] says there are none. A key it does not name
+// is refused.
+type closeInput struct {
+	Criteria     []core.CriterionOutcome `json:"criteria"`
+	Lessons      []core.Lesson           `json:"lessons"`
+	Mistakes     []core.Mistake          `json:"mistakes"`
+	Deliverables []core.TaskFile         `json:"deliverables"`
+}
+
+// taskClose is `cairn task close <id> --outcome done|failed --summary s [--no-lessons-reason r]
+// [--json-input] [--agent a] [--json]`: the task closed with its outcome (CONTRACT §2, task_close).
+// A refused close changes nothing, and the refusal names what is missing. The structured fields
+// come from standard input as one JSON object when --json-input is given.
+func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	const verb = "cairn task close"
+	fl, asJSON := newFlags(verb)
+	agent := fl.String("agent", "", agentHelp)
+	outcome := fl.String("outcome", "", "done or failed")
+	summary := fl.String("summary", "", "what was done, in a few sentences; - reads standard input")
+	noLessons := fl.String("no-lessons-reason", "", "why there are no lessons, when the lessons are []; - reads standard input")
+	jsonInput := fl.Bool("json-input", false, "read criteria, lessons, mistakes and deliverables from standard input as one JSON object; a list left out is absent")
+	pos, code, done := parse(fl, args, stdout, stderr)
+	if done {
+		return code
+	}
+	if len(pos) != 1 {
+		fmt.Fprintln(stderr, verb+": name one task id: cairn task close <id> --outcome done --summary s")
+		return 2
+	}
+	in := &inputs{stdin: stdin}
+	req := core.TaskCloseRequest{ID: pos[0], Outcome: core.TaskStatus(*outcome)}
+	var err error
+	if req.Summary, err = in.text("summary", *summary); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.NoLessonsReason, err = in.text("no-lessons-reason", *noLessons); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if *jsonInput {
+		var body closeInput
+		if err := in.decode("json-input", &body); err != nil {
+			return usageErr(stderr, verb, err)
+		}
+		req.Criteria, req.Lessons, req.Mistakes, req.Deliverables = body.Criteria, body.Lessons, body.Mistakes, body.Deliverables
+	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
+	s, err := open()
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	t, err := s.Svc.TaskClose(withAgent(s.Ctx, name), req)
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	if *asJSON {
+		return writeJSON(stdout, stderr, verb, t)
+	}
+	writeTask(stdout, t)
+	return 0
+}
+
 // writeStarted prints a started task for a person: its id and status, then its plan.
 func writeStarted(w io.Writer, res *core.TaskStartResult) {
 	fmt.Fprintf(w, "%s  %s\n", FoldLine(res.ID), FoldLine(string(res.Status)))
