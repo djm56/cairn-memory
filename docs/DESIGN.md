@@ -495,7 +495,7 @@ in M2, and M1's tests ran against an in-process server (D19).
 | `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The M1 binary had no network listener (D19). The `cairn serve` listener of M2 mounts them (D20). |
 | `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
 | `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. Built in M1. |
-| `internal/cli` | Planned, M4. The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
+| `internal/cli` | Built in M4 (#87). The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
 | `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
 | `internal/auth` | API keys and scopes (server mode). |
 | `internal/ui` | The web pages, embedded in the binary. |
@@ -515,13 +515,21 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
 | `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are built in M4 (#83, #84). What Claude Code does with each is in §4.1. |
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
-| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is placed in M4 (D22). |
+| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` prints every task of the project, built in M4 (D22). |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
-| `cairn enable --agent <name>` | Planned, M4. Installs a client's hooks (`session-start`, `pre-compact`, `stop`) and its registration. `claude-code` first; `opencode` and `pi` are written experimental. |
+| `cairn enable --agent <name>` | Built in M4 (#85). For `claude-code`, it adds the three hooks (`session-start`, matched on `startup`, `resume`, `clear` and `compact`; `pre-compact`; `stop`) to the project's `.claude/settings.local.json`, and writes no MCP registration: that comes through the M5 plugin or `claude mcp add`. For `opencode` and `pi`, which are EXPERIMENTAL, it also writes the MCP registration and the task-loop instructions. Before it writes an existing file, it copies the original to `cairn/backups/<project>` in the user's cache directory (`os.UserCacheDir`, outside the project), as a file of mode 0600 in a directory made 0700. `--dry-run` writes nothing. |
 | `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
 | `cairn restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
-| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1; `--agent` is planned, M4. |
+| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1. `--agent` (`claude-code`, `opencode` or `pi`) is built in M4 (#86): for `claude-code` it lists the cairn hooks in the settings files and runs each once against the server, and it warns when the SessionStart matcher does not name `compact`; for `opencode` and `pi` (EXPERIMENTAL) it reports whether the registration and the instructions are in place. No file is written. |
+| `cairn task` | `current`, `get`, `list`, `start`, `update` and `close` a task, each with `--json`. Built in M4 (#87). |
+| `cairn step` | `add`, `update` and `plan` the steps of a task, each with `--json`. Built in M4 (#87). |
+| `cairn event log` | Logs an event on a task, with `--json`. Built in M4 (#87). |
+| `cairn learning` | `add` proposes a learning and `list` reads the project's learnings, each with `--json`. Built in M4 (#87). |
+| `cairn directive list` | The directives that apply, ranked and capped at 12, with the `expired` and `omitted` counts, with `--json`. Built in M4 (#87). |
+| `cairn recall --goal <text>` | What applies to a goal, as the `recall` tool gives it, with `--json`. Built in M4 (#87). |
+| `cairn search --query <text>` | Full-text search, as the `search` tool gives it, with `--json`. Built in M4 (#87). |
+| `cairn prime` | The session-start view for an agent with only a shell: the session-start block the hook writes, then the active task, with `--json`. Built in M4 (#87). |
 
 #### 5.2.1 Backup and restore (M2, #74)
 
@@ -1337,9 +1345,9 @@ rules, written in terms of the same tools.
 ### 6.2 Other clients
 
 Plan v1 (decision D14) gives every client other than Claude Code the CLI over
-the same HTTP API (`internal/cli`, planned for M4). Bash is enough for that, so
+the same HTTP API (`internal/cli`, built in M4). Bash is enough for that, so
 no per-harness plugin is needed in v1. The rows below are the per-client
-registrations. They come through `cairn enable` in M4 (OpenCode and Pi
+registrations. They come through `cairn enable`, built in M4 (OpenCode and Pi
 experimental, as PLAN.md §3 sets out). Per-harness plugins are Later.
 
 | Client | Registration | Instructions | Notes |
