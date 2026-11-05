@@ -273,6 +273,22 @@ func TestLearningListJSON(t *testing.T) {
 	}
 }
 
+// TestLearningListEmptyJSON checks that a list with no learning writes the learnings as [], an array,
+// and the next cursor as absent.
+func TestLearningListEmptyJSON(t *testing.T) {
+	svc := &fakeLearning{list: &core.LearningList{Learnings: []core.Learning{}}}
+	code, out, errOut, _ := learningRun(svc, strings.NewReader(""), "list", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, want one line of JSON, got %q", code, errOut, out)
+	}
+	if got := jsonField(t, out, "learnings"); got != "[]" {
+		t.Errorf("learnings = %s, want []", got)
+	}
+	if next := jsonField(t, out, "next"); next != "" {
+		t.Errorf("next = %s with no page after it, want the key absent", next)
+	}
+}
+
 // TestLearningListRefusedThroughTheFake checks that a refusal of the server exits 1 with the reason
 // on stderr and nothing on stdout.
 func TestLearningListRefusedThroughTheFake(t *testing.T) {

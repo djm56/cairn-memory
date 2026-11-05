@@ -94,6 +94,22 @@ func TestDirectiveListJSON(t *testing.T) {
 	}
 }
 
+// TestDirectiveListEmptyJSON checks that a list with no directive writes the directives as [], an
+// array, and the counts as 0, as the contract has them.
+func TestDirectiveListEmptyJSON(t *testing.T) {
+	svc := &fakeDirectives{list: &core.DirectiveList{Directives: []core.Directive{}}}
+	code, out, errOut, _ := directiveRun(svc, "list", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, want one line of JSON, got %q", code, errOut, out)
+	}
+	if got := jsonField(t, out, "directives"); got != "[]" {
+		t.Errorf("directives = %s, want []", got)
+	}
+	if expired, omitted := jsonField(t, out, "expired"), jsonField(t, out, "omitted"); expired != "0" || omitted != "0" {
+		t.Errorf("expired %s, omitted %s; want 0 and 0", expired, omitted)
+	}
+}
+
 // TestDirectiveListAgentFlag checks the request of directive list. --agent narrows the list to the
 // role it names. With the flag left out, the request names no role, even when CAIRN_AGENT is set, so
 // the list is every role, as the contract has it.

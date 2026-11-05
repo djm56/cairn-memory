@@ -46,6 +46,36 @@ func TestHelpListsTheLearningAndDirectiveVerbs(t *testing.T) {
 	}
 }
 
+// TestEmptyListsAreArraysThroughTheServer runs learning list and directive list, in JSON, against a
+// real server with nothing in the project. Each list must come back as [], and not null: the
+// server's own answer is what a script reads, so the check is made on the wire form, not a fake.
+func TestEmptyListsAreArraysThroughTheServer(t *testing.T) {
+	_, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	t.Setenv("CAIRN_AGENT", "")
+	for _, c := range []struct {
+		key  string
+		args []string
+	}{
+		{"learnings", []string{"learning", "list", "--json"}},
+		{"directives", []string{"directive", "list", "--json"}},
+	} {
+		code, out, errOut := runCmd(t, c.args...)
+		if code != 0 || errOut != "" {
+			t.Fatalf("%v: exit %d, stderr %q", c.args, code, errOut)
+		}
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(out), &obj); err != nil {
+			t.Fatalf("%v: the output is not a JSON object: %v\n%s", c.args, err, out)
+		}
+		if got := string(obj[c.key]); got != "[]" {
+			t.Errorf("%v: %s = %s, want []", c.args, c.key, got)
+		}
+	}
+}
+
 // TestLearningAndDirectiveThroughTheServer runs learning add and list, and directive list, against a
 // real server, in JSON and as text. It checks that a proposal is stored as proposed under the agent
 // named, that a task id the server does not hold is refused, and that a directive scoped to a role is

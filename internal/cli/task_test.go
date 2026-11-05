@@ -65,6 +65,17 @@ func oneLine(s string) bool {
 	return strings.Count(s, "\n") == 1 && strings.HasSuffix(s, "\n")
 }
 
+// jsonField returns the raw JSON value of key in the object out. A list that holds nothing must
+// encode as [] and not null, so a script that reads it gets an array; a test checks the raw text.
+func jsonField(t *testing.T, out, key string) string {
+	t.Helper()
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(out), &obj); err != nil {
+		t.Fatalf("the output is not a JSON object: %v\n%s", err, out)
+	}
+	return string(obj[key])
+}
+
 // activeTask is a task with two steps, the first active, for the reads below.
 func activeTask() core.Task {
 	return core.Task{
