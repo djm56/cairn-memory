@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -213,10 +214,12 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 	}
 	if !changed {
 		fmt.Fprintf(stdout, "unchanged: %s\n", path)
+		warnIfNotOnPath(stderr)
 		return 0
 	}
 	if dryRun {
 		fmt.Fprintf(stdout, "dry run: nothing written to %s\n", path)
+		warnIfNotOnPath(stderr)
 		return 0
 	}
 
@@ -249,7 +252,17 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 	if backup != "" {
 		fmt.Fprintf(stdout, "backup %s\n", backup)
 	}
+	warnIfNotOnPath(stderr)
 	return 0
+}
+
+// warnIfNotOnPath warns on stderr when cairn is not on the PATH of this shell. The hooks run the bare command cairn,
+// so the client that runs them must find it on its own PATH. enable cannot see that PATH, so the warning is only a
+// guide. It does not change the exit code.
+func warnIfNotOnPath(stderr io.Writer) {
+	if _, err := exec.LookPath("cairn"); err != nil {
+		fmt.Fprintln(stderr, "cairn enable: warning: cairn is not on the PATH of this shell; the hooks run cairn by name, so put the binary on the PATH Claude Code uses")
+	}
 }
 
 // addClaudeHooks merges hooks into the settings document in raw, which is the file as it is when exists is true.

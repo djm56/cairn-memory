@@ -55,14 +55,27 @@ var (
 
 // enableProject makes a project with a project file, runs the commands from it, and fixes the backup clock. It
 // returns the project root. Every path a test writes is under it, and useDir points HOME at a fresh directory, so
-// no settings file of the machine is reachable.
+// no settings file of the machine is reachable. cairnOnPath makes the command findable, so a success prints nothing
+// on stderr.
 func enableProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\n")
 	useDir(t, dir)
 	setEnableClock(t)
+	cairnOnPath(t)
 	return dir
+}
+
+// cairnOnPath makes a file named cairn in a fresh directory, and makes that directory the whole PATH for the test, so
+// enable finds the command.
+func cairnOnPath(t *testing.T) {
+	t.Helper()
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "cairn"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
 }
 
 // setEnableClock fixes the clock a backup's name is read from, until the test ends.
@@ -538,6 +551,27 @@ func TestEnableDryRunWritesNothing(t *testing.T) {
 			t.Errorf(".claude holds %v, want no backup", got)
 		}
 	})
+}
+
+// TestEnableWarnsWhenCairnIsNotOnThePath checks that a write with cairn off the PATH still exits 0 and writes the file,
+// and that the warning goes to stderr and names the PATH.
+func TestEnableWarnsWhenCairnIsNotOnThePath(t *testing.T) {
+	dir := enableProject(t)
+	t.Setenv("PATH", t.TempDir())
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q: want 0, since the warning does not change the exit code", code, stderr)
+	}
+	if !strings.Contains(stderr, "not on the PATH") {
+		t.Errorf("stderr %q does not warn about the PATH", stderr)
+	}
+	if !strings.Contains(stdout, "wrote "+settingsIn(dir)+"\n") {
+		t.Errorf("stdout does not say the file was written:\n%s", stdout)
+	}
+	if _, err := os.Stat(settingsIn(dir)); err != nil {
+		t.Errorf("the settings file was not written: %v", err)
+	}
 }
 
 // TestEnableWithNoProjectFileExitsOne checks that a directory with no project file is not a project: enable exits 1,
