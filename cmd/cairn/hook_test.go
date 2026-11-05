@@ -186,6 +186,25 @@ func TestStopIsSilentWhenNoStepIsActive(t *testing.T) {
 	}
 }
 
+// TestStopIsSilentOnARestartedStepThatKeepsItsFailureSummary pins a deliberate limit of the warning. A step
+// that fails and starts again is active with the summary of its failed attempt, since a start does not clear
+// the summary. Stop does not name such a step. The stored step does not say which attempt a summary belongs
+// to, so the warning cannot tell this case from a finished one. The test keeps the limit a choice.
+func TestStopIsSilentOnARestartedStepThatKeepsItsFailureSummary(t *testing.T) {
+	local, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	id := seedTask(t, local, "acme-api")
+	updateStep(t, local, "acme-api", id, 1, core.StepFail, "Timed out reading the schema.")
+	updateStep(t, local, "acme-api", id, 1, core.StepStart, "")
+
+	code, stdout, stderr := runCmd(t, "hook", "stop")
+	if code != 0 || stderr != "" || stdout != "" {
+		t.Errorf("exit %d, stderr %q, stdout %q: want 0 and nothing, since the restarted step keeps its failure summary", code, stderr, stdout)
+	}
+}
+
 // TestStopIsSilentWithNoActiveTask checks that stop prints nothing for a project with no active task. Unlike
 // the other two events it has no no-task line.
 func TestStopIsSilentWithNoActiveTask(t *testing.T) {
@@ -368,8 +387,15 @@ func TestHooksGiveUpOnAServerThatNeverAnswers(t *testing.T) {
 // done. It fails the test when the server refuses the call.
 func finishStep(t *testing.T, local *core.Local, project, id string, number int, summary string) {
 	t.Helper()
+	updateStep(t, local, project, id, number, core.StepFinish, summary)
+}
+
+// updateStep applies action to step number of task id in project, with summary, as an agent does. It fails
+// the test when the server refuses the call.
+func updateStep(t *testing.T, local *core.Local, project, id string, number int, action core.StepAction, summary string) {
+	t.Helper()
 	ctx := core.WithCaller(context.Background(), core.Caller{Project: project, Agent: "main", Role: core.RoleAgent})
-	if _, err := local.StepUpdate(ctx, core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(number), Action: core.StepFinish, Summary: summary}); err != nil {
-		t.Fatalf("finish step %d: %v", number, err)
+	if _, err := local.StepUpdate(ctx, core.StepUpdateRequest{TaskID: id, Step: core.NumberRef(number), Action: action, Summary: summary}); err != nil {
+		t.Fatalf("%s step %d: %v", action, number, err)
 	}
 }
