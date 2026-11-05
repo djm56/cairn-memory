@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"strings"
@@ -28,51 +28,51 @@ func TestPlainFoldsAndStripsServerText(t *testing.T) {
 		"plain text, unchanged: a -> b && c <d>": "plain text, unchanged: a -> b && c <d>",
 	}
 	for in, want := range cases {
-		if got := plain(in); got != want {
-			t.Errorf("plain(%q) = %q, want %q", in, got, want)
+		if got := Plain(in); got != want {
+			t.Errorf("Plain(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
 
-// TestPlainCapsLength checks the cap: maxLineRunes runes in all, the last of them an
+// TestPlainCapsLength checks the cap: MaxLineRunes runes in all, the last of them an
 // ellipsis, and a text at the cap is kept whole.
 func TestPlainCapsLength(t *testing.T) {
-	exact := strings.Repeat("a", maxLineRunes)
-	if got := plain(exact); got != exact {
-		t.Errorf("a text of %d runes was changed", maxLineRunes)
+	exact := strings.Repeat("a", MaxLineRunes)
+	if got := Plain(exact); got != exact {
+		t.Errorf("a text of %d runes was changed", MaxLineRunes)
 	}
-	long := strings.Repeat("é", maxLineRunes+40)
-	got := plain(long)
-	if n := len([]rune(got)); n != maxLineRunes {
-		t.Errorf("capped text has %d runes, want %d", n, maxLineRunes)
+	long := strings.Repeat("é", MaxLineRunes+40)
+	got := Plain(long)
+	if n := len([]rune(got)); n != MaxLineRunes {
+		t.Errorf("capped text has %d runes, want %d", n, MaxLineRunes)
 	}
 	if !strings.HasSuffix(got, "…") {
 		t.Errorf("capped text %q does not end in an ellipsis", got)
 	}
 }
 
-// TestBlockTextKeepsLinesAndStripsControls checks blockText, for section bodies: the
+// TestBlockTextKeepsLinesAndStripsControls checks BlockText, for section bodies: the
 // line feeds and the tabs stay, a carriage return becomes a line feed, and the controls
 // and escape sequences go.
 func TestBlockTextKeepsLinesAndStripsControls(t *testing.T) {
 	in := "first\r\nsecond\rthird\x1b[2J\n\tindented\x07 end"
 	want := "first\nsecond\nthird\n\tindented\nend"
-	if got := blockText(in); got != want {
-		t.Errorf("blockText = %q, want %q", got, want)
+	if got := BlockText(in); got != want {
+		t.Errorf("BlockText = %q, want %q", got, want)
 	}
 }
 
 // TestFoldLineHasNoCap checks that the export's single-line fields are folded, not cut.
 func TestFoldLineHasNoCap(t *testing.T) {
-	long := strings.Repeat("b", maxLineRunes+10)
-	if got := foldLine(long); got != long {
-		t.Errorf("foldLine cut a text of %d runes", len(long))
+	long := strings.Repeat("b", MaxLineRunes+10)
+	if got := FoldLine(long); got != long {
+		t.Errorf("FoldLine cut a text of %d runes", len(long))
 	}
 }
 
 // TestFormatCharactersAreDropped checks that a format character (Unicode
 // category Cf) shows nothing and changes how the text around it is read, so plain,
-// foldLine and blockText drop each group of them, and keep the text on both sides.
+// FoldLine and BlockText drop each group of them, and keep the text on both sides.
 func TestFormatCharactersAreDropped(t *testing.T) {
 	groups := map[string][]rune{
 		"soft hyphen":            {0x00ad},
@@ -90,9 +90,9 @@ func TestFormatCharactersAreDropped(t *testing.T) {
 		for _, r := range runes {
 			in := "a" + string(r) + "b"
 			for fn, got := range map[string]string{
-				"plain":     plain(in),
-				"foldLine":  foldLine(in),
-				"blockText": blockText(in),
+				"plain":     Plain(in),
+				"FoldLine":  FoldLine(in),
+				"BlockText": BlockText(in),
 			} {
 				if got != "ab" {
 					t.Errorf("%s: %s(U+%04X) = %q, want %q", name, fn, r, got, "ab")
@@ -107,7 +107,7 @@ func TestFormatCharactersAreDropped(t *testing.T) {
 func TestFormatCharactersKeepOtherText(t *testing.T) {
 	in := "café 日本 👍 \u202eend"
 	want := "café 日本 👍 end"
-	if got := plain(in); got != want {
-		t.Errorf("plain(%q) = %q, want %q", in, got, want)
+	if got := Plain(in); got != want {
+		t.Errorf("Plain(%q) = %q, want %q", in, got, want)
 	}
 }
