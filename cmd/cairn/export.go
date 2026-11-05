@@ -69,7 +69,19 @@ func runExportTask(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn export task: %s\n", reason(err))
 		return 1
 	}
-	renderTask(stdout, detail, events)
+	var out bytes.Buffer
+	renderTask(&out, detail, events)
+	return writeExport(stdout, stderr, "cairn export task", out.Bytes())
+}
+
+// writeExport writes a finished export to stdout in one write, and returns the exit code. A write that
+// fails is reported on stderr with exit 1: an export that did not reach its destination must not look
+// complete, as a full disk or a closed pipe would make it.
+func writeExport(stdout, stderr io.Writer, what string, doc []byte) int {
+	if _, err := stdout.Write(doc); err != nil {
+		fmt.Fprintf(stderr, "%s: write the output: %v\n", what, err)
+		return 1
+	}
 	return 0
 }
 
@@ -104,8 +116,7 @@ func runExportProject(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if len(tasks) == 0 {
-		fmt.Fprintf(stdout, "no tasks in %s\n", foldLine(t.project.Name))
-		return 0
+		return writeExport(stdout, stderr, "cairn export project", []byte("no tasks in "+foldLine(t.project.Name)+"\n"))
 	}
 	var out bytes.Buffer
 	for i, task := range tasks {
@@ -119,8 +130,7 @@ func runExportProject(args []string, stdout, stderr io.Writer) int {
 		}
 		renderTask(&out, detail, events)
 	}
-	_, _ = stdout.Write(out.Bytes())
-	return 0
+	return writeExport(stdout, stderr, "cairn export project", out.Bytes())
 }
 
 // fetchTask reads one task as the export needs it: its detail, all of the brief, the steps and the close,
