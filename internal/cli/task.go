@@ -201,7 +201,9 @@ func newFlags(name string) (*flag.FlagSet, *bool) {
 // reads it, so a task id or a text that begins with a dash can be given after one. The tokens
 // are sorted here, into flags with their values and positionals, and the flags are parsed once.
 // done is true when the command should stop now: the flags were asked for with -h (code 0, their
-// list on stdout) or one was wrong (code 2, with the cause on stderr).
+// list on stdout) or one was wrong (code 2, with the cause on stderr). Every verb reads its flags here, so
+// the check every verb makes of CAIRN_AGENT (checkEnvAgent) is made here too, reads included: a name the
+// wire form refuses is a usage error, before the project is opened.
 func parse(fl *flag.FlagSet, args []string, stdout, stderr io.Writer) (pos []string, code int, done bool) {
 	var flagArgs []string
 	for i := 0; i < len(args); i++ {
@@ -228,6 +230,9 @@ func parse(fl *flag.FlagSet, args []string, stdout, stderr io.Writer) (pos []str
 		}
 		fmt.Fprintf(stderr, "%s: %v; run %s -h for the flags\n", fl.Name(), err, fl.Name())
 		return nil, 2, true
+	}
+	if !checkEnvAgent(fl.Name(), stderr) {
+		return nil, ExitUsage, true
 	}
 	return pos, 0, false
 }

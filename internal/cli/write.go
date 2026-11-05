@@ -56,6 +56,23 @@ func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, s
 	return name, true
 }
 
+// checkEnvAgent refuses CAIRN_AGENT when it is set to a name the wire form cannot carry (CONTRACT §1.1): a
+// control character, or a space at either end. The refusal is a usage error, exit 2, written to stderr, and
+// the verb opens no project. Every verb makes this check, reads included, whether or not the verb takes the
+// variable as its name, so a malformed caller name is refused, not ignored. A variable that is unset or only
+// spaces is no name, and passes. It returns false when it refused, having written the message.
+func checkEnvAgent(verb string, stderr io.Writer) bool {
+	name := os.Getenv(identity.EnvAgent)
+	if strings.TrimSpace(name) == "" {
+		return true
+	}
+	if err := core.CheckCaller(core.Caller{Agent: name}); err != nil {
+		fmt.Fprintf(stderr, "%s: the name from %s is refused: %s\n", verb, identity.EnvAgent, Reason(err))
+		return false
+	}
+	return true
+}
+
 // withAgent returns ctx with the caller's agent set to name. The rest of the caller is kept, so
 // the project and the client are still those the open gave.
 func withAgent(ctx context.Context, name string) context.Context {

@@ -16,8 +16,6 @@ type deferral struct{ name, reason string }
 // CLI cannot give.
 var deferrals = []deferral{
 	{"identity/viewer_first_read_is_not_found", "a viewer's read: the CLI calls as an agent only and cannot carry the viewer role"},
-	{"identity/agent_name_control_character_refused", "a control character in the agent name: task get, task list, learning list, directive list, recall and search are not sent the caller's name, so the CLI does not check it"},
-	{"identity/agent_name_edge_space_refused", "an edge space in the agent name: task get, task list, learning list, directive list, recall and search are not sent the caller's name, so the CLI does not check it"},
 	{"identity/client_name_refused", "the caller's client name is not carried: the CLI names itself cairn-cli"},
 	{"identity/session_name_refused", "the caller's session is not carried: the CLI sends no session"},
 

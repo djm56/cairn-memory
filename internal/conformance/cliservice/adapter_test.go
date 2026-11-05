@@ -176,6 +176,12 @@ func call[R any](s *Service, ctx context.Context, a *argv, stdin []byte) (*R, er
 	if c.Project != "" {
 		env = append(env, "CAIRN_PROJECT="+c.Project)
 	}
+	// The caller's agent goes in CAIRN_AGENT as well as in --agent where a verb takes one. Every verb checks
+	// the variable, reads included, so a malformed agent is refused on a read as core refuses it. A recall
+	// with no --agent takes the variable as its role, as core takes the caller's agent.
+	if c.Agent != "" {
+		env = append(env, "CAIRN_AGENT="+c.Agent)
+	}
 	cmd := exec.Command(cairnBin, a.args...)
 	cmd.Dir = s.dir
 	cmd.Env = env
