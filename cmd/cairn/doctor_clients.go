@@ -54,7 +54,7 @@ func openCodeChecks(root string) []check {
 	switch have, ok := mcp["cairn"]; {
 	case !ok:
 		checks = append(checks, check{name: "mcp", status: "warn", detail: "cairn is not registered in " + cfg + ": run cairn enable --agent opencode"})
-	case jsonEqual(have, openCodeEntry()):
+	case jsonFieldsEqual(have, openCodeCompared()):
 		checks = append(checks, check{name: "mcp", status: "ok", detail: "cairn is registered in " + cfg + " as cairn mcp"})
 	default:
 		checks = append(checks, check{name: "mcp", status: "warn", detail: "cairn is registered in " + cfg + " with other settings, which enable leaves as they are: edit the entry by hand"})
@@ -94,8 +94,9 @@ func piChecks(root string) []check {
 	return []check{piServerCheck(root), piBlockCheck(root)}
 }
 
-// piServerCheck reports the cairn server in the project file .pi/mcp.json: registered as enable writes it, registered with
-// other settings, or not registered.
+// piServerCheck reports the cairn server in the project file .pi/mcp.json: registered with the command, the args and the
+// exposure enable writes, registered with other values in those fields, or not registered. Other fields of the entry are not
+// compared.
 func piServerCheck(root string) check {
 	cfg := filepath.Join(root, filepath.FromSlash(piConfig))
 	doc, err := readObjectFile(cfg)
@@ -113,7 +114,7 @@ func piServerCheck(root string) check {
 	switch {
 	case !ok:
 		return check{name: "mcp", status: "warn", detail: "cairn is not registered in " + cfg + ": run cairn enable --agent pi"}
-	case jsonEqual(have, piEntry()):
+	case jsonFieldsEqual(have, piEntry()):
 		return check{name: "mcp", status: "ok", detail: "cairn is registered in " + cfg + " with exposure direct; pi reads this file only after the project is trusted"}
 	}
 	return check{name: "mcp", status: "warn", detail: "cairn is registered in " + cfg + " with other settings, which enable leaves as they are: edit the entry by hand"}

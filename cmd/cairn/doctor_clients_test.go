@@ -63,6 +63,33 @@ func TestDoctorOpenCodeAfterEnable(t *testing.T) {
 	}
 }
 
+// TestDoctorIgnoresTheRestOfTheCairnEntry checks that doctor compares the fields enable writes and no others. An OpenCode
+// entry with another timeout and an extra key is ok, and so is a pi entry with an extra key. A pi exposure other than direct
+// is still a warning, since the default would hide the tools from the model.
+func TestDoctorIgnoresTheRestOfTheCairnEntry(t *testing.T) {
+	t.Run("opencode with another timeout and an extra key", func(t *testing.T) {
+		dir := agentProject(t)
+		writeSettings(t, ocConfig(dir), `{"mcp": {"cairn": {"type": "local", "command": ["cairn", "mcp"], "timeout": 5000, "environment": {"A": "b"}}}}`)
+		if c := checkNamed(experimentalChecks("opencode", dir), "mcp"); c == nil || c.status != "ok" {
+			t.Errorf("mcp is %+v, want ok: the timeout and the extra key are the person's", c)
+		}
+	})
+	t.Run("pi with an extra key", func(t *testing.T) {
+		dir := agentProject(t)
+		writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct", "lifecycle": "lazy"}}}`)
+		if c := checkNamed(experimentalChecks("pi", dir), "mcp"); c == nil || c.status != "ok" {
+			t.Errorf("mcp is %+v, want ok: the extra key is the person's", c)
+		}
+	})
+	t.Run("pi with another exposure", func(t *testing.T) {
+		dir := agentProject(t)
+		writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "codemode"}}}`)
+		if c := checkNamed(experimentalChecks("pi", dir), "mcp"); c == nil || c.status != "warn" || !strings.Contains(c.detail, "with other settings") {
+			t.Errorf("mcp is %+v, want a warning about other settings", c)
+		}
+	})
+}
+
 // TestDoctorOpenCodeReadsCRLFAsTheSameText checks an instruction file with the current text and CRLF line endings, as a
 // checkout with autocrlf gives it: doctor reports it as holding the task loop.
 func TestDoctorOpenCodeReadsCRLFAsTheSameText(t *testing.T) {

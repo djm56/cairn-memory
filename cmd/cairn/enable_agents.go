@@ -46,6 +46,13 @@ func instructionsWith(prefix, note string) string {
 	return strings.NewReplacer("{prefix}", prefix, "{note}", note).Replace(instructionsTemplate)
 }
 
+// openCodeCompared is the part of the cairn entry doctor compares: its type and its command. The other fields, such as the
+// timeout, belong to the person who edits the entry, so doctor does not call them a fault.
+func openCodeCompared() map[string]any {
+	e := openCodeEntry()
+	return map[string]any{"type": e["type"], "command": e["command"]}
+}
+
 // instructionsMarker is the first line of the instruction file enable writes for OpenCode. It says the file is cairn's own
 // text, so enable may replace the file when cairn's text changes, and it is the line a person deletes to keep their own
 // edits. The file is not the AGENTS.md block, so the marker is not in that block.
@@ -321,6 +328,22 @@ func stringList(doc map[string]json.RawMessage, key string) ([]string, error) {
 		return nil, fmt.Errorf("has a %q key that is not an array of strings", key)
 	}
 	return list, nil
+}
+
+// jsonFieldsEqual reports whether raw is an object whose fields named in want hold the same JSON data as want's values. A
+// field that want does not name is not compared, so a person's own fields in the entry do not count.
+func jsonFieldsEqual(raw json.RawMessage, want map[string]any) bool {
+	var have map[string]json.RawMessage
+	if json.Unmarshal(raw, &have) != nil || have == nil {
+		return false
+	}
+	for key, v := range want {
+		h, ok := have[key]
+		if !ok || !jsonEqual(h, v) {
+			return false
+		}
+	}
+	return true
 }
 
 // jsonEqual reports whether raw holds the same JSON data as v, once v is encoded. Key order and layout do not count.
