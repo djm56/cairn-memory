@@ -518,6 +518,9 @@ func TestEnableRefusesWhenNoCacheDirectoryIsKnown(t *testing.T) {
 	if code != 1 || stdout != "" || !strings.Contains(stderr, "nothing was changed") {
 		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and nothing changed", code, stdout, stderr)
 	}
+	if !strings.Contains(stderr, "set HOME or XDG_CACHE_HOME") {
+		t.Errorf("stderr %q does not name the fix", stderr)
+	}
 	if string(readBytes(t, path)) != existingSettings {
 		t.Errorf("the file changed:\n%s", readBytes(t, path))
 	}
@@ -690,6 +693,7 @@ func TestEnableHelpSaysWhatItRewritesAndWhere(t *testing.T) {
 		"The backup holds the original text.",
 		"cairn must be on the PATH Claude Code uses",
 		"copies the original to cairn/backups/<project> in the user's cache directory",
+		"The backup is not kept for good",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("help lacks %q:\n%s", want, stdout)

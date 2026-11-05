@@ -153,6 +153,7 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "The file is rewritten in a new layout: its top-level keys are sorted and its whitespace is laid out again. The backup holds the original text.")
 	fmt.Fprintln(w, "The hooks run cairn by name, so cairn must be on the PATH Claude Code uses; enable warns when it is not on its own PATH.")
 	fmt.Fprintln(w, "Before it writes an existing file, it copies the original to cairn/backups/<project> in the user's cache directory (~/Library/Caches on macOS, ~/.cache on Linux), outside the project, and prints the path.")
+	fmt.Fprintln(w, "The backup is not kept for good: nothing prunes it, and a cleaner may clear the cache directory. Keep a copy of a backup you need.")
 	fmt.Fprintln(w, "A file that is not valid JSON is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
 	fmt.Fprintln(w, "Agents: claude-code. opencode and pi are not built yet.")
 	fl.SetOutput(w)
@@ -213,7 +214,7 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		}
 		if exists {
 			if backup, err = backupPath(name, enableNow()); err != nil {
-				fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed\n", path, err)
+				fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed: set HOME or XDG_CACHE_HOME, then run cairn enable again\n", path, err)
 				return 1
 			}
 			if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
