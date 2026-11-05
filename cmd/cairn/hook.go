@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/djm56/cairn-memory/internal/cli"
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
@@ -78,47 +79,8 @@ func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 	return 0
 }
 
-// writeSessionStart writes the block for cur. With no active task it is one line. role is the
-// agent role the counts were read for; with none, the block says agent-scoped directives were not
-// counted. refused is true when CAIRN_AGENT is set but refused: the block then names the variable
-// as the reason, so the agent is not told that no role is set when one was given.
+// writeSessionStart writes the session-start block for cur, with the hook's closing line. The block is
+// the one cli.SessionStart writes, which prime writes too, so the two cannot drift.
 func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string, refused bool) {
-	if cur.Task == nil {
-		fmt.Fprintf(w, "Cairn: no task is active in %s.\n", project)
-		return
-	}
-	// Every server-derived text goes through plain: the block is read by a model, so a
-	// title or next action cannot end its line or start one of its own.
-	task := cur.Task
-	fmt.Fprintf(w, "Cairn task: \"%s\" (%s, %s) in %s.\n", plain(task.Title), plain(task.ID), plain(string(task.Status)), project)
-	if next := plain(task.NextAction); next != "" {
-		fmt.Fprintf(w, "Next action: %s\n", next)
-	} else {
-		fmt.Fprintln(w, "Next action: none recorded.")
-	}
-	if s := currentStep(cur.Steps); s != nil {
-		fmt.Fprintf(w, "Current step: %d of %d, \"%s\" (%s).\n", s.Number, len(cur.Steps), plain(s.Title), plain(string(s.Status)))
-	} else {
-		fmt.Fprintln(w, "Current step: none open.")
-	}
-	if cur.OtherActive > 0 {
-		fmt.Fprintf(w, "Other active tasks: %d.\n", cur.OtherActive)
-	}
-	fmt.Fprintf(w, "Directives that apply: %d.\n", len(cur.Directives))
-	// The same note as cairn status: with no role, no agent-scoped directive is counted.
-	if role == "" {
-		if refused {
-			fmt.Fprintln(w, refusedRoleNote)
-		} else {
-			fmt.Fprintln(w, noRoleNote)
-		}
-	}
-	// The agent reads this block, so a directive left out is said so, with the reason.
-	if cur.Expired > 0 {
-		fmt.Fprintf(w, "Directives expired and left out (past review_by): %d.\n", cur.Expired)
-	}
-	if cur.Omitted > 0 {
-		fmt.Fprintf(w, "Directives omitted (beyond the cap of %d): %d. Call directive_list for all.\n", core.DirectiveCap, cur.Omitted)
-	}
-	fmt.Fprintln(w, "Call task_current for the brief, the steps and recent events.")
+	cli.SessionStart(w, project, cur, role, refused, cli.HookPointer)
 }

@@ -21,16 +21,14 @@ var workDir = os.Getwd
 // server can tell its calls from an MCP client's.
 const cliClient = "cairn-cli"
 
-// noRoleNote is the sentence status prints under its directive count, and the session-start hook
-// prints in its block, when no agent role is set. One constant holds it, as refusedRoleNote does, so
-// the two cannot drift. With no role the server counts only the directives not scoped to one, and the
-// sentence says so. A role comes from CAIRN_AGENT (roleFromEnv).
-const noRoleNote = "Agent-scoped directives were not counted: no agent role is set."
+// noRoleNote is the sentence status prints under its directive count when no agent role is set. Its text
+// is cli.NoRoleNote, which the session-start block prints too, so the two cannot drift. A role comes from
+// CAIRN_AGENT (roleFromEnv).
+const noRoleNote = cli.NoRoleNote
 
-// refusedRoleNote is the sentence status prints, and the session-start hook prints in its block, when
-// CAIRN_AGENT is set but the wire form refuses it. One constant holds it, so the two cannot drift. It
-// names the variable and the reason, so a person does not read it as the variable being unset.
-const refusedRoleNote = "Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)."
+// refusedRoleNote is the sentence status prints when CAIRN_AGENT is set but the wire form refuses it. Its
+// text is cli.RefusedRoleNote, which the session-start block prints too.
+const refusedRoleNote = cli.RefusedRoleNote
 
 // target is what a command needs to call the server for the project it runs in.
 type target struct {
