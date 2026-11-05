@@ -144,6 +144,51 @@ func TestPiLeavesAWholeBlockAlone(t *testing.T) {
 	}
 }
 
+// TestPiLeavesACRLFBlockAlone checks the CRLF twin of TestPiLeavesAWholeBlockAlone: AGENTS.md with the current block and CRLF
+// line endings, as a checkout with autocrlf gives it, is the same text. It is not written, and no backup is made.
+func TestPiLeavesACRLFBlockAlone(t *testing.T) {
+	dir := enableProject(t)
+	existing := strings.ReplaceAll(piNotes+"\n"+piBlock()+"More notes after the block.\n", "\n", "\r\n")
+	writeSettings(t, piAgentsFile(dir), existing)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct"}}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if string(readBytes(t, piAgentsFile(dir))) != existing {
+		t.Errorf("AGENTS.md with CRLF line endings changed:\n%q", readBytes(t, piAgentsFile(dir)))
+	}
+	if !strings.Contains(stdout, "unchanged: "+piAgentsFile(dir)+"\n") || !strings.Contains(stdout, reportLine("instructions", "already present", piAgents+" block")) {
+		t.Errorf("stdout does not say the CRLF block is already present:\n%s", stdout)
+	}
+	if got := listDir(t, filepath.Dir(piBackupOf(t, "AGENTS.md"))); len(got) != 0 {
+		t.Errorf("a backup was made of a CRLF file that did not change: %v", got)
+	}
+}
+
+// TestPiUpdatesACRLFBlockAndKeepsItsLineEndings checks an older cairn block in a CRLF file: the block is replaced by the current
+// text with CRLF line endings, the CRLF text on either side is kept byte for byte, and the original is copied to the backup.
+func TestPiUpdatesACRLFBlockAndKeepsItsLineEndings(t *testing.T) {
+	dir := enableProject(t)
+	older := strings.ReplaceAll(piBeginLine+"\nan older task loop\n"+piEnd+"\n", "\n", "\r\n")
+	original := strings.ReplaceAll(piNotes, "\n", "\r\n") + "\r\n" + older + strings.ReplaceAll("More notes after the block.\n", "\n", "\r\n")
+	writeSettings(t, piAgentsFile(dir), original)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct"}}}`)
+
+	code, _, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	want := strings.ReplaceAll(piNotes+"\n"+strings.TrimSuffix(piBlock(), "\n")+"\nMore notes after the block.\n", "\n", "\r\n")
+	if got := string(readBytes(t, piAgentsFile(dir))); got != want {
+		t.Errorf("AGENTS.md is not the CRLF notes, the current block in CRLF and the notes after it:\n%q", got)
+	}
+	if !bytes.Equal(readBytes(t, piBackupOf(t, "AGENTS.md")), []byte(original)) {
+		t.Errorf("the backup is not the original CRLF file:\n%q", readBytes(t, piBackupOf(t, "AGENTS.md")))
+	}
+}
+
 // TestPiRunTwiceGivesTheSameFiles checks idempotence from a project with the files already there: a second run writes
 // nothing and makes no second backup.
 func TestPiRunTwiceGivesTheSameFiles(t *testing.T) {

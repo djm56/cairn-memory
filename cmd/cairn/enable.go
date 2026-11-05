@@ -169,7 +169,7 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL, and every line they print says so.")
 	fmt.Fprintln(w, "opencode: adds the cairn MCP server to opencode.json under mcp, lists .cairn/instructions.md in its instructions, and writes that file with the task loop. A JSON file with comments is refused. The instruction path, .cairn/instructions.md, is taken relative to the project root; no real OpenCode run has confirmed that yet, so it is EXPERIMENTAL.")
 	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers.")
-	fmt.Fprintln(w, "A block is cairn's only when its start line is exactly cairn's text and its end marker is alone on its line, each marker occurring once, in order.")
+	fmt.Fprintln(w, "A block is cairn's only when its start line is exactly cairn's text and its end marker is alone on its line, each marker occurring once, in order. Line endings do not count, and an updated block keeps the file's own line endings.")
 	fmt.Fprintln(w, "Text outside such a block is never changed, and a block cairn wrote earlier is updated to the current text. Any other marker text in AGENTS.md is refused, and you fix the markers by hand.")
 	fmt.Fprintln(w, "The OpenCode instruction file is replaced only when it starts with cairn's marker line. One without the marker is someone's own, so it is left as it is, and opencode.json is still merged. pi reads .pi/mcp.json only after the project is trusted.")
 	fl.SetOutput(w)

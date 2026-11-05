@@ -144,7 +144,7 @@ func piBlockCheck(root string) check {
 	text := string(raw)
 	switch agentsBlock(text) {
 	case "whole":
-		if agentsBlockText(text) != strings.TrimSuffix(piBlock(), "\n") {
+		if !sameText([]byte(agentsBlockText(text)), []byte(strings.TrimSuffix(piBlock(), "\n"))) {
 			return check{name: "instructions", status: "warn", detail: "the cairn block in " + path + " is an older text: run cairn enable --agent pi to update it"}
 		}
 		return check{name: "instructions", status: "ok", detail: "the cairn block is in " + path}

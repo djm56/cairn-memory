@@ -309,17 +309,22 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 			text := string(raw)
 			switch agentsBlock(text) {
 			case "whole":
-				// A block that is cairn's own, between its markers, is updated when cairn's text has changed. Only those bytes are
-				// replaced: the text on either side of the markers is kept as it is.
+				// A block that is cairn's own, between its markers, is updated when cairn's text has changed. Line endings do not
+				// count. Only the block's bytes are replaced: the text on either side of the markers is kept as it is, and a block
+				// that has CRLF line endings is written with them, so the file keeps its own line endings.
+				start, end, _ := blockSpan(text)
+				block := text[start:end]
 				current := strings.TrimSuffix(piBlock(), "\n")
-				if agentsBlockText(text) == current {
+				if sameText([]byte(block), []byte(current)) {
 					blockState = "already present"
 					return nil, false, nil
 				}
 				blockState = "updated"
-				start := strings.Index(text, piBegin)
-				end := start + len(agentsBlockText(text))
-				return []byte(text[:start] + current + text[end:]), true, nil
+				eol := "\n"
+				if strings.Contains(block, "\r\n") {
+					eol = "\r\n"
+				}
+				return []byte(text[:start] + strings.ReplaceAll(current, "\n", eol) + text[end:]), true, nil
 			case "absent":
 				// The block goes at the end, after a blank line when the file has text. What is above it is kept as it is.
 				blockState = "added"

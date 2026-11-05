@@ -250,25 +250,29 @@ func TestDoctorPiWarnsOnAnOlderBlock(t *testing.T) {
 
 // TestDoctorPiAgreesWithEnableOnMarkerText checks that doctor and enable read the same AGENTS.md. Where enable refuses a file,
 // doctor warns that the block is not whole, and the refused bytes stay as they were. Where enable updates a block, doctor
-// warns about the older text first, and reports the block current once enable has updated it.
+// warns about the older text first, and reports the block current once enable has updated it. Where the block is current
+// with CRLF line endings, doctor reports it ok, and enable leaves the bytes as they are.
 func TestDoctorPiAgreesWithEnableOnMarkerText(t *testing.T) {
 	cases := []struct {
 		name, text string
 		refused    bool   // enable refuses the file
-		warn       string // what doctor says of the block before enable runs
+		kept       bool   // enable leaves the bytes as they are
+		warn       string // what doctor says of the block before enable runs; "" for ok
 	}{
-		{"a mention of both markers in prose", markerInProse, true, "not whole"},
-		{"a start marker mid-line, then a real end line", "# Notes\n\nSee the old " + piBegin + " line.\n" + piEnd + "\n", true, "not whole"},
-		{"a start line close to cairn's text", strings.Replace(piBlock(), "do not edit inside", "edit freely", 1), true, "not whole"},
-		{"an older cairn block", piNotes + "\n" + piBeginLine + "\nan older task loop\n" + piEnd + "\nMore notes.\n", false, "older text"},
+		{"a mention of both markers in prose", markerInProse, true, false, "not whole"},
+		{"a start marker mid-line, then a real end line", "# Notes\n\nSee the old " + piBegin + " line.\n" + piEnd + "\n", true, false, "not whole"},
+		{"a start line close to cairn's text", strings.Replace(piBlock(), "do not edit inside", "edit freely", 1), true, false, "not whole"},
+		{"an older cairn block", piNotes + "\n" + piBeginLine + "\nan older task loop\n" + piEnd + "\nMore notes.\n", false, false, "older text"},
+		{"the current block with CRLF line endings", strings.ReplaceAll(piNotes+"\n"+piBlock()+"More notes.\n", "\n", "\r\n"), false, true, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := enableProject(t)
 			writeSettings(t, piAgentsFile(dir), tc.text)
 
-			if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "warn" || !strings.Contains(c.detail, tc.warn) {
-				t.Errorf("instructions is %+v, want a warning with %q", c, tc.warn)
+			c := checkNamed(experimentalChecks("pi", dir), "instructions")
+			if c == nil || (tc.warn == "" && c.status != "ok") || (tc.warn != "" && (c.status != "warn" || !strings.Contains(c.detail, tc.warn))) {
+				t.Errorf("instructions is %+v, want ok or a warning with %q", c, tc.warn)
 			}
 			code, _, _ := runCmd(t, "enable", "--agent", "pi")
 			if tc.refused {
@@ -278,10 +282,13 @@ func TestDoctorPiAgreesWithEnableOnMarkerText(t *testing.T) {
 				return
 			}
 			if code != 0 {
-				t.Fatalf("enable: exit %d, want the older block updated", code)
+				t.Fatalf("enable: exit %d, want the block left or updated", code)
+			}
+			if tc.kept && string(readBytes(t, piAgentsFile(dir))) != tc.text {
+				t.Errorf("enable changed a current block:\n%q", readBytes(t, piAgentsFile(dir)))
 			}
 			if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "ok" {
-				t.Errorf("instructions is %+v, want ok after enable updated the block", c)
+				t.Errorf("instructions is %+v, want ok after enable", c)
 			}
 		})
 	}
