@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/djm56/cairn-memory/internal/core"
 )
 
 // agentProject makes a project with a project file, and runs the commands from it. useDir points HOME at a fresh
@@ -351,6 +354,49 @@ func TestDoctorDryRunWithNoActiveTask(t *testing.T) {
 	}
 	if checks[2].status != "ok" || !strings.Contains(checks[2].detail, "0 bytes, nothing printed") {
 		t.Errorf("stop is %s %q, want ok and nothing printed", checks[2].status, checks[2].detail)
+	}
+}
+
+// projectNames lists the names of the projects the server holds, as an operator reads the list. It is the server's own
+// answer, so a test sees a row the hooks created.
+func projectNames(t *testing.T, local *core.Local) []string {
+	t.Helper()
+	ctx := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator})
+	list, err := local.ProjectList(ctx, core.ProjectListRequest{})
+	if err != nil {
+		t.Fatalf("project list: %v", err)
+	}
+	names := []string{}
+	for _, p := range list.Projects {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
+// TestDoctorDryRunCreatesTheProjectRow pins what the dry run does on the server. The server has never seen acme-api, so
+// the first read of it creates the project's row, as the hooks do. The project list is read before and after.
+func TestDoctorDryRunCreatesTheProjectRow(t *testing.T) {
+	local, url := newServer(t, nil)
+	serverProject(t, url)
+	if before := projectNames(t, local); len(before) != 0 {
+		t.Fatalf("the server lists %v before the dry run, want none", before)
+	}
+
+	dryRunChecks()
+
+	if after := projectNames(t, local); !slices.Equal(after, []string{"acme-api"}) {
+		t.Errorf("the server lists %v after the dry run, want the row the hooks create", after)
+	}
+}
+
+// TestDoctorHelpSaysWhatTheDryRunWrites checks that the help says the dry run's first read can create the project's row,
+// and that the command without --agent changes nothing.
+func TestDoctorHelpSaysWhatTheDryRunWrites(t *testing.T) {
+	_, stdout, _ := runCmd(t, "doctor", "--help")
+	for _, want := range []string{"Without --agent it changes nothing.", "creates the project's row, as the hooks do."} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("help lacks %q:\n%s", want, stdout)
+		}
 	}
 }
 

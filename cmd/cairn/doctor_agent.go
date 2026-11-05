@@ -73,7 +73,8 @@ func claudeCodeChecks(wd string) []check {
 }
 
 // dryRunChecks runs each cairn hook once, in-process, and reports what each printed (dryRunCheck). The hooks read the
-// active task and write nothing, so the dry run writes nothing either.
+// active task and write no file. The server may still create the project's row on the first read, as the hooks do
+// (TaskCurrent), so the dry run is not read-only on the server.
 func dryRunChecks() []check {
 	checks := make([]check, 0, len(claudeHooks))
 	for _, h := range claudeHooks {
