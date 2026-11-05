@@ -30,9 +30,9 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "session-start", "pre-compact":
-		return runContextHook(args[0], args[1:], stdout, stderr, writeContextBlock)
+		return runContextHook(args[0], "no context added", args[1:], stdout, stderr, writeContextBlock)
 	case "stop":
-		return runContextHook(args[0], args[1:], stdout, stderr, writeStepWarning)
+		return runContextHook(args[0], "no warning given", args[1:], stdout, stderr, writeStepWarning)
 	}
 	fmt.Fprintf(stderr, "cairn hook: unknown event %q: use session-start, pre-compact or stop\n", args[0])
 	return 2
@@ -45,30 +45,34 @@ func runHook(args []string, stdout, stderr io.Writer) int {
 // turn, is worse than a missing line. So when the project or the server is not there, or does not answer,
 // nothing is printed on stdout and the reason goes to stderr. A panic is the same: it is reported on
 // stderr, and the client carries on. It writes nothing: its one call is a read.
-func runContextHook(event string, args []string, stdout, stderr io.Writer, write hookWriter) (code int) {
+//
+// nothing is the phrase the stderr messages give for what was not written: "no context added" for an
+// event that adds a block, "no warning given" for stop. It is named per event so the message is true
+// of the event it came from.
+func runContextHook(event, nothing string, args []string, stdout, stderr io.Writer, write hookWriter) (code int) {
 	if len(args) > 0 {
 		fmt.Fprintf(stderr, "cairn hook %s: takes no arguments, got %q\n", event, args)
 		return 2
 	}
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Fprintf(stderr, "cairn hook %s: no context added: an internal fault: %v\n%s", event, p, debug.Stack())
+			fmt.Fprintf(stderr, "cairn hook %s: %s: an internal fault: %v\n%s", event, nothing, p, debug.Stack())
 			code = 0
 		}
 	}()
 	wd, err := workDir()
 	if err != nil {
-		fmt.Fprintf(stderr, "cairn hook %s: no context added: the working directory: %v\n", event, err)
+		fmt.Fprintf(stderr, "cairn hook %s: %s: the working directory: %v\n", event, nothing, err)
 		return 0
 	}
 	t, err := dial(wd, hookTimeout)
 	if err != nil {
-		fmt.Fprintf(stderr, "cairn hook %s: no context added: %s\n", event, reason(err))
+		fmt.Fprintf(stderr, "cairn hook %s: %s: %s\n", event, nothing, reason(err))
 		return 0
 	}
 	cur, err := currentFor(t)
 	if err != nil {
-		fmt.Fprintf(stderr, "cairn hook %s: no context added: %s\n", event, reason(err))
+		fmt.Fprintf(stderr, "cairn hook %s: %s: %s\n", event, nothing, reason(err))
 		return 0
 	}
 	// The output is built whole and written once, so a fault cannot leave part of it on stdout.

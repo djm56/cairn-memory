@@ -16,6 +16,15 @@ import (
 // hookEvents are the three events cairn hook answers. The tests that hold for every event run over them.
 var hookEvents = []string{"session-start", "pre-compact", "stop"}
 
+// hookNothing is the phrase a hook's stderr gives for what it did not write: no context for the two events
+// that add the block, and no warning for stop. The shared tests check it per event.
+func hookNothing(event string) string {
+	if event == "stop" {
+		return "no warning given"
+	}
+	return "no context added"
+}
+
 // TestSessionStartPrintsTheActiveTask checks the block a session start gets: the
 // task, its next action, its current step, the directive count and the line that
 // tells the agent to call task_current. It makes one call, a read.
@@ -220,8 +229,8 @@ func TestSessionStartAddsNothingWhenUnconfigured(t *testing.T) {
 				if stdout != "" {
 					t.Errorf("stdout %q, want nothing: the context is not known", stdout)
 				}
-				if !strings.Contains(stderr, "no context added") || !strings.Contains(stderr, "cairn hook "+event+":") {
-					t.Errorf("stderr %q does not say no context was added, by this event", stderr)
+				if want := "cairn hook " + event + ": " + hookNothing(event) + ": "; !strings.Contains(stderr, want) {
+					t.Errorf("stderr %q does not say %q, by this event", stderr, want)
 				}
 				assertNoDestructive(t, stderr)
 			})
@@ -310,8 +319,8 @@ func TestHooksAddNothingOnAPanic(t *testing.T) {
 			if stdout != "" {
 				t.Errorf("stdout %q, want nothing", stdout)
 			}
-			if !strings.Contains(stderr, "boom") || !strings.Contains(stderr, "no context added") {
-				t.Errorf("stderr %q does not report the fault and that no context was added", stderr)
+			if !strings.Contains(stderr, "boom") || !strings.Contains(stderr, hookNothing(event)) {
+				t.Errorf("stderr %q does not report the fault and that %s", stderr, hookNothing(event))
 			}
 		})
 	}
@@ -348,8 +357,8 @@ func TestHooksGiveUpOnAServerThatNeverAnswers(t *testing.T) {
 			if code != 0 || stdout != "" {
 				t.Errorf("exit %d, stdout %q: want 0 and nothing on stdout", code, stdout)
 			}
-			if !strings.Contains(stderr, "no context added") {
-				t.Errorf("stderr %q does not say no context was added", stderr)
+			if !strings.Contains(stderr, hookNothing(event)) {
+				t.Errorf("stderr %q does not say %s", stderr, hookNothing(event))
 			}
 		})
 	}
