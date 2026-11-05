@@ -176,7 +176,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 enable: an existing Claude Code hook whose matcher is not a string is reported as `matcher is not a string`, not as `(none)`. The output for `--agent pi` says that pi reads `.pi/mcp.json` only after the project is trusted.
 - M4 enable help (EXPERIMENTAL): the OpenCode instruction path, `.cairn/instructions.md`, is taken relative to the project root, and no real OpenCode run has confirmed that yet.
 - M4 CLI step ids (#88): `cairn step add --after-id <id>` inserts after a step named by its id, and `cairn task get --step-id <id>` reads the events of a step named by its id, as `--step-id` already does on `step update` and `event log`. Each is refused with exit 2 when the id is under 1, and when a position or a step is given both ways.
-- M4 conformance (#88): the conformance suite runs its agent calls through the `cairn` binary, and an exit check runs an agent with only bash that starts, works and closes a task through the CLI. The CLI does not carry error kinds, so the cases that check them are listed as deferred, with their reasons.
+- M4 conformance (#88): the conformance suite runs its agent calls through the `cairn` binary, and an exit check runs an agent with only bash that starts, works and closes a task through the CLI. The CLI carries each error's kind and the close policy's missing list, so 98 of the 106 cases pass through it. The other 8 are deferred, each with the text its failure must contain, and three of them are properties of a CLI that stay deferred.
 
 ### Changed
 
