@@ -453,16 +453,17 @@ func TestBackupRemovesItsNameWhenTheStagingDirectoryIsSwappedBeforeTheLink(t *te
 // leave no staging directory behind and no output name.
 func TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos(t *testing.T) {
 	cases := map[string]struct {
-		err  error
-		hint bool
+		err    error
+		hint   bool
+		exists bool // the refusal must be the already-exists one
 	}{
-		"EPERM":      {syscall.EPERM, true},
-		"ENOTSUP":    {syscall.ENOTSUP, true},
-		"EOPNOTSUPP": {syscall.EOPNOTSUPP, true},
-		"EXDEV":      {syscall.EXDEV, true},
-		"ENOSYS":     {syscall.ENOSYS, true},
-		"EEXIST":     {syscall.EEXIST, false},
-		"EIO":        {syscall.EIO, false},
+		"EPERM":      {syscall.EPERM, true, false},
+		"ENOTSUP":    {syscall.ENOTSUP, true, false},
+		"EOPNOTSUPP": {syscall.EOPNOTSUPP, true, false},
+		"EXDEV":      {syscall.EXDEV, true, false},
+		"ENOSYS":     {syscall.ENOSYS, true, false},
+		"EEXIST":     {syscall.EEXIST, false, true},
+		"EIO":        {syscall.EIO, false, false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -484,8 +485,8 @@ func TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos(t *testing.T) {
 			if got := strings.Contains(err.Error(), "does not support hard links"); got != c.hint {
 				t.Errorf("Backup with the link failing with %s: hint = %v, want %v (err: %v)", name, got, c.hint, err)
 			}
-			if name == "EEXIST" && !strings.Contains(err.Error(), "already exists") {
-				t.Errorf("Backup with the link failing with EEXIST: err = %v, want the already-exists refusal", err)
+			if got := strings.Contains(err.Error(), "already exists"); got != c.exists {
+				t.Errorf("Backup with the link failing with %s: already-exists refusal = %v, want %v (err: %v)", name, got, c.exists, err)
 			}
 			if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
 				t.Errorf("a refused backup left the output %s behind", out)

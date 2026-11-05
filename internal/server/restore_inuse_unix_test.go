@@ -1,4 +1,4 @@
-//go:build unix
+//go:build darwin || linux || freebsd || openbsd
 
 package server
 
@@ -19,6 +19,10 @@ import (
 
 	"github.com/djm56/cairn-memory/internal/store"
 )
+
+// rawProbeBuilt says the lock probe of inuse_unix.go is built here, so a raw restore with no holder
+// reports that the probe found no lock. inuse_other_test.go sets it false for the stub.
+const rawProbeBuilt = true
 
 // holdEnv selects how the helper process holds the database. Only startHolder sets it, and only on
 // the helper's environment. The database path is in holdEnv+"_DB".
@@ -82,7 +86,7 @@ func TestRestoreHoldHelper(t *testing.T) {
 }
 
 // startHolder starts a helper process that holds the database at db in mode, and returns once the
-// helper says it holds it. The helper runs until the test ends, when its standard input closes.
+// helper says it holds it, or fails the test if it has not said so within holderReadyTimeout. The helper runs until the test ends, when its standard input closes.
 // The holder must be another process: POSIX locks belong to the process that takes them, so a lock
 // held by this process is not one the probe can see.
 func startHolder(t *testing.T, mode, db string) {
@@ -105,11 +109,31 @@ func startHolder(t *testing.T, mode, db string) {
 		_ = stdin.Close()
 		_ = cmd.Wait()
 	})
-	line, err := bufio.NewReader(stdout).ReadString('\n')
-	if err != nil || strings.TrimSpace(line) != "ready" {
-		t.Fatalf("the helper did not hold %s as %s: read %q, %v", db, mode, line, err)
+	// The handshake has a deadline, so a helper that wedges before it says "ready" fails the test
+	// here instead of hanging it until the go test timeout. The helper is killed, which ends the read.
+	type handshake struct {
+		line string
+		err  error
+	}
+	got := make(chan handshake, 1)
+	go func() {
+		line, err := bufio.NewReader(stdout).ReadString('\n')
+		got <- handshake{line, err}
+	}()
+	select {
+	case h := <-got:
+		if h.err != nil || strings.TrimSpace(h.line) != "ready" {
+			t.Fatalf("the helper did not hold %s as %s: read %q, %v", db, mode, h.line, h.err)
+		}
+	case <-time.After(holderReadyTimeout):
+		_ = cmd.Process.Kill()
+		t.Fatalf("the helper did not say it holds %s as %s within %v", db, mode, holderReadyTimeout)
 	}
 }
+
+// holderReadyTimeout is how long startHolder waits for the helper to say it holds the database. A
+// helper starts and opens one database, so this is far longer than a healthy one needs.
+const holderReadyTimeout = 30 * time.Second
 
 // damageHeader overwrites the first 16 bytes of the file at path, so that it is no longer a
 // readable SQLite database. The file keeps its inode, so a helper that holds it still holds the
@@ -191,51 +215,62 @@ func TestRestoreRefusesARawDatabaseHeldOnlyByItsDeadManSwitch(t *testing.T) {
 }
 
 // TestRawInUseChangesNothing checks the probe alone, with no holder. It must report no lock, return
-// no error, and leave the database, its -wal and its -shm with the same names, bytes and
-// modification times. Opening a file for the probe must not write to it.
+// no error, and leave every file with the same name, bytes and modification time. Opening a file for
+// the probe must not write to it. With the database alone, no -wal or -shm, the probe must create
+// neither: a creating open would make the -shm it asks about.
 func TestRawInUseChangesNothing(t *testing.T) {
-	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
-	if err := os.WriteFile(db, []byte(strings.Repeat("this is not a database\n", 200)), 0o600); err != nil {
-		t.Fatal(err)
+	cases := map[string][]string{
+		"with its -wal and -shm": {"cairn.db", "cairn.db-wal", "cairn.db-shm"},
+		"the database alone":     {"cairn.db"},
 	}
-	if err := os.WriteFile(db+"-wal", []byte("a wal of nothing"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(db+"-shm", []byte("a shm of nothing"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	names := listDir(t, dir)
-	bytesBefore := map[string][]byte{}
-	timesBefore := map[string]time.Time{}
-	for _, name := range []string{"cairn.db", "cairn.db-wal", "cairn.db-shm"} {
-		bytesBefore[name] = readBytes(t, filepath.Join(dir, name))
-		fi, err := os.Stat(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		timesBefore[name] = fi.ModTime()
-	}
+	for name, files := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			db := filepath.Join(dir, "cairn.db")
+			for _, f := range files {
+				content := "a " + f + " of nothing"
+				if f == "cairn.db" {
+					content = strings.Repeat("this is not a database\n", 200)
+				}
+				if err := os.WriteFile(filepath.Join(dir, f), []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			names := listDir(t, dir)
+			bytesBefore := map[string][]byte{}
+			timesBefore := map[string]time.Time{}
+			for _, f := range files {
+				bytesBefore[f] = readBytes(t, filepath.Join(dir, f))
+				fi, err := os.Stat(filepath.Join(dir, f))
+				if err != nil {
+					t.Fatal(err)
+				}
+				timesBefore[f] = fi.ModTime()
+			}
 
-	held, err := rawInUse(db)
-	if held || err != nil {
-		t.Fatalf("rawInUse with no holder: held = %v, err = %v; want false and nil", held, err)
-	}
-	if got := listDir(t, dir); !slices.Equal(got, names) {
-		t.Errorf("the probe changed the directory: %v, was %v", got, names)
-	}
-	for name, want := range bytesBefore {
-		path := filepath.Join(dir, name)
-		if got := readBytes(t, path); string(got) != string(want) {
-			t.Errorf("the probe changed the bytes of %s", name)
-		}
-		fi, err := os.Stat(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !fi.ModTime().Equal(timesBefore[name]) {
-			t.Errorf("the probe changed the modification time of %s", name)
-		}
+			held, err := rawInUse(db)
+			if held || err != nil {
+				t.Fatalf("rawInUse with no holder: held = %v, err = %v; want false and nil", held, err)
+			}
+			// The listing is the check that nothing was created: a -wal or -shm the probe made would
+			// show here as a new name.
+			if got := listDir(t, dir); !slices.Equal(got, names) {
+				t.Errorf("the probe changed the directory: %v, was %v", got, names)
+			}
+			for f, want := range bytesBefore {
+				path := filepath.Join(dir, f)
+				if got := readBytes(t, path); string(got) != string(want) {
+					t.Errorf("the probe changed the bytes of %s", f)
+				}
+				fi, err := os.Stat(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !fi.ModTime().Equal(timesBefore[f]) {
+					t.Errorf("the probe changed the modification time of %s", f)
+				}
+			}
+		})
 	}
 }
 

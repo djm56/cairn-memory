@@ -1,6 +1,11 @@
-//go:build unix
+//go:build darwin || linux || freebsd || openbsd
 
 package server
+
+// The probe is built for the systems it was checked against: Linux, macOS, FreeBSD and OpenBSD.
+// Each has F_GETLK with the struct flock this file fills in, and runs SQLite's unix VFS with the
+// lock offsets below. Other unix systems take the stub in inuse_other.go, which reports that the
+// lock cannot be checked, until the probe is checked on them.
 
 import (
 	"errors"
@@ -20,8 +25,10 @@ import (
 //     takes on the database file lies inside it.
 //   - The -shm file's dead-man switch, DMS, is byte 128. UNIX_SHM_BASE is (22+SQLITE_SHM_NLOCK)*4,
 //     which is 120 with SQLITE_SHM_NLOCK of 8, and DMS is UNIX_SHM_BASE+8 (os_unix.c, SQLite 3.54.1,
-//     where the lock table is listed and unixLockSharedMemory takes it). Every connection that has a
-//     WAL database open holds a shared lock on DMS, so an idle WAL server holds it too.
+//     where the lock table is listed and unixLockSharedMemory takes it). The lock is held per process,
+//     not per connection: SQLite shares one -shm handle among a process's connections, and while any
+//     of them has the WAL database open the process holds a shared lock on DMS. So an idle WAL server
+//     holds it too.
 //     unixLockSharedMemory and _unixIsSharingShmNode test it with F_GETLK, as this probe does.
 const (
 	dbLockStart  int64 = 0x40000000

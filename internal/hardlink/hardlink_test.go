@@ -1,7 +1,6 @@
 package hardlink
 
 import (
-	"io/fs"
 	"os"
 	"syscall"
 	"testing"
@@ -22,7 +21,7 @@ func TestUnsupportedNamesOnlyTheErrnosThatMeanNoLinks(t *testing.T) {
 		"ENOSYS":     {syscall.ENOSYS, true},
 		"EEXIST":     {syscall.EEXIST, false},
 		"EIO":        {syscall.EIO, false},
-		"ENOENT":     {fs.ErrNotExist, false},
+		"ENOENT":     {syscall.ENOENT, false},
 	}
 	for name, c := range cases {
 		if got := Unsupported(&os.LinkError{Op: "link", Old: "a", New: "b", Err: c.err}); got != c.want {

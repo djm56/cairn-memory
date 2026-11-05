@@ -357,10 +357,15 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 			if !strings.Contains(out.String(), "is not a readable SQLite database") {
 				t.Errorf("the report %q does not say the target was not a readable database", out.String())
 			}
-			// No holder is running here, so the read-only probe finds none, and the prompt says so and
-			// still says that serve must be stopped.
-			if !strings.Contains(out.String(), "A read-only probe found no lock on") || !strings.Contains(out.String(), "Stop cairn serve") {
-				t.Errorf("the prompt %q does not say the probe found no lock and to stop cairn serve", out.String())
+			// No holder is running here. Where the probe is built it finds none, and the prompt says so;
+			// where it is not, the stub cannot tell, and the prompt says the lock could not be checked.
+			// Either way the prompt still says that serve must be stopped.
+			wantProbe := "The lock could not be checked for"
+			if rawProbeBuilt {
+				wantProbe = "A read-only probe found no lock on"
+			}
+			if !strings.Contains(out.String(), wantProbe) || !strings.Contains(out.String(), "Stop cairn serve") {
+				t.Errorf("the prompt %q does not say %q and to stop cairn serve", out.String(), wantProbe)
 			}
 			assertReportNamesMoves(t, target, out.String())
 			if got := readBytes(t, preRestoreName(target)); string(got) != string(origMain) {
@@ -370,6 +375,62 @@ func TestRestoreMovesAFileThatIsNotADatabaseAsItIs(t *testing.T) {
 				t.Errorf("the moved -wal is not the bytes that were there: it was changed")
 			}
 			assertKeys(t, target, "alpha")
+		})
+	}
+}
+
+// TestRestoreProbesARawDatabaseAgainBeforeTheFirstMove covers a holder that starts on a raw database
+// while the operator types the path. The probe before the prompt finds no lock; the one just before
+// the first move finds a holder, or can no longer tell. Either refuses after the prompt with nothing
+// moved: the directory listing and the database's bytes are as they were, and the staged copy is
+// gone. The probe is replaced through the probeRaw seam, so the test runs on every platform.
+func TestRestoreProbesARawDatabaseAgainBeforeTheFirstMove(t *testing.T) {
+	cases := map[string]struct {
+		second func() (bool, error)
+		want   string
+	}{
+		"a holder appears":      {func() (bool, error) { return true, nil }, "is in use"},
+		"the probe cannot tell": {func() (bool, error) { return false, errors.New("probe failed") }, "could not be checked again"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			backup := makeBackup(t, dir, "alpha")
+			target := filepath.Join(dir, "cairn.db")
+			if err := os.WriteFile(target, []byte(strings.Repeat("this is not a database\n", 200)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			before := listDir(t, dir)
+			bytesBefore := readBytes(t, target)
+
+			calls := 0
+			prev := probeRaw
+			probeRaw = func(string) (bool, error) {
+				calls++
+				if calls == 1 {
+					return false, nil
+				}
+				return c.second()
+			}
+			t.Cleanup(func() { probeRaw = prev })
+
+			opts, out := restoreRun(target, backup, target+"\n", true)
+			err := Restore(context.Background(), opts)
+			if err == nil || !strings.Contains(err.Error(), c.want) || !strings.Contains(err.Error(), "nothing was changed") {
+				t.Fatalf("Restore with %s before the first move: err = %v, want %q and nothing changed", name, err, c.want)
+			}
+			if calls != 2 {
+				t.Errorf("the probe ran %d times, want 2: once before the prompt and once before the first move", calls)
+			}
+			if !strings.Contains(out.String(), "To confirm") {
+				t.Errorf("the refusal came before the prompt; this is the probe after it: output %q", out.String())
+			}
+			if got := listDir(t, dir); !slices.Equal(got, before) {
+				t.Errorf("a refused restore changed the directory: %v, was %v", got, before)
+			}
+			if got := readBytes(t, target); string(got) != string(bytesBefore) {
+				t.Errorf("a refused restore changed the bytes of the database")
+			}
 		})
 	}
 }

@@ -1,12 +1,12 @@
-//go:build !unix
+//go:build !(darwin || linux || freebsd || openbsd)
 
 package server
 
 import "errors"
 
-// rawInUse cannot tell on this platform. The probe reads POSIX record locks with fcntl, and this
-// build has none of them. It always returns an error, so Restore keeps its warning that the lock
-// could not be checked.
+// rawInUse cannot tell on this platform. The probe reads POSIX record locks with fcntl, and is built
+// only for the systems it was checked against (see inuse_unix.go). Here it always returns an error,
+// so Restore keeps its warning that the lock could not be checked.
 func rawInUse(string) (bool, error) {
-	return false, errors.New("the lock probe needs POSIX record locks, which this build does not use")
+	return false, errors.New("the lock probe is not built for this system")
 }
