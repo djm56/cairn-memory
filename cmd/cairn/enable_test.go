@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -449,6 +450,30 @@ func TestEnableBacksUpTheOriginalWithItsMode(t *testing.T) {
 		}
 		if info.Mode().Perm() != 0o600 {
 			t.Errorf("%s has mode %o, want 600", p, info.Mode().Perm())
+		}
+	}
+}
+
+// TestEnableBacksUpAWorldReadableFileAs0600 checks that a backup is 0600 even when the file it copies is 0644: the
+// backup may hold secrets. The settings file keeps its own 0644.
+func TestEnableBacksUpAWorldReadableFileAs0600(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, existingSettings)
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, _, stderr := runCmd(t, "enable", "--agent", "claude-code"); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	for p, want := range map[string]fs.FileMode{path: 0o644, backupIn(t, "acme-api"): 0o600} {
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != want {
+			t.Errorf("%s has mode %o, want %o", p, info.Mode().Perm(), want)
 		}
 	}
 }

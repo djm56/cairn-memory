@@ -221,7 +221,7 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 				fmt.Fprintf(stderr, "cairn enable: create %s: %v; nothing was changed\n", filepath.Dir(backup), err)
 				return 1
 			}
-			if err := copyNew(backup, raw, mode); err != nil {
+			if err := copyNew(backup, raw); err != nil {
 				fmt.Fprintf(stderr, "cairn enable: back up %s: %v; nothing was changed\n", path, err)
 				return 1
 			}
@@ -406,18 +406,15 @@ func encodeSettings(doc map[string]json.RawMessage) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// copyNew creates path with content and mode. It refuses a path that exists, so an earlier backup is never replaced.
-// A failure after the file is made removes it.
-func copyNew(path string, content []byte, mode fs.FileMode) error {
+// copyNew creates path with content at mode 0600, whatever the mode of the file it copies. A backup holds the settings
+// as they were, and they may hold secrets, so it is never readable by other users. It refuses a path that exists, so an
+// earlier backup is never replaced. A failure after the file is made removes it.
+func copyNew(path string, content []byte) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
 	}
-	err = finishFile(f, content)
-	if err == nil {
-		err = os.Chmod(path, mode)
-	}
-	if err != nil {
+	if err := finishFile(f, content); err != nil {
 		os.Remove(path)
 		return err
 	}
