@@ -42,7 +42,7 @@ type check struct {
 func runDoctor(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairn doctor", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
-	agent := fl.String("agent", "", "also check a client's hooks: claude-code")
+	agent := fl.String("agent", "", "also check a client: claude-code (its hooks), or opencode and pi (their registration; both EXPERIMENTAL)")
 	if err := fl.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			writeDoctorHelp(stdout, fl)
@@ -63,12 +63,9 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	switch *agent {
-	case "", "claude-code":
-	case "opencode", "pi":
-		fmt.Fprintf(stderr, "cairn doctor: --agent %s is not built yet: use --agent claude-code\n", *agent)
-		return 2
+	case "", "claude-code", "opencode", "pi":
 	default:
-		fmt.Fprintf(stderr, "cairn doctor: unknown agent %q: use --agent claude-code\n", *agent)
+		fmt.Fprintf(stderr, "cairn doctor: unknown agent %q: use --agent claude-code, opencode or pi\n", *agent)
 		return 2
 	}
 
@@ -120,6 +117,16 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		}
 		failed = failed || anyFailed(agentChecks)
 	}
+	if *agent == "opencode" || *agent == "pi" {
+		// The section is tagged, so every line it prints says the client is experimental.
+		section := tagLines(stdout, experimentalPrefix(*agent))
+		fmt.Fprintf(section, "registration for %s, read only\n", *agent)
+		agentChecks := experimentalChecks(*agent, wd)
+		for _, c := range agentChecks {
+			fmt.Fprintf(section, "%-12s %-5s %s\n", c.name, c.status, c.detail)
+		}
+		failed = failed || anyFailed(agentChecks)
+	}
 	if failed {
 		return 1
 	}
@@ -132,7 +139,7 @@ func writeDoctorHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Checks the binary, the project file, the server and whether it answers as a Cairn server. Without --agent it changes nothing.")
 	fmt.Fprintln(w, "With --agent claude-code it also lists the cairn hooks in the Claude Code settings files, and runs each hook once against the server. No file is written.")
 	fmt.Fprintln(w, "Each hook reads the active task. The first read of a project the server has not seen creates the project's row, as the hooks do.")
-	fmt.Fprintln(w, "Agents: claude-code. opencode and pi are not built yet.")
+	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL: with either, doctor reports whether the registration and the instructions that cairn enable writes are in the project, and changes nothing.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
 }

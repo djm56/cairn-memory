@@ -426,8 +426,6 @@ func TestDoctorUsageErrors(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"an agent that is not built", []string{"doctor", "--agent", "opencode"}, "not built yet"},
-		{"pi is not built yet", []string{"doctor", "--agent", "pi"}, "not built yet"},
 		{"an unknown agent", []string{"doctor", "--agent", "nope"}, "unknown agent"},
 		{"an argument after the flags", []string{"doctor", "--agent", "claude-code", "extra"}, "takes flags only"},
 		{"an unknown flag", []string{"doctor", "--nope"}, "run cairn doctor --help"},

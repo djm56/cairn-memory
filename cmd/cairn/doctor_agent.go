@@ -177,10 +177,10 @@ const tailRefused = ": cairn enable refuses it and leaves it as it is"
 
 // readSettingsHooks reads the settings file at path and returns each cairn hook under the three events. A file that is
 // not there has none. A file that cannot be read, or that enable refuses, is an error whose text completes the sentence
-// "<path> ...": readSettingsFile gives the reasons for the file itself, and the merge refusals are enable's own. Entries
+// "<path> ...": readCheckedFile gives the reasons for the file itself, and the merge refusals are enable's own. Entries
 // that are not shaped as the settings format gives them are not matches, as in enable.
 func readSettingsHooks(path string) ([]installedHook, error) {
-	raw, err := readSettingsFile(path)
+	raw, err := readCheckedFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -217,12 +217,12 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 	return found, nil
 }
 
-// readSettingsFile returns the bytes of the settings file at path, or the reason doctor does not read it. The path is
+// readCheckedFile returns the bytes of the file at path, which enable merges, or the reason doctor does not read it. The path is
 // looked at with Lstat before it is opened, so a symbolic link, a FIFO, a device or a directory is not opened: opening a
 // FIFO or a device can block, and a link would take doctor to a file enable does not touch. The open file is checked
 // again, and the read stops one byte past the cap, so a file that changes between the two looks is still refused. A file
 // that is not there is fs.ErrNotExist, unchanged, so the caller can treat it as having no hooks.
-func readSettingsFile(path string) ([]byte, error) {
+func readCheckedFile(path string) ([]byte, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
