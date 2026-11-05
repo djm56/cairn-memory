@@ -65,9 +65,14 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
 	// With no agent role the server counts only directives that are not scoped to one. That is
 	// said here, not left for a person to infer. With a role the count includes its own, so the
-	// line is left out.
+	// line is left out. When CAIRN_AGENT is set but refused, the line says so, since a value was
+	// given and it is not the same fault as none.
 	if t.role == "" {
-		fmt.Fprintf(w, "            %s\n", noRoleNote)
+		note := noRoleNote
+		if t.roleRefused {
+			note = refusedRoleNote
+		}
+		fmt.Fprintf(w, "            %s\n", note)
 	}
 	// The two counts are shown only when there is one, so a clean project reads as before.
 	// A directive left out is named, not dropped without a word.

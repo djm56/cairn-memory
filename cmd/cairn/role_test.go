@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -25,23 +26,26 @@ func (r *roleSvc) TaskCurrent(ctx context.Context) (*core.TaskCurrent, error) {
 }
 
 // TestRoleFromEnvIsTheVariableWhenItIsValid checks the agent role the counts are read for: the
-// variable when it is set to a name the wire form carries, and no role otherwise. A blank value, a
-// value with a space at an end, and one with a control character are no role.
+// variable when it is set to a name the wire form carries. Unset and blank values are no role and
+// are not refused. A value with a space at an end, or with a control character, is refused: no role,
+// and the refusal is reported, so the block can name the variable.
 func TestRoleFromEnvIsTheVariableWhenItIsValid(t *testing.T) {
 	cases := []struct {
 		name, value, want string
+		refused           bool
 	}{
-		{"a name", "hicks", "hicks"},
-		{"unset", "", ""},
-		{"blank", "   ", ""},
-		{"a trailing space", "hicks ", ""},
-		{"a control character", "hicks" + string(rune(1)), ""},
+		{"a name", "hicks", "hicks", false},
+		{"unset", "", "", false},
+		{"blank", "   ", "", false},
+		{"a trailing space", "hicks ", "", true},
+		{"a control character", "hicks" + string(rune(1)), "", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("CAIRN_AGENT", c.value)
-			if got := roleFromEnv(); got != c.want {
-				t.Errorf("roleFromEnv() = %q, want %q", got, c.want)
+			got, refused := roleFromEnv()
+			if got != c.want || refused != c.refused {
+				t.Errorf("roleFromEnv() = (%q, %v), want (%q, %v)", got, refused, c.want, c.refused)
 			}
 		})
 	}
@@ -70,12 +74,12 @@ func TestStatusDropsTheNoteWithARole(t *testing.T) {
 func TestSessionStartDropsTheNoteWithARole(t *testing.T) {
 	const sentence = "Agent-scoped directives were not counted: no agent role is set."
 	var with bytes.Buffer
-	writeSessionStart(&with, "acme-api", countsTask(), "hicks")
+	writeSessionStart(&with, "acme-api", countsTask(), "hicks", false)
 	if strings.Contains(with.String(), sentence) {
 		t.Errorf("session start with a role still says no role is set:\n%s", with.String())
 	}
 	var without bytes.Buffer
-	writeSessionStart(&without, "acme-api", countsTask(), "")
+	writeSessionStart(&without, "acme-api", countsTask(), "", false)
 	if !strings.Contains(without.String(), sentence) {
 		t.Errorf("session start with no role does not say so:\n%s", without.String())
 	}
@@ -101,20 +105,46 @@ func TestCurrentForNamesTheRoleOnTheCall(t *testing.T) {
 	}
 }
 
+// seedAgentDirective ratifies an agent-scoped directive for role, as the operator. An agent directive
+// applies in every project, so it is counted by the status of any project that the role reads for.
+func seedAgentDirective(t *testing.T, local *core.Local, role, title string) {
+	t.Helper()
+	ctx := core.WithCaller(context.Background(), core.Caller{Role: core.RoleOperator, Agent: "operator"})
+	if _, err := local.DirectiveRatify(ctx, core.DirectiveRatifyRequest{
+		Scope: core.ScopeAgent, Agent: role, Title: title, Rule: "Read the schema first.",
+	}); err != nil {
+		t.Fatalf("ratify agent directive for %s: %v", role, err)
+	}
+}
+
 // TestStatusAndHookWithARoleFromTheVariable runs status and the session-start hook against a real
-// server with CAIRN_AGENT set, and checks that neither prints the no-role sentence. With an invalid
-// value, the sentence is printed, as it is with no value.
+// server. Two agent-scoped directives are seeded, one for hicks and one for another role. With
+// CAIRN_AGENT=hicks the status count is one higher than with the variable unset, so the server
+// counted the role's own directive and not the other role's. A value the wire form refuses is no
+// role: status and the hook name the variable as refused, and the run still exits 0.
 func TestStatusAndHookWithARoleFromTheVariable(t *testing.T) {
 	local, url := newServer(t, nil)
 	useDir(t, t.TempDir())
 	t.Setenv("CAIRN_SERVER", url)
 	t.Setenv("CAIRN_PROJECT", "acme-api")
 	seedNamedTask(t, local, "acme-api", "Count with a role", "Read the schema first")
+	seedAgentDirective(t, local, "hicks", "Hicks reads the schema first")
+	seedAgentDirective(t, local, "reviewer", "Reviewer checks the diff")
+
+	const unsetCount = "directives  0 apply to this project"
+	const hicksCount = "directives  1 apply to this project"
+
+	t.Setenv("CAIRN_AGENT", "")
+	os.Unsetenv("CAIRN_AGENT")
+	code, unset, errOut := runCmd(t, "status")
+	if code != 0 || errOut != "" || !strings.Contains(unset, unsetCount) {
+		t.Errorf("status with CAIRN_AGENT unset: exit %d, stderr %q, want %q, output:\n%s", code, errOut, unsetCount, unset)
+	}
 
 	t.Setenv("CAIRN_AGENT", "hicks")
 	code, status, errOut := runCmd(t, "status")
-	if code != 0 || errOut != "" || strings.Contains(status, noRoleNote) {
-		t.Errorf("status with CAIRN_AGENT=hicks: exit %d, stderr %q, output:\n%s", code, errOut, status)
+	if code != 0 || errOut != "" || !strings.Contains(status, hicksCount) || strings.Contains(status, noRoleNote) {
+		t.Errorf("status with CAIRN_AGENT=hicks: exit %d, stderr %q, want %q, output:\n%s", code, errOut, hicksCount, status)
 	}
 	code, hook, errOut := runCmd(t, "hook", "session-start")
 	if code != 0 || errOut != "" || strings.Contains(hook, "no agent role is set") {
@@ -122,8 +152,12 @@ func TestStatusAndHookWithARoleFromTheVariable(t *testing.T) {
 	}
 
 	t.Setenv("CAIRN_AGENT", "hicks ")
-	_, status, _ = runCmd(t, "status")
-	if !strings.Contains(status, noRoleNote) {
-		t.Errorf("status with an invalid CAIRN_AGENT does not say no role is set:\n%s", status)
+	code, status, errOut = runCmd(t, "status")
+	if code != 0 || errOut != "" || !strings.Contains(status, refusedRoleNote) || strings.Contains(status, noRoleNote) {
+		t.Errorf("status with a refused CAIRN_AGENT: exit %d, stderr %q, want the refused note, output:\n%s", code, errOut, status)
+	}
+	code, hook, errOut = runCmd(t, "hook", "session-start")
+	if code != 0 || errOut != "" || !strings.Contains(hook, refusedRoleSentence) || strings.Contains(hook, "no agent role is set") {
+		t.Errorf("hook with a refused CAIRN_AGENT: exit %d, stderr %q, want the refused sentence, output:\n%s", code, errOut, hook)
 	}
 }

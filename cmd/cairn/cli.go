@@ -26,6 +26,10 @@ const cliClient = "cairn-cli"
 // directives not scoped to one, and the line says so. A role comes from CAIRN_AGENT (roleFromEnv).
 const noRoleNote = "agent-scoped directives not counted: no agent role is set"
 
+// refusedRoleNote is the line status prints when CAIRN_AGENT is set but the wire form refuses it.
+// It names the variable and the reason, so a person does not read it as the variable being unset.
+const refusedRoleNote = "agent-scoped directives not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)"
+
 // target is what a command needs to call the server for the project it runs in.
 type target struct {
 	project identity.Project
@@ -37,19 +41,25 @@ type target struct {
 	// role is the agent role that status and the session-start hook count agent-scoped
 	// directives for: CAIRN_AGENT, when it is set and valid. Empty when there is none.
 	role string
+	// roleRefused is true when CAIRN_AGENT is set but refused, so role is empty for a reason
+	// other than the variable being unset or blank.
+	roleRefused bool
 }
 
 // roleFromEnv returns the agent role for the agent-scoped directive counts: CAIRN_AGENT, when it
-// is set to a name the wire form carries. A value that is blank, or has a control character or a
-// space at either end, is no role, so the count is the one with no role and the block says so. The
-// name is not checked against the agents that exist: a role names directives, and a role with none
-// lists none.
-func roleFromEnv() string {
-	role := os.Getenv(identity.EnvAgent)
-	if strings.TrimSpace(role) == "" || core.CheckCaller(core.Caller{Agent: role}) != nil {
-		return ""
+// is set to a name the wire form carries. A value that is unset or blank is no role. A value that
+// has a control character or a space at either end is refused: the role is empty and refused is
+// true, so the block can say the variable was refused rather than unset. The name is not checked
+// against the agents that exist: a role names directives, and a role with none lists none.
+func roleFromEnv() (role string, refused bool) {
+	role = os.Getenv(identity.EnvAgent)
+	if strings.TrimSpace(role) == "" {
+		return "", false
 	}
-	return role
+	if core.CheckCaller(core.Caller{Agent: role}) != nil {
+		return "", true
+	}
+	return role, false
 }
 
 // currentFor reads the active task for status and the session-start hook. When the target has a
@@ -95,7 +105,8 @@ func dial(wd string, timeout time.Duration) (*target, error) {
 		Client:  cliClient,
 		Role:    core.RoleAgent,
 	})
-	return &target{project: project, url: url, svc: svc, ctx: ctx, role: roleFromEnv()}, nil
+	role, refused := roleFromEnv()
+	return &target{project: project, url: url, svc: svc, ctx: ctx, role: role, roleRefused: refused}, nil
 }
 
 // loadKey returns the API key the calls send (DESIGN.md §2.1). A key that is in neither
