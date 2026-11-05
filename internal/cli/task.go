@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/djm56/cairn-memory/internal/core"
 )
@@ -195,13 +197,50 @@ func fail(stderr io.Writer, command string, err error) int {
 
 // writeJSON writes v as one line of JSON, with no HTML escapes, and returns the exit code.
 // The field names and order are those of the Go type, so the output is stable across calls.
+// The text is server text, and a person may run --json on a terminal, so the characters a
+// terminal can act on are written as escapes (escapeTerminal). The output still decodes to
+// the same value.
 func writeJSON(stdout, stderr io.Writer, command string, v any) int {
-	enc := json.NewEncoder(stdout)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
 		return fail(stderr, command, err)
 	}
+	if _, err := stdout.Write(escapeTerminal(buf.Bytes())); err != nil {
+		return fail(stderr, command, err)
+	}
 	return 0
+}
+
+// escapeTerminal returns the encoded JSON b with each character a terminal can act on written
+// as a \uXXXX escape: DEL, the C1 controls U+0080 to U+009F (U+009B is the single-byte CSI), and
+// the bidirectional embeddings and overrides U+202A to U+202E and isolates U+2066 to U+2069. The
+// encoder writes these raw. Each can occur only inside a JSON string, since JSON's own syntax is
+// ASCII, and an escape is valid there, so the result decodes to the same value.
+func escapeTerminal(b []byte) []byte {
+	var out bytes.Buffer
+	for len(b) > 0 {
+		r, size := utf8.DecodeRune(b)
+		if needsEscape(r) {
+			fmt.Fprintf(&out, `\u%04x`, r)
+		} else {
+			out.Write(b[:size])
+		}
+		b = b[size:]
+	}
+	return out.Bytes()
+}
+
+// needsEscape reports whether r is one of the characters escapeTerminal writes as an escape.
+func needsEscape(r rune) bool {
+	switch {
+	case r == 0x7f, r >= 0x80 && r <= 0x9f:
+		return true
+	case r >= 0x202a && r <= 0x202e, r >= 0x2066 && r <= 0x2069:
+		return true
+	}
+	return false
 }
 
 // statusFlag collects a repeatable --status flag into a list of task statuses.

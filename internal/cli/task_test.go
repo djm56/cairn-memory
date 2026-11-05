@@ -417,6 +417,52 @@ func TestTaskGetPrintsKeyFilesAndDeliverables(t *testing.T) {
 	}
 }
 
+// TestTaskJSONEscapesTerminalCharacters checks that --json writes the characters a terminal can
+// act on as escapes: U+009B (the single-byte CSI), U+202E (a bidi override), DEL and U+0085. The
+// characters are built from their code points, so this file holds only ASCII. The line is still
+// one line of JSON, and it decodes to the title the server sent.
+func TestTaskJSONEscapesTerminalCharacters(t *testing.T) {
+	csi := string(rune(0x9b))
+	bidi := string(rune(0x202e))
+	nel := string(rune(0x85))
+	del := string(rune(0x7f))
+	title := "Add" + csi + "2J rate" + bidi + " limit" + del + nel
+	task := activeTask()
+	task.Title = title
+	svc := &fakeTasks{detail: &core.TaskDetail{Task: task}}
+	code, out, errOut := runTask(t, svc, "get", "--json", "task-20261030-01")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	if !oneLine(out) {
+		t.Fatalf("--json output is not one line: %q", out)
+	}
+	for _, raw := range []string{csi, bidi, del, nel} {
+		if strings.Contains(out, raw) {
+			t.Errorf("--json output holds the raw character %U", []rune(raw)[0])
+		}
+	}
+	for _, r := range []rune{0x9b, 0x202e, 0x7f, 0x85} {
+		esc := `\u` + hex4(r)
+		if !strings.Contains(out, esc) {
+			t.Errorf("--json output lacks the escape %s", esc)
+		}
+	}
+	var got core.TaskDetail
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("--json output does not decode: %v: %s", err, out)
+	}
+	if got.Task.Title != title {
+		t.Errorf("the title decodes to %q, want %q", got.Task.Title, title)
+	}
+}
+
+// hex4 returns the four lower-case hex digits of r, as a JSON escape holds them.
+func hex4(r rune) string {
+	const digits = "0123456789abcdef"
+	return string([]byte{digits[r>>12&0xf], digits[r>>8&0xf], digits[r>>4&0xf], digits[r&0xf]})
+}
+
 // TestTaskHelpPrintsItsFlags checks that -h prints the flags of the verb to stdout and exits 0.
 func TestTaskHelpPrintsItsFlags(t *testing.T) {
 	svc := &fakeTasks{}
