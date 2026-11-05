@@ -72,9 +72,10 @@ func openCodeCompared() map[string]any {
 }
 
 // instructionsMarker is the first line of the instruction file enable writes for OpenCode. It says the file is cairn's own
-// text, so enable may replace the file when cairn's text changes, and it is the line a person deletes to keep their own
-// edits. The file is not the AGENTS.md block, so the marker is not in that block.
-const instructionsMarker = "<!-- cairn task loop, written by cairn enable (EXPERIMENTAL): replaced when cairn's text changes; delete this line to keep your own edits -->"
+// text, so enable may replace the file whenever it differs from cairn's text, and it is the line a person deletes to keep
+// their own edits. The file is not the AGENTS.md block, so the marker is not in that block. An earlier wording of this line
+// is not recognised, so a file that holds it is treated as someone's own and is left as it is.
+const instructionsMarker = "<!-- cairn task loop, written by cairn enable (EXPERIMENTAL): replaced whenever it differs from cairn's text; delete this line to keep your own edits -->"
 
 // openCodeInstructionsText is the whole instruction file enable writes for OpenCode: the marker, then the task loop with
 // OpenCode's prefix.

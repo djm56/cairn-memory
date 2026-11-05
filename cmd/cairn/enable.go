@@ -171,7 +171,7 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers.")
 	fmt.Fprintln(w, "A block is cairn's only when its start line is exactly cairn's text and its end marker is alone on its line, each marker occurring once, in order. Line endings do not count, and an updated block keeps the file's own line endings.")
 	fmt.Fprintln(w, "Text outside such a block is never changed, and a block cairn wrote earlier is updated to the current text. Any other marker text in AGENTS.md is refused, and you fix the markers by hand.")
-	fmt.Fprintln(w, "The OpenCode instruction file is replaced only when it starts with cairn's marker line. One without the marker is someone's own, so it is left as it is, and opencode.json is still merged. pi reads .pi/mcp.json only after the project is trusted.")
+	fmt.Fprintln(w, "The OpenCode instruction file is replaced whenever it differs from cairn's text, but only when it starts with cairn's marker line; delete that line to keep your own edits. A file without the marker is someone's own, so it is left as it is, and opencode.json is still merged. pi reads .pi/mcp.json only after the project is trusted.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
 }

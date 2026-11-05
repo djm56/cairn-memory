@@ -296,6 +296,29 @@ func TestOpenCodeReplacesAnOlderCairnInstructionFile(t *testing.T) {
 	assertExperimental(t, "opencode", stdout)
 }
 
+// TestOpenCodeLeavesAnEarlierMarkerWordingAlone checks that the marker line is matched only in its current wording. A file
+// that starts with the earlier wording, which was never released, is treated as someone's own: it is left as it is, with no
+// backup, and the config is still merged.
+func TestOpenCodeLeavesAnEarlierMarkerWordingAlone(t *testing.T) {
+	dir := enableProject(t)
+	const earlier = "<!-- cairn task loop, written by cairn enable (EXPERIMENTAL): replaced when cairn's text changes; delete this line to keep your own edits -->\nan older task loop\n"
+	writeSettings(t, ocInstructions(dir), earlier)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if string(readBytes(t, ocInstructions(dir))) != earlier {
+		t.Errorf("the file with the earlier marker wording was replaced:\n%s", readBytes(t, ocInstructions(dir)))
+	}
+	if !strings.Contains(stdout, reportLine("file", "differs, left as is", openCodeInstructions)) {
+		t.Errorf("stdout does not say the file was left as it is:\n%s", stdout)
+	}
+	if got := listDir(t, filepath.Dir(ocInstructionsBackup(t))); len(got) != 0 {
+		t.Errorf("a backup was made of a file that was not changed: %v", got)
+	}
+}
+
 // TestOpenCodeCountsLineEndingsAsNoDifference checks an instruction file that is the current text with CRLF line endings,
 // as a checkout with autocrlf writes it: it is already present, and it is not rewritten or backed up.
 func TestOpenCodeCountsLineEndingsAsNoDifference(t *testing.T) {
