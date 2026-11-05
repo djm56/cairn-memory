@@ -170,6 +170,7 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 	}
 	mode := fs.FileMode(0o644)
 	var raw []byte
+	var read fs.FileInfo
 	if exists {
 		// A link is not followed: a rename over it would replace the link with a file, so the file it names is not touched.
 		switch {
@@ -183,6 +184,12 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		raw, err = os.ReadFile(path)
 		if err != nil {
 			fmt.Fprintf(stderr, "cairn enable: read %s: %v\n", path, err)
+			return 1
+		}
+		// The size and modification time taken after the read are what the rename must still find.
+		read, err = os.Lstat(path)
+		if err != nil {
+			fmt.Fprintf(stderr, "cairn enable: look for %s: %v\n", path, err)
 			return 1
 		}
 		mode = info.Mode().Perm()
@@ -244,7 +251,15 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "cairn enable: create %s: %v\n", dir, err)
 		return 1
 	}
-	if err := replaceFile(path, content, mode, exists); err != nil {
+	if err := replaceFile(path, content, mode, exists, unchangedCheck(path, read)); err != nil {
+		if errors.Is(err, errChanged) {
+			if backup != "" {
+				fmt.Fprintf(stderr, "cairn enable: %s %v: nothing was replaced, and the original is kept at %s; run cairn enable again\n", path, err, backup)
+			} else {
+				fmt.Fprintf(stderr, "cairn enable: %s %v: nothing was replaced; run cairn enable again\n", path, err)
+			}
+			return 1
+		}
 		fmt.Fprintf(stderr, "cairn enable: write %s: %v; the file was not replaced\n", path, err)
 		return 1
 	}
@@ -405,12 +420,44 @@ func copyNew(path string, content []byte, mode fs.FileMode) error {
 	return nil
 }
 
+// errChanged is what the check before the rename returns when the settings file changed since enable read it. The
+// rename would then replace another writer's save, so it is not made.
+var errChanged = errors.New("it changed after enable read it")
+
+// beforeRename runs after the new file is synced and before the check and the rename. It is a variable so a test can
+// change the settings file at that moment.
+var beforeRename = func() {}
+
+// unchangedCheck returns the check replaceFile runs before its rename. The file must still be the one enable read: the
+// same size and modification time, or still absent when read is nil, which is when enable found no file. A file that
+// is there now, when none was read, or that is gone, or that has changed, is errChanged, so nothing is replaced.
+func unchangedCheck(path string, read fs.FileInfo) func() error {
+	return func() error {
+		now, err := os.Lstat(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			if read == nil {
+				return nil
+			}
+			return errChanged
+		}
+		if err != nil {
+			return err
+		}
+		if read == nil || !now.Mode().IsRegular() || now.Size() != read.Size() || !now.ModTime().Equal(read.ModTime()) {
+			return errChanged
+		}
+		return nil
+	}
+}
+
 // replaceFile puts content at path with one rename: the new file is written to a temporary file in the same
 // directory, made durable, and renamed over path. So a crash leaves the old file or the new one, never a part of
 // either. A file that already exists keeps its mode, since keepMode is set. Its temporary file is made 0600 and is
 // given that mode only after the content is synced, so the content is never readable more widely than the file
 // ends up. A new file is made at 0644 before the umask, which is its final mode, as cairn init makes its file.
-func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool) error {
+// unchanged runs after the content is synced and before the rename. When it fails, nothing is renamed, and the
+// temporary file is removed.
+func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool, unchanged func() error) error {
 	dir := filepath.Dir(path)
 	tmp := filepath.Join(dir, "."+settingsName+"."+rand.Text()+".tmp")
 	createMode := fs.FileMode(0o644)
@@ -429,6 +476,10 @@ func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool) e
 		if err := os.Chmod(tmp, mode); err != nil {
 			return err
 		}
+	}
+	beforeRename()
+	if err := unchanged(); err != nil {
+		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		return err

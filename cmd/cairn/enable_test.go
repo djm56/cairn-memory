@@ -693,3 +693,68 @@ func TestEnableRefusesASymlinkAndTouchesItsTarget(t *testing.T) {
 		t.Errorf("the file the link names was changed")
 	}
 }
+
+// onBeforeRename runs f at the moment before the check and the rename, until the test ends. It stands in for another
+// writer that saves the settings file while enable is writing it.
+func onBeforeRename(t *testing.T, f func()) {
+	t.Helper()
+	prev := beforeRename
+	beforeRename = f
+	t.Cleanup(func() { beforeRename = prev })
+}
+
+// TestEnableRefusesAFileThatChangesWhileItIsWritten checks that a settings file another writer saves between enable's
+// read and its rename is not replaced. enable exits 1, the other writer's file is kept, the temporary file is removed,
+// and the backup holds the original.
+func TestEnableRefusesAFileThatChangesWhileItIsWritten(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, existingSettings)
+	other := "{\"permissions\":{\"allow\":[]}}\n"
+	onBeforeRename(t, func() {
+		if err := os.WriteFile(path, []byte(other), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || !strings.Contains(stderr, "changed after enable read it") || !strings.Contains(stderr, "nothing was replaced") {
+		t.Errorf("exit %d, stderr %q: want 1 and the refusal named", code, stderr)
+	}
+	if strings.Contains(stdout, "wrote ") {
+		t.Errorf("stdout says the file was written:\n%s", stdout)
+	}
+	if string(readBytes(t, path)) != other {
+		t.Errorf("the other writer's file was replaced:\n%s", readBytes(t, path))
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file and no temporary file", got)
+	}
+	if !bytes.Equal(readBytes(t, backupIn(t, "acme-api")), []byte(existingSettings)) {
+		t.Errorf("the backup is not the original file")
+	}
+}
+
+// TestEnableRefusesAFileThatAppearsWhileItIsWritten checks the other case: a project with no settings file, where
+// another writer creates one between enable's check and its rename. The rename would replace it, so it is refused.
+func TestEnableRefusesAFileThatAppearsWhileItIsWritten(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	other := "{\"permissions\":{\"allow\":[]}}\n"
+	onBeforeRename(t, func() {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(other), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	code, _, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || !strings.Contains(stderr, "changed after enable read it") {
+		t.Errorf("exit %d, stderr %q: want 1 and the refusal named", code, stderr)
+	}
+	if string(readBytes(t, path)) != other {
+		t.Errorf("the file that appeared was replaced:\n%s", readBytes(t, path))
+	}
+}
