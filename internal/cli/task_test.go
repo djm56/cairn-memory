@@ -344,6 +344,79 @@ func TestTaskFlagErrors(t *testing.T) {
 	}
 }
 
+// TestTaskCurrentPrintsEveryPart checks that the summary of task current prints each part the
+// call read: the goal and context, the criteria with evidence, the steps with their assignee,
+// the recent events, each directive with its code, scope, title and rule, and the counts. A
+// next action of 250 runes is printed whole, since the summary cuts nothing.
+func TestTaskCurrentPrintsEveryPart(t *testing.T) {
+	task := activeTask()
+	task.Context = "Two limits, one per key."
+	task.NextAction = strings.Repeat("n", 250)
+	steps := twoSteps()
+	steps[1].Agent = "hicks"
+	svc := &fakeTasks{cur: &core.TaskCurrent{
+		Task:     &task,
+		Criteria: []core.Criterion{{Ord: 1, Criterion: "429 after 100 requests", Result: core.CriterionMet, Evidence: "test ok"}},
+		Steps:    steps,
+		RecentEvents: []core.Event{{
+			ID: 9, Kind: core.EventNote, Text: "started", OccurredAt: time.Date(2026, 10, 30, 9, 2, 0, 0, time.UTC),
+		}},
+		Directives: []core.Directive{
+			{Code: "D-0004", Scope: core.ScopeGlobal, Title: "Test first", Rule: "Write the failing test before the code."},
+			{Code: "D-0009", Scope: core.ScopeAgent, Agent: "reviewer", Title: "Read the diff", Rule: "Read every changed\nline."},
+		},
+		Expired: 2, Omitted: 3, OtherActive: 1,
+	}}
+	code, out, errOut := runTask(t, svc, "current")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	for _, want := range []string{
+		"next        " + strings.Repeat("n", 250) + "\n",
+		"context     Two limits, one per key.\n",
+		"other       1 other active task(s)\n",
+		"criteria\n  1. 429 after 100 requests — met: test ok\n",
+		"steps\n  1. [active] Write test\n  2. [pending] Implement (agent hicks)\n",
+		"recent events, newest first\n  2026-10-30 09:02 UTC  note  started\n",
+		"directives  2 apply to this project\n",
+		"  D-0004  global  Test first\n          Write the failing test before the code.\n",
+		"  D-0009  agent reviewer  Read the diff\n          Read every changed line.\n",
+		"expired     2 past review_by, left out\n",
+		"omitted     3 beyond the cap of 12\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestTaskGetPrintsKeyFilesAndDeliverables checks that the summary of task get prints the key
+// files of the brief and the deliverables of the close, each with its note when it has one.
+func TestTaskGetPrintsKeyFilesAndDeliverables(t *testing.T) {
+	task := activeTask()
+	task.Status = core.TaskDone
+	svc := &fakeTasks{detail: &core.TaskDetail{
+		Task: task,
+		KeyFiles: []core.TaskFile{
+			{Path: "internal/limit/limit.go", Role: core.FileKey, Note: "the limiter"},
+			{Path: "internal/limit/limit_test.go", Role: core.FileKey},
+		},
+		Deliverables: []core.TaskFile{{Path: "docs/limit.md", Role: core.FileDeliverable, Note: "the write-up"}},
+	}}
+	code, out, errOut := runTask(t, svc, "get", "task-20261030-01")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	for _, want := range []string{
+		"key files\n  internal/limit/limit.go — the limiter\n  internal/limit/limit_test.go\n",
+		"deliverables\n  docs/limit.md — the write-up\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 // TestTaskHelpPrintsItsFlags checks that -h prints the flags of the verb to stdout and exits 0.
 func TestTaskHelpPrintsItsFlags(t *testing.T) {
 	svc := &fakeTasks{}

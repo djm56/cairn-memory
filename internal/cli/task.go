@@ -30,6 +30,10 @@ type Opener func() (Session, error)
 // --json, which writes the result as one line of JSON: the object the MCP tool of the same
 // name returns, with the same field names (CONTRACT §2).
 //
+// The text form is a summary for a person. It prints each section the call read, folds every
+// text to one line, and leaves out what --json keeps: the timestamps, the event and step ids,
+// and the fields of a lesson or a mistake beyond the ones shown. --json is the whole object.
+//
 // Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
 func Task(open Opener, args []string, stdout, stderr io.Writer) int {
@@ -154,7 +158,7 @@ func taskList(open Opener, args []string, stdout, stderr io.Writer) int {
 func newFlags(name string) (*flag.FlagSet, *bool) {
 	fl := flag.NewFlagSet(name, flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
-	asJSON := fl.Bool("json", false, "write the result as one line of JSON, the object the MCP tool returns")
+	asJSON := fl.Bool("json", false, "write the whole result as one line of JSON, the object the MCP tool returns; the text form is a summary")
 	return fl, asJSON
 }
 
@@ -219,32 +223,28 @@ func (s *statusFlag) Set(v string) error {
 	return nil
 }
 
-// writeCurrent prints the active task for a person: its line, next action, current step
-// and directive counts. Each server text is folded to one line, so a title cannot start a
-// line of its own.
+// writeCurrent prints the active task for a person: its header and body, the current step
+// and the plan, the criteria, the recent events, and each directive that applies with its
+// code, scope, title and rule. Every text is folded to one line, so a title cannot start a
+// line of its own, and no text is cut. --json keeps the fields this summary leaves out.
 func writeCurrent(w io.Writer, cur *core.TaskCurrent) {
 	if cur.Task == nil {
 		fmt.Fprintln(w, "no task is active")
 		return
 	}
 	t := cur.Task
-	fmt.Fprintf(w, "task        %s  %s  %s\n", Plain(t.ID), Plain(string(t.Status)), Plain(t.Title))
-	if next := Plain(t.NextAction); next != "" {
-		fmt.Fprintf(w, "next        %s\n", next)
-	}
+	fmt.Fprintf(w, "task        %s  %s  %s\n", FoldLine(t.ID), FoldLine(string(t.Status)), FoldLine(t.Title))
+	writeBody(w, t)
 	if s := currentStep(cur.Steps); s != nil {
-		fmt.Fprintf(w, "step        %d of %d: %s (%s)\n", s.Number, len(cur.Steps), Plain(s.Title), Plain(string(s.Status)))
+		fmt.Fprintf(w, "step        %d of %d: %s (%s)\n", s.Number, len(cur.Steps), FoldLine(s.Title), FoldLine(string(s.Status)))
 	}
+	writeSteps(w, cur.Steps)
+	writeCriteria(w, cur.Criteria)
 	if cur.OtherActive > 0 {
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)
 	}
-	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
-	if cur.Expired > 0 {
-		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)
-	}
-	if cur.Omitted > 0 {
-		fmt.Fprintf(w, "omitted     %d beyond the cap of %d\n", cur.Omitted, core.DirectiveCap)
-	}
+	writeEvents(w, "recent events, newest first", cur.RecentEvents)
+	writeDirectives(w, cur)
 }
 
 // currentStep returns the step to work on: the active one, else the first pending one,
@@ -260,43 +260,17 @@ func currentStep(steps []core.Step) *core.Step {
 	return nil
 }
 
-// writeDetail prints one task in full for a person: its header, then each part the call
-// read. A label is one line, so a multi-line goal is folded; the JSON keeps the text whole.
+// writeDetail prints one task for a person: its header, then each section the call read.
+// A label is one line, so a multi-line goal is folded; the JSON keeps the text whole.
 func writeDetail(w io.Writer, d *core.TaskDetail) {
 	t := d.Task
 	fmt.Fprintf(w, "%s  %s  %s  %s\n", FoldLine(t.ID), FoldLine(string(t.Status)), FoldLine(string(t.Priority)), FoldLine(t.Title))
-	field(w, "project", t.Project)
-	field(w, "goal", t.Goal)
-	field(w, "context", t.Context)
-	field(w, "constraints", t.Constraints)
-	field(w, "next", t.NextAction)
-	field(w, "blockers", t.Blockers)
-	field(w, "outcome", t.OutcomeSummary)
-	if len(d.Criteria) > 0 {
-		fmt.Fprintln(w, "criteria")
-		for _, c := range d.Criteria {
-			line := fmt.Sprintf("  %d. %s", c.Ord, FoldLine(c.Criterion))
-			if c.Result != "" {
-				line += " — " + FoldLine(string(c.Result))
-			}
-			fmt.Fprintln(w, line)
-		}
-	}
-	if len(d.Steps) > 0 {
-		fmt.Fprintln(w, "steps")
-		for _, s := range d.Steps {
-			line := fmt.Sprintf("  %d. [%s] %s", s.Number, FoldLine(string(s.Status)), FoldLine(s.Title))
-			if s.Summary != "" {
-				line += ": " + FoldLine(s.Summary)
-			}
-			fmt.Fprintln(w, line)
-		}
-	}
+	writeBody(w, &t)
+	writeCriteria(w, d.Criteria)
+	writeFiles(w, "key files", d.KeyFiles)
+	writeSteps(w, d.Steps)
 	if len(d.Events) > 0 {
-		fmt.Fprintln(w, "events, newest first")
-		for _, e := range d.Events {
-			fmt.Fprintf(w, "  %s  %s  %s\n", stamp(e.OccurredAt), FoldLine(string(e.Kind)), FoldLine(e.Text))
-		}
+		writeEvents(w, "events, newest first", d.Events)
 	}
 	if d.Next != "" {
 		fmt.Fprintf(w, "more events: pass --cursor %s to read the next page\n", FoldLine(d.Next))
@@ -310,6 +284,21 @@ func writeDetail(w io.Writer, d *core.TaskDetail) {
 	for _, m := range d.Mistakes {
 		fmt.Fprintf(w, "mistake     %s (%s): %s\n", FoldLine(m.Agent), FoldLine(string(m.Impact)), FoldLine(m.Mistake))
 	}
+	writeFiles(w, "deliverables", d.Deliverables)
+}
+
+// writeBody prints the labelled fields of a task that both the summary and the detail share:
+// the project, the goal, the context and constraints, the owner, the next action, the
+// blockers and the outcome. A field that is empty is left out.
+func writeBody(w io.Writer, t *core.Task) {
+	field(w, "project", t.Project)
+	field(w, "goal", t.Goal)
+	field(w, "context", t.Context)
+	field(w, "constraints", t.Constraints)
+	field(w, "owner", t.Owner)
+	field(w, "next", t.NextAction)
+	field(w, "blockers", t.Blockers)
+	field(w, "outcome", t.OutcomeSummary)
 }
 
 // field prints one labelled line, unless the value is empty.
@@ -317,6 +306,103 @@ func field(w io.Writer, label, value string) {
 	if v := FoldLine(value); v != "" {
 		fmt.Fprintf(w, "%-11s %s\n", label, v)
 	}
+}
+
+// writeCriteria prints the acceptance criteria as a numbered block, each with its result and
+// its evidence when they are set. It prints nothing when there are none.
+func writeCriteria(w io.Writer, cs []core.Criterion) {
+	if len(cs) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "criteria")
+	for _, c := range cs {
+		line := fmt.Sprintf("  %d. %s", c.Ord, FoldLine(c.Criterion))
+		if c.Result != "" {
+			line += " — " + FoldLine(string(c.Result))
+		}
+		if c.Evidence != "" {
+			line += ": " + FoldLine(c.Evidence)
+		}
+		fmt.Fprintln(w, line)
+	}
+}
+
+// writeSteps prints the steps of a plan, each with its number, status, title, assignee and
+// summary when they are set. It prints nothing when there are none.
+func writeSteps(w io.Writer, steps []core.Step) {
+	if len(steps) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "steps")
+	for _, s := range steps {
+		line := fmt.Sprintf("  %d. [%s] %s", s.Number, FoldLine(string(s.Status)), FoldLine(s.Title))
+		if s.Agent != "" {
+			line += " (agent " + FoldLine(s.Agent) + ")"
+		}
+		if s.Summary != "" {
+			line += ": " + FoldLine(s.Summary)
+		}
+		fmt.Fprintln(w, line)
+	}
+}
+
+// writeFiles prints a block of files under its label: each path, then its note when it has
+// one. It prints nothing when there are none. Key files and deliverables use it.
+func writeFiles(w io.Writer, label string, files []core.TaskFile) {
+	if len(files) == 0 {
+		return
+	}
+	fmt.Fprintln(w, label)
+	for _, f := range files {
+		line := "  " + FoldLine(f.Path)
+		if f.Note != "" {
+			line += " — " + FoldLine(f.Note)
+		}
+		fmt.Fprintln(w, line)
+	}
+}
+
+// writeEvents prints a block of journal events under its label, one line each: the time to the
+// minute, the kind and the text. It prints nothing when there are none.
+func writeEvents(w io.Writer, label string, events []core.Event) {
+	if len(events) == 0 {
+		return
+	}
+	fmt.Fprintln(w, label)
+	for _, e := range events {
+		fmt.Fprintf(w, "  %s  %s  %s\n", stamp(e.OccurredAt), FoldLine(string(e.Kind)), FoldLine(e.Text))
+	}
+}
+
+// writeDirectives prints the directive count of the active task, then each directive that
+// applies: its code, its scope, its title, and its rule on the next line. The expired and
+// omitted counts follow when they are not zero, as the MCP tool counts them.
+func writeDirectives(w io.Writer, cur *core.TaskCurrent) {
+	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
+	for _, d := range cur.Directives {
+		fmt.Fprintf(w, "  %s  %s  %s\n", FoldLine(d.Code), scopeLabel(d), FoldLine(d.Title))
+		if rule := FoldLine(d.Rule); rule != "" {
+			fmt.Fprintf(w, "          %s\n", rule)
+		}
+	}
+	if cur.Expired > 0 {
+		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)
+	}
+	if cur.Omitted > 0 {
+		fmt.Fprintf(w, "omitted     %d beyond the cap of %d\n", cur.Omitted, core.DirectiveCap)
+	}
+}
+
+// scopeLabel names the scope of a directive for a person: global, project, or agent with the
+// role it is scoped to.
+func scopeLabel(d core.Directive) string {
+	switch d.Scope {
+	case core.ScopeAgent:
+		return "agent " + FoldLine(d.Agent)
+	case core.ScopeProject:
+		return "project"
+	}
+	return FoldLine(string(d.Scope))
 }
 
 // writeList prints one line per task, most recently updated first, and the cursor of the
