@@ -629,6 +629,33 @@ folder of the operator's own, then start `cairn serve` again. Nothing is deleted
 The stray refusal before step 2 gives the same instruction for a `-wal` or `-shm`
 with no database beside it. The same steps are in the README under "If a restore fails".
 
+#### 5.2.2 Exit codes of the CLI verbs (M4, #88)
+
+The verbs that take `--json` (`task`, `step`, `event`, `learning`, `directive`,
+`recall`, `search` and `prime`) exit with the code of the error kind of a failed
+call, so a script or an agent with only a shell can tell a refusal from a missing
+row without reading the message. The codes are the table in
+`internal/cli/exit.go`, and `cairn --help` prints the same table.
+
+| Exit | Meaning |
+|---|---|
+| 0 | success |
+| 1 | a failure with no kind: an internal failure of the server, or one raised on this machine |
+| 2 | a usage error, refused before any call: the message is on stderr, and nothing is on stdout |
+| 3 | `invalid`: the request is malformed, a value is unknown, or there is no project or agent |
+| 4 | `not_found`: the task, step, learning or directive is not in the caller's project |
+| 5 | `refused`: a rule forbids the call now, such as a status move or the close policy |
+| 6 | `operator_only`: an operator call made without the operator role |
+| 7 | `no_route`: the path is not a call, so the server base URL is wrong |
+| 8 | `unsupported_media_type`: the request body is not `application/json` |
+
+The kinds `unauthenticated` and `read_only` do not reach the CLI with their kind.
+The client answers them as plain errors, so they exit 1 with the kind `internal`,
+as any other failure with no kind does. With `--json`, a failed call writes
+`{"error": {"kind", "message", "missing"}}` to stdout, and nothing to stderr.
+`missing` is listed only for a refused close. The other commands (`status`,
+`doctor`, `export` and the rest) exit 1 on a failure.
+
 ### 5.3 The server
 
 Clients open no database. `cairn mcp` and the CLI send each call to
