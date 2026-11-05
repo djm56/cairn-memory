@@ -647,7 +647,6 @@ func TestEnableUsageErrors(t *testing.T) {
 		want string
 	}{
 		{"no agent", []string{"enable"}, "needs --agent"},
-		{"opencode is not built yet", []string{"enable", "--agent", "opencode"}, "not built yet"},
 		{"pi is not built yet", []string{"enable", "--agent", "pi"}, "not built yet"},
 		{"an unknown agent", []string{"enable", "--agent", "nope"}, "unknown agent"},
 		{"an argument after the flags", []string{"enable", "--agent", "claude-code", "extra"}, "takes flags only"},

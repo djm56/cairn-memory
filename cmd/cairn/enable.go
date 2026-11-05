@@ -124,8 +124,8 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 	case "":
 		fmt.Fprintln(stderr, "cairn enable: needs --agent <name>: use --agent claude-code, opencode or pi")
 		return 2
-	case "claude-code":
-	case "opencode", "pi":
+	case "claude-code", "opencode":
+	case "pi":
 		fmt.Fprintf(stderr, "cairn enable: --agent %s is not built yet: use --agent claude-code\n", *agent)
 		return 2
 	default:
@@ -147,6 +147,9 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 		// CAIRN_PROJECT names the project, but the project directory is found from the file, and there is none.
 		fmt.Fprintln(stderr, "cairn enable: CAIRN_PROJECT names the project, but the project directory is found from its .cairn.toml, and there is none: run cairn enable from the project, or unset CAIRN_PROJECT")
 		return 1
+	}
+	if *agent == "opencode" {
+		return enableOpenCode(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
 	}
 	return enableClaudeCode(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
 }
