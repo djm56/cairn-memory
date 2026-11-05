@@ -160,6 +160,36 @@ func TestEnableWritesTheHooksIntoAFreshProject(t *testing.T) {
 	}
 }
 
+// TestEnableGivesANewFileTheUmaskAppliedMode checks that a file enable creates has the mode 0644 before the umask, as
+// cairn init makes its file. The expected mode is read from a probe made at 0644 beside the test's directory, so the
+// check holds under whatever umask the test runs with.
+func TestEnableGivesANewFileTheUmaskAppliedMode(t *testing.T) {
+	dir := enableProject(t)
+	probe := filepath.Join(t.TempDir(), "probe")
+	f, err := os.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.Stat(probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if code, _, stderr := runCmd(t, "enable", "--agent", "claude-code"); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	info, err := os.Stat(settingsIn(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != want.Mode().Perm() {
+		t.Errorf("new file has mode %o, want %o (0644 before the umask)", info.Mode().Perm(), want.Mode().Perm())
+	}
+}
+
 // TestEnableKeepsEveryOtherKeyAndEntry checks a file with keys and hooks that enable does not add to: each is kept
 // with its value, the cairn hook with another command stays, and the original is copied to a backup first.
 func TestEnableKeepsEveryOtherKeyAndEntry(t *testing.T) {

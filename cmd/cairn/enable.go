@@ -347,12 +347,17 @@ func copyNew(path string, content []byte, mode fs.FileMode) error {
 
 // replaceFile puts content at path with one rename: the new file is written to a temporary file in the same
 // directory, made durable, and renamed over path. So a crash leaves the old file or the new one, never a part of
-// either. A file that already exists keeps its mode, since keepMode is set. A new file gets 0644 before the umask,
-// as cairn init makes its file.
+// either. A file that already exists keeps its mode, since keepMode is set. Its temporary file is made 0600 and is
+// given that mode only after the content is synced, so the content is never readable more widely than the file
+// ends up. A new file is made at 0644 before the umask, which is its final mode, as cairn init makes its file.
 func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool) error {
 	dir := filepath.Dir(path)
 	tmp := filepath.Join(dir, "."+settingsName+"."+rand.Text()+".tmp")
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	createMode := fs.FileMode(0o644)
+	if keepMode {
+		createMode = 0o600
+	}
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, createMode)
 	if err != nil {
 		return err
 	}
