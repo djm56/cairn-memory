@@ -255,16 +255,27 @@ func fail(stderr io.Writer, command string, err error) int {
 // terminal can act on are written as escapes (escapeTerminal). The output still decodes to
 // the same value.
 func writeJSON(stdout, stderr io.Writer, command string, v any) int {
+	b, err := encodeJSON(v)
+	if err != nil {
+		return fail(stderr, command, err)
+	}
+	if _, err := stdout.Write(b); err != nil {
+		return fail(stderr, command, err)
+	}
+	return 0
+}
+
+// encodeJSON returns v as one line of JSON, with the encoding writeJSON gives it: no HTML escapes, and
+// the terminal characters escaped (escapeTerminal). It ends in a newline. Every writer of JSON to a
+// terminal or a model goes through it, so a second writer cannot encode a server text differently.
+func encodeJSON(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		return fail(stderr, command, err)
+		return nil, err
 	}
-	if _, err := stdout.Write(escapeTerminal(buf.Bytes())); err != nil {
-		return fail(stderr, command, err)
-	}
-	return 0
+	return escapeTerminal(buf.Bytes()), nil
 }
 
 // escapeTerminal returns the encoded JSON b with each character a terminal can act on written

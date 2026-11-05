@@ -84,17 +84,26 @@ func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role strin
 	fmt.Fprintln(w, pointer)
 }
 
-// StepWarning writes the one-line warning the stop hook prints: a step of the active task that is active
-// with no summary. Only two fields are read, the step's status and its summary. A step is named when its
-// status is active and its summary is blank once trimmed. The summary is the latest result, and a step that
-// starts again after a failure keeps the summary of its failed attempt, so such a step is not named; the
-// fields do not say which attempt a summary belongs to.
+// hookWarning is the object the stop hook writes. Claude Code shows its systemMessage to the user. The
+// hook sets no other field, so it makes no decision for the client: the warning does not make the client
+// continue.
+type hookWarning struct {
+	SystemMessage string `json:"systemMessage"`
+}
+
+// StepWarning writes the warning the stop hook prints: one JSON object, with a systemMessage that is one
+// line of text. The warning is for a step of the active task that is active with no summary. Only two
+// fields are read, the step's status and its summary. A step is named when its status is active and its
+// summary is blank once trimmed. The summary is the latest result, and a step that starts again after a
+// failure keeps the summary of its failed attempt, so such a step is not named; the fields do not say
+// which attempt a summary belongs to.
 //
 // With one such step the warning names it. With more, it gives the count and names the first. It writes
-// nothing when no task is active or when every active step has a summary.
-func StepWarning(w io.Writer, cur *core.TaskCurrent) {
+// nothing when no task is active or when every active step has a summary. It returns an error only when
+// the object cannot be encoded, which a single string cannot cause.
+func StepWarning(w io.Writer, cur *core.TaskCurrent) error {
 	if cur.Task == nil {
-		return
+		return nil
 	}
 	n := 0
 	first := -1
@@ -107,13 +116,20 @@ func StepWarning(w io.Writer, cur *core.TaskCurrent) {
 		}
 	}
 	if n == 0 {
-		return
+		return nil
 	}
 	s := cur.Steps[first]
 	// The title is server text, so it goes through Plain: it cannot end the line or start one.
+	var msg string
 	if n == 1 {
-		fmt.Fprintf(w, "Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with step_update when it is done.\n", s.Number, len(cur.Steps), Plain(s.Title))
-		return
+		msg = fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.", s.Number, len(cur.Steps), Plain(s.Title))
+	} else {
+		msg = fmt.Sprintf("Cairn warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with cairn step update or the step_update tool when each is done.", n, s.Number, len(cur.Steps), Plain(s.Title))
 	}
-	fmt.Fprintf(w, "Cairn warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with step_update when each is done.\n", n, s.Number, len(cur.Steps), Plain(s.Title))
+	b, err := encodeJSON(hookWarning{SystemMessage: msg})
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(b)
+	return err
 }

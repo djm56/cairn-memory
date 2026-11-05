@@ -17,8 +17,9 @@ import (
 var hookTimeout = 5 * time.Second
 
 // hookWriter writes what one hook prints for the active task it has read. It writes nothing when it has
-// nothing to say.
-type hookWriter func(w io.Writer, t *target, cur *core.TaskCurrent)
+// nothing to say. It returns an error when what it would print cannot be built, and then the hook prints
+// nothing.
+type hookWriter func(w io.Writer, t *target, cur *core.TaskCurrent) error
 
 // runHook is the sub-command `cairn hook <event>`: the output a client's hook reads (DESIGN.md §4.1 and
 // §5.2). session-start and pre-compact print the same block. stop prints a warning only when a step is
@@ -77,21 +78,25 @@ func runContextHook(event, nothing string, args []string, stdout, stderr io.Writ
 	}
 	// The output is built whole and written once, so a fault cannot leave part of it on stdout.
 	var out bytes.Buffer
-	write(&out, t, cur)
+	if err := write(&out, t, cur); err != nil {
+		fmt.Fprintf(stderr, "cairn hook %s: %s: %v\n", event, nothing, err)
+		return 0
+	}
 	_, _ = stdout.Write(out.Bytes())
 	return 0
 }
 
 // writeContextBlock is what session-start and pre-compact print: the session-start block for the active
-// task, with the role the counts were read for.
-func writeContextBlock(w io.Writer, t *target, cur *core.TaskCurrent) {
+// task, with the role the counts were read for. It cannot fail.
+func writeContextBlock(w io.Writer, t *target, cur *core.TaskCurrent) error {
 	writeSessionStart(w, t.project.Name, cur, t.role, t.roleRefused)
+	return nil
 }
 
-// writeStepWarning is what stop prints: the one-line warning for an active step with no summary, and
-// nothing otherwise.
-func writeStepWarning(w io.Writer, _ *target, cur *core.TaskCurrent) {
-	cli.StepWarning(w, cur)
+// writeStepWarning is what stop prints: the warning for an active step with no summary, as one JSON object
+// with a systemMessage, and nothing otherwise.
+func writeStepWarning(w io.Writer, _ *target, cur *core.TaskCurrent) error {
+	return cli.StepWarning(w, cur)
 }
 
 // writeSessionStart writes the session-start block for cur, with the hook's closing line. The block is

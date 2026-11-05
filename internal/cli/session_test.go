@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -10,16 +12,26 @@ import (
 // stepWarningOf returns what StepWarning writes for cur.
 func stepWarningOf(cur *core.TaskCurrent) string {
 	var b bytes.Buffer
-	StepWarning(&b, cur)
+	if err := StepWarning(&b, cur); err != nil {
+		return "error: " + err.Error()
+	}
 	return b.String()
 }
 
-// TestStepWarningNamesAnActiveStepWithNoSummary checks the one-line warning for the active step of
-// activeTask, which has no summary: its number, its count, its title, and the call that records one.
+// warningJSON is the line StepWarning writes for the warning msg: one JSON object whose only field is
+// systemMessage, with its newline.
+func warningJSON(msg string) string {
+	b, _ := json.Marshal(map[string]string{"systemMessage": msg})
+	return string(b) + "\n"
+}
+
+// TestStepWarningNamesAnActiveStepWithNoSummary checks the warning for the active step of activeTask, which
+// has no summary: one JSON object whose systemMessage gives its number, its count, its title, and the routes
+// that record a summary.
 func TestStepWarningNamesAnActiveStepWithNoSummary(t *testing.T) {
 	task := activeTask()
 	cur := &core.TaskCurrent{Task: &task, Steps: twoSteps()}
-	want := `Cairn warning: step 1 of 2, "Write test", is active with no summary. Record a summary with step_update when it is done.` + "\n"
+	want := warningJSON(`Cairn warning: step 1 of 2, "Write test", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.`)
 	if got := stepWarningOf(cur); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
@@ -75,19 +87,24 @@ func TestStepWarningCountsSeveralActiveSteps(t *testing.T) {
 		{Number: 2, Title: "Implement", Status: core.StepActive},
 		{Number: 3, Title: "Document", Status: core.StepActive, Summary: "Done."},
 	}
-	want := `Cairn warning: 2 steps are active with no summary; the first is step 1 of 3, "Write test". Record a summary with step_update when each is done.` + "\n"
+	want := warningJSON(`Cairn warning: 2 steps are active with no summary; the first is step 1 of 3, "Write test". Record a summary with cairn step update or the step_update tool when each is done.`)
 	if got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps}); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
 }
 
 // TestStepWarningFoldsTheTitle checks that a title with a line feed and an escape sequence, built from
-// code points, is one line in the warning, and the sequence goes whole.
+// code points, is one line in the warning, and the sequence goes whole. The object's bytes carry no escape
+// character and no carriage return: the title cannot reach the client as a control character.
 func TestStepWarningFoldsTheTitle(t *testing.T) {
 	task := activeTask()
 	steps := []core.Step{{Number: 1, Title: "Write" + string(rune(0x0a)) + "test" + string(rune(0x1b)) + "[31m now", Status: core.StepActive}}
-	want := `Cairn warning: step 1 of 1, "Write test now", is active with no summary. Record a summary with step_update when it is done.` + "\n"
-	if got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps}); got != want {
+	want := warningJSON(`Cairn warning: step 1 of 1, "Write test now", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.`)
+	got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps})
+	if got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
+	}
+	if strings.ContainsAny(got, "\x1b\r") {
+		t.Errorf("warning carries a control character: %q", got)
 	}
 }

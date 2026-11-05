@@ -149,8 +149,8 @@ func TestPreCompactWithNoActiveTaskIsOneLine(t *testing.T) {
 	}
 }
 
-// TestStopWarnsOnAnActiveStepWithNoSummary pins the warning stop prints for a seeded task, whose first step
-// is active with no summary. It is one line, and it is one call, a read.
+// TestStopWarnsOnAnActiveStepWithNoSummary pins the bytes stop prints for a seeded task, whose first step is
+// active with no summary: one JSON object on one line, whose systemMessage is the warning. It is one call, a read.
 func TestStopWarnsOnAnActiveStepWithNoSummary(t *testing.T) {
 	var seen []string
 	local, url := newServer(t, &seen)
@@ -161,7 +161,7 @@ func TestStopWarnsOnAnActiveStepWithNoSummary(t *testing.T) {
 	seen = nil
 
 	code, stdout, stderr := runCmd(t, "hook", "stop")
-	want := `Cairn warning: step 1 of 2, "Read the schema", is active with no summary. Record a summary with step_update when it is done.` + "\n"
+	want := `{"systemMessage":"Cairn warning: step 1 of 2, \"Read the schema\", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done."}` + "\n"
 	if code != 0 || stderr != "" || stdout != want {
 		t.Errorf("exit %d, stderr %q, stdout %q: want 0, nothing on stderr and the warning %q", code, stderr, stdout, want)
 	}
