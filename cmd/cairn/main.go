@@ -34,6 +34,7 @@ func init() {
 		"export":  {summary: "Print a task as Markdown: export task [id]", run: runExport},
 		"hook":    {summary: "Output for a client hook: session-start", run: runHook},
 		"status":  {summary: "Show the server, the project and the active task", run: runStatus},
+		"task":    {summary: "Read a task: task current|get|list, each with --json", run: runTask},
 		"doctor":  {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
 		"serve":   {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
 		"key":     {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},

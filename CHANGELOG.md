@@ -145,6 +145,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Docs, M3 follow-ups (#148): DEPLOY.md gives the `systemd-analyze security` result as a description of the score, not as verbatim output.
 - Docs, M3 follow-ups (#165): the review labels in code comments and in the public docs are replaced by the rule they stood for, and the comments that were awkward or unwrapped are reworded. Two test-case name strings keep their review labels by design, since renaming them changes code: internal/core/errortext_test.go:117 and internal/store/queries_test.go:988. No code token changed. DESIGN.md §5.2.1 drops a review label, and DEPLOY.md says what a backup swap can leave behind, including an empty `.cairn-backup-*` directory from a refused backup.
 - Docs, M3 follow-ups: CONTRIBUTING.md lists `scan-invisible` and the Windows and macOS cross-builds among what CI runs. CLAUDE.md no longer names a local checkout path. wiki/Decisions.md records D27 to D29 as Bishop defaults, pending operator approval.
+- M4 CLI (#87, partial): `cairn task current|get|list`, each with `--json` (one line, the object the MCP tool returns). The text rules and error text move to `internal/cli`. More verbs to follow.
 
 ### Changed
 
