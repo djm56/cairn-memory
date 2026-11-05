@@ -429,9 +429,10 @@ func TestEnableRefusesAFileItCannotMerge(t *testing.T) {
 	}
 }
 
-// TestEnableBacksUpTheOriginalWithItsMode checks that the backup holds the original bytes and the original mode, and
-// that the new file keeps the mode too.
-func TestEnableBacksUpTheOriginalWithItsMode(t *testing.T) {
+// TestEnableKeepsAPrivateFilePrivate checks a settings file that is 0600: the file keeps 0600, and its backup, which is
+// 0600 too, holds the original bytes. The backup is 0600 whatever the mode of the file it copies, so a file that is not
+// private is checked by TestEnableBacksUpAWorldReadableFileAs0600, not here.
+func TestEnableKeepsAPrivateFilePrivate(t *testing.T) {
 	dir := enableProject(t)
 	path := settingsIn(dir)
 	writeSettings(t, path, existingSettings)
