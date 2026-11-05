@@ -11,21 +11,20 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// runExport is the sub-command `cairn export`. Only `task` is built (DESIGN.md §5.2);
-// `project` is in the scope of v1 with no milestone yet, so it is named as not built.
+// runExport is the sub-command `cairn export`: `task` (DESIGN.md §5.2) and `project`, which is placed
+// in M4 (D22, docs/PLAN.md §8).
 func runExport(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn export: name what to export: cairn export task [id]")
+		fmt.Fprintln(stderr, "cairn export: name what to export: cairn export task [id] or cairn export project")
 		return 2
 	}
 	switch args[0] {
 	case "task":
 		return runExportTask(args[1:], stdout, stderr)
 	case "project":
-		fmt.Fprintln(stderr, "cairn export: export project is not built yet (docs/PLAN.md §3, scope of v1)")
-		return 2
+		return runExportProject(args[1:], stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn export: unknown export %q: use cairn export task [id]\n", args[0])
+	fmt.Fprintf(stderr, "cairn export: unknown export %q: use cairn export task [id] or cairn export project\n", args[0])
 	return 2
 }
 
@@ -65,12 +64,7 @@ func runExportTask(args []string, stdout, stderr io.Writer) int {
 		}
 		id = cur.Task.ID
 	}
-	detail, err := t.svc.TaskGet(t.ctx, core.TaskGetRequest{ID: id})
-	if err != nil {
-		fmt.Fprintf(stderr, "cairn export task: %s\n", reason(err))
-		return 1
-	}
-	events, err := allEvents(t, id)
+	detail, events, err := fetchTask(t, id)
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn export task: %s\n", reason(err))
 		return 1
@@ -79,27 +73,115 @@ func runExportTask(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// runExportProject is `cairn export project`: every task of the caller's project as Markdown on stdout,
+// each written as export task writes it, with a blank line between two tasks. The server lists the tasks
+// most recently updated first, and they keep that order. Open and closed tasks are all written. It takes no
+// argument, and it reads only the caller's project through the server: the task list, every page of it, and
+// then each task.
+//
+// The whole document is built before anything is written, so a failed read prints nothing. A project with no
+// task prints one line that says so.
+//
+// Exit codes: 0 when the project was printed, 1 when a call failed, 2 for a usage error.
+func runExportProject(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		fmt.Fprintf(stderr, "cairn export project: takes no argument, got %q\n", args)
+		return 2
+	}
+	wd, err := workDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "cairn export project: the working directory: %v\n", err)
+		return 1
+	}
+	t, err := dial(wd, 0)
+	if err != nil {
+		fmt.Fprintf(stderr, "cairn export project: %s\n", reason(err))
+		return 1
+	}
+	tasks, err := allTasks(t)
+	if err != nil {
+		fmt.Fprintf(stderr, "cairn export project: %s\n", reason(err))
+		return 1
+	}
+	if len(tasks) == 0 {
+		fmt.Fprintf(stdout, "no tasks in %s\n", foldLine(t.project.Name))
+		return 0
+	}
+	var out bytes.Buffer
+	for i, task := range tasks {
+		detail, events, err := fetchTask(t, task.ID)
+		if err != nil {
+			fmt.Fprintf(stderr, "cairn export project: %s\n", reason(err))
+			return 1
+		}
+		if i > 0 {
+			out.WriteString("\n")
+		}
+		renderTask(&out, detail, events)
+	}
+	_, _ = stdout.Write(out.Bytes())
+	return 0
+}
+
+// fetchTask reads one task as the export needs it: its detail, all of the brief, the steps and the close,
+// and every page of its journal. Both exports read a task this way, so they cannot read it differently.
+func fetchTask(t *target, id string) (*core.TaskDetail, []core.Event, error) {
+	detail, err := t.svc.TaskGet(t.ctx, core.TaskGetRequest{ID: id})
+	if err != nil {
+		return nil, nil, err
+	}
+	events, err := allEvents(t, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	return detail, events, nil
+}
+
 // allEvents reads the whole journal of a task, page by page, in the order the server
-// gives it: newest first. A cursor that comes back a second time ends the read with
-// an error, so a server that loops cannot hang the command.
+// gives it: newest first.
 func allEvents(t *target, id string) ([]core.Event, error) {
-	var out []core.Event
+	return allPages(func(cursor string) ([]core.Event, string, error) {
+		page, err := t.svc.TaskGet(t.ctx, core.TaskGetRequest{ID: id, Section: core.SectionEvents, Limit: core.MaxLimit, Cursor: cursor})
+		if err != nil {
+			return nil, "", err
+		}
+		return page.Events, page.Next, nil
+	})
+}
+
+// allTasks reads the caller's task list, every page of it, most recently updated first. Every status is
+// listed.
+func allTasks(t *target) ([]core.TaskSummary, error) {
+	return allPages(func(cursor string) ([]core.TaskSummary, string, error) {
+		list, err := t.svc.TaskList(t.ctx, core.TaskListRequest{Limit: core.MaxLimit, Cursor: cursor})
+		if err != nil {
+			return nil, "", err
+		}
+		return list.Tasks, list.Next, nil
+	})
+}
+
+// allPages reads a paged list to its end. fetch returns one page and the cursor of the next, and an empty
+// cursor ends the list. A cursor that comes back a second time ends the read with an error, so a server
+// that loops cannot hang the command.
+func allPages[T any](fetch func(cursor string) ([]T, string, error)) ([]T, error) {
+	var out []T
 	cursor := ""
 	seen := map[string]bool{}
 	for {
-		page, err := t.svc.TaskGet(t.ctx, core.TaskGetRequest{ID: id, Section: core.SectionEvents, Limit: core.MaxLimit, Cursor: cursor})
+		items, next, err := fetch(cursor)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, page.Events...)
-		if page.Next == "" {
+		out = append(out, items...)
+		if next == "" {
 			return out, nil
 		}
-		if seen[page.Next] {
-			return nil, fmt.Errorf("the journal pages do not end: the cursor %q came back", page.Next)
+		if seen[next] {
+			return nil, fmt.Errorf("the pages do not end: the cursor %q came back", next)
 		}
-		seen[page.Next] = true
-		cursor = page.Next
+		seen[next] = true
+		cursor = next
 	}
 }
 

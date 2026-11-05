@@ -31,7 +31,7 @@ func init() {
 		"help":      {summary: "List the sub-commands", run: runHelp},
 		"mcp":       {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
 		"init":      {summary: "Write .cairn.toml: the project name and the server", run: runInit},
-		"export":    {summary: "Print a task as Markdown: export task [id]", run: runExport},
+		"export":    {summary: "Print a task, or the project's tasks, as Markdown: export task [id] or export project", run: runExport},
 		"hook":      {summary: "Output for a client hook: session-start, pre-compact or stop", run: runHook},
 		"status":    {summary: "Show the server, the project and the active task", run: runStatus},
 		"task":      {summary: "Read or write a task: task current|get|list|start|update|close, each with --json", run: runTask},

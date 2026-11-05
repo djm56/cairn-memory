@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -146,12 +148,11 @@ func TestExportWritesDataAndFoldsLines(t *testing.T) {
 	}
 }
 
-// TestExportUsageErrors checks the usage errors, each exit 2: no export named, a
-// project export that is not built, an unknown export, and more than one id.
+// TestExportUsageErrors checks the usage errors, each exit 2: no export named, an unknown export, and more
+// than one id.
 func TestExportUsageErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"export"},
-		{"export", "project"},
 		{"export", "widget"},
 		{"export", "task", "a", "b"},
 	} {
@@ -159,6 +160,148 @@ func TestExportUsageErrors(t *testing.T) {
 		if code != 2 || stderr == "" {
 			t.Errorf("%v: exit %d, stderr %q: want 2 and a message", args, code, stderr)
 		}
+	}
+}
+
+// seedClosedTask starts a task in project, finishes its one active step, and closes it as done, so the
+// project can start another task. It returns the id.
+func seedClosedTask(t *testing.T, local *core.Local, project, title string) string {
+	t.Helper()
+	id := seedNamedTask(t, local, project, title, "Read the schema first")
+	finishStep(t, local, project, id, 1, "Schema read.")
+	_, err := local.TaskClose(callerFor(project), core.TaskCloseRequest{
+		ID: id, Outcome: core.TaskDone, Summary: "Done.",
+		Criteria: []core.CriterionOutcome{}, Lessons: []core.Lesson{}, Mistakes: []core.Mistake{},
+		NoLessonsReason: "Nothing new.",
+	})
+	if err != nil {
+		t.Fatalf("close task %s: %v", id, err)
+	}
+	return id
+}
+
+// TestExportProjectPrintsEveryTask checks the project export over the server. Two closed tasks and an active
+// one are written, in the order the task list gives them, and each is byte for byte what export task prints
+// for it, with a blank line between two tasks. A task of another project is not written.
+func TestExportProjectPrintsEveryTask(t *testing.T) {
+	local, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	seedClosedTask(t, local, "acme-api", "First task")
+	seedClosedTask(t, local, "acme-api", "Second task")
+	active := seedNamedTask(t, local, "acme-api", "Third task", "Read the schema first")
+	other := seedTask(t, local, "other-api")
+
+	list, err := local.TaskList(callerFor("acme-api"), core.TaskListRequest{Limit: core.MaxLimit})
+	if err != nil {
+		t.Fatalf("list the tasks: %v", err)
+	}
+	var want []string
+	for _, s := range list.Tasks {
+		code, text, stderr := runCmd(t, "export", "task", s.ID)
+		if code != 0 {
+			t.Fatalf("export task %s: exit %d, stderr %q", s.ID, code, stderr)
+		}
+		want = append(want, text)
+	}
+
+	code, stdout, stderr := runCmd(t, "export", "project")
+	if code != 0 || stderr != "" {
+		t.Fatalf("export project: exit %d, stderr %q; want 0 and nothing on stderr", code, stderr)
+	}
+	if stdout != strings.Join(want, "\n") {
+		t.Errorf("export project is not the task exports in list order:\n%s\nwant:\n%s", stdout, strings.Join(want, "\n"))
+	}
+	if len(list.Tasks) != 3 || !strings.Contains(stdout, "- **ID:** "+active+"\n") {
+		t.Errorf("the project has %d tasks, want 3 with %s among them:\n%s", len(list.Tasks), active, stdout)
+	}
+	if strings.Contains(stdout, "- **ID:** "+other+"\n") {
+		t.Errorf("export project writes a task of another project:\n%s", stdout)
+	}
+	assertNoDestructive(t, stdout)
+}
+
+// TestExportProjectOfAnEmptyProjectSaysSo checks that a project with no task prints the one line that says
+// so, and exits 0.
+func TestExportProjectOfAnEmptyProjectSaysSo(t *testing.T) {
+	_, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+
+	code, stdout, stderr := runCmd(t, "export", "project")
+	if code != 0 || stderr != "" || stdout != "no tasks in acme-api\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 0, the one line and nothing on stderr", code, stdout, stderr)
+	}
+}
+
+// TestExportProjectReadsEveryTaskPage checks the paging of the task list: more tasks than one page
+// (core.MaxLimit) are all written, each once.
+func TestExportProjectReadsEveryTaskPage(t *testing.T) {
+	local, url := newServer(t, nil)
+	useDir(t, t.TempDir())
+	t.Setenv("CAIRN_SERVER", url)
+	t.Setenv("CAIRN_PROJECT", "acme-api")
+	const tasks = core.MaxLimit + 1
+	for i := 0; i < tasks; i++ {
+		seedClosedTask(t, local, "acme-api", fmt.Sprintf("Task %03d", i))
+	}
+
+	code, stdout, stderr := runCmd(t, "export", "project")
+	if code != 0 {
+		t.Fatalf("exit %d, want 0 (stderr %q)", code, stderr)
+	}
+	if got := strings.Count(stdout, "- **ID:** "); got != tasks {
+		t.Errorf("export project has %d tasks, want %d", got, tasks)
+	}
+}
+
+// TestExportProjectTakesNoArgument checks the usage error: export project takes no argument, and a name
+// after it is refused before anything is read.
+func TestExportProjectTakesNoArgument(t *testing.T) {
+	code, stdout, stderr := runCmd(t, "export", "project", "acme-api")
+	if code != 2 || stdout != "" || stderr == "" {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 2, no stdout and a message", code, stdout, stderr)
+	}
+}
+
+// TestAllPagesFollowsTheCursor checks the paging helper the exports share: each cursor is passed to the next
+// call, and the items come back in page order.
+func TestAllPagesFollowsTheCursor(t *testing.T) {
+	pages := map[string]struct {
+		items []int
+		next  string
+	}{
+		"":  {[]int{1, 2}, "a"},
+		"a": {[]int{3}, "b"},
+		"b": {nil, ""},
+	}
+	got, err := allPages(func(cursor string) ([]int, string, error) {
+		p, ok := pages[cursor]
+		if !ok {
+			return nil, "", fmt.Errorf("unexpected cursor %q", cursor)
+		}
+		return p.items, p.next, nil
+	})
+	if err != nil || !slices.Equal(got, []int{1, 2, 3}) {
+		t.Errorf("allPages = %v, %v; want 1 2 3 and no error", got, err)
+	}
+}
+
+// TestAllPagesRefusesACursorThatComesBack checks that a cursor the server returns a second time ends the read
+// with an error, so a server that loops cannot hang the command.
+func TestAllPagesRefusesACursorThatComesBack(t *testing.T) {
+	calls := 0
+	_, err := allPages(func(cursor string) ([]int, string, error) {
+		calls++
+		if calls > 10 {
+			t.Fatalf("the read did not stop after %d calls", calls)
+		}
+		return []int{calls}, "same", nil
+	})
+	if err == nil || !strings.Contains(err.Error(), `the cursor "same" came back`) {
+		t.Errorf("allPages error = %v; want the cursor that came back named", err)
 	}
 }
 
