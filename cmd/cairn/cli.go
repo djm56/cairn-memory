@@ -21,10 +21,11 @@ var workDir = os.Getwd
 // server can tell its calls from an MCP client's.
 const cliClient = "cairn-cli"
 
-// noRoleNote is the line status prints under its directive count, and the session-start hook
-// prints in its own words, when no agent role is set. With no role the server counts only the
-// directives not scoped to one, and the line says so. A role comes from CAIRN_AGENT (roleFromEnv).
-const noRoleNote = "agent-scoped directives not counted: no agent role is set"
+// noRoleNote is the sentence status prints under its directive count, and the session-start hook
+// prints in its block, when no agent role is set. One constant holds it, as refusedRoleNote does, so
+// the two cannot drift. With no role the server counts only the directives not scoped to one, and the
+// sentence says so. A role comes from CAIRN_AGENT (roleFromEnv).
+const noRoleNote = "Agent-scoped directives were not counted: no agent role is set."
 
 // refusedRoleNote is the sentence status prints, and the session-start hook prints in its block, when
 // CAIRN_AGENT is set but the wire form refuses it. One constant holds it, so the two cannot drift. It

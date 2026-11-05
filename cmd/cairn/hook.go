@@ -110,7 +110,7 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent, role 
 		if refused {
 			fmt.Fprintln(w, refusedRoleNote)
 		} else {
-			fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
+			fmt.Fprintln(w, noRoleNote)
 		}
 	}
 	// The agent reads this block, so a directive left out is said so, with the reason.
