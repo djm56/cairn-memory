@@ -681,6 +681,42 @@ func TestEnableHelpAndRegistry(t *testing.T) {
 	}
 }
 
+// TestEnableHelpSaysWhatItRewritesAndWhere checks the help sentences that tell a person what enable changes: the file is
+// laid out again, the backup holds the original text, and cairn must be on the PATH Claude Code uses.
+func TestEnableHelpSaysWhatItRewritesAndWhere(t *testing.T) {
+	_, stdout, _ := runCmd(t, "enable", "--help")
+	for _, want := range []string{
+		"The file is rewritten in a new layout",
+		"The backup holds the original text.",
+		"cairn must be on the PATH Claude Code uses",
+		"copies the original to cairn/backups/<project> in the user's cache directory",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("help lacks %q:\n%s", want, stdout)
+		}
+	}
+}
+
+// TestEnableBackupDirectoriesArePrivate checks that the directories a backup is made in are private, so no other user
+// can list the backups. A umask can only narrow a mode, so the check is that no bit outside 0700 is set.
+func TestEnableBackupDirectoriesArePrivate(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, settingsIn(dir), existingSettings)
+	if code, _, stderr := runCmd(t, "enable", "--agent", "claude-code"); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	project := filepath.Dir(backupIn(t, "acme-api"))
+	for _, d := range []string{project, filepath.Dir(project), filepath.Dir(filepath.Dir(project))} {
+		info, err := os.Stat(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&^0o700 != 0 {
+			t.Errorf("%s has mode %o, want no bits outside 0700", d, info.Mode().Perm())
+		}
+	}
+}
+
 // TestEnableWritesToTheProjectAboveTheWorkingDirectory checks that enable finds the project file as init and doctor
 // do, walking up from the working directory, and writes the settings file beside that file.
 func TestEnableWritesToTheProjectAboveTheWorkingDirectory(t *testing.T) {
