@@ -38,16 +38,18 @@ in Cairn leaves the same kind of marker.
 
 ## Design in brief
 
-- **Works with any agent harness.** Plain Claude Code first, through MCP; OpenCode,
-  pi, Bishop and others through the CLI (planned for M4) over the same HTTP API (D14). Nothing in the core assumes a
-  framework, a crew or a file layout.
+- **Works with any agent harness.** Plain Claude Code first, through MCP and hooks;
+  OpenCode, pi, Bishop and others through the CLI, built in M4, over the same HTTP API
+  (D14). Nothing in the core assumes a framework, a crew or a file layout.
 - **The database is the source of truth.** Agents write and read through MCP
   tools. No Markdown state files to keep in step.
 - **One binary, `cairn`.** It is the MCP server (`cairn mcp`, built in M1),
   the HTTP server (`cairn serve`, built in M2, live run passed on 2026-11-02; the web UI,
-  built in M3), the hook helper and the admin tool. The M1 commands are `init`, `status`, `doctor`,
-  `export task` and `hook session-start`; the CLI proper is planned for M4. Go
-  and SQLite with full-text search; no C toolchain.
+  built in M3), the hook helper, the CLI and the admin tool. The M1 commands are `init`,
+  `status`, `doctor`, `export task` and `hook session-start`. The M4 commands are the
+  other two hooks, `enable`, `doctor --agent`, `export project` and the CLI verbs
+  described under [Using the CLI](#using-the-cli). Go and SQLite with full-text search;
+  no C toolchain.
 - **One server.** Clients connect to `cairn serve` over HTTP with an API key,
   so a team or several machines share one place to look and back up (decision
   D11). `cairn serve` is built in M2, and its live run passed on 2026-11-02. `cairn mcp`
@@ -89,6 +91,79 @@ server = "https://cairn.lan:8788"
 The repository and the Go module still carry the name `cairn-memory`.
 Renaming them to `cairn` is planned (decision D18), and the rename has not
 been done.
+
+### Using the CLI
+
+The CLI is for an agent with only a shell, or a harness without MCP. Each verb calls
+the server over HTTP with the key from `CAIRN_API_KEY` or `~/.config/cairn/client.env`,
+and needs `server` in `.cairn.toml` or `CAIRN_SERVER`, as `cairn mcp` does. The verbs
+that take `--json` write, on one line, the object the MCP tool returns.
+
+| Verb | What it does |
+|---|---|
+| `cairn task current`, `get`, `list`, `start`, `update`, `close` | Read the active task, read or list tasks, start one, change one, or close one |
+| `cairn step add`, `update`, `plan` | Add a step, change one by its number, or replace the pending steps |
+| `cairn event log` | Log an event on a task |
+| `cairn learning add`, `list` | Propose a learning, or list the project's learnings |
+| `cairn directive list` | The directives that apply, ranked and capped at 12 |
+| `cairn recall --goal <text>` | What applies to a goal: directives, lessons, mistakes and similar tasks |
+| `cairn search --query <text>` | Full-text search across tasks, events, learnings, directives and notes |
+| `cairn prime` | The session-start view for an agent with only a shell |
+
+`--agent` names the calling agent. The write verbs, `task current`, `recall` and
+`prime` take it from `CAIRN_AGENT` when the flag is left out. `directive list` does
+not read `CAIRN_AGENT`, so it lists every role unless `--agent` is given. A list with
+nothing in it prints one line, `no <items>`, such as `no tasks` or `no directives`.
+
+**Hooks.** `cairn enable --agent claude-code` adds three hooks to the project's
+`.claude/settings.local.json`: `session-start`, `pre-compact` and `stop`. It keeps every
+other entry, and copies the original file to `cairn/backups/<project>` in the user's
+cache directory, outside the project, before it writes. `--dry-run` writes nothing.
+`enable` writes hooks only. The Claude Code MCP registration is not written by
+`enable`: it comes through the M5 plugin, or by hand with
+`claude mcp add cairn -- cairn mcp`.
+
+In Claude Code, a task survives `/compact` through the session-start hook. Its matcher
+names `compact`, so it runs again after compaction, and its output is added to the
+agent's context. The pre-compact hook is installed, and it does nothing in Claude Code,
+since its output is not added to the context. The stop hook prints a warning when a
+step of the active task is active with no summary. `cairn doctor --agent claude-code`
+lists the hooks, runs each once against the server, and warns when the session-start
+matcher does not name `compact`. The design is in [DESIGN.md §4.1](docs/DESIGN.md#41-session-start).
+The live check of the carry across `/compact` has not yet been run on Claude Code. It
+is M4's exit check, and [docs/M4-HAND-CHECK.md](docs/M4-HAND-CHECK.md) has the steps.
+
+**OpenCode and pi (EXPERIMENTAL).** `cairn enable --agent opencode` and
+`--agent pi` add the cairn MCP server to the client's own config, and write the
+task-loop instructions into the project: `opencode.json` and `.cairn/instructions.md`
+for OpenCode, and `.pi/mcp.json` and a block in `AGENTS.md` for pi. Neither client has
+hooks. Neither path has been confirmed by a real run of the client, so every line they
+print says EXPERIMENTAL. pi reads `.pi/mcp.json` only after the project is trusted.
+`cairn doctor --agent opencode` and `--agent pi` report whether the registration and
+the instructions are in place.
+
+**Export.** `cairn export project` prints every task of the project, open and closed,
+in the form `cairn export task` uses, and says so when there are none.
+
+**Exit codes.** A failed call of the verbs that take `--json` exits with the code of
+its error kind, so a script can tell a refusal from a missing row. `cairn --help`
+prints the same table.
+
+| Exit | Meaning |
+|---|---|
+| 0 | success |
+| 1 | a failure with no kind: an internal failure of the server, or one raised on this machine |
+| 2 | a usage error, refused before any call |
+| 3 | `invalid`: the request is malformed, a value is unknown, or there is no project or agent |
+| 4 | `not_found`: the task, step, learning or directive is not in the caller's project |
+| 5 | `refused`: a rule forbids the call now, such as a status move or the close policy |
+| 6 | `operator_only`: an operator call made without the operator role |
+| 7 | `no_route`: the path is not a call, so the server base URL is wrong |
+| 8 | `unsupported_media_type`: the request body is not `application/json` |
+
+With `--json`, a failed call writes `{"error": {"kind", "message", "missing"}}` to
+stdout. The other commands exit 1 on a failure. The details are in
+[DESIGN.md §5.2.2](docs/DESIGN.md#522-exit-codes-of-the-cli-verbs-m4-88).
 
 ### Running the server
 
