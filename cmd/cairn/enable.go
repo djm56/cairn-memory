@@ -191,8 +191,9 @@ type planned struct {
 	changed bool
 }
 
-// planWrite looks at the file at fw.path, refuses what enable does not write through, reads it and merges it. Nothing is
-// written. The error names the file and says nothing was changed.
+// planWrite looks at the file at fw.path, refuses what enable does not write through, reads it and merges it. A file larger
+// than maxSettingsBytes is refused, as doctor refuses to read it. Nothing is written. The error names the file and says
+// nothing was changed.
 func planWrite(fw fileWrite) (planned, error) {
 	p := planned{fileWrite: fw, mode: 0o644}
 	info, err := os.Lstat(fw.path)
@@ -208,7 +209,10 @@ func planWrite(fw fileWrite) (planned, error) {
 		case !info.Mode().IsRegular():
 			return planned{}, fmt.Errorf("%s is not a regular file", fw.path)
 		}
-		raw, err := os.ReadFile(fw.path)
+		if info.Size() > maxSettingsBytes {
+			return planned{}, fmt.Errorf("%s is larger than %d bytes: enable does not read a file that large, so edit it by hand", fw.path, maxSettingsBytes)
+		}
+		raw, err := readCapped(fw.path)
 		if err != nil {
 			return planned{}, fmt.Errorf("read %s: %v", fw.path, err)
 		}
@@ -222,6 +226,24 @@ func planWrite(fw fileWrite) (planned, error) {
 	}
 	p.content, p.changed = content, changed
 	return p, nil
+}
+
+// readCapped returns the bytes of the file at path. The read stops one byte past maxSettingsBytes, so a file that grew past the
+// cap after its stat is refused, and not read whole into memory.
+func readCapped(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, maxSettingsBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > maxSettingsBytes {
+		return nil, fmt.Errorf("is larger than %d bytes", maxSettingsBytes)
+	}
+	return raw, nil
 }
 
 // backupWrite copies the original of a planned file that exists to the backup directory, and returns the copy's path. A

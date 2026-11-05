@@ -740,6 +740,34 @@ func TestEnableWritesToTheProjectAboveTheWorkingDirectory(t *testing.T) {
 	}
 }
 
+// TestEnableCapsTheFileItReads checks the cap enable applies to a file it merges, the cap doctor applies: a file of exactly
+// maxSettingsBytes is merged, and one byte more is refused, with the file left as it was and no backup made.
+func TestEnableCapsTheFileItReads(t *testing.T) {
+	t.Run("at the cap", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, settingsIn(dir), `{`+strings.Repeat(" ", maxSettingsBytes-2)+`}`)
+		if code, _, stderr := runCmd(t, "enable", "--agent", "claude-code"); code != 0 {
+			t.Fatalf("exit %d, stderr %q: want a file at the cap merged", code, stderr)
+		}
+	})
+	t.Run("one byte over", func(t *testing.T) {
+		dir := enableProject(t)
+		over := `{` + strings.Repeat(" ", maxSettingsBytes-1) + `}`
+		writeSettings(t, settingsIn(dir), over)
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 1 || stdout != "" || !strings.Contains(stderr, settingsIn(dir)+" is larger than 1048576 bytes") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the cap named", code, stdout, stderr)
+		}
+		if string(readBytes(t, settingsIn(dir))) != over {
+			t.Errorf("the file over the cap changed")
+		}
+		if _, err := os.Stat(backupIn(t, "acme-api")); !os.IsNotExist(err) {
+			t.Errorf("a backup was made of a file enable refused (stat error %v)", err)
+		}
+	})
+}
+
 // TestEnableRefusesASymlinkAndTouchesItsTarget checks that a settings file which is a symbolic link is refused: a
 // rename would replace the link, so the file it names is left alone.
 func TestEnableRefusesASymlinkAndTouchesItsTarget(t *testing.T) {
