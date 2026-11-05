@@ -23,6 +23,9 @@ import (
 type Session struct {
 	Svc core.Service
 	Ctx context.Context
+	// Project is the name of the project the command runs in, as Ctx carries it. prime names it in its
+	// output; the other commands do not need it.
+	Project string
 }
 
 // Opener returns the Session of a command. The command calls it only after its arguments

@@ -31,5 +31,5 @@ func openSession() (cli.Session, error) {
 	if err != nil {
 		return cli.Session{}, err
 	}
-	return cli.Session{Svc: t.svc, Ctx: t.ctx}, nil
+	return cli.Session{Svc: t.svc, Ctx: t.ctx, Project: t.project.Name}, nil
 }
