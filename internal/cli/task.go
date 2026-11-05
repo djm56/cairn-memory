@@ -531,8 +531,11 @@ func scopeLabel(d core.Directive) string {
 }
 
 // writeList prints one line per task, most recently updated first, and the cursor of the
-// next page when there is one.
+// next page when there is one. With no task it prints the empty-list line (emptyLine).
 func writeList(w io.Writer, list *core.TaskList) {
+	if len(list.Tasks) == 0 {
+		fmt.Fprintln(w, emptyLine("tasks"))
+	}
 	for _, t := range list.Tasks {
 		fmt.Fprintf(w, "%s  %s  %s  %s\n", Plain(t.ID), Plain(string(t.Status)), Plain(string(t.Priority)), Plain(t.Title))
 	}

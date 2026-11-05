@@ -230,6 +230,15 @@ func TestLearningListHuman(t *testing.T) {
 	}
 }
 
+// TestLearningListEmpty checks that a list with no learning says so, in the one empty-list form.
+func TestLearningListEmpty(t *testing.T) {
+	svc := &fakeLearning{list: &core.LearningList{Learnings: []core.Learning{}}}
+	code, out, errOut, _ := learningRun(svc, strings.NewReader(""), "list")
+	if code != 0 || errOut != "" || out != "no learnings\n" {
+		t.Errorf("exit %d, stderr %q, output %q; want the no-learning line", code, errOut, out)
+	}
+}
+
 // TestLearningListCapsALongTarget checks that a target too long for one line is cut in the summary, as
 // the title is, and that --json keeps it whole.
 func TestLearningListCapsALongTarget(t *testing.T) {

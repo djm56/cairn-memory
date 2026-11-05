@@ -68,6 +68,14 @@ func isFormat(r rune) bool {
 	return unicode.Is(unicode.Cf, r)
 }
 
+// emptyLine is the line a list prints when it holds nothing: "no" and the name of the list, which is
+// the name its --json key carries (tasks, learnings, directives, hits, lessons, mistakes). Every list
+// verb prints this one form, so an empty answer is never a blank screen that a person cannot tell
+// from a failure.
+func emptyLine(list string) string {
+	return "no " + list
+}
+
 // collapseSpaces turns each run of ASCII spaces in s into one space, and trims the edges.
 // A removed control sequence can leave two spaces where one line break was, and a line
 // should not read that way. Other spaces are left as they are.

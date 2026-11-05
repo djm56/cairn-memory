@@ -72,7 +72,7 @@ func TestDirectiveListHuman(t *testing.T) {
 func TestDirectiveListEmpty(t *testing.T) {
 	svc := &fakeDirectives{list: &core.DirectiveList{Directives: []core.Directive{}}}
 	code, out, errOut, _ := directiveRun(svc, "list")
-	if code != 0 || errOut != "" || out != "no directives apply\n" {
+	if code != 0 || errOut != "" || out != "no directives\n" {
 		t.Errorf("exit %d, stderr %q, output %q; want the no-directive line", code, errOut, out)
 	}
 }

@@ -96,7 +96,7 @@ func TestLearningAndDirectiveThroughTheServer(t *testing.T) {
 		t.Errorf("directive list: exit %d, stderr %q, output %q; want the hicks directive", code, errOut, out)
 	}
 	code, out, errOut = runCmd(t, "directive", "list", "--agent", "reviewer")
-	if code != 0 || errOut != "" || strings.Contains(out, "Hicks reads the schema first") || !strings.Contains(out, "no directives apply") {
+	if code != 0 || errOut != "" || strings.Contains(out, "Hicks reads the schema first") || !strings.Contains(out, "no directives\n") {
 		t.Errorf("directive list --agent reviewer: exit %d, stderr %q, output %q; want no hicks directive", code, errOut, out)
 	}
 }

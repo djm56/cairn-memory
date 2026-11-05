@@ -76,10 +76,10 @@ func directiveList(open Opener, args []string, stdout, stderr io.Writer) int {
 
 // writeDirectiveList prints the summary of a directive list: each directive's code, scope and title,
 // then its rule on the next line, then the expired and omitted counts when they are not zero. With no
-// directive it says so.
+// directive it prints the empty-list line (emptyLine), and the counts still follow.
 func writeDirectiveList(w io.Writer, list *core.DirectiveList) {
 	if len(list.Directives) == 0 {
-		fmt.Fprintln(w, "no directives apply")
+		fmt.Fprintln(w, emptyLine("directives"))
 	}
 	for _, d := range list.Directives {
 		fmt.Fprintf(w, "  %s  %s  %s\n", FoldLine(d.Code), scopeLabel(d), FoldLine(d.Title))

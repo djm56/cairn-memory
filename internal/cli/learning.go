@@ -217,8 +217,11 @@ func writeLearning(w io.Writer, l *core.Learning) {
 
 // writeLearningList prints one line per learning, newest first: its id, status, kind, title, and
 // the target when it has one. It is a summary; the fields it leaves out are in --json. The cursor of
-// the next page follows when there is one.
+// the next page follows when there is one. With no learning it prints the empty-list line (emptyLine).
 func writeLearningList(w io.Writer, list *core.LearningList) {
+	if len(list.Learnings) == 0 {
+		fmt.Fprintln(w, emptyLine("learnings"))
+	}
 	for _, l := range list.Learnings {
 		line := fmt.Sprintf("%d  %s  %s  %s", l.ID, Plain(string(l.Status)), Plain(string(l.Kind)), Plain(l.Title))
 		if t := Plain(l.Target); t != "" {

@@ -264,6 +264,15 @@ func TestTaskListHuman(t *testing.T) {
 	}
 }
 
+// TestTaskListEmpty checks that a list with no task says so, in the one empty-list form.
+func TestTaskListEmpty(t *testing.T) {
+	svc := &fakeTasks{list: &core.TaskList{Tasks: []core.TaskSummary{}}}
+	code, out, errOut := runTask(t, svc, "list")
+	if code != 0 || errOut != "" || out != "no tasks\n" {
+		t.Errorf("exit %d, stderr %q, output %q; want the no-task line", code, errOut, out)
+	}
+}
+
 // TestTaskListJSON checks the --json output of task list: one line, decoding to the list
 // with its tasks and next cursor.
 func TestTaskListJSON(t *testing.T) {
