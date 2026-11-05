@@ -230,6 +230,23 @@ func TestLearningListHuman(t *testing.T) {
 	}
 }
 
+// TestLearningListCapsALongTarget checks that a target too long for one line is cut in the summary, as
+// the title is, and that --json keeps it whole.
+func TestLearningListCapsALongTarget(t *testing.T) {
+	l := sampleLearning()
+	l.Title, l.Target = "Long", strings.Repeat("x", 300)
+	svc := &fakeLearning{list: &core.LearningList{Learnings: []core.Learning{l}}}
+	code, out, errOut, _ := learningRun(svc, strings.NewReader(""), "list")
+	want := "7  proposed  finding  Long  target " + strings.Repeat("x", MaxLineRunes-1) + "…\n"
+	if code != 0 || errOut != "" || out != want {
+		t.Errorf("exit %d, stderr %q, output %q; want the target cut to %d runes", code, errOut, out, MaxLineRunes)
+	}
+	code, out, _, _ = learningRun(svc, strings.NewReader(""), "list", "--json")
+	if code != 0 || !strings.Contains(out, strings.Repeat("x", 300)) {
+		t.Errorf("--json: exit %d; want the whole target", code)
+	}
+}
+
 // TestLearningListJSON checks the --json output of learning list: one line, the object the MCP tool
 // returns, with the learnings and the next cursor.
 func TestLearningListJSON(t *testing.T) {

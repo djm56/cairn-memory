@@ -221,7 +221,7 @@ func writeLearning(w io.Writer, l *core.Learning) {
 func writeLearningList(w io.Writer, list *core.LearningList) {
 	for _, l := range list.Learnings {
 		line := fmt.Sprintf("%d  %s  %s  %s", l.ID, Plain(string(l.Status)), Plain(string(l.Kind)), Plain(l.Title))
-		if t := FoldLine(l.Target); t != "" {
+		if t := Plain(l.Target); t != "" {
 			line += "  target " + t
 		}
 		fmt.Fprintln(w, line)
