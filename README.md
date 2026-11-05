@@ -162,7 +162,9 @@ prints the same table.
 | 8 | `unsupported_media_type`: the request body is not `application/json` |
 
 With `--json`, a failed call writes `{"error": {"kind", "message", "missing"}}` to
-stdout. The other commands exit 1 on a failure. The details are in
+stdout. The other commands exit 1 on a failure. A missing, malformed, unknown or revoked
+API key, and a viewer key on a write, also exit 1, with the kind `internal`, because the
+client answers them as plain errors. The details are in
 [DESIGN.md §5.2.2](docs/DESIGN.md#522-exit-codes-of-the-cli-verbs-m4-88).
 
 ### Running the server
