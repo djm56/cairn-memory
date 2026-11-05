@@ -47,6 +47,8 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 | Server | `cairn serve` is built in M2: TLS by files or behind a proxy, API keys with three scopes, backup and restore. Its live run (#19) passed on 2026-11-02. The web UI at `/ui/` is built in M3: sign-in, the read pages and the actions. The setup is in [DEPLOY.md](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md). | — |
 | CLI and hooks | The `pre-compact` and `stop` hooks, and `enable --agent claude-code`, are built in M4; `session-start` came in M1. `opencode` and `pi` are EXPERIMENTAL. The CLI verbs over the whole API, with `--json`, are built in M4 (#87). | The M4 exit check: a task carried across `/compact` on Claude Code, which has not yet been run. See [the hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md). |
 
+The CLI verbs are `task` (`current`, `get`, `list`, `start`, `update`, `close`), `step` (`add`, `update`, `plan`), `event log`, `learning` (`add`, `list`), `directive list`, `recall`, `search` and `prime`. Each takes `--json`, which writes one line of JSON. A list with nothing in it prints `no <items>`, such as `no tasks` or `no directives`. The exit codes of a failed call are in [DESIGN.md §5.2.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#522-exit-codes-of-the-cli-verbs-m4-88).
+
 The milestones are in [PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones). The commands are in [DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).
 
 ## Install for end users (planned)
