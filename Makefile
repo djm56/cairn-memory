@@ -53,13 +53,14 @@ scan-invisible:
 # Fails and lists the lines when a tracked file holds a local path that names a user or a machine
 # layout: a macOS, Linux or root home directory, a mounted volume, or a Windows user directory. The
 # placeholder user "you" is allowed, so docs can show where a file goes (/Users/you/ and /home/you/).
-# The Unix forms match only at a path start: the start of a line, or after whitespace, a quote, "=",
-# "(", ":" or "/" (so a file URL matches), and a word such as internal/root/x does not match. The
-# Windows form, any drive letter then Users in any case with either slash, matches at the same
-# starts. The whole tree is scanned; no file is excluded. git grep exits 0 on a match and 1 on none, so the result is inverted here. CI
-# runs this on every pull request.
+# A path is refused only when a word or path character comes right before it: a letter, digit,
+# "_", ".", "-", "~" or "$". So a path after a backtick, a bracket, a pipe, a comma or a file URL
+# is caught, while internal/root/x and ../home/x are not. The Windows form, any drive letter then
+# Users in any case with either slash, follows the same rule. The whole tree is scanned; no file
+# is excluded. git grep exits 0 on a match and 1 on none, so the result is inverted here. CI runs
+# this on every pull request.
 scan-local-paths:
-	@hits="$$(git grep -I -n -P '(^|[\s\x27"=(:/])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]users[\\/])(?!you[\\/]))')"; \
+	@hits="$$(git grep -I -n -P '(?<![A-Za-z0-9_.~$$-])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]users[\\/])(?!you[\\/]))')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
 	  echo "Local user or machine paths found in these tracked files (file:line:text):"; printf '%s\n' "$$hits"; exit 1; \
