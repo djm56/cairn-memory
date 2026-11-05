@@ -195,7 +195,7 @@ func (f *listFlag[T]) String() string {
 // Set adds one value. An empty value is refused: leave the flag out to list all.
 func (f *listFlag[T]) Set(v string) error {
 	if strings.TrimSpace(v) == "" {
-		return fmt.Errorf("a %s must be named; leave --%s out to list all", f.name, f.name)
+		return fmt.Errorf("a %s must be named; leave --%s out for all", f.name, f.name)
 	}
 	f.vals = append(f.vals, T(v))
 	return nil
