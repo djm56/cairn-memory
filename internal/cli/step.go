@@ -9,14 +9,14 @@ import (
 )
 
 // Step is the sub-command `cairn step`: the steps of a task, for a person or an agent with only a
-// shell (issue #87). Its verbs are add and update, and plan follows. A step is named by its number,
+// shell (issue #87). Its verbs are add, update and plan. A step is named by its number,
 // as the steps list shows it (CONTRACT §1.4). Each verb takes --json, which writes the result as one
 // line of JSON, the object the MCP tool of the same name returns (CONTRACT §3).
 //
 // Exit codes: 0 when the step was written, 1 when the open or the call failed, 2 for a usage error.
 func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn step: name what to do: cairn step add|update")
+		fmt.Fprintln(stderr, "cairn step: name what to do: cairn step add|update|plan")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -25,8 +25,10 @@ func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return stepAdd(open, rest, stdin, stdout, stderr)
 	case "update":
 		return stepUpdate(open, rest, stdin, stdout, stderr)
+	case "plan":
+		return stepPlan(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn step: unknown verb %q: use cairn step add|update\n", verb)
+	fmt.Fprintf(stderr, "cairn step: unknown verb %q: use cairn step add|update|plan\n", verb)
 	return 2
 }
 
@@ -129,6 +131,66 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 		return writeJSON(stdout, stderr, verb, step)
 	}
 	fmt.Fprintln(stdout, stepLine(*step))
+	return 0
+}
+
+// planInput is the JSON form of step_plan (CONTRACT §3): the new pending steps, each with a title
+// and an optional agent. "steps" is required: a plan with no steps list is refused, because it would
+// otherwise remove every pending step by accident. [] removes them on purpose.
+type planInput struct {
+	Steps []core.StepInput `json:"steps"`
+}
+
+// stepPlan is `cairn step plan <task-id> --json-input [--agent a] [--json]`: the task's pending steps
+// replaced with the list on standard input (CONTRACT §3, step_plan). A step that an event refers to
+// cannot be removed, and the refusal names it. The list is only ever read from standard input, so
+// --json-input is required.
+func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	const verb = "cairn step plan"
+	fl, asJSON := newFlags(verb)
+	agent := fl.String("agent", "", agentHelp)
+	jsonInput := fl.Bool("json-input", false, "required: read the new steps from standard input as one JSON object, {\"steps\": [{\"title\": ..., \"agent\": ...}]}")
+	pos, code, done := parse(fl, args, stdout, stderr)
+	if done {
+		return code
+	}
+	if len(pos) != 1 {
+		fmt.Fprintln(stderr, verb+": name one task id: cairn step plan <task-id> --json-input")
+		return 2
+	}
+	if !*jsonInput {
+		fmt.Fprintln(stderr, verb+": the new steps come from standard input: give --json-input, with {\"steps\": [...]}")
+		return 2
+	}
+	in := &inputs{stdin: stdin}
+	var body planInput
+	if err := in.decode("json-input", &body); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if body.Steps == nil {
+		fmt.Fprintln(stderr, verb+": standard input has no steps list: give {\"steps\": [...]}, or [] to remove every pending step")
+		return 2
+	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
+	s, err := open()
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	list, err := s.Svc.StepPlan(withAgent(s.Ctx, name), core.StepPlanRequest{TaskID: pos[0], Steps: body.Steps})
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	if *asJSON {
+		return writeJSON(stdout, stderr, verb, list)
+	}
+	if len(list.Steps) == 0 {
+		fmt.Fprintln(stdout, "no steps")
+		return 0
+	}
+	writeSteps(stdout, list.Steps)
 	return 0
 }
 

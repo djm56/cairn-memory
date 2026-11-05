@@ -177,6 +177,88 @@ func TestStepUpdateUsageErrors(t *testing.T) {
 	}
 }
 
+// TestStepPlanHuman checks the human output of step plan: the new plan as the steps list shows it,
+// and that the request carries the steps with their assignees, read from standard input.
+func TestStepPlanHuman(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{list: &core.StepList{Steps: twoSteps()}}
+	stdin := `{"steps": [{"title": "Write test", "agent": "hicks"}, {"title": "Implement"}]}`
+	code, out, errOut := runWrite(t, Step, svc, stdin, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
+	if code != 0 || errOut != "" || out != "steps\n  1. [active] Write test\n  2. [pending] Implement\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want the plan", code, out, errOut)
+	}
+	got := svc.gotPlan
+	if got.TaskID != "task-20261030-01" || len(got.Steps) != 2 || got.Steps[0].Agent != "hicks" || got.Steps[1].Agent != "" {
+		t.Errorf("the request was %+v, want the two steps with the first's assignee", got)
+	}
+}
+
+// TestStepPlanEmptyListRemovesPendingSteps checks that [] is sent as an empty plan, and that the
+// answer for a plan with no steps is said in words.
+func TestStepPlanEmptyListRemovesPendingSteps(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{list: &core.StepList{}}
+	code, out, errOut := runWrite(t, Step, svc, `{"steps": []}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
+	if code != 0 || errOut != "" || out != "no steps\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 0 and no steps", code, out, errOut)
+	}
+	if svc.gotPlan.Steps == nil || len(svc.gotPlan.Steps) != 0 {
+		t.Errorf("steps %v, want an empty list sent", svc.gotPlan.Steps)
+	}
+}
+
+// TestStepPlanJSON checks the --json output of step plan: one line, decoding to the step list.
+func TestStepPlanJSON(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{list: &core.StepList{Steps: twoSteps()}}
+	code, out, errOut := runWrite(t, Step, svc, `{"steps": [{"title": "Write test"}]}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, output %q; want one line and exit 0", code, errOut, out)
+	}
+	var got core.StepList
+	if err := json.Unmarshal([]byte(out), &got); err != nil || len(got.Steps) != 2 {
+		t.Errorf("--json decodes to %+v (%v), want the two steps", got, err)
+	}
+}
+
+// TestStepPlanRefusedByServer checks the refusal of a pending step that an event refers to: the
+// server's words on stderr, exit 1.
+func TestStepPlanRefusedByServer(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{err: core.Refused("step 2 has a review: skip it first")}
+	code, out, errOut := runWrite(t, Step, svc, `{"steps": []}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
+	if code != 1 || out != "" || errOut != "cairn step plan: step 2 has a review: skip it first\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the refusal", code, out, errOut)
+	}
+}
+
+// TestStepPlanUsageErrors checks the usage errors of step plan: the steps must come from standard
+// input with --json-input, the steps list must be present, and a task id is needed. Each exits 2
+// and makes no call.
+func TestStepPlanUsageErrors(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	cases := []struct {
+		name  string
+		stdin string
+		args  []string
+		want  string
+	}{
+		{"no json-input", `{"steps": []}`, []string{"plan", "task-20261030-01", "--agent", "hicks"}, "give --json-input"},
+		{"no steps list", `{}`, []string{"plan", "task-20261030-01", "--json-input", "--agent", "hicks"}, "no steps list"},
+		{"a key it does not name", `{"step": []}`, []string{"plan", "task-20261030-01", "--json-input", "--agent", "hicks"}, "not the JSON object this call takes"},
+		{"no task id", `{"steps": []}`, []string{"plan", "--json-input", "--agent", "hicks"}, "name one task id"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{list: &core.StepList{}}
+			code, _, errOut := runWrite(t, Step, svc, c.stdin, c.args...)
+			if code != 2 || !strings.Contains(errOut, c.want) || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming %q and no call", code, errOut, svc.calls, c.want)
+			}
+		})
+	}
+}
+
 // TestStepVerbs checks the usage errors of the command itself: no verb, and a verb it does not
 // have.
 func TestStepVerbs(t *testing.T) {
