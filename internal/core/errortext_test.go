@@ -127,7 +127,7 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 }
 
 // TestAuditWalkAcceptsARootWithATrailingSeparator checks that a root written with a trailing
-// separator skips the same directories as the root written without one (8-S10). The skip is
+// separator skips the same directories as the root written without one. The skip is
 // decided by comparing the parent of each directory with the root, so the root is cleaned first.
 func TestAuditWalkAcceptsARootWithATrailingSeparator(t *testing.T) {
 	root := auditTree(t)
