@@ -45,7 +45,7 @@ What `make test` checks today: the tests in `cmd/cairn` cover the command frame 
 | MCP adapter | `cairn mcp`: the 15 tools over stdio, to the server named by `server` in `.cairn.toml` or `CAIRN_SERVER`. It refuses to start without one. | — |
 | Claude Code plugin | Nothing yet | M5. |
 | Server | `cairn serve` is built in M2: TLS by files or behind a proxy, API keys with three scopes, backup and restore. Its live run (#19) passed on 2026-11-02. The web UI at `/ui/` is built in M3: sign-in, the read pages and the actions. The setup is in [DEPLOY.md](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md). | — |
-| CLI and hooks | The three hooks, `session-start`, `pre-compact` and `stop`, and `enable --agent claude-code`, in M4. `opencode` and `pi` are EXPERIMENTAL. The CLI verbs over the whole API, with `--json`, are built in M4 (#87). | The M4 exit check: a task carried across `/compact` on Claude Code, which has not yet been run. See [the hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md). |
+| CLI and hooks | The `pre-compact` and `stop` hooks, and `enable --agent claude-code`, are built in M4; `session-start` came in M1. `opencode` and `pi` are EXPERIMENTAL. The CLI verbs over the whole API, with `--json`, are built in M4 (#87). | The M4 exit check: a task carried across `/compact` on Claude Code, which has not yet been run. See [the hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md). |
 
 The milestones are in [PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones). The commands are in [DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).
 
