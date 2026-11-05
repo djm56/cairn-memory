@@ -41,7 +41,7 @@ type Opener func() (Session, error)
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
 func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start|close")
+		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start|update|close")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -56,8 +56,10 @@ func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return taskStart(open, rest, stdin, stdout, stderr)
 	case "close":
 		return taskClose(open, rest, stdin, stdout, stderr)
+	case "update":
+		return taskUpdate(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start|close\n", verb)
+	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start|update|close\n", verb)
 	return 2
 }
 

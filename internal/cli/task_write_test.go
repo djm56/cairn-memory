@@ -283,6 +283,150 @@ func TestTaskCloseUsageErrors(t *testing.T) {
 	}
 }
 
+// TestTaskUpdateHuman checks the human output of task update: the task in its layout, with the
+// field it set, and that the request sets that field and no other.
+func TestTaskUpdateHuman(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--next-action", "write the test", "--agent", "hicks")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	if !strings.HasPrefix(out, "task-20261030-01  active  normal  Add rate limit\n") || !strings.Contains(out, "next        write the test\n") {
+		t.Errorf("output %q, want the task with its next action", out)
+	}
+	req := svc.gotUpdate
+	if req.NextAction == nil || *req.NextAction != "write the test" {
+		t.Errorf("next action %v, want the one given", req.NextAction)
+	}
+	if req.Status != nil || req.Owner != nil || req.Title != nil || req.Priority != nil || req.Blockers != nil || req.Criteria != nil {
+		t.Errorf("the request changed fields that were not given: %+v", req)
+	}
+}
+
+// TestTaskUpdateStatusAndReason checks that a status and its reason reach the request, and that a
+// flag given blank clears its field rather than leaving it out.
+func TestTaskUpdateStatusAndReason(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	if code, _, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--status", "blocked", "--reason", "waiting on review", "--blockers", "", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	req := svc.gotUpdate
+	if req.Status == nil || *req.Status != core.TaskBlocked || req.Reason != "waiting on review" {
+		t.Errorf("the request was %+v, want blocked with the reason", req)
+	}
+	if req.Blockers == nil || *req.Blockers != "" {
+		t.Errorf("blockers %v, want a blank value sent to clear it", req.Blockers)
+	}
+}
+
+// TestTaskUpdatePriority checks that --priority reaches the request as a priority.
+func TestTaskUpdatePriority(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	if code, _, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--priority", "urgent", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if svc.gotUpdate.Priority == nil || *svc.gotUpdate.Priority != core.PriorityUrgent {
+		t.Errorf("priority %v, want urgent", svc.gotUpdate.Priority)
+	}
+}
+
+// TestTaskUpdateBriefListsReplaceOrKeep checks the rule of CONTRACT §2 through the input: a list
+// given as [] replaces the list with none, and a list left out is not sent, so the task keeps it.
+func TestTaskUpdateBriefListsReplaceOrKeep(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	if code, _, errOut := runWrite(t, Task, svc, `{"criteria": [], "key_files": [{"path": "internal/limit/limit.go"}]}`,
+		"update", "task-20261030-01", "--json-input", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	req := svc.gotUpdate
+	if req.Criteria == nil || len(*req.Criteria) != 0 {
+		t.Errorf("criteria %v, want an empty list that replaces the list", req.Criteria)
+	}
+	if req.KeyFiles == nil || len(*req.KeyFiles) != 1 {
+		t.Errorf("key files %v, want the one given", req.KeyFiles)
+	}
+	if code, _, errOut := runWrite(t, Task, svc, `{"key_files": []}`, "update", "task-20261030-01", "--json-input", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if svc.gotUpdate.Criteria != nil {
+		t.Errorf("criteria %v were sent though the input left them out", svc.gotUpdate.Criteria)
+	}
+}
+
+// TestTaskUpdateTextFromStandardInput checks that a text flag set to "-" carries standard input.
+func TestTaskUpdateTextFromStandardInput(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	if code, _, errOut := runWrite(t, Task, svc, "write the failing test\n", "update", "task-20261030-01", "--next-action", "-", "--agent", "hicks"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if svc.gotUpdate.NextAction == nil || *svc.gotUpdate.NextAction != "write the failing test" {
+		t.Errorf("next action %v, want the input", svc.gotUpdate.NextAction)
+	}
+}
+
+// TestTaskUpdateJSON checks the --json output of task update: one line, decoding to the task.
+func TestTaskUpdateJSON(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	task := activeTask()
+	svc := &fakeWrites{task: &task}
+	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--priority", "high", "--agent", "hicks", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, output %q; want one line and exit 0", code, errOut, out)
+	}
+	var got core.Task
+	if err := json.Unmarshal([]byte(out), &got); err != nil || got.ID != task.ID {
+		t.Errorf("--json decodes to %+v (%v), want task %s", got, err, task.ID)
+	}
+}
+
+// TestTaskUpdateRefusedByServer checks a refusal of the server, such as a second active task: one
+// line on stderr, exit 1.
+func TestTaskUpdateRefusedByServer(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{err: core.Refused("another task is active in this project")}
+	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--status", "active", "--agent", "hicks")
+	if code != 1 || out != "" || errOut != "cairn task update: another task is active in this project\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the refusal", code, out, errOut)
+	}
+}
+
+// TestTaskUpdateUsageErrors checks the usage errors of task update: no task id, a key --json-input
+// does not name, two flags that read standard input, and no agent. Each exits 2 and makes no call.
+func TestTaskUpdateUsageErrors(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	cases := []struct {
+		name  string
+		stdin string
+		args  []string
+		want  string
+	}{
+		{"no task id", "", []string{"update", "--status", "active", "--agent", "hicks"}, "name one task id"},
+		{"a key --json-input does not name", `{"criterion": []}`, []string{"update", "task-20261030-01", "--json-input", "--agent", "hicks"}, "not the JSON object this call takes"},
+		{"two flags read standard input", "text", []string{"update", "task-20261030-01", "--goal", "-", "--context", "-", "--agent", "hicks"}, "both read standard input"},
+		{"no agent", "", []string{"update", "task-20261030-01", "--status", "active"}, "no agent name"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			task := activeTask()
+			svc := &fakeWrites{task: &task}
+			code, _, errOut := runWrite(t, Task, svc, c.stdin, c.args...)
+			if code != 2 || !strings.Contains(errOut, c.want) || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming %q and no call", code, errOut, svc.calls, c.want)
+			}
+		})
+	}
+}
+
 // TestTaskStartHelpNamesTheVariable checks that -h names the agent variable and the stdin forms,
 // so the fallback and the "-" are written where a person reads the flags.
 func TestTaskStartHelpNamesTheVariable(t *testing.T) {

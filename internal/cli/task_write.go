@@ -147,6 +147,103 @@ func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 	return 0
 }
 
+// updateInput is the JSON form of the brief lists of task_update (CONTRACT §2): the criteria and
+// the key files. A list given replaces the whole list, a list left out keeps the one the task has,
+// and [] replaces it with none.
+type updateInput struct {
+	Criteria *[]string        `json:"criteria"`
+	KeyFiles *[]core.TaskFile `json:"key_files"`
+}
+
+// taskUpdate is `cairn task update <id> [--status s] [--reason r] [--priority p] [--owner o]
+// [--next-action n] [--blockers b] [--title t] [--goal g] [--context c] [--constraints k]
+// [--json-input] [--agent a] [--json]`: the fields given change, and no others (CONTRACT §2,
+// task_update). The brief fields change only before any step starts, and the server refuses them
+// after. A move to blocked or abandoned needs --reason.
+func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	const verb = "cairn task update"
+	fl, asJSON := newFlags(verb)
+	agent := fl.String("agent", "", agentHelp)
+	status := fl.String("status", "", "active, blocked or abandoned; a status the task already has is refused")
+	reason := fl.String("reason", "", "why: required for blocked and abandoned, and written to the journal; - reads standard input")
+	priority := fl.String("priority", "", "low, normal, high or urgent")
+	owner := fl.String("owner", "", "the agent leading the task")
+	nextAction := fl.String("next-action", "", "the next thing to do; - reads standard input")
+	blockers := fl.String("blockers", "", "what is blocking the task; - reads standard input")
+	title := fl.String("title", "", "brief: only before any step starts; - reads standard input")
+	goal := fl.String("goal", "", "brief: only before any step starts; - reads standard input")
+	ctxFlag := fl.String("context", "", "brief: only before any step starts; - reads standard input")
+	constraints := fl.String("constraints", "", "brief: only before any step starts; - reads standard input")
+	jsonInput := fl.Bool("json-input", false, "read criteria and key_files from standard input as one JSON object; a list given replaces the whole list")
+	pos, code, done := parse(fl, args, stdout, stderr)
+	if done {
+		return code
+	}
+	if len(pos) != 1 {
+		fmt.Fprintln(stderr, verb+": name one task id: cairn task update <id> --status active")
+		return 2
+	}
+	in := &inputs{stdin: stdin}
+	req := core.TaskUpdateRequest{ID: pos[0]}
+	var err error
+	if given(fl, "status") {
+		st := core.TaskStatus(*status)
+		req.Status = &st
+	}
+	if req.Reason, err = in.text("reason", *reason); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if given(fl, "priority") {
+		p := core.Priority(*priority)
+		req.Priority = &p
+	}
+	if req.Owner, err = in.optText(fl, "owner", *owner); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.NextAction, err = in.optText(fl, "next-action", *nextAction); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.Blockers, err = in.optText(fl, "blockers", *blockers); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.Title, err = in.optText(fl, "title", *title); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.Goal, err = in.optText(fl, "goal", *goal); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.Context, err = in.optText(fl, "context", *ctxFlag); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if req.Constraints, err = in.optText(fl, "constraints", *constraints); err != nil {
+		return usageErr(stderr, verb, err)
+	}
+	if *jsonInput {
+		var body updateInput
+		if err := in.decode("json-input", &body); err != nil {
+			return usageErr(stderr, verb, err)
+		}
+		req.Criteria, req.KeyFiles = body.Criteria, body.KeyFiles
+	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
+	s, err := open()
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	t, err := s.Svc.TaskUpdate(withAgent(s.Ctx, name), req)
+	if err != nil {
+		return fail(stderr, verb, err)
+	}
+	if *asJSON {
+		return writeJSON(stdout, stderr, verb, t)
+	}
+	writeTask(stdout, t)
+	return 0
+}
+
 // writeStarted prints a started task for a person: its id and status, then its plan.
 func writeStarted(w io.Writer, res *core.TaskStartResult) {
 	fmt.Fprintf(w, "%s  %s\n", FoldLine(res.ID), FoldLine(string(res.Status)))
