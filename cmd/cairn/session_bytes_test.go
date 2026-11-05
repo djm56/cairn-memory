@@ -83,7 +83,7 @@ func sessionBlockCases() []sessionBlockCase {
 				"Next action: none recorded.",
 				"Current step: none open.",
 				"Directives that apply: 0.",
-				refusedRoleNote,
+				"Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end).",
 				"Call task_current for the brief, the steps and recent events.",
 			},
 		},

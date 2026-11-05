@@ -31,7 +31,7 @@ Next action: write the test
 Current step: 1 of 2, "Write test" (active).
 Directives that apply: 0.
 Agent-scoped directives were not counted: no agent role is set.
-Run cairn task current for the brief, the steps and recent events; cairn directive list for all directives.
+The brief, steps and recent events follow; run cairn directive list for all directives.
 `
 
 // TestPrimeHumanWithAnActiveTask checks the human output of prime with a task and no role: the block,
@@ -55,16 +55,91 @@ func TestPrimeHumanWithAnActiveTask(t *testing.T) {
 		"task        task-20261030-01  active  Add rate limit\n",
 		"next        write the test\n",
 		"step        1 of 2: Write test (active)\n",
-		"directives  0 apply to this project\n",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Errorf("summary lacks %q:\n%s", want, summary)
 		}
 	}
+	// The block gives the directive count, so the summary does not give it a second time.
+	if strings.Contains(summary, "apply to this project") {
+		t.Errorf("summary repeats the directive count the block gives:\n%s", summary)
+	}
 }
 
-// TestPrimeHumanWithNoTask checks that with no active task prime writes the block's one line and stops:
-// no blank line and no summary follow it, and the exit is 0.
+// TestPrimeSummaryListsDirectivesUnderAHeading checks that prime's summary lists the directives that
+// apply under a heading with no count, since the block above it already gives the count. Each directive
+// is one line, with its rule on the next.
+func TestPrimeSummaryListsDirectivesUnderAHeading(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	task := activeTask()
+	cur := &core.TaskCurrent{
+		Task: &task, Steps: twoSteps(),
+		Directives: []core.Directive{{Code: "D-0001", Scope: core.ScopeProject, Title: "Read first", Rule: "Read the schema."}},
+	}
+	code, out, errOut, _ := primeRun(&fakeTasks{cur: cur}, "--agent", "reviewer")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
+	}
+	_, summary, _ := strings.Cut(out, "\n\n")
+	for _, want := range []string{
+		"Directives that apply: 1.\n",
+		"\ndirectives\n  D-0001  project  Read first\n          Read the schema.\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("prime output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(summary, "apply to this project") {
+		t.Errorf("summary repeats the directive count:\n%s", summary)
+	}
+}
+
+// TestPrimeNamesTheCLIWhenDirectivesAreOmitted checks that the block prime writes names the CLI command
+// for the omitted directives, not the MCP tool, which prime's agent does not have. The hook's block keeps
+// the MCP name; its byte pin is in cmd/cairn.
+func TestPrimeNamesTheCLIWhenDirectivesAreOmitted(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	task := activeTask()
+	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps(), Omitted: 3}}
+	code, out, errOut, _ := primeRun(svc)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
+	}
+	const want = "Directives omitted (beyond the cap of 12): 3. Call cairn directive list for all.\n"
+	if !strings.Contains(out, want) {
+		t.Errorf("prime output lacks %q:\n%s", want, out)
+	}
+	if strings.Contains(out, "directive_list") {
+		t.Errorf("prime names the MCP tool, which its agent does not have:\n%s", out)
+	}
+}
+
+// TestPrimeFoldsAHostileTitle checks that a title with a line feed and an escape sequence, built from
+// code points, comes out of prime as one line each: the block and the summary both. The sequence goes
+// whole, and no control character reaches the output.
+func TestPrimeFoldsAHostileTitle(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	task := activeTask()
+	task.Title = "Ship" + string(rune(0x0a)) + "now" + string(rune(0x1b)) + "[31m done"
+	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps()}}
+	code, out, errOut, _ := primeRun(svc)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
+	}
+	const block = `Cairn task: "Ship now done" (task-20261030-01, active) in acme-api.` + "\n"
+	if !strings.HasPrefix(out, block) {
+		t.Errorf("the block does not begin with the folded title line %q:\n%q", block, out)
+	}
+	if !strings.Contains(out, "task        task-20261030-01  active  Ship now done\n") {
+		t.Errorf("the summary does not carry the folded title:\n%q", out)
+	}
+	if strings.ContainsRune(out, 0x1b) || strings.Contains(out, "Ship\n") {
+		t.Errorf("the output carries the line break or the escape:\n%q", out)
+	}
+}
+
+// TestPrimeHumanWithNoTask checks that with no active task prime writes the block's one line and
+// stops: no blank line and no summary follow it, and the exit is 0.
 func TestPrimeHumanWithNoTask(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
@@ -99,8 +174,8 @@ func TestPrimeWithARole(t *testing.T) {
 	}
 }
 
-// TestPrimeJSON checks the --json output of prime field by field: exactly four keys, the project, the
-// role, role_refused as false, and the current result, which decodes to the task and its steps.
+// TestPrimeJSON checks the --json output of prime field by field: exactly three keys, the project, the
+// role and the current result, which decodes to the task and its steps.
 func TestPrimeJSON(t *testing.T) {
 	task := activeTask()
 	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps()}}
@@ -112,14 +187,16 @@ func TestPrimeJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &keys); err != nil {
 		t.Fatalf("the output is not a JSON object: %v\n%s", err, out)
 	}
-	if len(keys) != 4 {
-		t.Errorf("the object has %d keys, want exactly project, role, role_refused and current", len(keys))
+	if len(keys) != 3 {
+		t.Errorf("the object has %d keys, want exactly project, role and current", len(keys))
+	}
+	if _, ok := keys["role_refused"]; ok {
+		t.Errorf("the object carries role_refused, which no prime answer can set")
 	}
 	var got struct {
-		Project     string           `json:"project"`
-		Role        string           `json:"role"`
-		RoleRefused bool             `json:"role_refused"`
-		Current     core.TaskCurrent `json:"current"`
+		Project string           `json:"project"`
+		Role    string           `json:"role"`
+		Current core.TaskCurrent `json:"current"`
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("the output does not decode: %v\n%s", err, out)
@@ -129,9 +206,6 @@ func TestPrimeJSON(t *testing.T) {
 	}
 	if got.Role != "reviewer" {
 		t.Errorf("role = %q, want reviewer", got.Role)
-	}
-	if got.RoleRefused {
-		t.Errorf("role_refused = true, want false")
 	}
 	if got.Current.Task == nil || got.Current.Task.ID != task.ID || len(got.Current.Steps) != 2 {
 		t.Errorf("current decodes to %+v, want task %s with two steps", got.Current, task.ID)
@@ -164,8 +238,8 @@ func TestPrimeJSONCurrentIsTaskCurrents(t *testing.T) {
 	}
 }
 
-// TestPrimeJSONWithNoTask checks that the JSON for no active task still has the four keys, with the
-// task null, and no role when none was given.
+// TestPrimeJSONWithNoTask checks that the JSON for no active task still has its keys, with the task
+// null, and no role when none was given.
 func TestPrimeJSONWithNoTask(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
@@ -184,6 +258,22 @@ func TestPrimeJSONWithNoTask(t *testing.T) {
 	}
 	if err := json.Unmarshal([]byte(jsonField(t, out, "current")), &cur); err != nil || cur.Task != nil {
 		t.Errorf("current = %s, want a task_current result with task null (err %v)", jsonField(t, out, "current"), err)
+	}
+}
+
+// TestPrimeRefusesASessionWithNoProject checks that a session the opener returns with no project name is
+// an internal fault: exit 1, nothing on stdout, a message that says so, and no call made.
+func TestPrimeRefusesASessionWithNoProject(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	svc := &fakeTasks{cur: &core.TaskCurrent{}}
+	open := func() (Session, error) {
+		return Session{Svc: svc, Ctx: core.WithCaller(context.Background(), testCaller)}, nil
+	}
+	var out, errOut bytes.Buffer
+	code := Prime(open, nil, &out, &errOut)
+	if code != 1 || out.Len() != 0 || !strings.Contains(errOut.String(), "an internal fault") || svc.calls != 0 {
+		t.Errorf("exit %d, stdout %q, stderr %q, calls %d; want exit 1, nothing on stdout, an internal fault on stderr and no call",
+			code, out.String(), errOut.String(), svc.calls)
 	}
 }
 

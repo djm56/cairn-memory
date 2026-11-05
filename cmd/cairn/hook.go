@@ -82,5 +82,5 @@ func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 // writeSessionStart writes the session-start block for cur, with the hook's closing line. The block is
 // the one cli.SessionStart writes, which prime writes too, so the two cannot drift.
 func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string, refused bool) {
-	cli.SessionStart(w, project, cur, role, refused, cli.HookPointer)
+	cli.SessionStart(w, project, cur, role, refused, cli.HookPointer, cli.HookOmittedCall)
 }

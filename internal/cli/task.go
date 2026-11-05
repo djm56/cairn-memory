@@ -357,6 +357,13 @@ func (s *statusFlag) Set(v string) error {
 // code, scope, title and rule. Every text is folded to one line, so a title cannot start a
 // line of its own, and no text is cut. --json keeps the fields this summary leaves out.
 func writeCurrent(w io.Writer, cur *core.TaskCurrent) {
+	writeCurrentSummary(w, cur, true)
+}
+
+// writeCurrentSummary is writeCurrent, with the directive count written only when countDirectives is
+// true. Prime writes the session-start block before this summary, and the block already gives the count,
+// so prime passes false and the count is printed once.
+func writeCurrentSummary(w io.Writer, cur *core.TaskCurrent, countDirectives bool) {
 	if cur.Task == nil {
 		fmt.Fprintln(w, "no task is active")
 		return
@@ -373,7 +380,7 @@ func writeCurrent(w io.Writer, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)
 	}
 	writeEvents(w, "recent events, newest first", cur.RecentEvents)
-	writeDirectives(w, cur)
+	writeDirectives(w, cur, countDirectives)
 }
 
 // currentStep returns the step to work on: the active one, else the first pending one,
@@ -503,13 +510,19 @@ func writeEvents(w io.Writer, label string, events []core.Event) {
 }
 
 // writeDirectives prints the directive count of the active task, then each directive that
-// applies: its code, its scope, its title, and its rule on the next line. The expired and
-// omitted counts follow when they are not zero, as the MCP tool counts them.
-func writeDirectives(w io.Writer, cur *core.TaskCurrent) {
-	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
+// applies: its code, its scope, its title, and its rule on the next line. The title and the rule go
+// through Plain, so each is capped to one line, as the directive list is. The count is written only
+// when count is true; without it, a heading is written over the list when there is one. The expired
+// and omitted counts follow when they are not zero, as the MCP tool counts them.
+func writeDirectives(w io.Writer, cur *core.TaskCurrent, count bool) {
+	if count {
+		fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
+	} else if len(cur.Directives) > 0 {
+		fmt.Fprintln(w, "directives")
+	}
 	for _, d := range cur.Directives {
-		fmt.Fprintf(w, "  %s  %s  %s\n", FoldLine(d.Code), scopeLabel(d), FoldLine(d.Title))
-		if rule := FoldLine(d.Rule); rule != "" {
+		fmt.Fprintf(w, "  %s  %s  %s\n", FoldLine(d.Code), scopeLabel(d), Plain(d.Title))
+		if rule := Plain(d.Rule); rule != "" {
 			fmt.Fprintf(w, "          %s\n", rule)
 		}
 	}

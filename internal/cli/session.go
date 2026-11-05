@@ -21,18 +21,28 @@ const RefusedRoleNote = "Agent-scoped directives were not counted: CAIRN_AGENT i
 // agent with the server's tools calls for the brief.
 const HookPointer = "Call task_current for the brief, the steps and recent events."
 
-// PrimePointer is the closing line of the session-start block prime prints. It names the CLI commands,
-// for an agent that has only a shell and no hook.
-const PrimePointer = "Run cairn task current for the brief, the steps and recent events; cairn directive list for all directives."
+// HookOmittedCall is the call the omitted-directives line of the hook's block names. The hook's agent has
+// the server's tools, so the call is the MCP tool.
+const HookOmittedCall = "directive_list"
+
+// PrimePointer is the closing line of the session-start block prime prints. Prime writes the summary of
+// the task directly after the block, so the pointer says that the brief, steps and events follow, and it
+// names the one CLI command the summary does not show.
+const PrimePointer = "The brief, steps and recent events follow; run cairn directive list for all directives."
+
+// PrimeOmittedCall is the call the omitted-directives line of prime's block names. Prime's agent has only
+// a shell, so the call is the CLI command.
+const PrimeOmittedCall = "cairn directive list"
 
 // SessionStart writes the session-start block for cur: the active task, its next action and current
 // step, the count of directives that apply, and the closing line pointer. With no active task it is one
-// line. The hook and prime both write it, so the two cannot drift; they differ only in pointer.
+// line. The hook and prime both write it, so the two cannot drift; they differ only in the wording that
+// names a call: the pointer and the call the omitted-directives line names.
 //
 // role is the agent role the counts were read for; with none, the block says agent-scoped directives
 // were not counted. refused is true when CAIRN_AGENT is set but refused: the block then names the
 // variable as the reason, so the agent is not told that no role is set when one was given.
-func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string, refused bool, pointer string) {
+func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string, refused bool, pointer, omittedCall string) {
 	if cur.Task == nil {
 		fmt.Fprintf(w, "Cairn: no task is active in %s.\n", project)
 		return
@@ -68,7 +78,7 @@ func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role strin
 		fmt.Fprintf(w, "Directives expired and left out (past review_by): %d.\n", cur.Expired)
 	}
 	if cur.Omitted > 0 {
-		fmt.Fprintf(w, "Directives omitted (beyond the cap of %d): %d. Call directive_list for all.\n", core.DirectiveCap, cur.Omitted)
+		fmt.Fprintf(w, "Directives omitted (beyond the cap of %d): %d. Call %s for all.\n", core.DirectiveCap, cur.Omitted, omittedCall)
 	}
 	fmt.Fprintln(w, pointer)
 }

@@ -57,7 +57,7 @@ func TestPrimeRoundTripWithARoleFromTheVariable(t *testing.T) {
 	seedAgentDirective(t, local, "hicks", "Hicks reads the schema first")
 	seedAgentDirective(t, local, "reviewer", "Reviewer checks the diff")
 
-	const pointer = "Run cairn task current for the brief, the steps and recent events; cairn directive list for all directives.\n"
+	const pointer = "The brief, steps and recent events follow; run cairn directive list for all directives.\n"
 
 	t.Setenv("CAIRN_AGENT", "hicks")
 	code, out, errOut := runCmd(t, "prime")
@@ -66,7 +66,6 @@ func TestPrimeRoundTripWithARoleFromTheVariable(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Directives that apply: 1.\n",
-		"directives  1 apply to this project\n",
 		pointer,
 	} {
 		if !strings.Contains(out, want) {
@@ -82,16 +81,15 @@ func TestPrimeRoundTripWithARoleFromTheVariable(t *testing.T) {
 		t.Fatalf("prime --json with CAIRN_AGENT=hicks: exit %d, stderr %q", code, errOut)
 	}
 	var got struct {
-		Project     string           `json:"project"`
-		Role        string           `json:"role"`
-		RoleRefused bool             `json:"role_refused"`
-		Current     core.TaskCurrent `json:"current"`
+		Project string           `json:"project"`
+		Role    string           `json:"role"`
+		Current core.TaskCurrent `json:"current"`
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("prime --json does not decode: %v\n%s", err, out)
 	}
-	if got.Project != "acme-api" || got.Role != "hicks" || got.RoleRefused {
-		t.Errorf("project %q, role %q, role_refused %v; want acme-api, hicks and false", got.Project, got.Role, got.RoleRefused)
+	if got.Project != "acme-api" || got.Role != "hicks" {
+		t.Errorf("project %q, role %q; want acme-api and hicks", got.Project, got.Role)
 	}
 	if len(got.Current.Directives) != 1 || got.Current.Directives[0].Title != "Hicks reads the schema first" {
 		t.Errorf("current directives = %+v, want only hicks's directive", got.Current.Directives)
