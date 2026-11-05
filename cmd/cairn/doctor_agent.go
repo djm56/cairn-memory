@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/djm56/cairn-memory/internal/cli"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
@@ -68,6 +70,72 @@ func claudeCodeChecks(wd string) []check {
 		}
 	}
 	return checks
+}
+
+// dryRunChecks runs each cairn hook once, in-process, and reports what each printed (dryRunCheck). The hooks read the
+// active task and write nothing, so the dry run writes nothing either.
+func dryRunChecks() []check {
+	checks := make([]check, 0, len(claudeHooks))
+	for _, h := range claudeHooks {
+		checks = append(checks, dryRunCheck(h))
+	}
+	return checks
+}
+
+// dryRunCheck runs one cairn hook through the same code its client runs, with stdout and stderr captured, against the
+// server the command is configured for. It reports the exit code and the byte count of what the hook printed, and the
+// first line of it, folded to one printable line: the rest of the output, the context a hook adds, is not printed. The
+// hook exits 0 whatever happens, so any other exit code is a fault. stop must print one JSON object with a systemMessage,
+// or nothing, and that is checked. A hook that prints nothing and says why on stderr is a warning, since a hook that
+// cannot reach the server prints nothing.
+func dryRunCheck(h claudeHook) check {
+	arg := strings.TrimPrefix(h.cmdline, "cairn hook ")
+	var stdout, stderr bytes.Buffer
+	code := runHook([]string{arg}, &stdout, &stderr)
+	out := stdout.Bytes()
+
+	status := "ok"
+	parts := []string{fmt.Sprintf("%s: exit %d, %d bytes", arg, code, len(out))}
+	switch {
+	case code != 0:
+		status = "fail"
+		parts = append(parts, "the hook exits 0 whatever happens, so this exit is a fault")
+	case arg == "stop" && len(out) > 0 && stopOutputOK(out):
+		parts = append(parts, "valid JSON with systemMessage")
+	case arg == "stop" && len(out) > 0:
+		status = "fail"
+		parts = append(parts, "not one JSON object with a systemMessage")
+	case len(out) == 0 && stderr.Len() == 0:
+		parts = append(parts, "nothing printed")
+	case len(out) == 0:
+		status = "warn"
+		parts = append(parts, "nothing printed")
+	}
+	if len(out) > 0 {
+		parts = append(parts, "first line: "+cli.Plain(firstLine(out)))
+	}
+	if stderr.Len() > 0 {
+		parts = append(parts, "stderr: "+cli.Plain(firstLine(stderr.Bytes())))
+	}
+	return check{name: "dry run", status: status, detail: strings.Join(parts, ", ")}
+}
+
+// stopOutputOK reports whether out is one JSON object whose systemMessage is text that is not empty. Claude Code shows
+// that message to the user, so it is the one thing a stop hook must print.
+func stopOutputOK(out []byte) bool {
+	var v struct {
+		SystemMessage *string `json:"systemMessage"`
+	}
+	if json.Unmarshal(bytes.TrimSpace(out), &v) != nil {
+		return false
+	}
+	return v.SystemMessage != nil && *v.SystemMessage != ""
+}
+
+// firstLine returns the text of b up to its first line break.
+func firstLine(b []byte) string {
+	line, _, _ := strings.Cut(string(b), "\n")
+	return line
 }
 
 // readSettingsHooks reads the settings file at path and returns each cairn hook under the three events. A file that is

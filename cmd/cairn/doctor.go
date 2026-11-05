@@ -105,7 +105,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	}
 	failed := anyFailed(checks)
 	if *agent == "claude-code" {
-		agentChecks := claudeCodeChecks(wd)
+		agentChecks := append(claudeCodeChecks(wd), dryRunChecks()...)
 		fmt.Fprintln(stdout, "hooks for claude-code")
 		for _, c := range agentChecks {
 			fmt.Fprintf(stdout, "%-12s %-5s %s\n", c.name, c.status, c.detail)

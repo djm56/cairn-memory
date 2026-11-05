@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -273,6 +274,124 @@ func TestDoctorUsageErrors(t *testing.T) {
 				t.Errorf("exit %d, stdout %q, stderr %q: want 2, nothing on stdout and %q on stderr", code, stdout, stderr, tc.want)
 			}
 		})
+	}
+}
+
+// serverProject is agentProject with a server: the project file names url, so the hooks and the reach check call it.
+func serverProject(t *testing.T, url string) string {
+	t.Helper()
+	dir := agentProject(t)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+url+"\"\n")
+	return dir
+}
+
+// TestDoctorDryRunWithAnActiveTask checks the dry run of the three hooks against a server with an active task. Each
+// hook exits 0 and prints something; the session-start and pre-compact lines show the first line of the block, and the
+// stop hook prints one JSON object with a systemMessage. Each hook makes one read of the active task, and the project's
+// tree is left as it was.
+func TestDoctorDryRunWithAnActiveTask(t *testing.T) {
+	var seen []string
+	local, url := newServer(t, &seen)
+	dir := serverProject(t, url)
+	id := seedTask(t, local, "acme-api")
+	seen = nil
+
+	checks := dryRunChecks()
+	if len(checks) != 3 {
+		t.Fatalf("%d dry runs, want one per hook: %v", len(checks), checks)
+	}
+	for i, prefix := range []string{"session-start: exit 0, ", "pre-compact: exit 0, ", "stop: exit 0, "} {
+		if checks[i].status != "ok" || !strings.HasPrefix(checks[i].detail, prefix) {
+			t.Errorf("dry run %d is %s %q, want ok and the prefix %q", i, checks[i].status, checks[i].detail, prefix)
+		}
+	}
+	firstLine := "first line: Cairn task: \"Wire the export\" (" + id + ", active) in acme-api."
+	for i := 0; i < 2; i++ {
+		if !strings.Contains(checks[i].detail, firstLine) {
+			t.Errorf("dry run %d lacks the first line of the block:\n%q", i, checks[i].detail)
+		}
+	}
+	if !strings.Contains(checks[2].detail, "valid JSON with systemMessage") {
+		t.Errorf("stop lacks the JSON check: %q", checks[2].detail)
+	}
+	if len(seen) != 3 {
+		t.Errorf("the hooks made %d calls, want one read each: %q", len(seen), seen)
+	}
+	for _, p := range seen {
+		if !strings.HasPrefix(p, "/v1/agent/task_current") {
+			t.Errorf("a hook made a call other than a read: %q", p)
+		}
+	}
+	if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml"}) {
+		t.Errorf("the project holds %v after the dry run, want the project file alone", got)
+	}
+
+	_, stdout, _ := runCmd(t, "doctor", "--agent", "claude-code")
+	for _, c := range checks {
+		if !strings.Contains(stdout, checkLine(c)+"\n") {
+			t.Errorf("output lacks the dry run line %q:\n%s", checkLine(c), stdout)
+		}
+	}
+}
+
+// TestDoctorDryRunWithNoActiveTask checks the dry run against a server with no active task: session-start and
+// pre-compact print the one line for that, and stop prints nothing, which is ok.
+func TestDoctorDryRunWithNoActiveTask(t *testing.T) {
+	_, url := newServer(t, nil)
+	serverProject(t, url)
+
+	checks := dryRunChecks()
+	if len(checks) != 3 {
+		t.Fatalf("%d dry runs, want one per hook: %v", len(checks), checks)
+	}
+	for i := 0; i < 2; i++ {
+		if checks[i].status != "ok" || !strings.Contains(checks[i].detail, "first line: Cairn: no task is active in acme-api.") {
+			t.Errorf("dry run %d is %s %q, want ok and the no-task line", i, checks[i].status, checks[i].detail)
+		}
+	}
+	if checks[2].status != "ok" || !strings.Contains(checks[2].detail, "0 bytes, nothing printed") {
+		t.Errorf("stop is %s %q, want ok and nothing printed", checks[2].status, checks[2].detail)
+	}
+}
+
+// TestDoctorDryRunWithNoServer checks the dry run with no server configured: each hook prints nothing and says why on
+// stderr, so each is a warning, not a failure.
+func TestDoctorDryRunWithNoServer(t *testing.T) {
+	agentProject(t)
+
+	checks := dryRunChecks()
+	for i, c := range checks {
+		if c.status != "warn" || !strings.Contains(c.detail, "nothing printed") || !strings.Contains(c.detail, "stderr: ") {
+			t.Errorf("dry run %d is %s %q, want a warning that says why on stderr", i, c.status, c.detail)
+		}
+		if anyFailed([]check{c}) {
+			t.Errorf("dry run %d failed with no server: %q", i, c.detail)
+		}
+	}
+}
+
+// TestStopOutputOK checks the JSON rule for the stop hook: one object with a systemMessage that is text. Anything else
+// is refused, including JSON that is valid but has no such message.
+func TestStopOutputOK(t *testing.T) {
+	cases := []struct {
+		out  string
+		want bool
+	}{
+		{`{"systemMessage":"Cairn warning: a step has no summary."}`, true},
+		{"{\"systemMessage\":\"x\"}\n", true},
+		{`{"systemMessage":""}`, false},
+		{`{"systemMessage":5}`, false},
+		{`{}`, false},
+		{`null`, false},
+		{`[]`, false},
+		{`"systemMessage"`, false},
+		{`{"systemMessage":"x"} trailing`, false},
+		{`not json`, false},
+	}
+	for _, tc := range cases {
+		if got := stopOutputOK([]byte(tc.out)); got != tc.want {
+			t.Errorf("stopOutputOK(%q) = %v, want %v", tc.out, got, tc.want)
+		}
 	}
 }
 
