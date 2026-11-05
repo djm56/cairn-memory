@@ -111,7 +111,7 @@ func hasRoute(paths []routePath, path, method string) bool {
 // headers are checked on each answer. The paths and methods come from the table, so a route
 // added to it is covered too.
 func TestRouteTableAnswers405ToEveryDisallowedMethod(t *testing.T) {
-	candidates := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch}
+	candidates := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions, http.MethodTrace}
 	for _, hsts := range []bool{false, true} {
 		hr := newHarness(t, true, hsts)
 		// The loop below checks what the table holds, so an empty table would pass it. The table
