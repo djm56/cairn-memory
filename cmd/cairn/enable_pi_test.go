@@ -243,6 +243,89 @@ func TestPiRefusesWhatItCannotMerge(t *testing.T) {
 	}
 }
 
+// TestPiAppendsToAnAgentsFileWithoutItsLineBreak checks the separator branch: AGENTS.md text that does not end in a line break
+// gets one, then a blank line, then the block. An empty AGENTS.md gets the block alone.
+func TestPiAppendsToAnAgentsFileWithoutItsLineBreak(t *testing.T) {
+	t.Run("text with no line break at the end", func(t *testing.T) {
+		dir := enableProject(t)
+		const notes = "# Notes\n\nKeep the tests green."
+		writeSettings(t, piAgentsFile(dir), notes)
+
+		if code, _, stderr := runCmd(t, "enable", "--agent", "pi"); code != 0 {
+			t.Fatalf("exit %d, stderr %q", code, stderr)
+		}
+		if got := string(readBytes(t, piAgentsFile(dir))); got != notes+"\n\n"+piBlock() {
+			t.Errorf("AGENTS.md is not the notes, a line break, a blank line and the block:\n%q", got)
+		}
+		if !bytes.Equal(readBytes(t, piBackupOf(t, "AGENTS.md")), []byte(notes)) {
+			t.Errorf("the backup is not the original notes")
+		}
+	})
+	t.Run("an empty file", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, piAgentsFile(dir), "")
+
+		if code, _, stderr := runCmd(t, "enable", "--agent", "pi"); code != 0 {
+			t.Fatalf("exit %d, stderr %q", code, stderr)
+		}
+		if got := string(readBytes(t, piAgentsFile(dir))); got != piBlock() {
+			t.Errorf("AGENTS.md is not the block alone:\n%q", got)
+		}
+	})
+}
+
+// TestPiRefusesPathsItCannotWriteThrough checks a path enable writes that holds something else: a directory where
+// .pi/mcp.json or AGENTS.md goes, and a .pi that is a file. Each is refused while the run plans its files, so exit 1 comes
+// with nothing written, and the refusal names the path.
+func TestPiRefusesPathsItCannotWriteThrough(t *testing.T) {
+	mkdir := func(t *testing.T, path string) {
+		t.Helper()
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name  string
+		setup func(t *testing.T, dir string)
+		want  func(dir string) string // the text stderr must hold
+		kept  []string                // what the project holds after the refusal
+	}{
+		{
+			name:  "a directory named mcp.json",
+			setup: func(t *testing.T, dir string) { mkdir(t, piConfigFile(dir)) },
+			want:  func(dir string) string { return piConfigFile(dir) + " is not a regular file" },
+			kept:  []string{".cairn.toml", ".pi"},
+		},
+		{
+			name:  "a directory named AGENTS.md",
+			setup: func(t *testing.T, dir string) { mkdir(t, piAgentsFile(dir)) },
+			want:  func(dir string) string { return piAgentsFile(dir) + " is not a regular file" },
+			kept:  []string{".cairn.toml", piAgents},
+		},
+		{
+			name:  "a .pi that is a file",
+			setup: func(t *testing.T, dir string) { writeFile(t, dir, ".pi", "not a directory\n") },
+			want:  func(dir string) string { return "look for " + piConfigFile(dir) },
+			kept:  []string{".cairn.toml", ".pi"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			tc.setup(t, dir)
+			want := tc.want(dir)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+			if code != 1 || stdout != "" || !strings.Contains(stderr, want) {
+				t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and %q on stderr", code, stdout, stderr, want)
+			}
+			if got := listDir(t, dir); !slices.Equal(got, tc.kept) {
+				t.Errorf("the project holds %v, want %v", got, tc.kept)
+			}
+		})
+	}
+}
+
 // TestPiRefusesASymlinkedAgentsFile checks an AGENTS.md that is a symbolic link: the file it names is not touched.
 func TestPiRefusesASymlinkedAgentsFile(t *testing.T) {
 	dir := enableProject(t)

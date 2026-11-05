@@ -337,6 +337,58 @@ func TestOpenCodeRefusesAJsoncConfig(t *testing.T) {
 	}
 }
 
+// TestOpenCodeRefusesPathsItCannotWriteThrough checks a path enable writes that holds something else: a directory where
+// opencode.json or the instruction file goes, and a .cairn that is a file. Each is refused while the run plans its files, so
+// exit 1 comes with nothing written, and the refusal names the path.
+func TestOpenCodeRefusesPathsItCannotWriteThrough(t *testing.T) {
+	mkdir := func(t *testing.T, path string) {
+		t.Helper()
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name  string
+		setup func(t *testing.T, dir string)
+		want  func(dir string) string // the text stderr must hold
+		kept  []string                // what the project holds after the refusal
+	}{
+		{
+			name:  "a directory named opencode.json",
+			setup: func(t *testing.T, dir string) { mkdir(t, ocConfig(dir)) },
+			want:  func(dir string) string { return ocConfig(dir) + " is not a regular file" },
+			kept:  []string{".cairn.toml", openCodeFile},
+		},
+		{
+			name:  "a directory named instructions.md",
+			setup: func(t *testing.T, dir string) { mkdir(t, ocInstructions(dir)) },
+			want:  func(dir string) string { return ocInstructions(dir) + " is not a regular file" },
+			kept:  []string{".cairn", ".cairn.toml"},
+		},
+		{
+			name:  "a .cairn that is a file",
+			setup: func(t *testing.T, dir string) { writeFile(t, dir, ".cairn", "not a directory\n") },
+			want:  func(dir string) string { return "look for " + ocInstructions(dir) },
+			kept:  []string{".cairn", ".cairn.toml"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			tc.setup(t, dir)
+			want := tc.want(dir)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+			if code != 1 || stdout != "" || !strings.Contains(stderr, want) {
+				t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and %q on stderr", code, stdout, stderr, want)
+			}
+			if got := listDir(t, dir); !slices.Equal(got, tc.kept) {
+				t.Errorf("the project holds %v, want %v", got, tc.kept)
+			}
+		})
+	}
+}
+
 // TestOpenCodeRefusesASymlinkedConfig checks an opencode.json that is a symbolic link: the file it names is not touched.
 func TestOpenCodeRefusesASymlinkedConfig(t *testing.T) {
 	dir := enableProject(t)

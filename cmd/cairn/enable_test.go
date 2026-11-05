@@ -740,6 +740,23 @@ func TestEnableWritesToTheProjectAboveTheWorkingDirectory(t *testing.T) {
 	}
 }
 
+// TestEnableRefusesASettingsPathThatIsADirectory checks a directory where the project's settings file goes: enable refuses it
+// while it plans the file, so exit 1 comes with nothing written and the refusal names the path.
+func TestEnableRefusesASettingsPathThatIsADirectory(t *testing.T) {
+	dir := enableProject(t)
+	if err := os.MkdirAll(settingsIn(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, settingsIn(dir)+" is not a regular file") {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the directory named", code, stdout, stderr)
+	}
+	if got := listDir(t, filepath.Join(dir, settingsDir)); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the directory and nothing else", got)
+	}
+}
+
 // TestEnableCapsTheFileItReads checks the cap enable applies to a file it merges, the cap doctor applies: a file of exactly
 // maxSettingsBytes is merged, and one byte more is refused, with the file left as it was and no backup made.
 func TestEnableCapsTheFileItReads(t *testing.T) {
