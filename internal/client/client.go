@@ -328,6 +328,21 @@ func setCaller(ctx context.Context, h http.Header) error {
 	return nil
 }
 
+// ServerError is a core error the server wrote into its answer. Its message is server
+// text, so a person reading it (the CLI's doctor, status and export) gets it capped and
+// stripped. An error that the client or a local resolver builds is not a ServerError,
+// even when it is a core.Error, so the caller can cap the one and print the other whole.
+// errors.As finds the core.Error beneath it as before.
+type ServerError struct {
+	Err *core.Error
+}
+
+// Error returns the text of the core error, as core.Error gives it.
+func (e *ServerError) Error() string { return e.Err.Error() }
+
+// Unwrap returns the core error, so a caller that asks for a *core.Error still gets it.
+func (e *ServerError) Unwrap() error { return e.Err }
+
 // failure reads the error of an answer that is not a success. When the answer
 // carries a core error kind, the error is the core.Error it names. A no_route
 // answer names the base URL the client was given, since a mis-set base is the
@@ -355,7 +370,7 @@ func failure(base, route string, resp *http.Response) error {
 			return &core.Error{Kind: api.KindNoRoute, Message: fmt.Sprintf(
 				"no call at %s%s%s: check the server base URL", DisplayURL(base), api.Prefix, route)}
 		case isCoreKind(body.Error.Kind):
-			return body.Error
+			return &ServerError{Err: body.Error}
 		}
 	}
 	if resp.StatusCode == http.StatusNotFound {

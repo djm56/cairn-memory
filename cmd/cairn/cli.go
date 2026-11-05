@@ -85,17 +85,22 @@ func loadKey() (client.Key, error) {
 }
 
 // reason is the text of err for a person: the message of a core.Error, without its
-// kind, and the error's own text for any other failure. The message is server text, so
-// it goes through plain: one printable line,
-// capped at maxLineRunes, with no control or format character. Every print of reason's
-// result is a print of server text or of an error that may carry it, so all of them
-// get the same rule.
+// kind, and the error's own text for any other failure. A message the server wrote (a
+// client.ServerError) goes through plain, so it is one printable line capped at
+// maxLineRunes. A local error goes through foldLine alone: it is still one printable
+// line with no control or format character, but it is not cut. A local error names a
+// path or a fix, and doctor exists to show that cause, so a cut there hides the thing it
+// is for (#113).
 func reason(err error) string {
 	var ce *core.Error
-	if errors.As(err, &ce) {
+	if !errors.As(err, &ce) {
+		return foldLine(err.Error())
+	}
+	var se *client.ServerError
+	if errors.As(err, &se) {
 		return plain(ce.Message)
 	}
-	return plain(err.Error())
+	return foldLine(ce.Message)
 }
 
 // serverSource says where the server URL came from, for a person reading status or

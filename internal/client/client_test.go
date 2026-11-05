@@ -98,6 +98,27 @@ func TestErrorsComeBackAsTheCoreError(t *testing.T) {
 	}
 }
 
+// TestServerErrorsAreMarked checks that a core error the server wrote arrives as a
+// *client.ServerError, so the CLI caps its text, and that the core error is still there
+// beneath it. An internal failure is not marked: it is not a core error at all.
+func TestServerErrorsAreMarked(t *testing.T) {
+	c := loopback(t, failing{err: &core.Error{Kind: core.KindInvalid, Message: "fix the request"}})
+	_, err := c.TaskStart(agentCtx(), core.TaskStartRequest{Title: "t", Goal: "g"})
+	var se *client.ServerError
+	if !errors.As(err, &se) {
+		t.Fatalf("a server core error arrived as %T, want a *client.ServerError", err)
+	}
+	if core.KindOf(err) != core.KindInvalid || se.Err.Message != "fix the request" {
+		t.Errorf("the marked error %v lost the core error", err)
+	}
+
+	c = loopback(t, failing{err: errors.New("disk on fire")})
+	_, err = c.TaskStart(agentCtx(), core.TaskStartRequest{Title: "t", Goal: "g"})
+	if errors.As(err, &se) {
+		t.Errorf("an internal failure is marked as a server error: %v", err)
+	}
+}
+
 // TestInternalFailureIsAPlainError checks that a failure which is not a
 // core.Error reaches the client as a plain error: it is not a core kind, it names
 // the route and the status, and the cause does not travel.
