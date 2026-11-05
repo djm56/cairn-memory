@@ -17,7 +17,8 @@ import (
 // --goal is required, and --goal - reads it from standard input. --agent names the caller's role, as
 // the MCP tool's agent argument does: it names the role's agent-scoped directives, and it is not a
 // filter on the rest. Left out, CAIRN_AGENT names the role, as task current reads it. With neither, no
-// agent-scoped directive is listed.
+// agent-scoped directive is listed. A name the wire form refuses, from either source, is a usage error
+// here, exit 2, where status and the session-start hook only note a refused CAIRN_AGENT and go on.
 //
 // The text form is a summary. It prints the directives as directive list prints them, then one line for
 // each lesson, mistake and task, and the empty-list line for each part with none. --json keeps every
@@ -28,7 +29,7 @@ func Recall(open Opener, args []string, stdin io.Reader, stdout, stderr io.Write
 	const verb = "cairn recall"
 	fl, asJSON := newFlags(verb)
 	goal := fl.String("goal", "", "what the task is for, in a sentence; - reads standard input")
-	agent := fl.String("agent", "", "the calling agent's role, such as hicks or reviewer; names its agent-scoped directives; left out, "+identity.EnvAgent+" is used")
+	agent := fl.String("agent", "", "the calling agent's role, such as hicks or reviewer; names its agent-scoped directives; left out, "+identity.EnvAgent+" is used; a name the wire form refuses is a usage error")
 	limit := fl.Int("limit", 0, "per list: 5 by default, 100 at most; leave it out for the default")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
