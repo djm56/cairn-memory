@@ -113,16 +113,24 @@ practice. The reference does not run a session for you.
   `cairn step update <task-id> 1 --action start --agent <agent-name>`. Note the next
   action the task shows with `cairn task current`.
 - [ ] **3.7 Run `/compact` in the Claude Code session.** Type `/compact` and let it
-  finish. Do not type a message after it. Note the time of `/compact` in UTC.
-- [ ] **3.8 Watch what the agent does next, with no prompt from you.** Let the session
-  run for one turn, then read the reply.
+  finish. Do not type a message after it yet. Note the time of `/compact` in UTC.
+- [ ] **3.8 Watch whether a turn starts, with no prompt from you.** Wait for the
+  session to show a reply after `/compact` has finished. This guide does not know
+  whether Claude Code starts a turn by itself after a manual `/compact`. The check is
+  what records it.
+  - If a reply appears on its own, read it, and go on to the pass and fail lines below.
+  - If no reply appears, send one fixed, neutral message in the session: `continue`.
+    Send exactly that text and nothing else. Record that you sent it, its exact text
+    and the time in UTC, then read the reply. Sending it does not fail the check. It
+    still counts as a pass if the agent carries on with the task.
 
 What to look for:
 
-- **Pass.** After `/compact`, with no message from you, the agent carries on with the
-  task. It works on step 1, or says what step 1's next action is, and does not ask you
-  what the task is. In the debug log, the `SessionStart` hook ran once after the
-  compact, and its output reached the agent.
+- **Pass.** After `/compact`, the agent carries on with the task. It works on step 1, or
+  says what step 1's next action is, and does not ask you what the task is. This holds
+  whether a turn started by itself or after the one neutral message from 3.8. Sending
+  that message does not fail the check. In the debug log, the `SessionStart` hook ran
+  once after the compact.
 - **Fail.** The agent asks what the task is, starts unrelated work, or takes no step
   from the task. Or the debug log shows no `SessionStart` hook run after the compact.
   Or the doctor warned about the matcher in 3.4 and the matcher was not fixed.
