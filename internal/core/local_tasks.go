@@ -140,6 +140,16 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 	}
 	cur := &TaskCurrent{}
 	err = l.st.WithReadTx(ctx, func(q store.Querier) error {
+		// SQLite starts a read transaction's snapshot at its first read, not at BEGIN.
+		// The project row is that first read, so the seam below runs inside the
+		// snapshot, and every read after it (directives, task, criteria, steps and
+		// events) is one the seam's writes must not show (#108).
+		if _, err := store.GetProject(ctx, q, c.Project); err != nil {
+			return err
+		}
+		if l.betweenReads != nil {
+			l.betweenReads()
+		}
 		// Directives are read whether or not a task is active: they belong to the
 		// project, and CONTRACT §2 gives them with every answer.
 		set, err := directivesFor(ctx, q, c.Project, c.Agent, false, l.now())
@@ -163,9 +173,6 @@ func (l *Local) TaskCurrent(ctx context.Context) (*TaskCurrent, error) {
 		t := taskFromRow(row)
 		cur.Task = &t
 		cur.OtherActive = len(active) - 1
-		if l.betweenReads != nil {
-			l.betweenReads()
-		}
 		crit, err := store.ListCriteria(ctx, q, row.ID)
 		if err != nil {
 			return err
