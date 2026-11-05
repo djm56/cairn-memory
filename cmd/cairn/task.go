@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/djm56/cairn-memory/internal/cli"
 )
@@ -25,5 +26,5 @@ func runTask(args []string, stdout, stderr io.Writer) int {
 			return cli.Session{}, err
 		}
 		return cli.Session{Svc: t.svc, Ctx: t.ctx}, nil
-	}, args, stdout, stderr)
+	}, args, os.Stdin, stdout, stderr)
 }

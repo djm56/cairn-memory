@@ -38,7 +38,7 @@ type Opener func() (Session, error)
 //
 // Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a
 // usage error. A failure is printed to stderr, as one line, in the words reason gives it.
-func Task(open Opener, args []string, stdout, stderr io.Writer) int {
+func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list")
 		return 2
@@ -61,7 +61,7 @@ func Task(open Opener, args []string, stdout, stderr io.Writer) int {
 // since that is an answer, not a failure.
 func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	fl, asJSON := newFlags("cairn task current")
-	agent := fl.String("agent", "", "the calling agent's role, such as main or reviewer; names its agent-scoped directives")
+	agent := fl.String("agent", "", "the calling agent's role, such as main or reviewer; names its agent-scoped directives; left out, "+EnvAgent+" is used")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
@@ -70,15 +70,14 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn task current: takes no task id, got %q\n", pos)
 		return 2
 	}
+	name, _ := agentName(fl, *agent, false, "cairn task current", stderr)
 	s, err := open()
 	if err != nil {
 		return fail(stderr, "cairn task current", err)
 	}
 	ctx := s.Ctx
-	if *agent != "" {
-		c, _ := core.CallerFrom(ctx)
-		c.Agent = *agent
-		ctx = core.WithCaller(ctx, c)
+	if name != "" {
+		ctx = withAgent(ctx, name)
 	}
 	cur, err := s.Svc.TaskCurrent(ctx)
 	if err != nil {

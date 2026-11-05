@@ -56,7 +56,7 @@ func runTask(t *testing.T, svc core.Service, args ...string) (int, string, strin
 		return Session{Svc: svc, Ctx: core.WithCaller(context.Background(), testCaller)}, nil
 	}
 	var out, errOut bytes.Buffer
-	code := Task(open, args, &out, &errOut)
+	code := Task(open, args, strings.NewReader(""), &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -329,7 +329,7 @@ func TestTaskOpenFailureStopsBeforeTheCall(t *testing.T) {
 	svc := &fakeTasks{}
 	open := func() (Session, error) { return Session{}, core.Invalid("no project: run cairn init") }
 	var out, errOut bytes.Buffer
-	code := Task(open, []string{"list"}, &out, &errOut)
+	code := Task(open, []string{"list"}, strings.NewReader(""), &out, &errOut)
 	if code != 1 || errOut.String() != "cairn task list: no project: run cairn init\n" || svc.calls != 0 {
 		t.Errorf("exit %d, stderr %q, calls %d; want 1, the open's text and no call", code, errOut.String(), svc.calls)
 	}
