@@ -401,6 +401,35 @@ func TestDoctorAgentFollowsTheUsersSettingsLink(t *testing.T) {
 	})
 }
 
+// TestDoctorAgentNamesADanglingUsersSettingsLink checks the user's settings file when it is a link that leads to nothing: doctor
+// gives one warning line, which names the dead link and its target, and reads no hook from it.
+func TestDoctorAgentNamesADanglingUsersSettingsLink(t *testing.T) {
+	dir := agentProject(t)
+	user := userSettings(t)
+	if err := os.MkdirAll(filepath.Dir(user), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "no-such-settings.json")
+	if err := os.Symlink(target, user); err != nil {
+		t.Skipf("this system cannot make a symbolic link: %v", err)
+	}
+
+	checks := claudeCodeChecks(dir)
+	var warnings []check
+	for _, c := range checks {
+		if c.name == "settings" {
+			warnings = append(warnings, c)
+		}
+	}
+	want := user + " is a symbolic link to " + target + ", which does not exist, so doctor reads no hooks from it"
+	if len(warnings) != 1 || warnings[0].status != "warn" || warnings[0].detail != want {
+		t.Errorf("settings checks are %+v, want one warning: %q", warnings, want)
+	}
+	if stop := checkNamed(checks, "Stop"); stop == nil || stop.status != "warn" {
+		t.Errorf("Stop is %+v, want a warning that no hook is installed", stop)
+	}
+}
+
 // TestDoctorAgentDoesNotReadAFileLargerThanTheCap checks the cap. A file of exactly maxSettingsBytes is read, with no
 // warning. One byte more is a warning that says doctor does not read it, and enable is not named as refusing it.
 func TestDoctorAgentDoesNotReadAFileLargerThanTheCap(t *testing.T) {

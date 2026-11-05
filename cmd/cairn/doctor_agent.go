@@ -44,7 +44,8 @@ type installedHook struct {
 // hooks are optional, and a project that has not run enable is not broken. A file that enable would refuse is a
 // warning with its reason, and the other files are still read. A project file that is a link, is not a regular file, or is
 // larger than maxSettingsBytes is not read at all. The user's file is the exception to the link rule: it is followed, since
-// the user owns that path and a dotfiles link is common, and its target must still be a regular file under the cap. wd is
+// the user owns that path and a dotfiles link is common, and its target must still be a regular file under the cap. A user's
+// link that leads to nothing is one warning that names it. wd is
 // the directory the command runs from, which finds the project as the other commands do.
 func claudeCodeChecks(wd string) []check {
 	var checks []check
@@ -243,7 +244,9 @@ func readCheckedFile(path string) ([]byte, error) {
 // fs.ErrNotExist, unchanged, so the caller can treat it as having no hooks.
 //
 // For the user's file (user is set) the path is looked at with Stat instead, so a link is followed to its target, which must
-// still be a regular file under the cap. The refusals then carry no note that enable refuses the file.
+// still be a regular file under the cap. The refusals then carry no note that enable refuses the file. A link that leads to
+// nothing is an error that names the link and its target, not fs.ErrNotExist, so the caller warns about it rather than
+// reading the file as absent.
 func readSettingsFile(path string, user bool) ([]byte, error) {
 	tail := tailRefused
 	stat := os.Lstat
@@ -254,6 +257,13 @@ func readSettingsFile(path string, user bool) ([]byte, error) {
 	info, err := stat(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			// The user's link that leads nowhere is named, so a dotfiles link that is broken does not read as a missing hook with no
+			// reason given. A link is named only for the user's file, since a project file that is a link is refused already.
+			if user {
+				if target, lerr := os.Readlink(path); lerr == nil {
+					return nil, fmt.Errorf("is a symbolic link to %s, which does not exist, so doctor reads no hooks from it", target)
+				}
+			}
 			return nil, err
 		}
 		return nil, fmt.Errorf("could not be read: %w%s", err, tail)
