@@ -277,7 +277,7 @@ func TestEnableLeavesAnIdenticalEntryAlone(t *testing.T) {
 
 // TestEnableMatchesTheCommandNotTheMatcher checks the rule for an existing entry: a cairn command under its event
 // counts as present whatever its matcher, and the entry is left as it is. A SessionStart entry without the compact
-// matcher is therefore not widened here. That is an open point for the operator, and this test pins the behaviour.
+// matcher is therefore not widened here, and the line names its matcher so the operator can see it.
 func TestEnableMatchesTheCommandNotTheMatcher(t *testing.T) {
 	dir := enableProject(t)
 	path := settingsIn(dir)
@@ -287,13 +287,45 @@ func TestEnableMatchesTheCommandNotTheMatcher(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
 	}
-	if got := outcomes(stdout)["SessionStart"]; got != "already present" {
-		t.Errorf("SessionStart is %q, want already present", got)
+	if got := outcomes(stdout)["SessionStart"]; got != "already present, matcher is startup, not startup|resume|clear|compact" {
+		t.Errorf("SessionStart is %q, want the matcher named", got)
 	}
 	got := decodeJSON(t, readBytes(t, path))["hooks"].(map[string]any)["SessionStart"]
 	want := []any{entryJSON("startup", "cairn hook session-start")}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("SessionStart is %v, want the entry left as it was", got)
+	}
+}
+
+// TestEnableReportsAMatcherThatDiffers checks the line for an existing SessionStart entry. An entry with the matcher
+// enable writes gets the bare "already present". An entry with no matcher gets the matcher named as (none). Either way
+// the entry is kept as it was.
+func TestEnableReportsAMatcherThatDiffers(t *testing.T) {
+	cases := []struct {
+		name  string
+		entry string
+		want  string
+	}{
+		{"the same matcher", `{"matcher":"startup|resume|clear|compact","hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present"},
+		{"no matcher", `{"hooks":[{"type":"command","command":"cairn hook session-start"}]}`, "already present, matcher is (none), not startup|resume|clear|compact"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			writeSettings(t, settingsIn(dir), `{"hooks":{"SessionStart":[`+tc.entry+`]}}`)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+			if code != 0 || stderr != "" {
+				t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+			}
+			if got := outcomes(stdout)["SessionStart"]; got != tc.want {
+				t.Errorf("SessionStart is %q, want %q", got, tc.want)
+			}
+			got := decodeJSON(t, readBytes(t, settingsIn(dir)))["hooks"].(map[string]any)["SessionStart"]
+			if want := []any{decodeJSON(t, []byte(tc.entry))}; !reflect.DeepEqual(got, want) {
+				t.Errorf("SessionStart is %v, want the entry left as it was: %v", got, want)
+			}
+		})
 	}
 }
 

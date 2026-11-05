@@ -64,10 +64,14 @@ var claudeHooks = []claudeHook{
 	{event: "Stop", cmdline: "cairn hook stop"},
 }
 
-// hookResult is what enable found for one hook: added to the file, or already registered under its event.
+// hookResult is what enable found for one hook: added to the file, or already registered under its event. When it
+// was already there, matcher is the matcher of the entry that runs it, and differs is set when the hook names a
+// matcher and that entry has another. enable reports such an entry and leaves it as it is.
 type hookResult struct {
-	hook  claudeHook
-	added bool
+	hook    claudeHook
+	added   bool
+	matcher string
+	differs bool
 }
 
 // hookEntry and hookCommand are the shape the settings format gives an entry under an event: a matcher, and a list
@@ -199,8 +203,11 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 	}
 	for _, r := range results {
 		state := "already present"
-		if r.added {
+		switch {
+		case r.added:
 			state = "added"
+		case r.differs:
+			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
 		}
 		fmt.Fprintf(stdout, "%-12s %-17s %s\n", r.hook.event, state, r.hook.cmdline)
 	}
@@ -275,8 +282,8 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 				return nil, nil, false, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array`, h.event)
 			}
 		}
-		if hasCommand(entries, h.cmdline) {
-			results = append(results, hookResult{hook: h})
+		if matchers := commandMatchers(entries, h.cmdline); len(matchers) > 0 {
+			results = append(results, hookResult{hook: h, matcher: matchers[0], differs: h.matcher != "" && matchers[0] != h.matcher})
 			continue
 		}
 		entry, err := marshalRaw(hookEntry{Matcher: h.matcher, Hooks: []hookCommand{{Type: "command", Command: h.cmdline}}})
@@ -303,13 +310,15 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 	return doc, results, true, nil
 }
 
-// hasCommand reports whether one of entries already runs cmdline, in any of its handlers. The test is on the command
-// string alone, so an entry with another matcher still counts. An entry or a handler that is not shaped as the
-// settings format gives it is not a match, and is left as it is.
-func hasCommand(entries []json.RawMessage, cmdline string) bool {
+// commandMatchers returns the matcher of each entry that already runs cmdline in one of its handlers, in order. The
+// test is on the command string alone, so an entry with another matcher still counts. An entry with no matcher gives
+// "". An entry or a handler that is not shaped as the settings format gives it is not a match, and is left as it is.
+func commandMatchers(entries []json.RawMessage, cmdline string) []string {
+	var matchers []string
 	for _, raw := range entries {
 		var entry struct {
-			Hooks []json.RawMessage `json:"hooks"`
+			Matcher any               `json:"matcher"`
+			Hooks   []json.RawMessage `json:"hooks"`
 		}
 		if json.Unmarshal(raw, &entry) != nil {
 			continue
@@ -322,11 +331,22 @@ func hasCommand(entries []json.RawMessage, cmdline string) bool {
 				continue
 			}
 			if s, ok := h.Command.(string); ok && s == cmdline {
-				return true
+				matcher, _ := entry.Matcher.(string)
+				matchers = append(matchers, matcher)
+				break
 			}
 		}
 	}
-	return false
+	return matchers
+}
+
+// shownMatcher is a matcher as the output names it. An entry with no matcher matches every occurrence, so it is
+// shown as (none).
+func shownMatcher(matcher string) string {
+	if matcher == "" {
+		return "(none)"
+	}
+	return matcher
 }
 
 // marshalRaw encodes v as compact JSON, without escaping <, > and &, so a value enable copies keeps its characters.
