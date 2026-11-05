@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -119,7 +120,14 @@ func (in *inputs) decode(name string, v any) error {
 	if err := in.take(name); err != nil {
 		return err
 	}
-	dec := json.NewDecoder(io.LimitReader(in.stdin, maxInputBytes))
+	raw, err := io.ReadAll(io.LimitReader(in.stdin, maxInputBytes+1))
+	if err != nil {
+		return fmt.Errorf("--%s: read standard input: %w", name, err)
+	}
+	if len(raw) > maxInputBytes {
+		return fmt.Errorf("--%s: standard input is larger than %d bytes", name, maxInputBytes)
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		return fmt.Errorf("--%s: standard input is not the JSON object this call takes: %w", name, err)

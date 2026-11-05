@@ -116,6 +116,19 @@ func TestInputsTextStopsAtTheCap(t *testing.T) {
 	}
 }
 
+// TestInputsDecodeRefusesAnInputOverTheCap checks that a --json-input larger than the request cap
+// is refused as too large, not reported as bad JSON.
+func TestInputsDecodeRefusesAnInputOverTheCap(t *testing.T) {
+	var got struct {
+		Criteria []string `json:"criteria"`
+	}
+	big := `{"criteria": ["` + strings.Repeat("x", maxInputBytes) + `"]}`
+	in := &inputs{stdin: strings.NewReader(big)}
+	if err := in.decode("json-input", &got); err == nil || !strings.Contains(err.Error(), "larger than") {
+		t.Errorf("an input over the cap: %v; want the size refusal", err)
+	}
+}
+
 // TestInputsDecodeRefusesAnUnknownKey checks that --json-input refuses a key the call does not
 // name, so a misspelt field is not dropped, and that it reads one object.
 func TestInputsDecodeRefusesAnUnknownKey(t *testing.T) {
