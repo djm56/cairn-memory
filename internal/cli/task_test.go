@@ -355,12 +355,13 @@ func TestTaskCurrentPrintsEveryPart(t *testing.T) {
 	task.NextAction = strings.Repeat("n", 250)
 	steps := twoSteps()
 	steps[1].Agent = "hicks"
+	at := time.Date(2026, 10, 30, 9, 2, 0, 0, time.UTC)
 	svc := &fakeTasks{cur: &core.TaskCurrent{
 		Task:     &task,
 		Criteria: []core.Criterion{{Ord: 1, Criterion: "429 after 100 requests", Result: core.CriterionMet, Evidence: "test ok"}},
 		Steps:    steps,
 		RecentEvents: []core.Event{{
-			ID: 9, Kind: core.EventNote, Text: "started", OccurredAt: time.Date(2026, 10, 30, 9, 2, 0, 0, time.UTC),
+			ID: 9, Kind: core.EventNote, Text: "started", OccurredAt: at,
 		}},
 		Directives: []core.Directive{
 			{Code: "D-0004", Scope: core.ScopeGlobal, Title: "Test first", Rule: "Write the failing test before the code."},
@@ -378,7 +379,7 @@ func TestTaskCurrentPrintsEveryPart(t *testing.T) {
 		"other       1 other active task(s)\n",
 		"criteria\n  1. 429 after 100 requests — met: test ok\n",
 		"steps\n  1. [active] Write test\n  2. [pending] Implement (agent hicks)\n",
-		"recent events, newest first\n  2026-10-30 09:02 UTC  note  started\n",
+		"recent events, newest first\n  " + stamp(at) + "  note  started\n",
 		"directives  2 apply to this project\n",
 		"  D-0004  global  Test first\n          Write the failing test before the code.\n",
 		"  D-0009  agent reviewer  Read the diff\n          Read every changed line.\n",

@@ -469,7 +469,7 @@ func writeEvents(w io.Writer, label string, events []core.Event) {
 	}
 	fmt.Fprintln(w, label)
 	for _, e := range events {
-		fmt.Fprintf(w, "  %s  %s  %s\n", stamp(e.OccurredAt), FoldLine(string(e.Kind)), FoldLine(e.Text))
+		fmt.Fprintln(w, "  "+eventLine(e))
 	}
 }
 
