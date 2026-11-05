@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/djm56/cairn-memory/internal/cli"
 	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/identity"
@@ -84,23 +84,10 @@ func loadKey() (client.Key, error) {
 	return key, nil
 }
 
-// reason is the text of err for a person: the message of a core.Error, without its
-// kind, and the error's own text for any other failure. A message the server wrote (a
-// client.ServerError) goes through plain, so it is one printable line capped at
-// maxLineRunes. A local error goes through foldLine alone: it is still one printable
-// line with no control or format character, but it is not cut. A local error names a
-// path or a fix, and doctor exists to show that cause, so a cut there hides the thing it
-// is for (#113).
+// reason is the text of err for a person (cli.Reason, #113): a server's message is capped
+// to one line, and a local one is printed whole.
 func reason(err error) string {
-	var ce *core.Error
-	if !errors.As(err, &ce) {
-		return foldLine(err.Error())
-	}
-	var se *client.ServerError
-	if errors.As(err, &se) {
-		return plain(ce.Message)
-	}
-	return foldLine(ce.Message)
+	return cli.Reason(err)
 }
 
 // serverSource says where the server URL came from, for a person reading status or
