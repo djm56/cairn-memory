@@ -561,7 +561,47 @@ func TestPiUpdatesAnOlderCairnBlock(t *testing.T) {
 	assertExperimental(t, "pi", stdout)
 }
 
-// TestAgentsBlockStates checks how the block's markers are read: none, one whole block, or a block that is broken.
+// markerInProse is AGENTS.md text that mentions both markers, once each and in order, in the middle of a paragraph. Neither
+// mention is a whole line, so the file is not cairn's block.
+const markerInProse = "# Notes\n\nThe cairn block runs from <!-- cairn:begin --> down to <!-- cairn:end -->, and enable keeps it there.\n\nKeep the tests green.\n"
+
+// TestPiRefusesMarkersThatAreNotWholeLines checks the AGENTS.md files that hold marker text but no whole block: a mention of
+// both markers in prose, a start marker mid-line before a real end line, and a start line that is close to cairn's but not
+// exact. Each is refused with exit 1, nothing written, the bytes of AGENTS.md unchanged, and no backup made.
+func TestPiRefusesMarkersThatAreNotWholeLines(t *testing.T) {
+	cases := []struct {
+		name, text string
+	}{
+		{"a mention of both markers in prose", markerInProse},
+		{"a start marker mid-line, then a real end line", "# Notes\n\nSee the old <!-- cairn:begin --> line.\n" + piEnd + "\n"},
+		{"a start line close to cairn's text", "# Notes\n\n" + strings.Replace(piBeginLine, "do not edit inside", "edit freely", 1) + "\nmy notes\n" + piEnd + "\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			writeSettings(t, piAgentsFile(dir), tc.text)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+			if code != 1 || stdout != "" {
+				t.Errorf("exit %d, stdout %q: want 1 and nothing on stdout", code, stdout)
+			}
+			if !strings.Contains(stderr, piAgentsFile(dir)+" has a cairn block that is not whole") || !strings.Contains(stderr, "fix the markers by hand") {
+				t.Errorf("stderr %q does not refuse the file and say to fix the markers by hand", stderr)
+			}
+			if got := readBytes(t, piAgentsFile(dir)); !bytes.Equal(got, []byte(tc.text)) {
+				t.Errorf("AGENTS.md changed; it must stay byte for byte:\n%q", got)
+			}
+			if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml", piAgents}) {
+				t.Errorf("the project holds %v, want the project file and AGENTS.md alone", got)
+			}
+			if got := listDir(t, filepath.Dir(piBackupOf(t, "AGENTS.md"))); len(got) != 0 {
+				t.Errorf("a backup was made of a file that was refused: %v", got)
+			}
+		})
+	}
+}
+
+// TestAgentsBlockStates checks how the block's markers are read: none, one whole block, or marker text that is not a block.
 func TestAgentsBlockStates(t *testing.T) {
 	cases := []struct {
 		name, text, want string
@@ -574,6 +614,11 @@ func TestAgentsBlockStates(t *testing.T) {
 		{"an end marker alone", piEnd + "\n", "broken"},
 		{"two blocks", piBlock() + piBlock(), "broken"},
 		{"an end before a start", piEnd + "\n" + piBegin + " -->\n", "broken"},
+		{"both markers mentioned in prose", markerInProse, "broken"},
+		{"a start marker mid-line", "x " + piBeginLine + "\n" + piEnd + "\n", "broken"},
+		{"a start line with an edited comment", strings.Replace(piBlock(), "do not edit inside", "edit freely", 1), "broken"},
+		{"an end marker with text after it", piBeginLine + "\n" + piEnd + " trailing\n", "broken"},
+		{"an end marker before its start line", piEnd + "\n" + piBeginLine + "\n", "broken"},
 	}
 	for _, tc := range cases {
 		if got := agentsBlock(tc.text); got != tc.want {

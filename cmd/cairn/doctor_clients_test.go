@@ -248,6 +248,45 @@ func TestDoctorPiWarnsOnAnOlderBlock(t *testing.T) {
 	}
 }
 
+// TestDoctorPiAgreesWithEnableOnMarkerText checks that doctor and enable read the same AGENTS.md. Where enable refuses a file,
+// doctor warns that the block is not whole, and the refused bytes stay as they were. Where enable updates a block, doctor
+// warns about the older text first, and reports the block current once enable has updated it.
+func TestDoctorPiAgreesWithEnableOnMarkerText(t *testing.T) {
+	cases := []struct {
+		name, text string
+		refused    bool   // enable refuses the file
+		warn       string // what doctor says of the block before enable runs
+	}{
+		{"a mention of both markers in prose", markerInProse, true, "not whole"},
+		{"a start marker mid-line, then a real end line", "# Notes\n\nSee the old " + piBegin + " line.\n" + piEnd + "\n", true, "not whole"},
+		{"a start line close to cairn's text", strings.Replace(piBlock(), "do not edit inside", "edit freely", 1), true, "not whole"},
+		{"an older cairn block", piNotes + "\n" + piBeginLine + "\nan older task loop\n" + piEnd + "\nMore notes.\n", false, "older text"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			writeSettings(t, piAgentsFile(dir), tc.text)
+
+			if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "warn" || !strings.Contains(c.detail, tc.warn) {
+				t.Errorf("instructions is %+v, want a warning with %q", c, tc.warn)
+			}
+			code, _, _ := runCmd(t, "enable", "--agent", "pi")
+			if tc.refused {
+				if code != 1 || string(readBytes(t, piAgentsFile(dir))) != tc.text {
+					t.Errorf("enable exit %d, or AGENTS.md changed: want a refusal and the bytes unchanged", code)
+				}
+				return
+			}
+			if code != 0 {
+				t.Fatalf("enable: exit %d, want the older block updated", code)
+			}
+			if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "ok" {
+				t.Errorf("instructions is %+v, want ok after enable updated the block", c)
+			}
+		})
+	}
+}
+
 // TestDoctorExperimentalIsReadOnly checks that doctor for either client writes nothing: the tree of the project, and the
 // files in it, are the same after the command as before.
 func TestDoctorExperimentalIsReadOnly(t *testing.T) {

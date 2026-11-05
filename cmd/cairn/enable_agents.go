@@ -203,39 +203,73 @@ func piEntry() map[string]any {
 // the prefix OpenCode gives the same tools.
 const piNote = " In OpenCode they start with cairn_, so there put cairn_ where the steps say mcp__cairn__."
 
+// piBeginLine is the start marker line cairn writes into AGENTS.md, without its line break. A line of a file counts as
+// cairn's start marker only when it is this text, once a trailing carriage return is taken off.
+const piBeginLine = piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->"
+
 // piBlock is the block enable writes into AGENTS.md: a start marker that says how it came to be there, the task loop with
 // the pi prefix and the note for OpenCode, and the end marker. Only the text between the markers is enable's.
 func piBlock() string {
-	return piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\n" + instructionsWith(piToolPrefix, piNote) + piEnd + "\n"
+	return piBeginLine + "\n" + instructionsWith(piToolPrefix, piNote) + piEnd + "\n"
 }
 
-// agentsBlock says what state the cairn block of AGENTS.md is in: "absent" when there is no marker, "whole" when there is
-// one start marker, then one end marker, and "broken" for anything else: a marker without its partner, a doubled marker,
-// or an end before its start.
+// lineIs reports whether the line that begins at offset at of text is want. The line must begin at the start of text or
+// after a line break, and its text up to the next line break, less a trailing carriage return, must equal want.
+func lineIs(text string, at int, want string) bool {
+	if at > 0 && text[at-1] != '\n' {
+		return false
+	}
+	line := text[at:]
+	if i := strings.IndexByte(line, '\n'); i >= 0 {
+		line = line[:i]
+	}
+	return strings.TrimSuffix(line, "\r") == want
+}
+
+// blockSpan finds cairn's block in text, and is the one recogniser enable and doctor both use. The block is cairn's only
+// when each marker is a whole line, each marker string occurs once in the file, the start line is piBeginLine, and the end
+// line is piEnd, with a trailing carriage return allowed on each. Any other marker text, such as a mention inside a line or
+// in prose, a start line that differs from cairn's text, a second block, or an end before its start, means the file is not
+// cairn's block, and ok is false. Otherwise start and end are the byte offsets of the block from its start line through its
+// end marker, not counting the line break after the end marker.
+func blockSpan(text string) (start, end int, ok bool) {
+	if strings.Count(text, piBegin) != 1 || strings.Count(text, piEnd) != 1 {
+		return 0, 0, false
+	}
+	start, endAt := strings.Index(text, piBegin), strings.Index(text, piEnd)
+	if endAt < start || !lineIs(text, start, piBeginLine) || !lineIs(text, endAt, piEnd) {
+		return 0, 0, false
+	}
+	return start, endAt + len(piEnd), true
+}
+
+// agentsBlock says what state the cairn block of AGENTS.md is in: "absent" when there is no marker text at all, "whole"
+// when blockSpan finds cairn's block, and "broken" for any other marker text, which enable refuses and does not change.
 func agentsBlock(text string) string {
-	begins, ends := strings.Count(text, piBegin), strings.Count(text, piEnd)
-	switch {
-	case begins == 0 && ends == 0:
+	if strings.Count(text, piBegin) == 0 && strings.Count(text, piEnd) == 0 {
 		return "absent"
-	case begins == 1 && ends == 1 && strings.Index(text, piBegin) < strings.Index(text, piEnd):
+	}
+	if _, _, ok := blockSpan(text); ok {
 		return "whole"
 	}
 	return "broken"
 }
 
-// agentsBlockText returns the cairn block of text, from its start marker through its end marker, without the line break
-// after the end marker. It is meaningful only when agentsBlock says "whole", and is then the same bytes piBlock gives,
-// without its last line break, when the block is current.
+// agentsBlockText returns the cairn block of text, from its start line through its end marker, without the line break after
+// the end marker. It is meaningful only when agentsBlock says "whole", and is "" otherwise.
 func agentsBlockText(text string) string {
-	begin := strings.Index(text, piBegin)
-	return text[begin : strings.Index(text, piEnd)+len(piEnd)]
+	start, end, ok := blockSpan(text)
+	if !ok {
+		return ""
+	}
+	return text[start:end]
 }
 
 // enablePi sets up pi for the project at root, EXPERIMENTAL. It adds the cairn server to .pi/mcp.json under mcpServers, with
 // exposure "direct", and writes the task loop into AGENTS.md between the two markers. Each file is merged as the others are:
-// what is there stays, a cairn server that differs is reported and left, text outside the markers is never rewritten, and a
-// whole block is left as it is when it is current. A whole block with an older cairn text between its markers is updated to
-// the current text, with a backup first.
+// what is there stays, and a cairn server that differs is reported and left. A whole block (see blockSpan) is left as it is
+// when it is current. A whole block with an older cairn text between its markers is updated to the current text, with a
+// backup first, and the text outside it is never rewritten. AGENTS.md with any other marker text is refused.
 func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 	var serverState, blockState string
 	config := fileWrite{
@@ -297,7 +331,7 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 				}
 				return []byte(text + piBlock()), true, nil
 			}
-			return nil, false, errors.New("has a cairn block that is not whole: a start or end marker is missing, doubled, or in the wrong order")
+			return nil, false, errors.New("has a cairn block that is not whole: each marker must be a whole line of its own, once, with the start line exactly cairn's text and the end marker after it, so fix the markers by hand")
 		},
 	}
 	report := func() string {
