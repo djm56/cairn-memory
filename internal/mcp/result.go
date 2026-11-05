@@ -22,22 +22,43 @@ const kindInternal core.Kind = "internal"
 // is a judgement: about 16,000 tokens of a model's context for one call.
 const maxResultBytes = 64 << 10
 
-// answer is the success result of a tool: v as compact JSON in one text block.
-// Compact, because every result is read by a model (PLAN.md §6). A value that
-// does not encode is a failure of the adapter, and is answered as one. A value
-// that encodes to more than maxResultBytes is a tool error, not a block of that size:
-// the message names the section and limit arguments, which narrow a task read.
-func answer(v any) *mcp.CallToolResult {
+// answer is the success result of the tool named tool: v as compact JSON in one text
+// block. Compact, because every result is read by a model (PLAN.md §6). A value that
+// does not encode is a failure of the adapter, and is answered as one. A value that
+// encodes to more than maxResultBytes is a tool error, not a block of that size: the
+// message is narrowClause for the tool, so it names only arguments the tool takes (#111).
+func answer(v any, tool string) *mcp.CallToolResult {
 	body, err := compact(v)
 	if err != nil {
 		return failure(err)
 	}
 	if len(body) > maxResultBytes {
 		return failure(core.Invalid(
-			"the result is %d bytes, more than the %d a tool result may hold: narrow the read with the section argument (brief, steps, events or close) and the limit argument, then page with cursor",
-			len(body), maxResultBytes))
+			"the result is %d bytes, more than the %d a tool result may hold: %s",
+			len(body), maxResultBytes, narrowClause(tool)))
 	}
 	return text(string(body), false)
+}
+
+// narrowClause is the part of the #111 refusal that tells the model how to ask for less,
+// for the tool named tool. It names only the arguments that tool takes. A tool with no
+// argument that narrows its result gets the generic clause, which names none.
+func narrowClause(tool string) string {
+	switch tool {
+	case "task_get":
+		return "narrow the read with the section argument (brief, steps, events or close); for events, page with the limit and cursor arguments. A brief over the limit cannot be narrowed further, so its text must be shortened"
+	case "task_list":
+		return "narrow the list with the status argument, or page with the limit and cursor arguments"
+	case "learning_list":
+		return "narrow the list with the status, kind or target arguments, or page with the limit and cursor arguments"
+	case "search":
+		return "narrow the search with the kinds argument, or page with the limit and cursor arguments"
+	case "directive_list":
+		return "narrow the list with the agent argument"
+	case "recall":
+		return "ask for fewer items with the limit argument"
+	}
+	return "this tool takes no argument that narrows its result, so the stored text must be shortened"
 }
 
 // compact encodes v as one line of JSON, without the HTML escapes json.Marshal

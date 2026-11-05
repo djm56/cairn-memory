@@ -19,10 +19,26 @@ func (l longTask) TaskGet(context.Context, core.TaskGetRequest) (*core.TaskDetai
 	return &core.TaskDetail{Task: core.Task{ID: "task-20261030-01", Title: "Long", Goal: l.goal}}, nil
 }
 
+// longList is a Service whose TaskList and TaskCurrent return one entry of the given
+// text, for the refusal of a tool that is not task_get.
+type longList struct {
+	core.Unimplemented
+	text string
+}
+
+func (l longList) TaskList(context.Context, core.TaskListRequest) (*core.TaskList, error) {
+	return &core.TaskList{Tasks: []core.TaskSummary{{ID: "task-20261030-01", Title: l.text}}}, nil
+}
+
+func (l longList) TaskCurrent(context.Context) (*core.TaskCurrent, error) {
+	return &core.TaskCurrent{Task: &core.Task{ID: "task-20261030-01", Title: "Long", Goal: l.text}}, nil
+}
+
 // TestLongResultIsAToolErrorNamingTheArguments checks #111: a task read with no section
 // that would send more than maxResultBytes is a tool error, not the whole task. The
-// message names the section and limit arguments, so the model can narrow the read, and
-// the error itself is small. Removing the ceiling makes this test fail.
+// message names the section argument, and the limit and cursor arguments that page the
+// events, so the model can narrow the read; the error itself is small. Removing the
+// ceiling makes this test fail.
 func TestLongResultIsAToolErrorNamingTheArguments(t *testing.T) {
 	cs := connect(t, longTask{goal: strings.Repeat("a", 80<<10)}, acme)
 	text, isErr := call(t, cs, "task_get", map[string]any{"id": "task-20261030-01"})
@@ -30,13 +46,50 @@ func TestLongResultIsAToolErrorNamingTheArguments(t *testing.T) {
 	if got.Kind != "invalid" {
 		t.Fatalf("a long task read: kind %q, want invalid (%s)", got.Kind, text)
 	}
-	for _, want := range []string{"section", "limit"} {
+	for _, want := range []string{"section", "limit", "cursor"} {
 		if !strings.Contains(got.Message, want) {
 			t.Errorf("the message %q does not name the %s argument", got.Message, want)
 		}
 	}
 	if len(text) > 4<<10 {
 		t.Errorf("the tool error is %d bytes; the refusal should be small", len(text))
+	}
+}
+
+// TestLongListNamesOnlyTheArgumentsItTakes checks #111 for a tool other than task_get:
+// task_list takes status, limit and cursor, and not section, so its refusal must name
+// those and must not name section. Under the old shared message it did.
+func TestLongListNamesOnlyTheArgumentsItTakes(t *testing.T) {
+	cs := connect(t, longList{text: strings.Repeat("a", 80<<10)}, acme)
+	text, isErr := call(t, cs, "task_list", map[string]any{})
+	got := errorOf(t, text, isErr)
+	if got.Kind != "invalid" {
+		t.Fatalf("a long list: kind %q, want invalid (%s)", got.Kind, text)
+	}
+	for _, want := range []string{"status", "limit", "cursor"} {
+		if !strings.Contains(got.Message, want) {
+			t.Errorf("the message %q does not name the %s argument", got.Message, want)
+		}
+	}
+	if strings.Contains(got.Message, "section") {
+		t.Errorf("the message %q names the section argument, which task_list does not take", got.Message)
+	}
+}
+
+// TestLongResultOfToolWithNoNarrowingArgument checks #111 for a tool with no argument
+// that narrows its result: task_current takes only agent. Its refusal is the generic
+// clause, which names no argument at all.
+func TestLongResultOfToolWithNoNarrowingArgument(t *testing.T) {
+	cs := connect(t, longList{text: strings.Repeat("a", 80<<10)}, acme)
+	text, isErr := call(t, cs, "task_current", map[string]any{})
+	got := errorOf(t, text, isErr)
+	if got.Kind != "invalid" {
+		t.Fatalf("a long current task: kind %q, want invalid (%s)", got.Kind, text)
+	}
+	for _, not := range []string{"section", "limit", "cursor", "status"} {
+		if strings.Contains(got.Message, not) {
+			t.Errorf("the message %q names the %s argument, which task_current does not take", got.Message, not)
+		}
 	}
 }
 

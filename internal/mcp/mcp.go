@@ -123,7 +123,7 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 		if err != nil {
 			return failure(withAgentArgument(err, write, caller.Agent)), nil
 		}
-		return answer(out), nil
+		return answer(out, name), nil
 	})
 }
 
