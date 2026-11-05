@@ -95,6 +95,16 @@ func routePaths(u *ui) []routePath {
 	return out
 }
 
+// hasRoute reports whether paths holds path, registered for method.
+func hasRoute(paths []routePath, path, method string) bool {
+	for _, rp := range paths {
+		if rp.path == path && rp.methods[method] {
+			return true
+		}
+	}
+	return false
+}
+
 // TestRouteTableAnswers405ToEveryDisallowedMethod checks the mux's own 405 on every route of the
 // table. For each path, each method the table does not register for it is refused with 405, and
 // the Allow header names exactly the methods that are registered, with HEAD where GET is. The
@@ -104,7 +114,17 @@ func TestRouteTableAnswers405ToEveryDisallowedMethod(t *testing.T) {
 	candidates := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch}
 	for _, hsts := range []bool{false, true} {
 		hr := newHarness(t, true, hsts)
-		for _, rp := range routePaths(hr.u) {
+		// The loop below checks what the table holds, so an empty table would pass it. The table
+		// must hold routes, and a known one: POST on pathDecide, with {id} filled as routePaths
+		// fills it.
+		paths := routePaths(hr.u)
+		if len(paths) == 0 {
+			t.Fatal("the route table is empty, so no 405 is checked")
+		}
+		if !hasRoute(paths, "/ui/learnings/x/decide", http.MethodPost) {
+			t.Fatal("the route table has no POST on /ui/learnings/x/decide (pathDecide)")
+		}
+		for _, rp := range paths {
 			allowed := map[string]bool{}
 			for m := range rp.methods {
 				allowed[m] = true
