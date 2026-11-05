@@ -546,10 +546,18 @@ nothing changed unless the step says otherwise:
    are the bytes restored. A refused copy is removed with any `-wal` or `-shm`
    beside it, after the copy is closed.
 3. If the database exists, it is first checked with a read-only open. A file that
-   cannot be read as SQLite is not opened for writing at all: it takes no lock,
-   and it is moved as it is at step 5. Nothing can check for a server on such a
-   file, so the output says the lock could not be checked and that `cairn serve`
-   must be stopped, and the operator confirms that. A readable database must not be
+   cannot be read as SQLite is not opened for writing at all, and takes no lock.
+   Its SQLite lock bytes are read instead, with a read-only `F_GETLK` probe
+   (`internal/server/inuse_unix.go`), which changes nothing and takes no lock. A
+   lock held by another process refuses the restore, with nothing moved. When the
+   probe finds none, the output says it cannot see every holder: an idle connection
+   in rollback-journal mode holds no lock. Where the probe cannot run, the output
+   says the lock could not be checked. The probe runs again just before the first
+   move. It is built for Linux, macOS, FreeBSD and OpenBSD. Its tests run on Linux,
+   the CI runner, and on macOS, which CI does not run; FreeBSD and OpenBSD are built
+   and vetted, not run. On any other system the lock cannot be checked. The file is
+   moved as it is at step 5, and the operator confirms that `cairn serve` is
+   stopped. A readable database must not be
    in use. An exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
    or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
    do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is
