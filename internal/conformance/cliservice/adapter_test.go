@@ -29,6 +29,12 @@
 //     means the default and not a reference, a learning list over all projects, a lone "-" as a text value
 //     (the CLI reads it as standard input), and a nil step list in step plan. The adapter refuses each of
 //     these rather than sending a different request. A step named by id is sent as --after-id, --step-id.
+//
+// Three of the deferred cases are permanent properties of a CLI, not gaps to close, and they stay deferred for
+// as long as the CLI is a CLI: identity/client_name_refused and identity/session_name_refused, since the CLI
+// names itself cairn-cli and sends no session, and identity/viewer_first_read_is_not_found, since the CLI calls
+// only as an agent and carries no viewer role. The other deferrals are gaps or documented choices, and each
+// names its own in the deferral list.
 package cliservice
 
 import (
