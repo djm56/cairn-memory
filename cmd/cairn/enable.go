@@ -256,9 +256,9 @@ func replaceWrite(p planned, backup string) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, errChanged) && backup != "":
-		return fmt.Errorf("%s %v: nothing was replaced, and the original is kept at %s; run cairn enable again", p.path, err, backup)
+		return fmt.Errorf("%s %v: this file was not replaced, and the original is kept at %s; run cairn enable again", p.path, err, backup)
 	case errors.Is(err, errChanged):
-		return fmt.Errorf("%s %v: nothing was replaced; run cairn enable again", p.path, err)
+		return fmt.Errorf("%s %v: this file was not replaced; run cairn enable again", p.path, err)
 	}
 	return fmt.Errorf("write %s: %v; the file was not replaced", p.path, err)
 }
@@ -266,7 +266,8 @@ func replaceWrite(p planned, backup string) error {
 // enableWrites does what enable does for a set of files, in the order given. It plans every file first, so a refusal
 // stops the run with nothing written. When no file changed it reports that. A dry run reports what would change and writes
 // nothing. Otherwise it backs up each changed file that exists, then replaces each changed file, and reports only once
-// every write has worked, so stdout is empty when a write is refused. report builds the lines printed on every path that
+// every write has worked, so stdout is empty when a write is refused. A write that fails after an earlier one has worked
+// names each file already written, with its original, on stderr. report builds the lines printed on every path that
 // reports; it is called after the planning, so it can use what the merges found.
 func enableWrites(files []fileWrite, project string, dryRun bool, report func() string, stdout, stderr io.Writer) int {
 	plans := make([]planned, 0, len(files))
@@ -310,11 +311,23 @@ func enableWrites(files []fileWrite, project string, dryRun bool, report func() 
 		}
 		backups[p.path] = backup
 	}
+	var written []planned
 	for _, p := range changed {
 		if err := replaceWrite(p, backups[p.path]); err != nil {
 			fmt.Fprintf(stderr, "cairn enable: %v\n", err)
+			// An earlier file of the run is already in its new state, and nothing undoes it. Each is named, with its
+			// original, so the person knows what is there now. A run again finishes the rest: an earlier file that is
+			// already in place is reported as already present.
+			for _, done := range written {
+				if backup := backups[done.path]; backup != "" {
+					fmt.Fprintf(stderr, "cairn enable: already written, and not undone: %s; its original is at %s\n", done.path, backup)
+				} else {
+					fmt.Fprintf(stderr, "cairn enable: already written, and not undone: %s; it did not exist before\n", done.path)
+				}
+			}
 			return 1
 		}
+		written = append(written, p)
 	}
 	fmt.Fprint(stdout, report())
 	for _, p := range changed {

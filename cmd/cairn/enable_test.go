@@ -786,7 +786,7 @@ func TestEnableRefusesAFileThatChangesWhileItIsWritten(t *testing.T) {
 	})
 
 	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
-	if code != 1 || !strings.Contains(stderr, "changed after enable read it") || !strings.Contains(stderr, "nothing was replaced") {
+	if code != 1 || !strings.Contains(stderr, "changed after enable read it") || !strings.Contains(stderr, "this file was not replaced") {
 		t.Errorf("exit %d, stderr %q: want 1 and the refusal named", code, stderr)
 	}
 	if stdout != "" {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -314,6 +315,78 @@ func TestPiRefusesWhenNoCacheDirectoryIsKnown(t *testing.T) {
 	if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml", "AGENTS.md"}) {
 		t.Errorf("the project holds %v, want AGENTS.md and the project file alone", got)
 	}
+}
+
+// TestPiFailureOnTheSecondFileNamesTheFirst checks a run that fails on its second write. The project file is written first,
+// so it is in place when AGENTS.md is refused. stderr names the project file as written, with its original, and says
+// AGENTS.md was not replaced, with its backup. Both ways the second write can fail are run: the file changes after it is
+// read, and the rename fails.
+func TestPiFailureOnTheSecondFileNamesTheFirst(t *testing.T) {
+	t.Run("the AGENTS.md changes after it is read", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, piConfigFile(dir), piExisting)
+		writeSettings(t, piAgentsFile(dir), piNotes)
+		other := "# Other\n"
+		calls := 0
+		onBeforeRename(t, func() {
+			calls++
+			if calls == 2 {
+				if err := os.WriteFile(piAgentsFile(dir), []byte(other), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+		if code != 1 || stdout != "" {
+			t.Errorf("exit %d, stdout %q: want 1 and nothing on stdout", code, stdout)
+		}
+		for _, want := range []string{
+			piAgentsFile(dir) + " it changed after enable read it: this file was not replaced, and the original is kept at " + piBackupOf(t, "AGENTS.md"),
+			"already written, and not undone: " + piConfigFile(dir) + "; its original is at " + piBackupOf(t, "mcp.json"),
+		} {
+			if !strings.Contains(stderr, want) {
+				t.Errorf("stderr lacks %q:\n%s", want, stderr)
+			}
+		}
+		if strings.Contains(stderr, "nothing was replaced") {
+			t.Errorf("stderr says nothing was replaced, which is false here:\n%s", stderr)
+		}
+		if string(readBytes(t, piAgentsFile(dir))) != other {
+			t.Errorf("AGENTS.md was replaced:\n%s", readBytes(t, piAgentsFile(dir)))
+		}
+	})
+	t.Run("the rename fails", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, piConfigFile(dir), piExisting)
+		writeSettings(t, piAgentsFile(dir), piNotes)
+		calls := 0
+		prev := renameFile
+		renameFile = func(from, to string) error {
+			calls++
+			if calls == 2 {
+				return errors.New("injected rename failure")
+			}
+			return os.Rename(from, to)
+		}
+		t.Cleanup(func() { renameFile = prev })
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+		if code != 1 || stdout != "" {
+			t.Errorf("exit %d, stdout %q: want 1 and nothing on stdout", code, stdout)
+		}
+		for _, want := range []string{
+			"write " + piAgentsFile(dir) + ": injected rename failure; the file was not replaced",
+			"already written, and not undone: " + piConfigFile(dir) + "; its original is at " + piBackupOf(t, "mcp.json"),
+		} {
+			if !strings.Contains(stderr, want) {
+				t.Errorf("stderr lacks %q:\n%s", want, stderr)
+			}
+		}
+		if string(readBytes(t, piAgentsFile(dir))) != piNotes {
+			t.Errorf("AGENTS.md changed:\n%s", readBytes(t, piAgentsFile(dir)))
+		}
+	})
 }
 
 // TestAgentsBlockStates checks how the block's markers are read: none, one whole block, or a block that is broken.
