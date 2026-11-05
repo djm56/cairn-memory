@@ -647,7 +647,6 @@ func TestEnableUsageErrors(t *testing.T) {
 		want string
 	}{
 		{"no agent", []string{"enable"}, "needs --agent"},
-		{"pi is not built yet", []string{"enable", "--agent", "pi"}, "not built yet"},
 		{"an unknown agent", []string{"enable", "--agent", "nope"}, "unknown agent"},
 		{"an argument after the flags", []string{"enable", "--agent", "claude-code", "extra"}, "takes flags only"},
 		{"an unknown flag", []string{"enable", "--agent", "claude-code", "--nope"}, "run cairn enable --help"},

@@ -124,10 +124,7 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 	case "":
 		fmt.Fprintln(stderr, "cairn enable: needs --agent <name>: use --agent claude-code, opencode or pi")
 		return 2
-	case "claude-code", "opencode":
-	case "pi":
-		fmt.Fprintf(stderr, "cairn enable: --agent %s is not built yet: use --agent claude-code\n", *agent)
-		return 2
+	case "claude-code", "opencode", "pi":
 	default:
 		fmt.Fprintf(stderr, "cairn enable: unknown agent %q: use --agent claude-code, opencode or pi\n", *agent)
 		return 2
@@ -148,8 +145,11 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "cairn enable: CAIRN_PROJECT names the project, but the project directory is found from its .cairn.toml, and there is none: run cairn enable from the project, or unset CAIRN_PROJECT")
 		return 1
 	}
-	if *agent == "opencode" {
+	switch *agent {
+	case "opencode":
 		return enableOpenCode(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
+	case "pi":
+		return enablePi(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
 	}
 	return enableClaudeCode(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
 }
@@ -164,7 +164,10 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Before it writes an existing file, it copies the original to cairn/backups/<project> in the user's cache directory (~/Library/Caches on macOS, ~/.cache on Linux), outside the project, and prints the path.")
 	fmt.Fprintln(w, "The backup is not kept for good: nothing prunes it, and a cleaner may clear the cache directory. Keep a copy of a backup you need.")
 	fmt.Fprintln(w, "A file that is not valid JSON is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
-	fmt.Fprintln(w, "Agents: claude-code. opencode and pi are not built yet.")
+	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL, and every line they print says so.")
+	fmt.Fprintln(w, "opencode: adds the cairn MCP server to opencode.json under mcp, lists .cairn/instructions.md in its instructions, and writes that file with the task loop. A JSON file with comments is refused.")
+	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers. Text outside the markers is never changed.")
+	fmt.Fprintln(w, "The OpenCode instruction file is refused when it holds other content. pi reads .pi/mcp.json only after the project is trusted.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
 }

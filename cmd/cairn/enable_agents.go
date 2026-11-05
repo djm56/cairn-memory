@@ -119,6 +119,107 @@ func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) in
 	return enableWrites([]fileWrite{file, config}, name, dryRun, report, stdout, stderr)
 }
 
+// The names enable writes for pi. pi reads .pi/mcp.json only after the project is trusted, and reads AGENTS.md without trust.
+const (
+	piConfig     = ".pi/mcp.json"
+	piAgents     = "AGENTS.md"
+	piToolPrefix = "mcp__cairn__"
+	piBegin      = "<!-- cairn:begin"
+	piEnd        = "<!-- cairn:end -->"
+)
+
+// piEntry is the mcpServers entry enable writes for cairn. exposure "direct" declares the tools to the model, as pi's docs
+// give it; the default, codemode, would leave them out of the model's view.
+func piEntry() map[string]any {
+	return map[string]any{"command": "cairn", "args": []string{"mcp"}, "exposure": "direct"}
+}
+
+// piBlock is the block enable writes into AGENTS.md: a start marker that says how it came to be there, the task loop with
+// the pi prefix, and the end marker. Only the text between the markers is enable's.
+func piBlock() string {
+	return piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\n" + instructionsFor(piToolPrefix) + piEnd + "\n"
+}
+
+// agentsBlock says what state the cairn block of AGENTS.md is in: "absent" when there is no marker, "whole" when there is
+// one start marker, then one end marker, and "broken" for anything else: a marker without its partner, a doubled marker,
+// or an end before its start.
+func agentsBlock(text string) string {
+	begins, ends := strings.Count(text, piBegin), strings.Count(text, piEnd)
+	switch {
+	case begins == 0 && ends == 0:
+		return "absent"
+	case begins == 1 && ends == 1 && strings.Index(text, piBegin) < strings.Index(text, piEnd):
+		return "whole"
+	}
+	return "broken"
+}
+
+// enablePi sets up pi for the project at root, EXPERIMENTAL. It adds the cairn server to .pi/mcp.json under mcpServers, with
+// exposure "direct", and writes the task loop into AGENTS.md between the two markers. Each file is merged as the others are:
+// what is there stays, a cairn server that differs is reported and left, text outside the markers is never rewritten, and a
+// block that is already whole is left as it is.
+func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
+	var serverState, blockState string
+	config := fileWrite{
+		path: filepath.Join(root, filepath.FromSlash(piConfig)),
+		merge: func(raw []byte, exists bool) ([]byte, bool, error) {
+			doc, err := jsonObject(raw, exists)
+			if err != nil {
+				return nil, false, err
+			}
+			servers, err := member(doc, "mcpServers")
+			if err != nil {
+				return nil, false, err
+			}
+			if have, ok := servers["cairn"]; ok {
+				serverState = "differs, left as is"
+				if jsonEqual(have, piEntry()) {
+					serverState = "already present"
+				}
+				return nil, false, nil
+			}
+			entry, err := marshalRaw(piEntry())
+			if err != nil {
+				return nil, false, err
+			}
+			servers["cairn"] = entry
+			if doc["mcpServers"], err = marshalRaw(servers); err != nil {
+				return nil, false, err
+			}
+			serverState = "added"
+			content, err := encodeSettings(doc)
+			return content, err == nil, err
+		},
+	}
+	agents := fileWrite{
+		path: filepath.Join(root, piAgents),
+		merge: func(raw []byte, exists bool) ([]byte, bool, error) {
+			text := string(raw)
+			switch agentsBlock(text) {
+			case "whole":
+				blockState = "already present"
+				return nil, false, nil
+			case "absent":
+				// The block goes at the end, after a blank line when the file has text. What is above it is kept as it is.
+				blockState = "added"
+				if text != "" && !strings.HasSuffix(text, "\n") {
+					text += "\n"
+				}
+				if text != "" {
+					text += "\n"
+				}
+				return []byte(text + piBlock()), true, nil
+			}
+			return nil, false, errors.New("has a cairn block that is not whole: a start or end marker is missing, doubled, or in the wrong order")
+		},
+	}
+	report := func() string {
+		return reportLine("mcp", serverState, piConfig+" mcpServers.cairn") +
+			reportLine("instructions", blockState, piAgents+" block")
+	}
+	return enableWrites([]fileWrite{config, agents}, name, dryRun, report, stdout, stderr)
+}
+
 // jsonObject decodes raw as the top-level object of a JSON file, keeping each member as its raw JSON. A file that is not
 // there is an empty object. JSON with comments is not valid JSON here, so it is refused. The errors complete the sentence
 // "<path> ...".
