@@ -97,11 +97,19 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	fl, asJSON := newFlags("cairn task get")
 	section := fl.String("section", "", "one part of the task: brief, steps, events or close; empty for all")
-	limit := fl.Int("limit", 0, "events only: the page size, 20 by default, 100 at most")
+	limit := fl.Int("limit", 0, "events only: the page size: 20 by default, 100 at most; leave it out for the default")
 	cursor := fl.String("cursor", "", "events only: the next value from the last page")
+	step := fl.Int("step", 0, "events only: the events of one step, by its number as the steps list shows it")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
+	}
+	if limitUsage(fl, "cairn task get", *limit, stderr) {
+		return 2
+	}
+	if given(fl, "step") && *step < 1 {
+		fmt.Fprintln(stderr, "cairn task get: --step must be a step number, 1 or more; leave it out for every step")
+		return 2
 	}
 	if len(pos) != 1 {
 		fmt.Fprintln(stderr, "cairn task get: name one task id: cairn task get <id>")
@@ -111,9 +119,12 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, "cairn task get", err)
 	}
-	d, err := s.Svc.TaskGet(s.Ctx, core.TaskGetRequest{
-		ID: pos[0], Section: core.TaskSection(*section), Limit: *limit, Cursor: *cursor,
-	})
+	req := core.TaskGetRequest{ID: pos[0], Section: core.TaskSection(*section), Limit: *limit, Cursor: *cursor}
+	if given(fl, "step") {
+		ref := core.NumberRef(*step)
+		req.Step = &ref
+	}
+	d, err := s.Svc.TaskGet(s.Ctx, req)
 	if err != nil {
 		return fail(stderr, "cairn task get", err)
 	}
@@ -129,12 +140,15 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 func taskList(open Opener, args []string, stdout, stderr io.Writer) int {
 	fl, asJSON := newFlags("cairn task list")
 	var statuses statusFlag
-	fl.Var(&statuses, "status", "a status to list: open, active, blocked, done, failed or abandoned; repeat for more; empty lists all")
-	limit := fl.Int("limit", 0, "the page size, 20 by default, 100 at most")
+	fl.Var(&statuses, "status", "a status to list: open, active, blocked, done, failed or abandoned; repeat for more; leave it out to list all")
+	limit := fl.Int("limit", 0, "the page size: 20 by default, 100 at most; leave it out for the default")
 	cursor := fl.String("cursor", "", "the next value from the last page")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
+	}
+	if limitUsage(fl, "cairn task list", *limit, stderr) {
+		return 2
 	}
 	if len(pos) > 0 {
 		fmt.Fprintf(stderr, "cairn task list: takes no task id, got %q\n", pos)
@@ -165,27 +179,51 @@ func newFlags(name string) (*flag.FlagSet, *bool) {
 }
 
 // parse reads the flags of fl from args, in any order with the positional arguments, and
-// returns the positional arguments. done is true when the command should stop now: the
-// flags were asked for with -h (code 0, their list on stdout) or one was wrong (code 2,
-// with the cause on stderr).
+// returns the positional arguments. Everything after a "--" is positional, as the flag package
+// reads it, so a task id or a text that begins with a dash can be given after one. The tokens
+// are sorted here, into flags with their values and positionals, and the flags are parsed once.
+// done is true when the command should stop now: the flags were asked for with -h (code 0, their
+// list on stdout) or one was wrong (code 2, with the cause on stderr).
 func parse(fl *flag.FlagSet, args []string, stdout, stderr io.Writer) (pos []string, code int, done bool) {
-	for {
-		if err := fl.Parse(args); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				fl.SetOutput(stdout)
-				fl.PrintDefaults()
-				return nil, 0, true
-			}
-			fmt.Fprintf(stderr, "%s: %v; run %s -h for the flags\n", fl.Name(), err, fl.Name())
-			return nil, 2, true
+	var flagArgs []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			pos = append(pos, args[i+1:]...)
+			break
 		}
-		args = fl.Args()
-		if len(args) == 0 {
-			return pos, 0, false
+		if len(a) < 2 || a[0] != '-' {
+			pos = append(pos, a)
+			continue
 		}
-		pos = append(pos, args[0])
-		args = args[1:]
+		flagArgs = append(flagArgs, a)
+		if !strings.Contains(a, "=") && takesValue(fl, a) && i+1 < len(args) {
+			i++
+			flagArgs = append(flagArgs, args[i])
+		}
 	}
+	if err := fl.Parse(flagArgs); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fl.SetOutput(stdout)
+			fl.PrintDefaults()
+			return nil, 0, true
+		}
+		fmt.Fprintf(stderr, "%s: %v; run %s -h for the flags\n", fl.Name(), err, fl.Name())
+		return nil, 2, true
+	}
+	return pos, 0, false
+}
+
+// takesValue reports whether the flag a, written without an "=", takes the next argument as its
+// value. It mirrors the flag package, which reads that argument whatever it looks like, so a
+// value may itself begin with a dash. A name the set does not have takes none; Parse refuses it.
+func takesValue(fl *flag.FlagSet, a string) bool {
+	f := fl.Lookup(strings.TrimLeft(a, "-"))
+	if f == nil {
+		return false
+	}
+	bf, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return !(ok && bf.IsBoolFlag())
 }
 
 // fail prints the reason of err on one line to stderr, prefixed with the command, and
@@ -243,6 +281,29 @@ func needsEscape(r rune) bool {
 	return false
 }
 
+// given reports whether the flag called name was set on the command line. A flag left out is
+// not given, even when its value is the default.
+func given(fl *flag.FlagSet, name string) bool {
+	set := false
+	fl.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
+}
+
+// limitUsage prints the usage error for a --limit that was given as less than 1, and reports
+// whether it did. An explicit 0 is refused rather than read as the default: the default is
+// to leave the flag out.
+func limitUsage(fl *flag.FlagSet, command string, limit int, stderr io.Writer) bool {
+	if !given(fl, "limit") || limit >= 1 {
+		return false
+	}
+	fmt.Fprintf(stderr, "%s: --limit must be 1 or more; leave it out for the default\n", command)
+	return true
+}
+
 // statusFlag collects a repeatable --status flag into a list of task statuses.
 type statusFlag []core.TaskStatus
 
@@ -256,8 +317,12 @@ func (s *statusFlag) String() string {
 }
 
 // Set adds one status. Whether it is a real status is the server's to say, so the value
-// is passed on as it is written.
+// is passed on as it is written. An empty value is refused here: leaving the flag out is how
+// a person lists every status, and an empty status would only be refused by the server.
 func (s *statusFlag) Set(v string) error {
+	if strings.TrimSpace(v) == "" {
+		return errors.New("a status must be named; leave --status out to list all")
+	}
 	*s = append(*s, core.TaskStatus(v))
 	return nil
 }

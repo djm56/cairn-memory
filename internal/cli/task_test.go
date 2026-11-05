@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
@@ -461,6 +462,174 @@ func TestTaskJSONEscapesTerminalCharacters(t *testing.T) {
 func hex4(r rune) string {
 	const digits = "0123456789abcdef"
 	return string([]byte{digits[r>>12&0xf], digits[r>>8&0xf], digits[r>>4&0xf], digits[r&0xf]})
+}
+
+// TestTaskDoubleDashMakesEverythingPositional checks that after "--" a flag is a positional: the
+// --json after the terminator is read as the task id, not as the flag, so the output is the
+// human form.
+func TestTaskDoubleDashMakesEverythingPositional(t *testing.T) {
+	svc := &fakeTasks{detail: &core.TaskDetail{Task: activeTask()}}
+	code, out, errOut := runTask(t, svc, "get", "--", "--json")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0 and nothing on stderr", code, errOut)
+	}
+	if svc.gotGet.ID != "--json" {
+		t.Errorf("the id read was %q, want --json", svc.gotGet.ID)
+	}
+	if strings.HasPrefix(out, "{") {
+		t.Errorf("the --json after -- was read as the flag: %q", out)
+	}
+}
+
+// TestTaskDoubleDashCountsPositionals checks that the arguments after "--" count as positionals,
+// so two of them are a usage error whatever they look like, and nothing is called.
+func TestTaskDoubleDashCountsPositionals(t *testing.T) {
+	svc := &fakeTasks{}
+	if code, _, errOut := runTask(t, svc, "get", "--", "-x", "--json"); code != 2 || !strings.Contains(errOut, "name one task id") || svc.calls != 0 {
+		t.Errorf("get with two ids: exit %d, stderr %q, calls %d; want a usage error and no call", code, errOut, svc.calls)
+	}
+	if code, _, errOut := runTask(t, svc, "list", "--", "-x"); code != 2 || !strings.Contains(errOut, `takes no task id, got ["-x"]`) || svc.calls != 0 {
+		t.Errorf("list with an id: exit %d, stderr %q, calls %d; want a usage error and no call", code, errOut, svc.calls)
+	}
+}
+
+// TestTaskFlagsBeforeDoubleDash checks that a flag before "--" is still read, and that a flag's
+// value may begin with a dash, as the flag package reads it.
+func TestTaskFlagsBeforeDoubleDash(t *testing.T) {
+	svc := &fakeTasks{detail: &core.TaskDetail{Task: activeTask()}}
+	code, out, errOut := runTask(t, svc, "get", "--json", "--", "task-20261030-01")
+	if code != 0 || errOut != "" || !oneLine(out) || svc.gotGet.ID != "task-20261030-01" {
+		t.Errorf("exit %d, stderr %q, id %q, output %q; want the json of the named task", code, errOut, svc.gotGet.ID, out)
+	}
+	list := &fakeTasks{list: &core.TaskList{}}
+	if code, _, errOut := runTask(t, list, "list", "--cursor", "-c1"); code != 0 || list.gotList.Cursor != "-c1" {
+		t.Errorf("exit %d, stderr %q, cursor %q; want the cursor -c1", code, errOut, list.gotList.Cursor)
+	}
+}
+
+// TestTaskLimitBelowOneIsAUsageError checks that an explicit --limit below 1 is a usage error in
+// each verb that pages, with no call: the default is to leave the flag out, so 0 is not it.
+func TestTaskLimitBelowOneIsAUsageError(t *testing.T) {
+	svc := &fakeTasks{list: &core.TaskList{}, detail: &core.TaskDetail{Task: activeTask()}}
+	for _, args := range [][]string{
+		{"list", "--limit", "0"},
+		{"list", "--limit", "-3"},
+		{"get", "task-20261030-01", "--limit", "0"},
+	} {
+		code, _, errOut := runTask(t, svc, args...)
+		if code != 2 || !strings.Contains(errOut, "--limit must be 1 or more") {
+			t.Errorf("%v: exit %d, stderr %q; want a usage error", args, code, errOut)
+		}
+	}
+	if svc.calls != 0 {
+		t.Errorf("the usage errors made %d calls", svc.calls)
+	}
+}
+
+// TestTaskStatusNeedsAName checks that an empty --status is a usage error and makes no call, so
+// an empty status is never sent to the server. Leaving the flag out is how a person lists all.
+func TestTaskStatusNeedsAName(t *testing.T) {
+	svc := &fakeTasks{list: &core.TaskList{}}
+	code, _, errOut := runTask(t, svc, "list", "--status", "")
+	if code != 2 || !strings.Contains(errOut, "a status must be named") || svc.calls != 0 {
+		t.Errorf("exit %d, stderr %q, calls %d; want a usage error and no call", code, errOut, svc.calls)
+	}
+}
+
+// TestTaskListHelpSaysHowToListAll checks that the help of --status says to leave it out to list
+// every status, and that the help of --limit says 0 is not the default.
+func TestTaskListHelpSaysHowToListAll(t *testing.T) {
+	svc := &fakeTasks{}
+	_, out, _ := runTask(t, svc, "list", "-h")
+	for _, want := range []string{"leave it out to list all", "leave it out for the default"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestTaskGetStepFilter checks that --step n sends the step as a number ref, the form the MCP
+// tool takes, and that no ref is sent without the flag. A step below 1 is a usage error, with no
+// call, since number 0 names no step outside step_add.
+func TestTaskGetStepFilter(t *testing.T) {
+	svc := &fakeTasks{detail: &core.TaskDetail{Task: activeTask()}}
+	if code, _, errOut := runTask(t, svc, "get", "task-20261030-01", "--section", "events", "--step", "2"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut)
+	}
+	if ref := svc.gotGet.Step; ref == nil || ref.Number == nil || *ref.Number != 2 || ref.ID != nil {
+		t.Errorf("the step ref was %+v, want number 2", ref)
+	}
+	plain := &fakeTasks{detail: &core.TaskDetail{Task: activeTask()}}
+	if code, _, errOut := runTask(t, plain, "get", "task-20261030-01"); code != 0 || plain.gotGet.Step != nil {
+		t.Errorf("exit %d, stderr %q, step ref %+v; want no ref without --step", code, errOut, plain.gotGet.Step)
+	}
+	refused := &fakeTasks{}
+	if code, _, errOut := runTask(t, refused, "get", "task-20261030-01", "--step", "0"); code != 2 || !strings.Contains(errOut, "--step must be a step number") || refused.calls != 0 {
+		t.Errorf("--step 0: exit %d, stderr %q, calls %d; want a usage error and no call", code, errOut, refused.calls)
+	}
+}
+
+// TestTaskServerErrorIsCappedToOneLine checks the error path of a message the server wrote: it
+// is one line of at most 200 runes, ending in an ellipsis, with no escape sequence in it.
+func TestTaskServerErrorIsCappedToOneLine(t *testing.T) {
+	msg := "first line\nsecond \x1b[31mline " + strings.Repeat("x", 300)
+	svc := &fakeTasks{err: &client.ServerError{Err: core.Invalid("%s", msg)}}
+	code, out, errOut := runTask(t, svc, "list")
+	if code != 1 || out != "" || !oneLine(errOut) {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 1, nothing on stdout and one line on stderr", code, out, errOut)
+	}
+	reason := strings.TrimPrefix(errOut, "cairn task list: ")
+	if n := len([]rune(strings.TrimSuffix(reason, "\n"))); n != MaxLineRunes {
+		t.Errorf("the reason is %d runes, want %d", n, MaxLineRunes)
+	}
+	if !strings.HasSuffix(errOut, "…\n") || strings.Contains(errOut, "\x1b") {
+		t.Errorf("stderr %q should end in an ellipsis and hold no escape sequence", errOut)
+	}
+}
+
+// TestTaskLocalErrorIsNotCut checks that an error the client or a local resolver built is printed
+// whole, as cli.Reason gives it, since it names a path or a fix and a cut would hide it.
+func TestTaskLocalErrorIsNotCut(t *testing.T) {
+	long := strings.Repeat("y", 300)
+	svc := &fakeTasks{err: core.Invalid("%s", long)}
+	code, _, errOut := runTask(t, svc, "list")
+	if code != 1 || errOut != "cairn task list: "+long+"\n" {
+		t.Errorf("exit %d, stderr of %d bytes; want the whole message", code, len(errOut))
+	}
+}
+
+// TestCurrentStepFallsBack checks which step the summary names: the active one, else the first
+// pending one, else none. A step that is done or skipped is never named.
+func TestCurrentStepFallsBack(t *testing.T) {
+	steps := []core.Step{
+		{Number: 1, Status: core.StepDone},
+		{Number: 2, Status: core.StepPending},
+		{Number: 3, Status: core.StepPending},
+	}
+	if s := currentStep(steps); s == nil || s.Number != 2 {
+		t.Errorf("with no active step, the current step is %+v, want the first pending one, 2", s)
+	}
+	steps[2].Status = core.StepActive
+	if s := currentStep(steps); s == nil || s.Number != 3 {
+		t.Errorf("with an active step, the current step is %+v, want the active one, 3", s)
+	}
+	if s := currentStep([]core.Step{{Number: 1, Status: core.StepDone}, {Number: 2, Status: core.StepSkipped}}); s != nil {
+		t.Errorf("with only done and skipped steps, the current step is %+v, want none", s)
+	}
+	if s := currentStep(nil); s != nil {
+		t.Errorf("with no steps, the current step is %+v, want none", s)
+	}
+}
+
+// TestTaskCurrentOmitsTheStepLineWhenNoStepIsOpen checks that the summary prints no step line
+// when no step is active or pending, so it does not name a step that is finished.
+func TestTaskCurrentOmitsTheStepLineWhenNoStepIsOpen(t *testing.T) {
+	task := activeTask()
+	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: []core.Step{{Number: 1, Title: "Write test", Status: core.StepDone}}}}
+	_, out, _ := runTask(t, svc, "current")
+	if strings.Contains(out, "step        ") {
+		t.Errorf("the output names a step though none is open:\n%s", out)
+	}
 }
 
 // TestTaskHelpPrintsItsFlags checks that -h prints the flags of the verb to stdout and exits 0.
