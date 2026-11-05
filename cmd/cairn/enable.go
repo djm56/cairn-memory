@@ -166,7 +166,7 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "A file that is not valid JSON is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
 	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL, and every line they print says so.")
 	fmt.Fprintln(w, "opencode: adds the cairn MCP server to opencode.json under mcp, lists .cairn/instructions.md in its instructions, and writes that file with the task loop. A JSON file with comments is refused.")
-	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers. Text outside the markers is never changed.")
+	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers. Text outside the markers is never changed, and a block cairn wrote earlier is updated to the current text.")
 	fmt.Fprintln(w, "The OpenCode instruction file is replaced only when it starts with cairn's marker line. One without the marker is someone's own, so it is left as it is, and opencode.json is still merged. pi reads .pi/mcp.json only after the project is trusted.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()

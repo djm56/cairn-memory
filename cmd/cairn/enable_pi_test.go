@@ -389,6 +389,44 @@ func TestPiFailureOnTheSecondFileNamesTheFirst(t *testing.T) {
 	})
 }
 
+// TestPiBlockNamesBothPrefixes checks the block names pi's tool prefix, and says the prefix OpenCode gives the same tools,
+// since OpenCode reads AGENTS.md too.
+func TestPiBlockNamesBothPrefixes(t *testing.T) {
+	block := piBlock()
+	for _, want := range []string{"mcp__cairn__task_current", "In OpenCode they start with cairn_", "put cairn_ where the steps say mcp__cairn__"} {
+		if !strings.Contains(block, want) {
+			t.Errorf("the block lacks %q:\n%s", want, block)
+		}
+	}
+}
+
+// TestPiUpdatesAnOlderCairnBlock checks a whole block that cairn wrote with older text: the block between its markers is
+// replaced by the current text, the text on either side is kept byte for byte, and the original is copied to the backup first.
+func TestPiUpdatesAnOlderCairnBlock(t *testing.T) {
+	dir := enableProject(t)
+	older := piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\nan older task loop\n" + piEnd + "\n"
+	original := piNotes + "\n" + older + "More notes after the block.\n"
+	writeSettings(t, piAgentsFile(dir), original)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct"}}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	want := piNotes + "\n" + strings.TrimSuffix(piBlock(), "\n") + "\nMore notes after the block.\n"
+	if got := string(readBytes(t, piAgentsFile(dir))); got != want {
+		t.Errorf("AGENTS.md is not the notes, the current block and the notes after it:\n%s", got)
+	}
+	backup := piBackupOf(t, "AGENTS.md")
+	if !bytes.Equal(readBytes(t, backup), []byte(original)) {
+		t.Errorf("the backup is not the original file:\n%s", readBytes(t, backup))
+	}
+	if !strings.Contains(stdout, reportLine("instructions", "updated", piAgents+" block")) || !strings.Contains(stdout, "backup "+backup+"\n") {
+		t.Errorf("stdout does not report the update and its backup:\n%s", stdout)
+	}
+	assertExperimental(t, "pi", stdout)
+}
+
 // TestAgentsBlockStates checks how the block's markers are read: none, one whole block, or a block that is broken.
 func TestAgentsBlockStates(t *testing.T) {
 	cases := []struct {

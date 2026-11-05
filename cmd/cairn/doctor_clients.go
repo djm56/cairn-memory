@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/djm56/cairn-memory/internal/identity"
 )
@@ -118,7 +119,7 @@ func piServerCheck(root string) check {
 	return check{name: "mcp", status: "warn", detail: "cairn is registered in " + cfg + " with other settings, which enable leaves as they are: edit the entry by hand"}
 }
 
-// piBlockCheck reports the cairn block in AGENTS.md: whole, absent, or broken.
+// piBlockCheck reports the cairn block in AGENTS.md: whole and current, whole with an older text, absent, or broken.
 func piBlockCheck(root string) check {
 	path := filepath.Join(root, piAgents)
 	raw, err := readCheckedFile(path)
@@ -128,8 +129,12 @@ func piBlockCheck(root string) check {
 	if err != nil {
 		return check{name: "instructions", status: "warn", detail: path + " " + err.Error()}
 	}
-	switch agentsBlock(string(raw)) {
+	text := string(raw)
+	switch agentsBlock(text) {
 	case "whole":
+		if agentsBlockText(text) != strings.TrimSuffix(piBlock(), "\n") {
+			return check{name: "instructions", status: "warn", detail: "the cairn block in " + path + " is an older text: run cairn enable --agent pi to update it"}
+		}
 		return check{name: "instructions", status: "ok", detail: "the cairn block is in " + path}
 	case "absent":
 		return check{name: "instructions", status: "warn", detail: "no cairn block in " + path + ": run cairn enable --agent pi"}

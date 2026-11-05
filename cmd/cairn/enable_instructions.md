@@ -1,6 +1,6 @@
 # Cairn
 
-This project keeps its task state in Cairn, through the Cairn tools. Their names start with {prefix}.
+This project keeps its task state in Cairn, through the Cairn tools. Their names start with {prefix}.{note}
 
 Work the task loop:
 

@@ -188,6 +188,24 @@ func TestDoctorPiFlagsWhatIsNotRight(t *testing.T) {
 	}
 }
 
+// TestDoctorPiWarnsOnAnOlderBlock checks an AGENTS.md whose cairn block is whole but holds older text: doctor warns and says
+// to run enable, and a block that is current is ok.
+func TestDoctorPiWarnsOnAnOlderBlock(t *testing.T) {
+	dir := agentProject(t)
+	older := piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\nan older task loop\n" + piEnd + "\n"
+	writeSettings(t, piAgentsFile(dir), older)
+	if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "warn" || !strings.Contains(c.detail, "is an older text") {
+		t.Errorf("instructions is %+v, want a warning about the older text", c)
+	}
+
+	if code, _, stderr := runCmd(t, "enable", "--agent", "pi"); code != 0 {
+		t.Fatalf("enable: exit %d, stderr %q", code, stderr)
+	}
+	if c := checkNamed(experimentalChecks("pi", dir), "instructions"); c == nil || c.status != "ok" {
+		t.Errorf("instructions is %+v, want ok after enable updated the block", c)
+	}
+}
+
 // TestDoctorExperimentalIsReadOnly checks that doctor for either client writes nothing: the tree of the project, and the
 // files in it, are the same after the command as before.
 func TestDoctorExperimentalIsReadOnly(t *testing.T) {

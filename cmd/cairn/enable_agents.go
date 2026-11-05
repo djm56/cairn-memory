@@ -14,7 +14,8 @@ import (
 )
 
 // instructionsTemplate is the task loop an experimental client is given. {prefix} stands where the client names cairn's
-// tools: OpenCode and pi each name an MCP server's tools in their own way, so instructionsFor fills it per client.
+// tools: OpenCode and pi each name an MCP server's tools in their own way, so instructionsFor fills it per client. {note}
+// is an optional sentence after the one that gives the prefix, empty for OpenCode's own file.
 //
 //go:embed enable_instructions.md
 var instructionsTemplate string
@@ -36,7 +37,13 @@ func openCodeEntry() map[string]any {
 
 // instructionsFor returns the task loop with the client's tool prefix where it names a tool.
 func instructionsFor(prefix string) string {
-	return strings.ReplaceAll(instructionsTemplate, "{prefix}", prefix)
+	return instructionsWith(prefix, "")
+}
+
+// instructionsWith returns the task loop with the client's tool prefix, and note after the sentence that gives the prefix.
+// The AGENTS.md block uses a note: OpenCode reads AGENTS.md too, and names its tools with another prefix.
+func instructionsWith(prefix, note string) string {
+	return strings.NewReplacer("{prefix}", prefix, "{note}", note).Replace(instructionsTemplate)
 }
 
 // instructionsMarker is the first line of the instruction file enable writes for OpenCode. It says the file is cairn's own
@@ -163,10 +170,14 @@ func piEntry() map[string]any {
 	return map[string]any{"command": "cairn", "args": []string{"mcp"}, "exposure": "direct"}
 }
 
+// piNote is the sentence the AGENTS.md block adds after the pi prefix. OpenCode reads AGENTS.md too, so the block also says
+// the prefix OpenCode gives the same tools.
+const piNote = " In OpenCode they start with cairn_, so there put cairn_ where the steps say mcp__cairn__."
+
 // piBlock is the block enable writes into AGENTS.md: a start marker that says how it came to be there, the task loop with
-// the pi prefix, and the end marker. Only the text between the markers is enable's.
+// the pi prefix and the note for OpenCode, and the end marker. Only the text between the markers is enable's.
 func piBlock() string {
-	return piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\n" + instructionsFor(piToolPrefix) + piEnd + "\n"
+	return piBegin + " (written by cairn enable --agent pi, EXPERIMENTAL; do not edit inside) -->\n" + instructionsWith(piToolPrefix, piNote) + piEnd + "\n"
 }
 
 // agentsBlock says what state the cairn block of AGENTS.md is in: "absent" when there is no marker, "whole" when there is
@@ -183,10 +194,19 @@ func agentsBlock(text string) string {
 	return "broken"
 }
 
+// agentsBlockText returns the cairn block of text, from its start marker through its end marker, without the line break
+// after the end marker. It is meaningful only when agentsBlock says "whole", and is then the same bytes piBlock gives,
+// without its last line break, when the block is current.
+func agentsBlockText(text string) string {
+	begin := strings.Index(text, piBegin)
+	return text[begin : strings.Index(text, piEnd)+len(piEnd)]
+}
+
 // enablePi sets up pi for the project at root, EXPERIMENTAL. It adds the cairn server to .pi/mcp.json under mcpServers, with
 // exposure "direct", and writes the task loop into AGENTS.md between the two markers. Each file is merged as the others are:
 // what is there stays, a cairn server that differs is reported and left, text outside the markers is never rewritten, and a
-// block that is already whole is left as it is.
+// whole block is left as it is when it is current. A whole block with an older cairn text between its markers is updated to
+// the current text, with a backup first.
 func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 	var serverState, blockState string
 	config := fileWrite{
@@ -226,8 +246,17 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 			text := string(raw)
 			switch agentsBlock(text) {
 			case "whole":
-				blockState = "already present"
-				return nil, false, nil
+				// A block that is cairn's own, between its markers, is updated when cairn's text has changed. Only those bytes are
+				// replaced: the text on either side of the markers is kept as it is.
+				current := strings.TrimSuffix(piBlock(), "\n")
+				if agentsBlockText(text) == current {
+					blockState = "already present"
+					return nil, false, nil
+				}
+				blockState = "updated"
+				start := strings.Index(text, piBegin)
+				end := start + len(agentsBlockText(text))
+				return []byte(text[:start] + current + text[end:]), true, nil
 			case "absent":
 				// The block goes at the end, after a blank line when the file has text. What is above it is kept as it is.
 				blockState = "added"
