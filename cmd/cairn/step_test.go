@@ -18,10 +18,34 @@ func TestStepIsWiredToItsVerbs(t *testing.T) {
 	}
 }
 
-// TestHelpListsTheWriteCommands checks that help names the step command beside task.
+// TestHelpListsTheWriteCommands checks that help names every verb of the task, step and event
+// commands, in the line of its command. A verb the registry leaves out fails here, so help cannot
+// hide one that exists.
 func TestHelpListsTheWriteCommands(t *testing.T) {
 	code, out, _ := runCmd(t, "help")
-	if code != 0 || !strings.Contains(out, "step") || !strings.Contains(out, "start") {
-		t.Errorf("help: exit %d, output %q; want the step command and task start listed", code, out)
+	if code != 0 {
+		t.Fatalf("help: exit %d", code)
 	}
+	want := map[string]string{
+		"task":  "task current|get|list|start|update|close",
+		"step":  "step add|update|plan",
+		"event": "event log",
+	}
+	for name, summary := range want {
+		if !helpHas(out, name, summary) {
+			t.Errorf("help does not list %q in the line of %s:\n%s", summary, name, out)
+		}
+	}
+}
+
+// helpHas reports whether the help line of the command name holds want. A help line is the
+// command's name padded to a column, then its summary.
+func helpHas(out, name, want string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 0 && fields[0] == name {
+			return strings.Contains(line, want)
+		}
+	}
+	return false
 }
