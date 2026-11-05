@@ -438,7 +438,8 @@ https://code.claude.com/docs/en/hooks.md:
 - `session-start` prints the block above. `enable` registers it with the
   matcher `startup|resume|clear|compact`, so it runs again after `/compact`. The
   reference says a SessionStart hook's plain stdout is added to Claude's context.
-  This is what carries a task across `/compact` in Claude Code.
+  This is what carries a task across `/compact` in Claude Code. The live run that
+  confirms it is M4's open exit check: see [M4-HAND-CHECK.md](M4-HAND-CHECK.md).
 - `pre-compact` prints the same block. It is installed, as D15 names it, but it
   is inert in Claude Code. The reference says plain stdout is written to the debug
   log and not shown in the transcript, except for four events, and PreCompact is
