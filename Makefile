@@ -53,14 +53,16 @@ scan-invisible:
 # Fails and lists the lines when a tracked file holds a local path that names a user or a machine
 # layout: a macOS, Linux or root home directory, a mounted volume, or a Windows user directory. The
 # placeholder user "you" is allowed, so docs can show where a file goes (/Users/you/ and /home/you/).
-# A path is refused only when a word or path character comes right before it: a letter, digit,
-# "_", ".", "-", "~" or "$". So a path after a backtick, a bracket, a pipe, a comma or a file URL
-# is caught, while internal/root/x and ../home/x are not. The Windows form, any drive letter then
-# Users in any case with either slash, follows the same rule. The whole tree is scanned; no file
-# is excluded. git grep exits 0 on a match and 1 on none, so the result is inverted here. CI runs
-# this on every pull request.
+# A path is skipped only when a letter, digit, "_", ".", "-", "~" or "$" comes right before it.
+# After anything else, such as a backtick, a bracket, a pipe, a comma, a colon or a space, the path
+# is caught. So internal/root/x and ../home/x are skipped, and a path in backticks or in a file URL
+# is caught. The Windows form is a drive letter, a colon, slashes or backslashes, Users in any case,
+# then more slashes or backslashes, and it follows the same rule. Not seen: a WSL path such as
+# /mnt/c/Users/..., which has a letter before its slash, and a path after "..." or a period, which
+# is skipped. The whole tree is scanned; no file is excluded. git grep exits 0 on a match and 1 on
+# none, so the result is inverted here. CI runs this on every pull request.
 scan-local-paths:
-	@hits="$$(git grep -I -n -P '(?<![A-Za-z0-9_.~$$-])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]users[\\/])(?!you[\\/]))')"; \
+	@hits="$$(git grep -I -n -P '(?<![A-Za-z0-9_.~$$-])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]+users[\\/]++)(?!you[\\/]))')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
 	  echo "Local user or machine paths found in these tracked files (file:line:text):"; printf '%s\n' "$$hits"; exit 1; \
