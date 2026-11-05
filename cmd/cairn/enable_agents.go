@@ -337,7 +337,7 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 				}
 				return []byte(text + piBlock()), true, nil
 			}
-			return nil, false, errors.New("has a cairn block that is not whole: each marker must be a whole line of its own, once, with the start line exactly cairn's text and the end marker after it, so fix the markers by hand")
+			return nil, false, errors.New("has a cairn block that is not whole: each marker must be a whole line of its own, once, with the start line exactly cairn's text and the end marker after it; a byte-order mark before the start line is one possible cause; fix the markers by hand")
 		},
 	}
 	report := func() string {

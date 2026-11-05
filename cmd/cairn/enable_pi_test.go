@@ -672,6 +672,32 @@ func TestPiRefusesMarkersThatAreNotWholeLines(t *testing.T) {
 	}
 }
 
+// TestPiRefusesAByteOrderMarkBeforeAFirstLineBlock pins that a byte-order mark at the start of AGENTS.md, in front of a block on
+// line 1, makes the block read as not whole. The start line then has no line break before it, so the file is refused, with the
+// refusal naming the mark as a possible cause, nothing written, and no backup. The mark is written as an escape, so the file
+// holds no invisible character.
+func TestPiRefusesAByteOrderMarkBeforeAFirstLineBlock(t *testing.T) {
+	dir := enableProject(t)
+	text := string([]byte{0xEF, 0xBB, 0xBF}) + piBlock() + "More notes after the block.\n"
+	writeSettings(t, piAgentsFile(dir), text)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 1 || stdout != "" {
+		t.Errorf("exit %d, stdout %q: want 1 and nothing on stdout", code, stdout)
+	}
+	for _, want := range []string{piAgentsFile(dir) + " has a cairn block that is not whole", "byte-order mark before the start line", "fix the markers by hand"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr %q lacks %q", stderr, want)
+		}
+	}
+	if got := readBytes(t, piAgentsFile(dir)); !bytes.Equal(got, []byte(text)) {
+		t.Errorf("AGENTS.md changed; it must stay byte for byte:\n%q", got)
+	}
+	if got := listDir(t, filepath.Dir(piBackupOf(t, "AGENTS.md"))); len(got) != 0 {
+		t.Errorf("a backup was made of a file that was refused: %v", got)
+	}
+}
+
 // TestAgentsBlockStates checks how the block's markers are read: none, one whole block, or marker text that is not a block.
 func TestAgentsBlockStates(t *testing.T) {
 	cases := []struct {
