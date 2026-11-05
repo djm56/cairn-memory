@@ -111,6 +111,47 @@ func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 // lower in the tree (internal/docs, cmd/cairn/bin) is a package and is audited (6-W5). A
 // testdata directory is not audited at any depth.
 func TestAuditWalkFindsEveryPackage(t *testing.T) {
+	root := auditTree(t)
+	got, err := auditDirs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "cmd", "cairn", "bin"),
+		filepath.Join(root, "internal", "docs"), filepath.Join(root, "newpkg"),
+	}
+	sort.Strings(want)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("auditDirs = %q, want %q", got, want)
+	}
+}
+
+// TestAuditWalkAcceptsARootWithATrailingSeparator checks that a root written with a trailing
+// separator skips the same directories as the root written without one (8-S10). The skip is
+// decided by comparing the parent of each directory with the root, so the root is cleaned first.
+func TestAuditWalkAcceptsARootWithATrailingSeparator(t *testing.T) {
+	root := auditTree(t)
+	want, err := auditDirs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(want) != 5 {
+		t.Fatalf("the tree audits %d directories, want 5", len(want))
+	}
+	got, err := auditDirs(root + string(filepath.Separator))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("auditDirs with a trailing separator = %q, want %q", got, want)
+	}
+}
+
+// auditTree writes the tree the walk tests read, and returns its root. It holds the skipped
+// directories, the test-only ones, a package under a name skipDirs also has lower down, and a
+// testdata directory at two depths.
+func auditTree(t *testing.T) string {
+	t.Helper()
 	root := t.TempDir()
 	write := func(rel string) {
 		t.Helper()
@@ -133,19 +174,7 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 	write("cmd/cairn/bin/b.go")
 	write("a/testdata/t.go")
 	write("testdata/r.go")
-
-	got, err := auditDirs(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "cmd", "cairn", "bin"),
-		filepath.Join(root, "internal", "docs"), filepath.Join(root, "newpkg"),
-	}
-	sort.Strings(want)
-	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Errorf("auditDirs = %q, want %q", got, want)
-	}
+	return root
 }
 
 // auditDirs returns, in order, the directories under root that hold a non-test Go file.
@@ -154,12 +183,13 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 // inputs, not packages, and one that does not parse would fail the audit.
 func auditDirs(root string) ([]string, error) {
 	seen := map[string]bool{}
+	clean := filepath.Clean(root)
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			if path != root && (d.Name() == "testdata" || (filepath.Dir(path) == root && skipDirs[d.Name()])) {
+			if path != root && (d.Name() == "testdata" || (filepath.Dir(path) == clean && skipDirs[d.Name()])) {
 				return filepath.SkipDir
 			}
 			return nil
