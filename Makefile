@@ -61,6 +61,7 @@ scan-invisible:
 # /mnt/c/Users/..., which has a letter before its slash, and a path after "..." or a period, which
 # is skipped. The whole tree is scanned; no file is excluded. git grep exits 0 on a match and 1 on
 # none, so the result is inverted here. CI runs this on every pull request.
+# The ++ after users is possessive: a doubled separator before you is not split or flagged.
 scan-local-paths:
 	@hits="$$(git grep -I -n -P '(?<![A-Za-z0-9_.~$$-])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]+users[\\/]++)(?!you[\\/]))')"; \
 	status=$$?; \
