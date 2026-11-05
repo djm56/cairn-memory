@@ -86,8 +86,13 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 		if err != nil {
 			return usageErr(stderr, verb, err)
 		}
-		if err := checkEventData(raw); err != nil {
-			return usageErr(stderr, verb, err)
+		if strings.TrimSpace(raw) == "" {
+			return usageErr(stderr, verb, errors.New("--data is empty: give a JSON object, such as {\"verdict\": \"approved\", \"critical\": 0, \"warnings\": 0}, or leave the flag out"))
+		}
+		// core checks the data and gives the message for each fault, with the fix the contract names (CONTRACT
+		// §4). The call is refused here, before any server is opened, as invalid. The flag is named in front.
+		if err := core.CheckEventData(req.Kind, json.RawMessage(raw)); err != nil {
+			return fail(stdout, stderr, verb, *asJSON, dataFlagError(err))
 		}
 		req.Data = json.RawMessage(raw)
 	}
@@ -106,23 +111,15 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	return 0
 }
 
-// checkEventData refuses a --data that is not one JSON object, before the project is resolved or
-// the server is called (CONTRACT §4 takes a JSON object). Without this check a bad value reaches
-// the encoder, which fails with a message that names no flag, and an empty value is dropped
-// without a word. The message names --data.
-func checkEventData(raw string) error {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return errors.New("--data is empty: give a JSON object, such as {\"verdict\": \"approved\", \"critical\": 0, \"warnings\": 0}, or leave the flag out")
+// dataFlagError returns the error of a --data that core refused, with --data named in front of core's
+// message. The kind is core's, so the call exits with the code of invalid. An error that is not a core
+// error is returned as it is.
+func dataFlagError(err error) error {
+	var ce *core.Error
+	if !errors.As(err, &ce) {
+		return err
 	}
-	if trimmed[0] != '{' {
-		return errors.New("--data must be a JSON object, which starts with {, such as {\"verdict\": \"approved\", \"critical\": 0, \"warnings\": 0}")
-	}
-	var v any
-	if err := json.Unmarshal([]byte(raw), &v); err != nil {
-		return fmt.Errorf("--data is not valid JSON: %v", err)
-	}
-	return nil
+	return &core.Error{Kind: ce.Kind, Message: "--data: " + ce.Message}
 }
 
 // eventLine is one journal entry as a person reads it: the time to the minute, the kind and the

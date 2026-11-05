@@ -121,24 +121,20 @@ func TestEventLogStepUsageErrors(t *testing.T) {
 	}
 }
 
-// TestEventLogDataMustBeAJSONObject checks that a --data which is not one JSON object is a usage
-// error naming --data, exit 2, with no call: text that is not JSON, an empty or blank value, an
-// array, a string, and a JSON object followed by more text. A JSON object with edge spaces is
-// accepted.
+// TestEventLogDataMustBeAJSONObject checks a --data that is not one JSON object, with no call. An empty or
+// blank value is a usage error, exit 2, naming --data. Text that is not JSON, an array, a string and a JSON
+// object followed by more text are malformed data, which core refuses as invalid, exit 3: the message names
+// --data and gives core's fix. A JSON object with edge spaces is accepted.
 func TestEventLogDataMustBeAJSONObject(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
-	cases := []struct {
+	usage := []struct {
 		name string
 		data string
 	}{
-		{"not JSON", "verdict=approved"},
 		{"empty", ""},
 		{"blank", "   "},
-		{"an array", `[{"verdict":"approved"}]`},
-		{"a string", `"approved"`},
-		{"an object then more text", `{"verdict":"approved"} trailing`},
 	}
-	for _, c := range cases {
+	for _, c := range usage {
 		t.Run(c.name, func(t *testing.T) {
 			svc := &fakeWrites{event: &core.Event{}}
 			code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", c.data, "--agent", "hicks")
@@ -147,20 +143,38 @@ func TestEventLogDataMustBeAJSONObject(t *testing.T) {
 			}
 		})
 	}
+	invalid := []struct {
+		name string
+		data string
+	}{
+		{"not JSON", "verdict=approved"},
+		{"an array", `[{"verdict":"approved"}]`},
+		{"a string", `"approved"`},
+		{"an object then more text", `{"verdict":"approved"} trailing`},
+	}
+	for _, c := range invalid {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{event: &core.Event{}}
+			code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", c.data, "--agent", "hicks")
+			if code != 3 || !strings.Contains(errOut, "--data: a review needs data") || !strings.Contains(errOut, "fix the data and log the review again") || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want exit 3 (invalid) naming --data, core's fix, and no call", code, errOut, svc.calls)
+			}
+		})
+	}
 	svc := &fakeWrites{event: &core.Event{ID: 9}}
-	if code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", ` {"verdict":"approved"} `, "--agent", "hicks"); code != 0 {
+	if code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", ` {"verdict":"approved","critical":0,"warnings":0} `, "--agent", "hicks"); code != 0 {
 		t.Errorf("an object with edge spaces: exit %d, stderr %q; want it accepted", code, errOut)
 	}
 }
 
 // TestEventLogDataFromStandardInputMustBeAJSONObject checks the same refusal for --data -: a
-// standard input that is not one JSON object is a usage error naming --data, and no call is made.
+// standard input that is not one JSON object is refused as invalid, naming --data, and no call is made.
 func TestEventLogDataFromStandardInputMustBeAJSONObject(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{event: &core.Event{}}
 	code, _, errOut := runWrite(t, Event, svc, "not a review\n", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", "-", "--agent", "hicks")
-	if code != 2 || !strings.Contains(errOut, "--data") || svc.calls != 0 {
-		t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming --data and no call", code, errOut, svc.calls)
+	if code != 3 || !strings.Contains(errOut, "--data") || svc.calls != 0 {
+		t.Errorf("exit %d, stderr %q, calls %d; want exit 3 naming --data and no call", code, errOut, svc.calls)
 	}
 }
 

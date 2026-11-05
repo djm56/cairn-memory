@@ -26,9 +26,6 @@ var deferrals = []deferral{
 	{"step/ref_gives_exactly_one", "step add --after by id, or by id 0: --after takes a step number, so these cannot be carried"},
 
 	{"event/step_refs_must_name_a_step", "an empty step reference on event log, and task get by a step id: the CLI cannot carry either, since --step takes a number and an absent --step means the task"},
-	{"event/review_data_missing_field_refused", "the CLI's --data check refuses data that is an array with its own message, which does not name the review fix that core gives"},
-	{"event/review_data_truncated_refused", "CLI defect: a review with truncated data gets the CLI's --data check message, not the review fix that core names (CONTRACT section 4)"},
-	{"event/note_data_truncated_refused", "the CLI's --data check words truncated note data as \"--data is not valid JSON\", not core's \"event data must be a JSON object\""},
 
 	{"task_get/bad_paging_refused", "task get by an empty step reference: an absent --step means every step, so no flag carries an empty reference"},
 
