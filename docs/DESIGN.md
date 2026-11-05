@@ -428,14 +428,32 @@ no project, no server, or a server that does not answer in 5 seconds, it prints
 nothing on stdout, says why on stderr, and exits 0, so the session starts.
 
 Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
-`stop`. `session-start` is built in M1 (issue #16). `pre-compact` and `stop` are
-planned for M4.
-`cairn enable --agent` installs all three.
+`stop`. All three are built. `session-start` came in M1 (issue #16), and
+`pre-compact` and `stop` in M4 (issues #83 and #84). `cairn enable --agent
+claude-code` installs all three in the project's `.claude/settings.local.json`.
 
-- `pre-compact` (planned, M4) prints the active task, the current step, the
-  next action and the directive count, so a task loop survives compaction.
-- `stop` (planned, M4) prints a one-line warning when a step is active without
-  a summary.
+What Claude Code does with each hook's output follows the hooks reference,
+https://code.claude.com/docs/en/hooks.md:
+
+- `session-start` prints the block above. `enable` registers it with the
+  matcher `startup|resume|clear|compact`, so it runs again after `/compact`. The
+  reference says a SessionStart hook's plain stdout is added to Claude's context.
+  This is what carries a task across `/compact` in Claude Code.
+- `pre-compact` prints the same block. It is installed, as D15 names it, but it
+  is inert in Claude Code. The reference says plain stdout is written to the debug
+  log and not shown in the transcript, except for four events, and PreCompact is
+  not one of them: UserPromptSubmit, UserPromptExpansion, SessionStart and
+  PostModelSwitch add it to Claude's context. The reference also says Claude Code
+  discards a PreCompact hook's `systemMessage`. So the block does not reach the
+  model.
+- `stop` prints one line of JSON, `{"systemMessage": ...}`, when a step of the
+  active task is active with no summary, and nothing otherwise. The reference
+  says `systemMessage` is a warning shown to the user. It is not added to
+  Claude's context.
+
+`cairn doctor --agent claude-code` warns when the SessionStart matcher does not
+name `compact`, since a matcher without it does not carry a task across
+`/compact`.
 
 ## 5. Architecture
 
@@ -495,7 +513,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
 | `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
-| `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are planned, M4. |
+| `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are built in M4 (#83, #84). What Claude Code does with each is in §4.1. |
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` is in Scope of v1 and is placed in M4 (D22). |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
@@ -1289,9 +1307,10 @@ plugins/claude-code/
   bin/cairn-launch             finds the cairn binary; if missing, exits
                                with the one-line install command
   hooks/hooks.json             SessionStart → cairn hook session-start
-                               (built in M1; issue #16);
+                               (command built in M1; issue #16);
                                PreCompact and Stop → cairn hook pre-compact
-                               and stop (planned, M4, D15)
+                               and stop (commands built in M4, D15; PreCompact
+                               is inert in Claude Code, §4.1). This file is M5.
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below
   commands/init.md             /cairn:init → cairn init
   commands/status.md           /cairn:status
