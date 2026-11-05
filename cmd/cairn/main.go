@@ -39,6 +39,7 @@ func init() {
 		"event":     {summary: "Log an event on a task: event log, with --json", run: runEvent},
 		"learning":  {summary: "Propose a learning or list them: learning add|list, each with --json", run: runLearning},
 		"directive": {summary: "List the directives that apply: directive list, with --json", run: runDirective},
+		"recall":    {summary: "What applies to a goal: recall --goal text [--agent role], with --json", run: runRecall},
 		"doctor":    {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
 		"serve":     {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
 		"key":       {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
