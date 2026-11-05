@@ -19,7 +19,8 @@ import (
 // useDir runs the commands from dir, with no caller set in the environment: the
 // project and server come only from the files the test writes. The API key is the test
 // key from CAIRN_API_KEY, and the home directory is a fresh one, so no client.env of the
-// machine running the tests is read.
+// machine running the tests is read. The cache directory is fresh too, since enable keeps
+// its backups there.
 func useDir(t *testing.T, dir string) {
 	t.Helper()
 	assertNoAncestorProjectFile(t)
@@ -27,6 +28,7 @@ func useDir(t *testing.T, dir string) {
 	t.Setenv("CAIRN_SERVER", "")
 	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("CAIRN_API_KEY", testAPIKey(t))
 	prev := workDir
 	workDir = func() (string, error) { return dir, nil }

@@ -31,6 +31,18 @@ const backupStamp = "20060102T150405Z"
 // chooses.
 var enableNow = func() time.Time { return time.Now().UTC() }
 
+// backupPath is where enable copies a project's settings file before it writes it: the user's cache directory, under
+// cairn/backups/<name>, named settings.local.json and the UTC time at. The cache directory is outside the project, so
+// a copy of a local settings file, which may hold secrets, is never in the project's tree, where a version control
+// command could pick it up. It is an error when the cache directory cannot be found.
+func backupPath(name string, at time.Time) (string, error) {
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cache, "cairn", "backups", name, settingsName+"."+at.Format(backupStamp)), nil
+}
+
 // claudeHook is one hook enable installs for Claude Code: the event it is registered under, the matcher that
 // narrows the event (empty for none), and the command line the hook runs.
 type claudeHook struct {
@@ -123,7 +135,7 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "cairn enable: CAIRN_PROJECT names the project, but the project directory is found from its .cairn.toml, and there is none: run cairn enable from the project, or unset CAIRN_PROJECT")
 		return 1
 	}
-	return enableClaudeCode(filepath.Dir(project.Path), *dryRun, stdout, stderr)
+	return enableClaudeCode(filepath.Dir(project.Path), project.Name, *dryRun, stdout, stderr)
 }
 
 // writeEnableHelp prints the usage of cairn enable, and its flags, to w.
@@ -131,16 +143,18 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: cairn enable --agent <name> [--dry-run]")
 	fmt.Fprintln(w, "Installs the cairn hooks into the project's Claude Code settings: .claude/settings.local.json in the project directory.")
 	fmt.Fprintln(w, "It adds only the hooks whose command is not registered under their event yet, and keeps every other key and entry.")
-	fmt.Fprintln(w, "Before it writes, it copies the file to settings.local.json.bak-<UTC time>. A file that is not valid JSON is refused, and left as it is.")
+	fmt.Fprintln(w, "Before it writes an existing file, it copies the original to cairn/backups/<project> in the user's cache directory (~/Library/Caches on macOS, ~/.cache on Linux), outside the project, and prints the path.")
+	fmt.Fprintln(w, "A file that is not valid JSON is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
 	fmt.Fprintln(w, "Agents: claude-code. opencode and pi are not built yet.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
 }
 
-// enableClaudeCode merges the Claude Code hooks into the settings file of the project at root. The file is read and
-// merged in memory first, so a refusal leaves it as it was. A write copies the original to a backup, then puts the
-// new file in place with one rename. Dry run prints the same lines and writes nothing.
-func enableClaudeCode(root string, dryRun bool, stdout, stderr io.Writer) int {
+// enableClaudeCode merges the Claude Code hooks into the settings file of the project called name, at root. The file
+// is read and merged in memory first, so a refusal leaves it as it was. A write copies the original to a backup
+// outside the project (backupPath), then puts the new file in place with one rename. Dry run prints the same lines
+// and writes nothing.
+func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 	dir := filepath.Join(root, settingsDir)
 	path := filepath.Join(dir, settingsName)
 	info, err := os.Lstat(path)
@@ -174,6 +188,15 @@ func enableClaudeCode(root string, dryRun bool, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn enable: %s %v. Nothing was changed: fix the file by hand, then run cairn enable again\n", path, err)
 		return 1
 	}
+	// The backup's place is found before anything is printed or written, so a project whose cache directory cannot be
+	// found is refused with nothing changed, and nothing is reported as done.
+	var backup string
+	if exists && changed && !dryRun {
+		if backup, err = backupPath(name, enableNow()); err != nil {
+			fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed\n", path, err)
+			return 1
+		}
+	}
 	for _, r := range results {
 		state := "already present"
 		if r.added {
@@ -195,17 +218,21 @@ func enableClaudeCode(root string, dryRun bool, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn enable: encode %s: %v\n", path, err)
 		return 1
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(stderr, "cairn enable: create %s: %v\n", dir, err)
-		return 1
-	}
-	var backup string
+	// The backup's directory is made before the project's directory, so a failed backup leaves the project's directory
+	// as it was.
 	if exists {
-		backup = path + ".bak-" + enableNow().Format(backupStamp)
+		if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
+			fmt.Fprintf(stderr, "cairn enable: create %s: %v; nothing was changed\n", filepath.Dir(backup), err)
+			return 1
+		}
 		if err := copyNew(backup, raw, mode); err != nil {
 			fmt.Fprintf(stderr, "cairn enable: back up %s: %v; nothing was changed\n", path, err)
 			return 1
 		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fmt.Fprintf(stderr, "cairn enable: create %s: %v\n", dir, err)
+		return 1
 	}
 	if err := replaceFile(path, content, mode, exists); err != nil {
 		fmt.Fprintf(stderr, "cairn enable: write %s: %v; the file was not replaced\n", path, err)

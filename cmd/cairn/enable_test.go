@@ -15,8 +15,20 @@ import (
 // enableClock is the UTC time every backup in these tests is named for.
 var enableClock = time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
 
-// backupName is the backup that a run at enableClock makes of a settings file.
-const backupName = "settings.local.json.bak-20261105T120000Z"
+// backupName is the name of the backup that a run at enableClock makes of a settings file. It lives in the cache
+// directory, not the project (backupIn).
+const backupName = "settings.local.json.20261105T120000Z"
+
+// backupIn is the backup a run at enableClock makes of the settings file of the project called name. It is under the
+// user's cache directory, which useDir points at a fresh directory.
+func backupIn(t *testing.T, name string) string {
+	t.Helper()
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(cache, "cairn", "backups", name, backupName)
+}
 
 // existingSettings is a settings file with keys and hooks that enable does not add to, and a cairn hook with a
 // different command, which enable must keep. The number and the characters an encoder would escape by default are
@@ -227,7 +239,7 @@ func TestEnableKeepsEveryOtherKeyAndEntry(t *testing.T) {
 	if got := outcomes(stdout); !reflect.DeepEqual(got, allAdded) {
 		t.Errorf("outcomes %v, want every hook added (the existing Stop hook is another command)", got)
 	}
-	backup := filepath.Join(dir, ".claude", backupName)
+	backup := backupIn(t, "acme-api")
 	if !bytes.Equal(readBytes(t, backup), []byte(existingSettings)) {
 		t.Errorf("the backup is not the original file:\n%s", readBytes(t, backup))
 	}
@@ -294,7 +306,7 @@ func TestEnableRunTwiceGivesTheSameFile(t *testing.T) {
 		wantFiles []string
 	}{
 		{"a fresh project", "", []string{settingsName}},
-		{"an existing file", existingSettings, []string{settingsName, backupName}},
+		{"an existing file", existingSettings, []string{settingsName}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -320,6 +332,11 @@ func TestEnableRunTwiceGivesTheSameFile(t *testing.T) {
 			}
 			if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, tc.wantFiles) {
 				t.Errorf(".claude holds %v, want %v", got, tc.wantFiles)
+			}
+			if tc.existing != "" {
+				if got := listDir(t, filepath.Dir(backupIn(t, "acme-api"))); !slices.Equal(got, []string{backupName}) {
+					t.Errorf("the backup directory holds %v, want only the backup of the first run", got)
+				}
 			}
 		})
 	}
@@ -375,7 +392,7 @@ func TestEnableBacksUpTheOriginalWithItsMode(t *testing.T) {
 	if code, _, stderr := runCmd(t, "enable", "--agent", "claude-code"); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
-	backup := filepath.Join(dir, ".claude", backupName)
+	backup := backupIn(t, "acme-api")
 	if !bytes.Equal(readBytes(t, backup), []byte(existingSettings)) {
 		t.Errorf("the backup is not the original:\n%s", readBytes(t, backup))
 	}
@@ -387,6 +404,66 @@ func TestEnableBacksUpTheOriginalWithItsMode(t *testing.T) {
 		if info.Mode().Perm() != 0o600 {
 			t.Errorf("%s has mode %o, want 600", p, info.Mode().Perm())
 		}
+	}
+}
+
+// TestEnableBacksUpOutsideTheProject checks that the backup of an existing settings file is not under the project,
+// so no command that reads the project's tree can find a copy of a local settings file there. The backup is in the
+// cache directory, and the project's .claude holds the settings file alone.
+func TestEnableBacksUpOutsideTheProject(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, settingsIn(dir), existingSettings)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	backup := backupIn(t, "acme-api")
+	if rel, err := filepath.Rel(dir, backup); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		t.Errorf("the backup %s is inside the project %s", backup, dir)
+	}
+	if !strings.Contains(stdout, "backup "+backup+"\n") {
+		t.Errorf("stdout does not print the backup's path:\n%s", stdout)
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file and nothing else", got)
+	}
+}
+
+// TestEnableRefusesWhenNoCacheDirectoryIsKnown checks that an existing file is not written when the backup has no
+// place to go: with no home directory and no cache directory set, enable exits 1 and changes nothing.
+func TestEnableRefusesWhenNoCacheDirectoryIsKnown(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, existingSettings)
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "nothing was changed") {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and nothing changed", code, stdout, stderr)
+	}
+	if string(readBytes(t, path)) != existingSettings {
+		t.Errorf("the file changed:\n%s", readBytes(t, path))
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file and nothing else", got)
+	}
+}
+
+// TestEnableNeedsNoCacheDirectoryForANewFile checks that a file enable creates has nothing to back up, so the cache
+// directory is not needed: a project with no settings file is written even when no cache directory is known.
+func TestEnableNeedsNoCacheDirectoryForANewFile(t *testing.T) {
+	dir := enableProject(t)
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+
+	code, _, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := decodeJSON(t, readBytes(t, settingsIn(dir))); !reflect.DeepEqual(got, map[string]any{"hooks": freshHooks()}) {
+		t.Errorf("settings file holds %v, want only the three hooks", got)
 	}
 }
 
