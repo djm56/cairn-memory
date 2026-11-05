@@ -29,8 +29,9 @@ func Event(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer
 	return 2
 }
 
-// eventLog is `cairn event log <task-id> --kind k --text t [--step n] [--data d] [--agent a]
-// [--json]`: one journal entry on a task (CONTRACT §4, event_log). An agent may log note,
+// eventLog is `cairn event log <task-id> --kind k --text t [--step n | --step-id n] [--data d]
+// [--agent a] [--json]`: one journal entry on a task (CONTRACT §4, event_log). The step is named by
+// its number, or by its id, and not both (CONTRACT §1.4). An agent may log note,
 // blocked, unblocked, handoff, decision, review and custom. A review needs --data, a JSON object
 // with verdict, critical and warnings. The server refuses the other kinds, which it writes itself.
 func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -40,6 +41,7 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	kind := fl.String("kind", "", "note, blocked, unblocked, handoff, decision, review or custom")
 	text := fl.String("text", "", "what happened; - reads standard input")
 	step := fl.Int("step", 0, "the step the event is about, by its number; left out, it is about the task")
+	stepID := fl.Int64("step-id", 0, "the step the event is about, by its id, instead of its number")
 	data := fl.String("data", "", "a JSON object of structured data, such as a review's verdict, critical and warnings; - reads standard input")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
@@ -51,6 +53,14 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	if given(fl, "step") && *step < 1 {
 		fmt.Fprintln(stderr, verb+": --step must be a step number, 1 or more; leave it out for the task")
+		return 2
+	}
+	if given(fl, "step-id") && *stepID < 1 {
+		fmt.Fprintln(stderr, verb+": --step-id must be a step id, 1 or more; leave it out for the task")
+		return 2
+	}
+	if given(fl, "step") && given(fl, "step-id") {
+		fmt.Fprintln(stderr, verb+": give the step by --step or by --step-id, not both")
 		return 2
 	}
 	name, ok := agentName(fl, *agent, true, verb, stderr)
@@ -65,6 +75,10 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	if given(fl, "step") {
 		ref := core.NumberRef(*step)
+		req.Step = &ref
+	}
+	if given(fl, "step-id") {
+		ref := core.IDRef(*stepID)
 		req.Step = &ref
 	}
 	if given(fl, "data") {

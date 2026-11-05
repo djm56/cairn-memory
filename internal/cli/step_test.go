@@ -9,6 +9,71 @@ import (
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
+// TestStepUpdateByID checks that step update takes the step by its id, with --step-id in place of
+// the number: the request carries an id ref and no number, and the human output is the step.
+func TestStepUpdateByID(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	svc := &fakeWrites{step: &core.Step{ID: 412, Number: 2, Title: "Write the test", Status: core.StepActive}}
+	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "--step-id", "412", "--action", "start", "--agent", "hicks")
+	if code != 0 || errOut != "" || out != "2. [active] Write the test\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0 and the step line", code, out, errOut)
+	}
+	if ref := svc.gotStepUpd.Step; ref.ID == nil || *ref.ID != 412 || ref.Number != nil {
+		t.Errorf("the step ref is %+v, want the id 412 and no number", ref)
+	}
+}
+
+// TestStepUpdateByIDJSON checks the --json output of step update by id: one line, decoding to the
+// step the server returned.
+func TestStepUpdateByIDJSON(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	svc := &fakeWrites{step: &core.Step{ID: 412, Number: 2, Title: "Write the test", Status: core.StepDone}}
+	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "--step-id", "412", "--action", "finish", "--summary", "done", "--agent", "hicks", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, output %q; want one line and exit 0", code, errOut, out)
+	}
+	var got core.Step
+	if err := json.Unmarshal([]byte(out), &got); err != nil || got.ID != 412 {
+		t.Errorf("--json decodes to %+v (%v), want step 412", got, err)
+	}
+}
+
+// TestStepUpdateByIDRefusedByServer checks that a step the server does not find is one line on
+// stderr, exit 1, as a refusal of a step by number is.
+func TestStepUpdateByIDRefusedByServer(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	svc := &fakeWrites{err: core.NotFound("step 412 is not in task task-20261030-01")}
+	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "--step-id", "412", "--action", "start", "--agent", "hicks")
+	if code != 1 || out != "" || errOut != "cairn step update: step 412 is not in task task-20261030-01\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the one-line refusal", code, out, errOut)
+	}
+}
+
+// TestStepUpdateStepUsageErrors checks the usage errors of step update's step: the number and the
+// id together, neither, a task id missing with the id, an id below 1. Each exits 2 and makes no call.
+func TestStepUpdateStepUsageErrors(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"number and id together", []string{"update", "task-20261030-01", "1", "--step-id", "412", "--action", "start", "--agent", "hicks"}, "not both"},
+		{"neither number nor id", []string{"update", "task-20261030-01", "--action", "start", "--agent", "hicks"}, "a step number"},
+		{"id with no task id", []string{"update", "--step-id", "412", "--action", "start", "--agent", "hicks"}, "not both"},
+		{"id below one", []string{"update", "task-20261030-01", "--step-id", "0", "--action", "start", "--agent", "hicks"}, "--step-id must be a step id"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{step: &core.Step{}}
+			code, _, errOut := runWrite(t, Step, svc, "", c.args...)
+			if code != 2 || !strings.Contains(errOut, c.want) || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming %q and no call", code, errOut, svc.calls, c.want)
+			}
+		})
+	}
+}
+
 // TestStepAddHuman checks the human output of step add: the new step with its number, status and
 // assignee, and that the request carries the position, the title, the assignee and the caller.
 func TestStepAddHuman(t *testing.T) {

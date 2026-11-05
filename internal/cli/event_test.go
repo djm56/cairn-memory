@@ -63,6 +63,64 @@ func TestEventLogReviewData(t *testing.T) {
 	}
 }
 
+// TestEventLogByStepID checks that event log names its step by --step-id: the request carries an id
+// ref and no number, and the human output is the entry's line.
+func TestEventLogByStepID(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	at := time.Date(2026, 11, 5, 9, 2, 0, 0, time.UTC)
+	svc := &fakeWrites{event: &core.Event{ID: 9, Kind: core.EventNote, Text: "started", OccurredAt: at}}
+	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--step-id", "412", "--agent", "hicks")
+	if code != 0 || errOut != "" || out != stamp(at)+"  note  started\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0 and the entry's line", code, out, errOut)
+	}
+	if ref := svc.gotEvent.Step; ref == nil || ref.ID == nil || *ref.ID != 412 || ref.Number != nil {
+		t.Errorf("the step ref is %+v, want the id 412 and no number", ref)
+	}
+}
+
+// TestEventLogByStepIDJSONAndRefusal checks the --json output of an event on a step named by its id,
+// and that a refusal of the server is one line on stderr, exit 1.
+func TestEventLogByStepIDJSONAndRefusal(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	svc := &fakeWrites{event: &core.Event{ID: 9, Kind: core.EventNote, Text: "started"}}
+	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--step-id", "412", "--agent", "hicks", "--json")
+	if code != 0 || errOut != "" || !oneLine(out) {
+		t.Fatalf("exit %d, stderr %q, output %q; want one line and exit 0", code, errOut, out)
+	}
+	var got core.Event
+	if err := json.Unmarshal([]byte(out), &got); err != nil || got.ID != 9 {
+		t.Errorf("--json decodes to %+v (%v), want event 9", got, err)
+	}
+	svc.err = core.NotFound("step 412 is not in task task-20261030-01")
+	code, out, errOut = runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--step-id", "412", "--agent", "hicks")
+	if code != 1 || out != "" || errOut != "cairn event log: step 412 is not in task task-20261030-01\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and the one-line refusal", code, out, errOut)
+	}
+}
+
+// TestEventLogStepUsageErrors checks the usage errors of the step of event log: both --step and
+// --step-id, an id below 1. Each exits 2 and makes no call.
+func TestEventLogStepUsageErrors(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"number and id together", []string{"log", "task-20261030-01", "--kind", "note", "--text", "x", "--step", "1", "--step-id", "412", "--agent", "hicks"}, "not both"},
+		{"id below one", []string{"log", "task-20261030-01", "--kind", "note", "--text", "x", "--step-id", "0", "--agent", "hicks"}, "--step-id must be a step id"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{event: &core.Event{}}
+			code, _, errOut := runWrite(t, Event, svc, "", c.args...)
+			if code != 2 || !strings.Contains(errOut, c.want) || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming %q and no call", code, errOut, svc.calls, c.want)
+			}
+		})
+	}
+}
+
 // TestEventLogDataMustBeAJSONObject checks that a --data which is not one JSON object is a usage
 // error naming --data, exit 2, with no call: text that is not JSON, an empty or blank value, an
 // array, a string, and a JSON object followed by more text. A JSON object with edge spaces is

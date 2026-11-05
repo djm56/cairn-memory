@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"strconv"
@@ -85,7 +86,8 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 
 // stepUpdate is `cairn step update <task-id> <number> --action a [--summary s] [--assignee a]
 // [--agent a] [--json]`: one step started, finished, failed or skipped, or reassigned (CONTRACT §3,
-// step_update). finish, fail and skip need a summary. --assignee reassigns the step.
+// step_update). finish, fail and skip need a summary. --assignee reassigns the step. The step is
+// named by its number, or by its id with --step-id in place of the number (CONTRACT §1.4).
 func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	const verb = "cairn step update"
 	fl, asJSON := newFlags(verb)
@@ -93,25 +95,22 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 	action := fl.String("action", "", "start, finish, fail or skip")
 	summary := fl.String("summary", "", "the result, needed for finish, fail and skip; - reads standard input")
 	assignee := fl.String("assignee", "", "reassign the step to this agent")
+	stepID := fl.Int64("step-id", 0, "the step by its id, instead of its number; give one or the other")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
 	}
-	if len(pos) != 2 {
-		fmt.Fprintln(stderr, verb+": name a task id and a step number: cairn step update <task-id> <number> --action start")
+	ref, ok := stepUpdateRef(fl, pos, verb, *stepID, stderr)
+	if !ok {
 		return 2
 	}
-	number, err := strconv.Atoi(pos[1])
-	if err != nil || number < 1 {
-		fmt.Fprintf(stderr, "%s: the step is a number, 1 or more, as the steps list shows it: got %q\n", verb, pos[1])
-		return 2
-	}
+	req := core.StepUpdateRequest{TaskID: pos[0], Step: ref, Action: core.StepAction(*action)}
 	name, ok := agentName(fl, *agent, true, verb, stderr)
 	if !ok {
 		return 2
 	}
 	in := &inputs{stdin: stdin}
-	req := core.StepUpdateRequest{TaskID: pos[0], Step: core.NumberRef(number), Action: core.StepAction(*action)}
+	var err error
 	if req.Summary, err = in.text("summary", *summary); err != nil {
 		return usageErr(stderr, verb, err)
 	}
@@ -132,6 +131,34 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 	}
 	fmt.Fprintln(stdout, stepLine(*step))
 	return 0
+}
+
+// stepUpdateRef reads the step of a step update from its arguments. The task id is the first
+// positional. The step is either the number in the second positional, or the id given with
+// --step-id, and never both. A step id is 1 or more. It writes the usage error and returns ok
+// false when the arguments do not give exactly one of the two.
+func stepUpdateRef(fl *flag.FlagSet, pos []string, verb string, id int64, stderr io.Writer) (ref core.StepRef, ok bool) {
+	if given(fl, "step-id") {
+		if len(pos) != 1 {
+			fmt.Fprintln(stderr, verb+": name the task id, and give the step by --step-id or by its number, not both: cairn step update <task-id> --step-id 412 --action start")
+			return core.StepRef{}, false
+		}
+		if id < 1 {
+			fmt.Fprintf(stderr, "%s: --step-id must be a step id, 1 or more: got %d\n", verb, id)
+			return core.StepRef{}, false
+		}
+		return core.IDRef(id), true
+	}
+	if len(pos) != 2 {
+		fmt.Fprintln(stderr, verb+": name a task id and a step number: cairn step update <task-id> <number> --action start")
+		return core.StepRef{}, false
+	}
+	number, err := strconv.Atoi(pos[1])
+	if err != nil || number < 1 {
+		fmt.Fprintf(stderr, "%s: the step is a number, 1 or more, as the steps list shows it: got %q\n", verb, pos[1])
+		return core.StepRef{}, false
+	}
+	return core.NumberRef(number), true
 }
 
 // planInput is the JSON form of step_plan (CONTRACT §3): the new pending steps, each with a title
