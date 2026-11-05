@@ -178,6 +178,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 CLI step ids (#88): `cairn step add --after-id <id>` inserts after a step named by its id, and `cairn task get --step-id <id>` reads the events of a step named by its id, as `--step-id` already does on `step update` and `event log`. Each is refused with exit 2 when the id is under 1, and when a position or a step is given both ways.
 - M4 conformance (#88): the conformance suite runs its agent calls through the `cairn` binary, and an exit check runs an agent with only bash that starts, works and closes a task through the CLI. The CLI carries each error's kind and the close policy's missing list, so 98 of the 106 cases pass through it. The other 8 are deferred, each with the text its failure must contain, and three of them are properties of a CLI that stay deferred.
 
+- Docs, M4 exit check: `docs/M4-HAND-CHECK.md`, an optional hand-check guide for the `/compact` exit check on Claude Code, and for the OpenCode and pi registrations, which are EXPERIMENTAL and have not been run. Linked from the README's CLI section.
+
 ### Changed
 
 - Behaviour change, M4 CLI exit codes (#88): a failed call of `task`, `step`, `event`, `learning`, `directive`, `recall`, `search` or `prime` exits with the code of its error kind: 3 invalid, 4 not_found, 5 refused, 6 operator_only, 7 no_route, 8 unsupported_media_type. Before, every failed call exited 1. A usage error still exits 2, before any call, and a failure with no kind still exits 1. `cairn --help` prints the table.
