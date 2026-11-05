@@ -33,6 +33,8 @@ type check struct {
 //
 // With --agent claude-code it adds a section after those checks: the cairn hooks
 // found in the Claude Code settings files, and a dry run of each hook (doctor_agent.go).
+// With --agent opencode or pi it adds a section, EXPERIMENTAL, that reads whether the
+// registration and the instructions of that client are in the project (doctor_clients.go).
 // That section writes no file. Its dry run is not read-only on the server: the first
 // read of a project the server has not seen creates the project's row, as the hooks do.
 //
