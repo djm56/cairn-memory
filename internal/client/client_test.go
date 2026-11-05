@@ -150,7 +150,7 @@ func TestMalformedAnswerIsAnError(t *testing.T) {
 }
 
 // TestOversizedAnswerIsAnError checks that a success larger than MaxResponseBytes
-// is refused, not read into memory, and is not a result.
+// is refused, and is not a result.
 //
 // The body is one byte over the limit, and it sets its own Content-Length. The client therefore
 // reads the whole body, and the size check is the only thing that can fail the call. The earlier
@@ -172,6 +172,35 @@ func TestOversizedAnswerIsAnError(t *testing.T) {
 	res, err := c.TaskCurrent(agentCtx())
 	if err == nil || res != nil || !strings.Contains(err.Error(), "larger than") {
 		t.Errorf("oversized answer gave result %v and error %v, want a size error", res, err)
+	}
+}
+
+// TestMaxResponseBytesAtTheLimitIsRead checks the other side of the limit: a success of
+// exactly MaxResponseBytes is read whole and decoded into the result. With
+// TestOversizedAnswerIsAnError it pins the limit to the byte, so a check that refused at
+// the limit itself, or a read that stopped short of it, fails here.
+func TestMaxResponseBytesAtTheLimitIsRead(t *testing.T) {
+	const prefix, suffix = `{"task":{"id":"`, `"}}`
+	id := strings.Repeat("x", client.MaxResponseBytes-len(prefix)-len(suffix))
+	exact := prefix + id + suffix
+	if len(exact) != client.MaxResponseBytes {
+		t.Fatalf("the body is %d bytes, want exactly %d", len(exact), client.MaxResponseBytes)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(exact)))
+		_, _ = w.Write([]byte(exact))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := client.New(srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := c.TaskCurrent(agentCtx())
+	if err != nil || res == nil || res.Task == nil {
+		t.Fatalf("an answer of exactly MaxResponseBytes gave result %v and error %v, want the result", res, err)
+	}
+	if res.Task.ID != id {
+		t.Errorf("the task id read is %d bytes, want the %d bytes sent", len(res.Task.ID), len(id))
 	}
 }
 

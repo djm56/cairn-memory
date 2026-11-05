@@ -27,8 +27,11 @@ import (
 const DefaultTimeout = 30 * time.Second
 
 // MaxResponseBytes caps the body of a successful answer. The server does not cap
-// its answers, so this is the client's guard: a larger answer is an error, not
-// read into memory. A failed answer is capped by api.MaxBodyBytes.
+// its answers, so this is the client's guard: an answer of up to this many bytes
+// is read and decoded, and a larger one is an error. The client reads up to
+// MaxResponseBytes+1 bytes of an answer into memory, the one byte more being how it
+// knows the answer is larger, and reads no further. A failed answer is capped by
+// api.MaxBodyBytes.
 const MaxResponseBytes = 16 << 20
 
 // Client is a core.Service over HTTP. Build one with New or NewWithKey; the zero value
