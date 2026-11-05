@@ -33,6 +33,7 @@ func init() {
 		"init":      {summary: "Write .cairn.toml: the project name and the server", run: runInit},
 		"export":    {summary: "Print a task, or the project's tasks, as Markdown: export task [id] or export project", run: runExport},
 		"hook":      {summary: "Output for a client hook: session-start, pre-compact or stop", run: runHook},
+		"enable":    {summary: "Install a client's hooks into the project: enable --agent claude-code [--dry-run]", run: runEnable},
 		"status":    {summary: "Show the server, the project and the active task", run: runStatus},
 		"task":      {summary: "Read or write a task: task current|get|list|start|update|close, each with --json", run: runTask},
 		"step":      {summary: "Add, update or plan the steps of a task: step add|update|plan, each with --json", run: runStep},
