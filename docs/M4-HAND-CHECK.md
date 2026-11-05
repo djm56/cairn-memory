@@ -94,24 +94,39 @@ practice. The reference does not run a session for you.
   This is the local scope, which is the default, so it stays on this machine. The
   server reads `CAIRN_API_KEY` from the environment Claude Code starts in. Then check
   that the tools `task_current` and `task_start` are listed. The CLI needs nothing
-  more than section 2.
+  more than section 2. With either route, a task read the agent makes on its own after
+  `/compact` makes the attempt not run, as the evidence note under What to look for says.
 - [ ] **3.4 Run `cairn doctor --agent claude-code`.** Record its output. Expect `ok`
   for `SessionStart` and `Stop`. A `PreCompact` line that is `ok` is expected, since
   the hook is installed as D15 names it. A `SessionStart` warning that the matcher does
   not name `compact` is a fail of this step: fix the matcher in
   `.claude/settings.local.json` by hand, then run the doctor again.
-- [ ] **3.5 Start a task with two steps.** Use either route:
+- [ ] **3.5 Start a task with two steps, from a separate terminal.** Open a second
+  terminal, outside the Claude Code session, and run these commands there from
+  `<project-dir>`, with `CAIRN_API_KEY` set as section 2.3 says:
 
   ```bash
   cairn task start --title "hand check" --goal "Check the /compact carry" --agent <agent-name>
   cairn step plan <task-id> --json-input --agent <agent-name>
   ```
 
-  For the second command, put `{"steps": [{"title": "first", "agent": "<agent-name>"}, {"title": "second", "agent": "<agent-name>"}]}` on standard input. Or do the same
-  with the `task_start` and `step_plan` MCP tools.
-- [ ] **3.6 Start step 1 and leave it active.** Run
-  `cairn step update <task-id> 1 --action start --agent <agent-name>`. Note the next
-  action the task shows with `cairn task current`.
+  For the second command, put
+  `{"steps": [{"title": "first", "agent": "<agent-name>"}, {"title": "second", "agent": "<agent-name>"}]}`
+  on standard input. Do not start the task or set its next action through the Claude Code session or its
+  MCP tools. Tell the operator not to mention the task in the session before `/compact`.
+  The task's facts must reach the agent only through the hook.
+- [ ] **3.6 Start step 1, and set a marker as the next action.** In the same separate
+  terminal, run `cairn step update <task-id> 1 --action start --agent <agent-name>`.
+  Then set the next action to a marker that nothing else in the project uses:
+
+  ```bash
+  cairn task update <task-id> --next-action "<distinctive-next-action>" --agent <agent-name>
+  ```
+
+  Replace `<distinctive-next-action>` with a unique phrase you choose, of two or three
+  words that appear nowhere else in this guide or the project. Write the phrase down.
+  It is the marker the pass under What to look for depends on. Check it with
+  `cairn task current` before you leave the terminal.
 - [ ] **3.7 Run `/compact` in the Claude Code session.** Type `/compact` and let it
   finish. Do not type a message after it yet. Note the time of `/compact` in UTC.
 - [ ] **3.8 Watch whether a turn starts, with no prompt from you.** Wait for the
@@ -126,23 +141,28 @@ practice. The reference does not run a session for you.
 
 What to look for:
 
-- **Pass.** After `/compact`, the agent carries on with the task. It works on step 1, or
-  says what step 1's next action is, and does not ask you what the task is. This holds
-  whether a turn started by itself or after the one neutral message from 3.8. Sending
-  that message does not fail the check. In the debug log, the `SessionStart` hook ran
-  once after the compact.
-- **Fail.** The agent asks what the task is, starts unrelated work, or takes no step
-  from the task. Or the debug log shows no `SessionStart` hook run after the compact.
-  Or the doctor warned about the matcher in 3.4 and the matcher was not fixed.
+- **Pass.** The agent's first reply after `/compact` names the marker from 3.6, or acts
+  on it: it works on step 1 as the marker says. The check does not depend on whether a
+  turn started by itself or after the neutral message from 3.8, and sending that message
+  does not fail the check.
+- **Fail.** The reply does not name or act on the marker. Or the agent asks what the
+  task is, starts unrelated work, or takes no step from the task. Or the doctor warned
+  about the matcher in 3.4 and the matcher was not fixed.
+- **Not run.** The agent made a task read of its own after the compact, as the note
+  below describes. Start again from 3.5 with a new task and a new marker.
 
-A note on evidence. If the agent calls `task_current` or `cairn task current` by itself
-after the compact, record that. A read the agent makes on its own does not prove the hook
-carried the task. The pass needs the debug log line as well as the behaviour, and the
-behaviour alone is not enough.
+A note on evidence. The marker is the evidence. It was set outside the session, so the
+conversation before `/compact` cannot hold it, and the compaction summary cannot carry
+it. The only other source is a task read the agent makes on its own. If the agent calls
+`task_current` or `cairn task current` after the compact, record the call. The reply
+then does not show that the hook carried the task, so the attempt is not run. The debug
+log line in 3.9 is supporting evidence only. It shows that the hook ran, not that the
+agent used its output, so it does not decide the verdict.
 
 - [ ] **3.9 Read the debug log for the hook runs.** Search `<log-file>` for the
   `SessionStart` hook entries, and find the entry after the time of `/compact`. Record
-  the entry's time and its event name. Redact any path in it, as section 6 says.
+  the entry's time and its event name. Redact any path in it, as section 6 says. This
+  is supporting evidence, and it does not decide the verdict.
 - [ ] **3.10 (Optional) Check the Stop warning.** With step 1 still active and no
   summary, end a turn. The Stop hook is meant to show a warning to you: its
   `systemMessage` is a warning shown to the user, not context for the agent. Record
