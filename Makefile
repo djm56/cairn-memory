@@ -59,7 +59,7 @@ scan-local-paths:
 	@hits="$$(git grep -I -n -P '/(Users|home|root|Volumes)/(?!you/)|C:\\Users\\(?!you\\)')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
-	  echo "Local home-directory paths found in these tracked files:"; echo "$$hits"; exit 1; \
+	  echo "Local user or machine paths found in these tracked files (file:line:text):"; printf '%s\n' "$$hits"; exit 1; \
 	elif [ $$status -ne 1 ]; then \
 	  echo "scan-local-paths: git grep failed (exit $$status)"; exit $$status; \
 	fi
