@@ -161,8 +161,10 @@ prints the same table.
 | 7 | `no_route`: the path is not a call, so the server base URL is wrong |
 | 8 | `unsupported_media_type`: the request body is not `application/json` |
 
-With `--json`, a failed call writes `{"error": {"kind", "message", "missing"}}` to
-stdout. The other commands exit 1 on a failure. A missing, malformed, unknown or revoked
+With `--json`, a failed call writes one line of JSON to stdout and nothing to stderr, for
+example `{"error":{"kind":"refused","message":"close policy not met: summary, lessons","missing":["summary","lessons"]}}`.
+The object holds `kind` and `message`, and `missing` for a refused close. The other
+commands exit 1 on a failure. A missing, malformed, unknown or revoked
 API key, and a viewer key on a write, also exit 1, with the kind `internal`, because the
 client answers them as plain errors. The details are in
 [DESIGN.md §5.2.2](docs/DESIGN.md#522-exit-codes-of-the-cli-verbs-m4-88).

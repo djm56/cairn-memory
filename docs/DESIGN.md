@@ -651,9 +651,11 @@ row without reading the message. The codes are the table in
 
 The kinds `unauthenticated` and `read_only` do not reach the CLI with their kind.
 The client answers them as plain errors, so they exit 1 with the kind `internal`,
-as any other failure with no kind does. With `--json`, a failed call writes
-`{"error": {"kind", "message", "missing"}}` to stdout, and nothing to stderr.
-`missing` is listed only for a refused close. The other commands (`status`,
+as any other failure with no kind does. With `--json`, a failed call writes one line of
+JSON to stdout, and nothing to stderr, for example
+`{"error":{"kind":"refused","message":"close policy not met: summary, lessons","missing":["summary","lessons"]}}`.
+The object holds `kind` and `message`; `missing` is listed only for a refused close.
+The other commands (`status`,
 `doctor`, `export` and the rest) exit 1 on a failure.
 
 ### 5.3 The server
