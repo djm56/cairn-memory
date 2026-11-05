@@ -39,13 +39,38 @@ func instructionsFor(prefix string) string {
 	return strings.ReplaceAll(instructionsTemplate, "{prefix}", prefix)
 }
 
+// instructionsMarker is the first line of the instruction file enable writes for OpenCode. It says the file is cairn's own
+// text, so enable may replace the file when cairn's text changes, and it is the line a person deletes to keep their own
+// edits. The file is not the AGENTS.md block, so the marker is not in that block.
+const instructionsMarker = "<!-- cairn task loop, written by cairn enable (EXPERIMENTAL): replaced when cairn's text changes; delete this line to keep your own edits -->"
+
+// openCodeInstructionsText is the whole instruction file enable writes for OpenCode: the marker, then the task loop with
+// OpenCode's prefix.
+func openCodeInstructionsText() string {
+	return instructionsMarker + "\n" + instructionsFor(openCodeToolPrefix)
+}
+
+// sameText reports whether a and b are the same text once line endings are taken as LF. A checkout that turns LF into CRLF
+// is the same text, so it is not replaced.
+func sameText(a, b []byte) bool {
+	return bytes.Equal(bytes.ReplaceAll(a, []byte("\r\n"), []byte("\n")), bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")))
+}
+
+// hasInstructionsMarker reports whether the first line of raw, with its line ending taken as LF, is the marker.
+func hasInstructionsMarker(raw []byte) bool {
+	first, _, _ := bytes.Cut(bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n")), []byte("\n"))
+	return string(first) == instructionsMarker
+}
+
 // enableOpenCode sets up OpenCode for the project at root, EXPERIMENTAL. It adds the cairn MCP server to opencode.json
 // under "mcp", lists the instruction file in its "instructions", and writes that file. Each is merged as enable merges
 // Claude Code's settings: what is there stays, a cairn entry that differs is reported and left, and a file is written only
-// when it changes. An instruction file that is there with other content is refused, since enable did not make it.
+// when it changes. An instruction file that cairn wrote, which has the marker, is replaced when cairn's text differs, with
+// a backup first. An instruction file without the marker is someone's own, so it is left as it is, and the config is still
+// merged. A refusal of the config refuses the run, and nothing is written.
 func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 	var mcpState, listState, fileState string
-	want := []byte(instructionsFor(openCodeToolPrefix))
+	want := []byte(openCodeInstructionsText())
 	file := fileWrite{
 		path: filepath.Join(root, filepath.FromSlash(openCodeInstructions)),
 		merge: func(raw []byte, exists bool) ([]byte, bool, error) {
@@ -53,11 +78,15 @@ func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) in
 			case !exists:
 				fileState = "added"
 				return want, true, nil
-			case bytes.Equal(raw, want):
+			case sameText(raw, want):
 				fileState = "already present"
 				return nil, false, nil
+			case hasInstructionsMarker(raw):
+				fileState = "replaced"
+				return want, true, nil
 			}
-			return nil, false, errors.New("has other content, which enable does not write over")
+			fileState = "differs, left as is"
+			return nil, false, nil
 		},
 	}
 	config := fileWrite{

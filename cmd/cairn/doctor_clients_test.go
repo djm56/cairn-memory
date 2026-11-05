@@ -63,6 +63,20 @@ func TestDoctorOpenCodeAfterEnable(t *testing.T) {
 	}
 }
 
+// TestDoctorOpenCodeReadsCRLFAsTheSameText checks an instruction file with the current text and CRLF line endings, as a
+// checkout with autocrlf gives it: doctor reports it as holding the task loop.
+func TestDoctorOpenCodeReadsCRLFAsTheSameText(t *testing.T) {
+	dir := agentProject(t)
+	if code, _, stderr := runCmd(t, "enable", "--agent", "opencode"); code != 0 {
+		t.Fatalf("enable: exit %d, stderr %q", code, stderr)
+	}
+	writeSettings(t, ocInstructions(dir), strings.ReplaceAll(openCodeInstructionsText(), "\n", "\r\n"))
+
+	if c := checkNamed(experimentalChecks("opencode", dir), "instructions"); c == nil || c.status != "ok" {
+		t.Errorf("instructions is %+v, want ok for the same text with CRLF line endings", c)
+	}
+}
+
 // TestDoctorOpenCodeFlagsWhatIsNotRight checks each way the OpenCode files can be off: a cairn server with other settings,
 // a listed file that is not there, a file with other text, and a config enable would refuse.
 func TestDoctorOpenCodeFlagsWhatIsNotRight(t *testing.T) {
@@ -94,6 +108,14 @@ func TestDoctorOpenCodeFlagsWhatIsNotRight(t *testing.T) {
 				writeSettings(t, filepath.Join(dir, ".cairn", "instructions.md"), "my notes\n")
 			},
 			check: "instructions", status: "warn", contain: "holds other text",
+		},
+		{
+			name:   "a listed file with an older cairn task loop",
+			config: `{"instructions": [".cairn/instructions.md"]}`,
+			setup: func(t *testing.T, dir string) {
+				writeSettings(t, filepath.Join(dir, ".cairn", "instructions.md"), instructionsMarker+"\nan older task loop\n")
+			},
+			check: "instructions", status: "warn", contain: "holds an older cairn task loop",
 		},
 		{
 			name:   "a config that is not valid JSON",

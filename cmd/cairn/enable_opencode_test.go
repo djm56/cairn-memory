@@ -69,7 +69,7 @@ func TestOpenCodeWritesIntoAFreshProject(t *testing.T) {
 		t.Errorf("opencode.json holds %v, want %v", got, want)
 	}
 	text := string(readBytes(t, ocInstructions(dir)))
-	if text != instructionsFor("cairn_") {
+	if text != openCodeInstructionsText() {
 		t.Errorf("instruction file is not the task loop with the OpenCode prefix:\n%s", text)
 	}
 	if !strings.Contains(text, "cairn_task_current") || strings.Contains(text, "{prefix}") {
@@ -233,22 +233,88 @@ func TestOpenCodeRefusesWhatItCannotMerge(t *testing.T) {
 	}
 }
 
-// TestOpenCodeRefusesAnInstructionFileItDidNotMake checks an instruction file that is already there with other content:
-// enable does not write over it, so nothing changes, not even the config that would list it.
-func TestOpenCodeRefusesAnInstructionFileItDidNotMake(t *testing.T) {
+// ocInstructionsBackup is the backup a run at enableClock makes of the instruction file of the project called acme-api.
+func ocInstructionsBackup(t *testing.T) string {
+	t.Helper()
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(cache, "cairn", "backups", "acme-api", "instructions.md."+enableClock.Format(backupStamp))
+}
+
+// TestOpenCodeLeavesAnInstructionFileWithoutTheMarker checks an instruction file that has no marker line: someone's own, so
+// it is left as it is, with no backup, and the config is still merged to list it.
+func TestOpenCodeLeavesAnInstructionFileWithoutTheMarker(t *testing.T) {
 	dir := enableProject(t)
 	const mine = "my own notes\n"
 	writeSettings(t, ocInstructions(dir), mine)
 
 	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
-	if code != 1 || stdout != "" || !strings.Contains(stderr, "has other content, which enable does not write over") || !strings.Contains(stderr, "Nothing was changed") {
-		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the refusal named", code, stdout, stderr)
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
 	}
 	if string(readBytes(t, ocInstructions(dir))) != mine {
-		t.Errorf("the instruction file was written over")
+		t.Errorf("the instruction file was written over:\n%s", readBytes(t, ocInstructions(dir)))
 	}
-	if got := listDir(t, dir); !slices.Equal(got, []string{".cairn", ".cairn.toml"}) {
-		t.Errorf("the project holds %v, want no config", got)
+	want := map[string]any{"mcp": map[string]any{"cairn": ocCairnEntry()}, "instructions": []any{openCodeInstructions}}
+	if got := decodeJSON(t, readBytes(t, ocConfig(dir))); !reflect.DeepEqual(got, want) {
+		t.Errorf("opencode.json holds %v, want the config still merged: %v", got, want)
+	}
+	if !strings.Contains(stdout, reportLine("file", "differs, left as is", openCodeInstructions)) {
+		t.Errorf("stdout does not say the file was left as it is:\n%s", stdout)
+	}
+	if got := listDir(t, filepath.Dir(ocInstructionsBackup(t))); len(got) != 0 {
+		t.Errorf("a backup was made of a file that was not changed: %v", got)
+	}
+}
+
+// TestOpenCodeReplacesAnOlderCairnInstructionFile checks an instruction file with cairn's marker and older text: it is
+// replaced, and the original is copied to the backup first.
+func TestOpenCodeReplacesAnOlderCairnInstructionFile(t *testing.T) {
+	dir := enableProject(t)
+	older := instructionsMarker + "\nan older task loop\n"
+	writeSettings(t, ocInstructions(dir), older)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if string(readBytes(t, ocInstructions(dir))) != openCodeInstructionsText() {
+		t.Errorf("the instruction file is not the current task loop:\n%s", readBytes(t, ocInstructions(dir)))
+	}
+	backup := ocInstructionsBackup(t)
+	if !bytes.Equal(readBytes(t, backup), []byte(older)) {
+		t.Errorf("the backup is not the original file:\n%s", readBytes(t, backup))
+	}
+	if info, err := os.Stat(backup); err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("the backup is not 0600: %v, %v", info, err)
+	}
+	if !strings.Contains(stdout, reportLine("file", "replaced", openCodeInstructions)) || !strings.Contains(stdout, "backup "+backup+"\n") {
+		t.Errorf("stdout does not report the replacement and its backup:\n%s", stdout)
+	}
+	assertExperimental(t, "opencode", stdout)
+}
+
+// TestOpenCodeCountsLineEndingsAsNoDifference checks an instruction file that is the current text with CRLF line endings,
+// as a checkout with autocrlf writes it: it is already present, and it is not rewritten or backed up.
+func TestOpenCodeCountsLineEndingsAsNoDifference(t *testing.T) {
+	dir := enableProject(t)
+	crlf := strings.ReplaceAll(openCodeInstructionsText(), "\n", "\r\n")
+	writeSettings(t, ocInstructions(dir), crlf)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if string(readBytes(t, ocInstructions(dir))) != crlf {
+		t.Errorf("the CRLF file was rewritten:\n%q", readBytes(t, ocInstructions(dir)))
+	}
+	if !strings.Contains(stdout, reportLine("file", "already present", openCodeInstructions)) {
+		t.Errorf("stdout does not say the file is already present:\n%s", stdout)
+	}
+	if got := listDir(t, filepath.Dir(ocInstructionsBackup(t))); len(got) != 0 {
+		t.Errorf("a backup was made of a file that did not change: %v", got)
 	}
 }
 
@@ -359,7 +425,7 @@ func TestOpenCodeFailureOnTheSecondFileNamesTheFirst(t *testing.T) {
 		if strings.Contains(stderr, "nothing was replaced") {
 			t.Errorf("stderr says nothing was replaced, which is false here:\n%s", stderr)
 		}
-		if string(readBytes(t, ocInstructions(dir))) != instructionsFor("cairn_") {
+		if string(readBytes(t, ocInstructions(dir))) != openCodeInstructionsText() {
 			t.Errorf("the instruction file written first is not in place")
 		}
 		if string(readBytes(t, ocConfig(dir))) != other {

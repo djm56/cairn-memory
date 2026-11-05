@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -65,13 +64,15 @@ func openCodeChecks(root string) []check {
 	case !slices.Contains(list, openCodeInstructions):
 		checks = append(checks, check{name: "instructions", status: "warn", detail: openCodeInstructions + " is not listed in " + cfg + ": run cairn enable --agent opencode"})
 	default:
-		checks = append(checks, instructionsFileCheck(instructions, instructionsFor(openCodeToolPrefix), "run cairn enable --agent opencode"))
+		checks = append(checks, instructionsFileCheck(instructions, openCodeInstructionsText(), "run cairn enable --agent opencode"))
 	}
 	return checks
 }
 
-// instructionsFileCheck reports the instruction file at path against the text enable writes into it. A file that is not
-// there, or is not readable, or holds other text, is a warning, and fix is what the warning tells the person to do.
+// instructionsFileCheck reports the instruction file at path against the text enable writes into it. The line endings do not
+// count. A file that is not there, or is not readable, is a warning. So is a file with cairn's marker and older text, which
+// enable replaces, and a file without the marker, which is someone's own and which enable leaves as it is. fix is what the
+// warning tells the person to do.
 func instructionsFileCheck(path, want, fix string) check {
 	raw, err := readCheckedFile(path)
 	switch {
@@ -79,10 +80,12 @@ func instructionsFileCheck(path, want, fix string) check {
 		return check{name: "instructions", status: "warn", detail: "listed, but " + path + " is not there: " + fix}
 	case err != nil:
 		return check{name: "instructions", status: "warn", detail: path + " " + err.Error()}
-	case !bytes.Equal(raw, []byte(want)):
-		return check{name: "instructions", status: "warn", detail: path + " holds other text, not the task loop enable writes: " + fix + " once it is moved aside"}
+	case sameText(raw, []byte(want)):
+		return check{name: "instructions", status: "ok", detail: path + " holds the task loop"}
+	case hasInstructionsMarker(raw):
+		return check{name: "instructions", status: "warn", detail: path + " holds an older cairn task loop, not the one enable writes: " + fix + " to replace it"}
 	}
-	return check{name: "instructions", status: "ok", detail: path + " holds the task loop"}
+	return check{name: "instructions", status: "warn", detail: path + " holds other text, without cairn's marker, so enable leaves it as it is: " + fix + " once it is moved aside"}
 }
 
 // piChecks reads the pi files of the project at root: the cairn server in .pi/mcp.json, and the block in AGENTS.md.
