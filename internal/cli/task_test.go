@@ -459,6 +459,47 @@ func TestTaskJSONEscapesTerminalCharacters(t *testing.T) {
 	}
 }
 
+// TestTaskJSONEscapesEveryFormatCharacter checks that --json escapes each Unicode format character
+// (category Cf), not only the bidi overrides and isolates: the left-to-right and arabic letter
+// marks, the zero-width characters, the word joiner, the soft hyphen, the byte order mark, and a
+// tag character above U+FFFF, which is written as a surrogate pair. Each is built from its code
+// point, and the title decodes back to the same text.
+func TestTaskJSONEscapesEveryFormatCharacter(t *testing.T) {
+	for _, r := range []rune{0x200e, 0x200f, 0x061c, 0x200b, 0xfeff, 0x00ad, 0x2060, 0x2069, 0xe0001, 0xe0041} {
+		ch := string(r)
+		task := activeTask()
+		task.Title = "a" + ch + "b"
+		svc := &fakeTasks{detail: &core.TaskDetail{Task: task}}
+		code, out, errOut := runTask(t, svc, "get", "--json", "task-20261030-01")
+		if code != 0 || errOut != "" || !oneLine(out) {
+			t.Fatalf("%U: exit %d, stderr %q, output %q; want one line and exit 0", r, code, errOut, out)
+		}
+		if strings.Contains(out, ch) {
+			t.Errorf("--json output holds the raw character %U", r)
+		}
+		if esc := jsonEscapeOf(r); !strings.Contains(out, esc) {
+			t.Errorf("--json output lacks the escape %s for %U", esc, r)
+		}
+		var got core.TaskDetail
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			t.Fatalf("%U: --json output does not decode: %v", r, err)
+		}
+		if got.Task.Title != task.Title {
+			t.Errorf("%U: the title decodes to %+q, want %+q", r, got.Task.Title, task.Title)
+		}
+	}
+}
+
+// jsonEscapeOf returns the escape --json writes for r: one \u escape up to U+FFFF, and the
+// surrogate pair above it.
+func jsonEscapeOf(r rune) string {
+	if r <= 0xffff {
+		return `\u` + hex4(r)
+	}
+	r -= 0x10000
+	return `\u` + hex4(0xd800+(r>>10)) + `\u` + hex4(0xdc00+(r&0x3ff))
+}
+
 // hex4 returns the four lower-case hex digits of r, as a JSON escape holds them.
 func hex4(r rune) string {
 	const digits = "0123456789abcdef"

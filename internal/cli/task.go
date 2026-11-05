@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -263,16 +264,17 @@ func writeJSON(stdout, stderr io.Writer, command string, v any) int {
 }
 
 // escapeTerminal returns the encoded JSON b with each character a terminal can act on written
-// as a \uXXXX escape: DEL, the C1 controls U+0080 to U+009F (U+009B is the single-byte CSI), and
-// the bidirectional embeddings and overrides U+202A to U+202E and isolates U+2066 to U+2069. The
-// encoder writes these raw. Each can occur only inside a JSON string, since JSON's own syntax is
-// ASCII, and an escape is valid there, so the result decodes to the same value.
+// as a JSON escape: DEL, the C1 controls U+0080 to U+009F (U+009B is the single-byte CSI), and
+// every format character of Unicode category Cf, which holds the bidi marks, overrides and
+// isolates, the zero-width characters and the tag characters. The encoder writes these raw. Each
+// can occur only inside a JSON string, since JSON's own syntax is ASCII, and an escape is valid
+// there, so the result decodes to the same value.
 func escapeTerminal(b []byte) []byte {
 	var out bytes.Buffer
 	for len(b) > 0 {
 		r, size := utf8.DecodeRune(b)
 		if needsEscape(r) {
-			fmt.Fprintf(&out, `\u%04x`, r)
+			writeEscape(&out, r)
 		} else {
 			out.Write(b[:size])
 		}
@@ -281,15 +283,23 @@ func escapeTerminal(b []byte) []byte {
 	return out.Bytes()
 }
 
-// needsEscape reports whether r is one of the characters escapeTerminal writes as an escape.
-func needsEscape(r rune) bool {
-	switch {
-	case r == 0x7f, r >= 0x80 && r <= 0x9f:
-		return true
-	case r >= 0x202a && r <= 0x202e, r >= 0x2066 && r <= 0x2069:
-		return true
+// writeEscape writes r as a JSON escape. A code point up to U+FFFF is one \uXXXX. A code point
+// above it, such as a tag character, is the UTF-16 surrogate pair JSON uses for it, so a decoder
+// reads back the same rune. A single \uXXXX above U+FFFF would read as a different character.
+func writeEscape(out *bytes.Buffer, r rune) {
+	if r <= 0xffff {
+		fmt.Fprintf(out, `\u%04x`, r)
+		return
 	}
-	return false
+	r -= 0x10000
+	fmt.Fprintf(out, `\u%04x\u%04x`, 0xd800+(r>>10), 0xdc00+(r&0x3ff))
+}
+
+// needsEscape reports whether r is one of the characters escapeTerminal writes as an escape:
+// DEL, the C1 controls, and every character of Unicode category Cf. It is the set a person's
+// terminal can act on, and the same set the human text path drops (isFormat in text.go).
+func needsEscape(r rune) bool {
+	return r == 0x7f || (r >= 0x80 && r <= 0x9f) || unicode.Is(unicode.Cf, r)
 }
 
 // given reports whether the flag called name was set on the command line. A flag left out is
