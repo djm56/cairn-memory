@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/djm56/cairn-memory/internal/cli"
@@ -33,16 +34,16 @@ const backupStamp = "20060102T150405Z"
 // chooses.
 var enableNow = func() time.Time { return time.Now().UTC() }
 
-// backupPath is where enable copies a project's settings file before it writes it: the user's cache directory, under
-// cairn/backups/<name>, named settings.local.json and the UTC time at. The cache directory is outside the project, so
-// a copy of a local settings file, which may hold secrets, is never in the project's tree, where a version control
-// command could pick it up. It is an error when the cache directory cannot be found.
-func backupPath(name string, at time.Time) (string, error) {
+// backupPath is where enable copies a file before it changes it: the user's cache directory, under cairn/backups/<project>,
+// named after the file and the UTC time at. The cache directory is outside the project, so a copy of a file that may hold
+// secrets is never in the project's tree, where a version control command could pick it up. It is an error when the cache
+// directory cannot be found.
+func backupPath(project, file string, at time.Time) (string, error) {
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(cache, "cairn", "backups", name, settingsName+"."+at.Format(backupStamp)), nil
+	return filepath.Join(cache, "cairn", "backups", project, file+"."+at.Format(backupStamp)), nil
 }
 
 // claudeHook is one hook enable installs for Claude Code: the event it is registered under, the matcher that
@@ -90,17 +91,18 @@ type hookCommand struct {
 	Command string `json:"command"`
 }
 
-// runEnable is the sub-command `cairn enable --agent <name> [--dry-run]` (DESIGN.md §5.2). It installs the hooks a
-// client needs into the project's settings. Only claude-code is built. It changes nothing that is already there:
-// each hook is added only when its command is not registered under its event yet.
+// runEnable is the sub-command `cairn enable --agent <name> [--dry-run]` (DESIGN.md §5.2). It sets up a client for the
+// project: the hooks of claude-code in the project's settings, and the registration and instructions of opencode and pi,
+// which are EXPERIMENTAL. It changes nothing that is already there: a file is written only when something in it is
+// missing.
 //
-// The project is found as the other commands find it, from its .cairn.toml, and the settings file is in the
-// directory of that file. Exit codes: 0 when the hooks are in place, or a dry run was done; 1 when the project is
-// not found or the settings file cannot be read, merged or written; 2 for a usage error.
+// The project is found as the other commands find it, from its .cairn.toml, and the files are in the directory of that
+// file. Exit codes: 0 when the files are in place, or a dry run was done; 1 when the project is not found or a file cannot be
+// read, merged or written; 2 for a usage error.
 func runEnable(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairn enable", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
-	agent := fl.String("agent", "", "the client to install hooks for: claude-code")
+	agent := fl.String("agent", "", "the client to set up: claude-code, or opencode and pi (both EXPERIMENTAL)")
 	dryRun := fl.Bool("dry-run", false, "print what would be added and write nothing")
 	if err := fl.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -110,20 +112,24 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn enable: %v; run cairn enable --help for the flags\n", err)
 		return 2
 	}
+	if *agent != "claude-code" && *agent != "" {
+		// Every line enable prints for an experimental client says so, including its refusals.
+		stdout, stderr = tagLines(stdout, experimentalPrefix(*agent)), tagLines(stderr, experimentalPrefix(*agent))
+	}
 	if fl.NArg() > 0 {
 		fmt.Fprintf(stderr, "cairn enable: takes flags only, got %q\n", fl.Args())
 		return 2
 	}
 	switch *agent {
 	case "":
-		fmt.Fprintln(stderr, "cairn enable: needs --agent <name>: use --agent claude-code")
+		fmt.Fprintln(stderr, "cairn enable: needs --agent <name>: use --agent claude-code, opencode or pi")
 		return 2
 	case "claude-code":
 	case "opencode", "pi":
 		fmt.Fprintf(stderr, "cairn enable: --agent %s is not built yet: use --agent claude-code\n", *agent)
 		return 2
 	default:
-		fmt.Fprintf(stderr, "cairn enable: unknown agent %q: use --agent claude-code\n", *agent)
+		fmt.Fprintf(stderr, "cairn enable: unknown agent %q: use --agent claude-code, opencode or pi\n", *agent)
 		return 2
 	}
 
@@ -160,118 +166,188 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fl.PrintDefaults()
 }
 
-// enableClaudeCode merges the Claude Code hooks into the settings file of the project called name, at root. The file
-// is read and merged in memory first, so a refusal leaves it as it was. A write copies the original to a backup
-// outside the project (backupPath), then puts the new file in place with one rename. Dry run prints the same lines
-// and writes nothing.
-func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
-	dir := filepath.Join(root, settingsDir)
-	path := filepath.Join(dir, settingsName)
-	info, err := os.Lstat(path)
-	exists := err == nil
+// fileWrite is one file enable may write: its path, and the merge that gives its new bytes from the bytes it holds now.
+// merge is given nil and exists false when the file is not there. It returns the bytes to write and whether they differ
+// from what is there. An error is a refusal: its text completes the sentence "<path> ...".
+type fileWrite struct {
+	path  string
+	merge func(raw []byte, exists bool) (content []byte, changed bool, err error)
+}
+
+// planned is a file enable has read and merged, and has not yet written.
+type planned struct {
+	fileWrite
+	exists  bool
+	mode    fs.FileMode
+	raw     []byte      // the bytes read, when the file exists
+	read    fs.FileInfo // the stat taken before the read, when the file exists
+	content []byte      // the bytes to write, when changed
+	changed bool
+}
+
+// planWrite looks at the file at fw.path, refuses what enable does not write through, reads it and merges it. Nothing is
+// written. The error names the file and says nothing was changed.
+func planWrite(fw fileWrite) (planned, error) {
+	p := planned{fileWrite: fw, mode: 0o644}
+	info, err := os.Lstat(fw.path)
+	p.exists = err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		fmt.Fprintf(stderr, "cairn enable: look for %s: %v\n", path, err)
-		return 1
+		return planned{}, fmt.Errorf("look for %s: %v", fw.path, err)
 	}
-	mode := fs.FileMode(0o644)
-	var raw []byte
-	var read fs.FileInfo
-	if exists {
+	if p.exists {
 		// A link is not followed: a rename over it would replace the link with a file, so the file it names is not touched.
 		switch {
 		case info.Mode()&fs.ModeSymlink != 0:
-			fmt.Fprintf(stderr, "cairn enable: %s is a symbolic link: enable does not write through a link, so edit the file it names by hand\n", path)
-			return 1
+			return planned{}, fmt.Errorf("%s is a symbolic link: enable does not write through a link, so edit the file it names by hand", fw.path)
 		case !info.Mode().IsRegular():
-			fmt.Fprintf(stderr, "cairn enable: %s is not a regular file\n", path)
-			return 1
+			return planned{}, fmt.Errorf("%s is not a regular file", fw.path)
 		}
-		raw, err = os.ReadFile(path)
+		raw, err := os.ReadFile(fw.path)
 		if err != nil {
-			fmt.Fprintf(stderr, "cairn enable: read %s: %v\n", path, err)
-			return 1
+			return planned{}, fmt.Errorf("read %s: %v", fw.path, err)
 		}
 		// The rename must find the file as the stat before the read saw it. A save between that stat and the read is then
 		// a change, and the rename is refused. A stat taken after the read would record such a save as the baseline.
-		read = info
-		mode = info.Mode().Perm()
+		p.raw, p.read, p.mode = raw, info, info.Mode().Perm()
 	}
-
-	doc, results, changed, err := addClaudeHooks(raw, exists, claudeHooks)
+	content, changed, err := fw.merge(p.raw, p.exists)
 	if err != nil {
-		fmt.Fprintf(stderr, "cairn enable: %s %v. Nothing was changed: fix the file by hand, then run cairn enable again\n", path, err)
-		return 1
+		return planned{}, fmt.Errorf("%s %v. Nothing was changed: fix the file by hand, then run cairn enable again", fw.path, err)
 	}
-	// The new content and the backup are made before anything is printed or written to the project, so a refusal here
-	// reports nothing as done. The backup's directory is made before the project's directory, so a failed backup
-	// leaves the project's directory as it was.
-	var content []byte
-	var backup string
-	if changed && !dryRun {
-		if content, err = encodeSettings(doc); err != nil {
-			fmt.Fprintf(stderr, "cairn enable: encode %s: %v; nothing was changed\n", path, err)
+	p.content, p.changed = content, changed
+	return p, nil
+}
+
+// backupWrite copies the original of a planned file that exists to the backup directory, and returns the copy's path. A
+// file that does not exist has nothing to copy, so it returns "". A failure leaves the project as it was.
+func backupWrite(p planned, project string) (string, error) {
+	if !p.exists {
+		return "", nil
+	}
+	backup, err := backupPath(project, filepath.Base(p.path), enableNow())
+	if err != nil {
+		return "", fmt.Errorf("find a place for the backup of %s: %v; nothing was changed: set HOME or XDG_CACHE_HOME, then run cairn enable again", p.path, err)
+	}
+	// The backup's directories are private: the copy may hold secrets, and a name in the directory tells who uses cairn.
+	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
+		return "", fmt.Errorf("create %s: %v; nothing was changed", filepath.Dir(backup), err)
+	}
+	if err := copyNew(backup, p.raw); err != nil {
+		return "", fmt.Errorf("back up %s: %v; nothing was changed", p.path, err)
+	}
+	return backup, nil
+}
+
+// replaceWrite puts the new bytes of a planned file in place. backup is the copy made of the original, or "". A file that
+// changed since it was read is not replaced, and the error says so, with the backup's path when there is one.
+func replaceWrite(p planned, backup string) error {
+	dir := filepath.Dir(p.path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %v", dir, err)
+	}
+	err := replaceFile(p.path, p.content, p.mode, p.exists, unchangedCheck(p.path, p.read))
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, errChanged) && backup != "":
+		return fmt.Errorf("%s %v: nothing was replaced, and the original is kept at %s; run cairn enable again", p.path, err, backup)
+	case errors.Is(err, errChanged):
+		return fmt.Errorf("%s %v: nothing was replaced; run cairn enable again", p.path, err)
+	}
+	return fmt.Errorf("write %s: %v; the file was not replaced", p.path, err)
+}
+
+// enableWrites does what enable does for a set of files, in the order given. It plans every file first, so a refusal
+// stops the run with nothing written. When no file changed it reports that. A dry run reports what would change and writes
+// nothing. Otherwise it backs up each changed file that exists, then replaces each changed file, and reports only once
+// every write has worked, so stdout is empty when a write is refused. report builds the lines printed on every path that
+// reports; it is called after the planning, so it can use what the merges found.
+func enableWrites(files []fileWrite, project string, dryRun bool, report func() string, stdout, stderr io.Writer) int {
+	plans := make([]planned, 0, len(files))
+	for _, fw := range files {
+		p, err := planWrite(fw)
+		if err != nil {
+			fmt.Fprintf(stderr, "cairn enable: %v\n", err)
 			return 1
 		}
-		if exists {
-			if backup, err = backupPath(name, enableNow()); err != nil {
-				fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed: set HOME or XDG_CACHE_HOME, then run cairn enable again\n", path, err)
-				return 1
-			}
-			if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
-				fmt.Fprintf(stderr, "cairn enable: create %s: %v; nothing was changed\n", filepath.Dir(backup), err)
-				return 1
-			}
-			if err := copyNew(backup, raw); err != nil {
-				fmt.Fprintf(stderr, "cairn enable: back up %s: %v; nothing was changed\n", path, err)
-				return 1
-			}
+		plans = append(plans, p)
+	}
+	var changed []planned
+	for _, p := range plans {
+		if p.changed {
+			changed = append(changed, p)
 		}
 	}
-	// The per-hook lines are built now and printed only when the outcome is known: on the unchanged and dry-run paths,
-	// and after the rename. A refusal after this point therefore leaves stdout empty, and stderr says why.
-	lines := hookLines(results)
-	if !changed {
-		fmt.Fprint(stdout, lines)
-		fmt.Fprintf(stdout, "unchanged: %s\n", path)
+	if len(changed) == 0 {
+		fmt.Fprint(stdout, report())
+		for _, p := range plans {
+			fmt.Fprintf(stdout, "unchanged: %s\n", p.path)
+		}
 		warnIfNotOnPath(stderr)
 		return 0
 	}
 	if dryRun {
-		fmt.Fprint(stdout, lines)
-		fmt.Fprintf(stdout, "dry run: nothing written to %s\n", path)
+		fmt.Fprint(stdout, report())
+		for _, p := range changed {
+			fmt.Fprintf(stdout, "dry run: nothing written to %s\n", p.path)
+		}
 		warnIfNotOnPath(stderr)
 		return 0
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(stderr, "cairn enable: create %s: %v\n", dir, err)
-		return 1
-	}
-	if err := replaceFile(path, content, mode, exists, unchangedCheck(path, read)); err != nil {
-		if errors.Is(err, errChanged) {
-			if backup != "" {
-				fmt.Fprintf(stderr, "cairn enable: %s %v: nothing was replaced, and the original is kept at %s; run cairn enable again\n", path, err, backup)
-			} else {
-				fmt.Fprintf(stderr, "cairn enable: %s %v: nothing was replaced; run cairn enable again\n", path, err)
-			}
+	backups := make(map[string]string, len(changed))
+	for _, p := range changed {
+		backup, err := backupWrite(p, project)
+		if err != nil {
+			fmt.Fprintf(stderr, "cairn enable: %v\n", err)
 			return 1
 		}
-		fmt.Fprintf(stderr, "cairn enable: write %s: %v; the file was not replaced\n", path, err)
-		return 1
+		backups[p.path] = backup
 	}
-	fmt.Fprint(stdout, lines)
-	fmt.Fprintf(stdout, "wrote %s\n", path)
-	if backup != "" {
-		fmt.Fprintf(stdout, "backup %s\n", backup)
+	for _, p := range changed {
+		if err := replaceWrite(p, backups[p.path]); err != nil {
+			fmt.Fprintf(stderr, "cairn enable: %v\n", err)
+			return 1
+		}
+	}
+	fmt.Fprint(stdout, report())
+	for _, p := range changed {
+		fmt.Fprintf(stdout, "wrote %s\n", p.path)
+		if backup := backups[p.path]; backup != "" {
+			fmt.Fprintf(stdout, "backup %s\n", backup)
+		}
 	}
 	warnIfNotOnPath(stderr)
 	return 0
 }
 
-// hookLines is the line enable prints for each hook, one per result and in order: the event, what became of its hook, and
-// the command. The lines are text, so the caller decides when they are printed.
+// enableClaudeCode merges the Claude Code hooks into the settings file of the project called name, at root. The file is
+// read and merged in memory first, so a refusal leaves it as it was. Dry run prints the same lines and writes nothing.
+func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
+	var results []hookResult
+	fw := fileWrite{
+		path: filepath.Join(root, settingsDir, settingsName),
+		merge: func(raw []byte, exists bool) ([]byte, bool, error) {
+			doc, res, changed, err := addClaudeHooks(raw, exists, claudeHooks)
+			results = res
+			if err != nil || !changed {
+				return nil, changed, err
+			}
+			content, err := encodeSettings(doc)
+			return content, err == nil, err
+		},
+	}
+	return enableWrites([]fileWrite{fw}, name, dryRun, func() string { return hookLines(results) }, stdout, stderr)
+}
+
+// reportLine is one line of what enable reports: what the line is about, what became of it, and the detail.
+func reportLine(what, state, detail string) string {
+	return fmt.Sprintf("%-12s %-17s %s\n", what, state, detail)
+}
+
+// hookLines is the report for the Claude Code hooks: one line per hook, in order.
 func hookLines(results []hookResult) string {
-	var b bytes.Buffer
+	var b strings.Builder
 	for _, r := range results {
 		state := "already present"
 		switch {
@@ -283,17 +359,17 @@ func hookLines(results []hookResult) string {
 		case r.differs:
 			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
 		}
-		fmt.Fprintf(&b, "%-12s %-17s %s\n", r.hook.event, state, r.hook.cmdline)
+		b.WriteString(reportLine(r.hook.event, state, r.hook.cmdline))
 	}
 	return b.String()
 }
 
-// warnIfNotOnPath warns on stderr when cairn is not on the PATH of this shell. The hooks run the bare command cairn,
-// so the client that runs them must find it on its own PATH. enable cannot see that PATH, so the warning is only a
-// guide. It does not change the exit code.
+// warnIfNotOnPath warns on stderr when cairn is not on the PATH of this shell. The hooks and the MCP registrations run the
+// bare command cairn, so the client that runs them must find it on its own PATH. enable cannot see that PATH, so the
+// warning is only a guide. It does not change the exit code.
 func warnIfNotOnPath(stderr io.Writer) {
 	if _, err := exec.LookPath("cairn"); err != nil {
-		fmt.Fprintln(stderr, "cairn enable: warning: cairn is not on the PATH of this shell; the hooks run cairn by name, so put the binary on the PATH Claude Code uses")
+		fmt.Fprintln(stderr, "cairn enable: warning: cairn is not on the PATH of this shell; the client runs cairn by name, so put the binary on the PATH the client uses")
 	}
 }
 
@@ -449,20 +525,20 @@ func copyNew(path string, content []byte) error {
 	return nil
 }
 
-// errChanged is what the check before the rename returns when the settings file changed since enable read it. The
-// rename would then replace another writer's save, so it is not made.
+// errChanged is what the check before the rename returns when the file changed since enable read it. The rename would
+// then replace another writer's save, so it is not made.
 var errChanged = errors.New("it changed after enable read it")
 
 // beforeRename runs after the new file is synced and before the check and the rename. It is a variable so a test can
-// change the settings file at that moment.
+// change the file at that moment.
 var beforeRename = func() {}
 
 // renameFile is the rename that puts the new file in place. It is a variable so a test can make it fail.
 var renameFile = os.Rename
 
 // unchangedCheck returns the check replaceFile runs before its rename. The file must still be the one enable read: the
-// same size and modification time, or still absent when read is nil, which is when enable found no file. A file that
-// is there now, when none was read, or that is gone, or that has changed, is errChanged, so nothing is replaced.
+// same size and modification time, or still absent when read is nil, which is when enable found no file. A file that is
+// there now, when none was read, or that is gone, or that has changed, is errChanged, so nothing is replaced.
 func unchangedCheck(path string, read fs.FileInfo) func() error {
 	return func() error {
 		now, err := os.Lstat(path)
@@ -491,7 +567,7 @@ func unchangedCheck(path string, read fs.FileInfo) func() error {
 // temporary file is removed.
 func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool, unchanged func() error) error {
 	dir := filepath.Dir(path)
-	tmp := filepath.Join(dir, "."+settingsName+"."+rand.Text()+".tmp")
+	tmp := filepath.Join(dir, "."+filepath.Base(path)+"."+rand.Text()+".tmp")
 	createMode := fs.FileMode(0o644)
 	if keepMode {
 		createMode = 0o600
