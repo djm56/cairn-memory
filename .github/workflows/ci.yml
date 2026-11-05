@@ -41,11 +41,11 @@ jobs:
       - name: go test -race
         run: make test
 
-      - name: Cross-compile and vet for Windows and macOS
-        # A compile check only, so a platform break is caught on the pull request. It does not make
-        # Windows a supported target: nothing here runs the binaries built for it. go vet compiles
-        # the _test.go files as well, which go build skips, so a break in a test file is caught too.
-        run: GOOS=windows go build ./... && GOOS=windows go vet ./... && GOOS=darwin go build ./... && GOOS=darwin go vet ./...
+      - name: Cross-compile and vet for Windows, macOS, FreeBSD and OpenBSD
+        # A compile check only, so a platform break is caught on the pull request. None of these
+        # is run here, and Windows is not a supported target. The targets are in the Makefile
+        # (cross), where go vet compiles the _test.go files as well.
+        run: make cross
 
       - name: Invisible and bidirectional characters
         # Refuses a tracked file that holds one, including a byte-order mark (Makefile, scan-invisible).

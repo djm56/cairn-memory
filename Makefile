@@ -5,7 +5,7 @@ APP=cairn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt fmt-check scan-invisible scan-local-paths run mutation
+.PHONY: build test vet fmt fmt-check cross scan-invisible scan-local-paths run mutation
 
 build:
 	mkdir -p bin
@@ -26,6 +26,13 @@ fmt-check:
 	if [ -n "$$unformatted" ]; then \
 	  echo "Not gofmt-formatted (run 'make fmt'):"; echo "$$unformatted"; exit 1; \
 	fi
+
+# Cross-compiles and vets the module for each other system the code is built for. go vet
+# compiles the _test.go files too, which go build skips, so a break in a test file is caught.
+# This is a compile check only: nothing here runs the binaries. Linux is the test target, and
+# the other systems are compiled, not run. CI runs it on every pull request.
+cross:
+	GOOS=windows go build ./... && GOOS=windows go vet ./... && GOOS=darwin go build ./... && GOOS=darwin go vet ./... && GOOS=freebsd go build ./... && GOOS=freebsd go vet ./... && GOOS=openbsd go build ./... && GOOS=openbsd go vet ./...
 
 # Fails and lists the files when a tracked file holds a bidirectional override, isolate or mark
 # (U+202A to U+202E, U+2066 to U+2069, U+061C), a zero-width or invisible character (U+200B to
