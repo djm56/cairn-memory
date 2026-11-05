@@ -33,12 +33,16 @@ type command func(open Opener, args []string, stdin io.Reader, stdout, stderr io
 
 // agentName returns the calling agent: the --agent flag when it was given, else EnvAgent. A
 // name of only spaces is no name, as CONTRACT §1.1 says. A write (required) with no name is a
-// usage error that names both sources, and ok is false. A read is not refused; it runs with no
-// agent.
+// usage error that names both sources, and ok is false. A name the wire form cannot carry, one
+// with a control character or a space at either end, is a usage error too, and the message names
+// the source it came from, so the fix is at the place it was set. A read with no name is not
+// refused; it runs with no agent.
 func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, stderr io.Writer) (name string, ok bool) {
 	name = flagValue
+	source := "--agent"
 	if !given(fl, "agent") {
 		name = os.Getenv(EnvAgent)
+		source = EnvAgent
 	}
 	if strings.TrimSpace(name) == "" {
 		if required {
@@ -46,6 +50,10 @@ func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, s
 			return "", false
 		}
 		return "", true
+	}
+	if err := core.CheckCaller(core.Caller{Agent: name}); err != nil {
+		fmt.Fprintf(stderr, "%s: the name from %s is refused: %s\n", verb, source, Reason(err))
+		return "", false
 	}
 	return name, true
 }

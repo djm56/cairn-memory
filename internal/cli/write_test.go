@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"strings"
 	"testing"
@@ -78,6 +79,68 @@ func TestAgentNameForAWriteNamesBothSources(t *testing.T) {
 	stderr.Reset()
 	if _, ok := agentName(fl2, *blank, true, "cairn task start", &stderr); ok {
 		t.Error("a blank --agent was replaced by the variable instead of refused")
+	}
+}
+
+// TestAgentNameIsCheckedBeforeTheCall checks that an agent name the wire form cannot carry is a
+// usage error, exit 2, before the project is opened and before any call. The name is refused from
+// the flag and from the variable, for a write and for a read, with a trailing space and with a
+// control character. The message names where the name came from, and does not print the control
+// character raw.
+func TestAgentNameIsCheckedBeforeTheCall(t *testing.T) {
+	bad := []struct{ label, name string }{
+		{"a trailing space", "hicks "},
+		{"a control character", "hicks" + string(rune(1))},
+	}
+	for _, b := range bad {
+		for _, source := range []string{"flag", "variable"} {
+			for _, verb := range []string{"write", "read"} {
+				t.Run(b.label+" from the "+source+" on a "+verb, func(t *testing.T) {
+					t.Setenv(EnvAgent, "")
+					if source == "variable" {
+						t.Setenv(EnvAgent, b.name)
+					}
+					var cmd command
+					var calls func() int
+					var svc core.Service
+					var args []string
+					if verb == "write" {
+						cmd = Event
+						fw := &fakeWrites{event: &core.Event{}}
+						svc, calls = fw, func() int { return fw.calls }
+						args = []string{"log", "task-20261030-01", "--kind", "note", "--text", "x"}
+					} else {
+						cmd = Task
+						ft := &fakeTasks{cur: &core.TaskCurrent{}}
+						svc, calls = ft, func() int { return ft.calls }
+						args = []string{"current"}
+					}
+					if source == "flag" {
+						args = append(args, "--agent", b.name)
+					}
+					opened := false
+					open := func() (Session, error) {
+						opened = true
+						return Session{Svc: svc, Ctx: core.WithCaller(context.Background(), testCaller)}, nil
+					}
+					var out, errOut bytes.Buffer
+					code := cmd(open, args, strings.NewReader(""), &out, &errOut)
+					if code != 2 || opened || calls() != 0 {
+						t.Fatalf("exit %d, opened %v, calls %d; want a usage error with no open and no call", code, opened, calls())
+					}
+					wantSource := "--agent"
+					if source == "variable" {
+						wantSource = EnvAgent
+					}
+					if !strings.Contains(errOut.String(), wantSource) || !strings.Contains(errOut.String(), "is refused") {
+						t.Errorf("stderr %q does not name the source %s", errOut.String(), wantSource)
+					}
+					if strings.ContainsRune(errOut.String(), 1) {
+						t.Errorf("stderr %q holds the control character raw", errOut.String())
+					}
+				})
+			}
+		}
 	}
 }
 

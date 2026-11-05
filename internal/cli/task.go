@@ -79,7 +79,10 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn task current: takes no task id, got %q\n", pos)
 		return 2
 	}
-	name, _ := agentName(fl, *agent, false, "cairn task current", stderr)
+	name, ok := agentName(fl, *agent, false, "cairn task current", stderr)
+	if !ok {
+		return 2
+	}
 	s, err := open()
 	if err != nil {
 		return fail(stderr, "cairn task current", err)
