@@ -326,6 +326,44 @@ func TestPiRefusesPathsItCannotWriteThrough(t *testing.T) {
 	}
 }
 
+// TestPiRefusesADotPiThatLeavesTheProject checks a .pi that is a link to a directory outside the project: enable would write
+// the registration into that directory, so it refuses while it plans, with exit 1, nothing written outside the project and
+// nothing written inside it. A .pi that is a dangling link is refused too, since enable cannot tell where it would write.
+func TestPiRefusesADotPiThatLeavesTheProject(t *testing.T) {
+	t.Run("a link to a directory outside", func(t *testing.T) {
+		dir := enableProject(t)
+		outside := t.TempDir()
+		if err := os.Symlink(outside, filepath.Join(dir, ".pi")); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "leads outside the project") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the link named", code, stdout, stderr)
+		}
+		if got := listDir(t, outside); len(got) != 0 {
+			t.Errorf("a file was written outside the project: %v", got)
+		}
+		if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml", ".pi"}) {
+			t.Errorf("the project holds %v, want the project file and the link alone", got)
+		}
+	})
+	t.Run("a dangling link", func(t *testing.T) {
+		dir := enableProject(t)
+		if err := os.Symlink(filepath.Join(dir, "nowhere"), filepath.Join(dir, ".pi")); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "cannot be resolved") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the link refused", code, stdout, stderr)
+		}
+		if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml", ".pi"}) {
+			t.Errorf("the project holds %v, want the project file and the link alone", got)
+		}
+	})
+}
+
 // TestPiRefusesASymlinkedAgentsFile checks an AGENTS.md that is a symbolic link: the file it names is not touched.
 func TestPiRefusesASymlinkedAgentsFile(t *testing.T) {
 	dir := enableProject(t)

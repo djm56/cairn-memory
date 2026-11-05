@@ -181,7 +181,7 @@ func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) in
 			reportLine("file", fileState, openCodeInstructions)
 	}
 	// The instruction file is written first, so the config never lists a file that is not there.
-	return enableWrites([]fileWrite{file, config}, name, dryRun, report, stdout, stderr)
+	return enableWrites([]fileWrite{file, config}, root, name, dryRun, report, stdout, stderr)
 }
 
 // The names enable writes for pi. pi reads .pi/mcp.json only after the project is trusted, and reads AGENTS.md without trust.
@@ -305,7 +305,7 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 			reportLine("instructions", blockState, piAgents+" block") +
 			reportLine("trust", "needs trust", "pi reads "+piConfig+" only after the project is trusted")
 	}
-	return enableWrites([]fileWrite{config, agents}, name, dryRun, report, stdout, stderr)
+	return enableWrites([]fileWrite{config, agents}, root, name, dryRun, report, stdout, stderr)
 }
 
 // jsonObject decodes raw as the top-level object of a JSON file, keeping each member as its raw JSON. A file that is not

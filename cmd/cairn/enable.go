@@ -193,11 +193,44 @@ type planned struct {
 	changed bool
 }
 
-// planWrite looks at the file at fw.path, refuses what enable does not write through, reads it and merges it. A file larger
-// than maxSettingsBytes is refused, as doctor refuses to read it. Nothing is written. The error names the file and says
-// nothing was changed.
-func planWrite(fw fileWrite) (planned, error) {
+// insideProject returns an error when dir, once its links are followed, is not inside root. The part of dir that does not
+// exist yet holds no links, so only the nearest part that does exist is resolved. A link that leads nowhere is refused too,
+// since enable cannot tell where it would write.
+func insideProject(dir, root string) error {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("the project directory %s cannot be resolved: %v", root, err)
+	}
+	existing := dir
+	for {
+		if _, err := os.Lstat(existing); err == nil {
+			break
+		}
+		parent := filepath.Dir(existing)
+		if parent == existing {
+			break
+		}
+		existing = parent
+	}
+	resolved, err := filepath.EvalSymlinks(existing)
+	if err != nil {
+		return fmt.Errorf("%s cannot be resolved, so enable cannot tell where it writes: %v", existing, err)
+	}
+	rel, err := filepath.Rel(realRoot, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return fmt.Errorf("%s is reached through a link that leads outside the project: enable does not write outside the project, so edit the file by hand", dir)
+	}
+	return nil
+}
+
+// planWrite looks at the file at fw.path, refuses what enable does not write through, reads it and merges it. The directory
+// the file goes in must stay inside root once its links are followed. A file larger than maxSettingsBytes is refused, as
+// doctor refuses to read it. Nothing is written. The error names the file and says nothing was changed.
+func planWrite(fw fileWrite, root string) (planned, error) {
 	p := planned{fileWrite: fw, mode: 0o644}
+	if err := insideProject(filepath.Dir(fw.path), root); err != nil {
+		return planned{}, err
+	}
 	info, err := os.Lstat(fw.path)
 	p.exists = err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -287,16 +320,17 @@ func replaceWrite(p planned, backup string) error {
 	return fmt.Errorf("write %s: %v; the file was not replaced", p.path, err)
 }
 
-// enableWrites does what enable does for a set of files, in the order given. It plans every file first, so a refusal
+// enableWrites does what enable does for a set of files, in the order given. root is the project directory, which every file
+// must stay inside once its links are followed. It plans every file first, so a refusal
 // stops the run with nothing written. When no file changed it reports that. A dry run reports what would change and writes
 // nothing. Otherwise it backs up each changed file that exists, then replaces each changed file, and reports only once
 // every write has worked, so stdout is empty when a write is refused. A write that fails after an earlier one has worked
 // names each file already written, with its original, on stderr. report builds the lines printed on every path that
 // reports; it is called after the planning, so it can use what the merges found.
-func enableWrites(files []fileWrite, project string, dryRun bool, report func() string, stdout, stderr io.Writer) int {
+func enableWrites(files []fileWrite, root, project string, dryRun bool, report func() string, stdout, stderr io.Writer) int {
 	plans := make([]planned, 0, len(files))
 	for _, fw := range files {
-		p, err := planWrite(fw)
+		p, err := planWrite(fw, root)
 		if err != nil {
 			fmt.Fprintf(stderr, "cairn enable: %v\n", err)
 			return 1
@@ -380,7 +414,7 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 			return content, err == nil, err
 		},
 	}
-	return enableWrites([]fileWrite{fw}, name, dryRun, func() string { return hookLines(results) }, stdout, stderr)
+	return enableWrites([]fileWrite{fw}, root, name, dryRun, func() string { return hookLines(results) }, stdout, stderr)
 }
 
 // reportLine is one line of what enable reports: what the line is about, what became of it, and the detail.
