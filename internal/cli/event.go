@@ -53,6 +53,10 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 		fmt.Fprintln(stderr, verb+": --step must be a step number, 1 or more; leave it out for the task")
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.EventLogRequest{TaskID: pos[0], Kind: core.EventKind(*kind)}
 	var err error
@@ -72,10 +76,6 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 			return usageErr(stderr, verb, err)
 		}
 		req.Data = json.RawMessage(raw)
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {

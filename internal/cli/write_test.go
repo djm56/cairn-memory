@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"io"
 	"strings"
 	"testing"
 
@@ -141,6 +142,61 @@ func TestAgentNameIsCheckedBeforeTheCall(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// countingReader is a standard input that records how many bytes a command read from it.
+type countingReader struct {
+	r io.Reader
+	n int
+}
+
+// Read reads from the underlying reader and counts the bytes it returns.
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += n
+	return n, err
+}
+
+// TestUsageErrorsBeforeStandardInput checks that a write verb refuses a missing agent, or a
+// cheap range fault, before it reads standard input: a usage error that consumed the input would
+// leave the person's piped text unsent, with no word about why. Each case gives a flag that reads
+// standard input, exits 2, reads no byte of it, and opens no project.
+func TestUsageErrorsBeforeStandardInput(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	const id = "task-20261030-01"
+	cases := []struct {
+		name string
+		cmd  command
+		args []string
+	}{
+		{"event log text from standard input, no agent", Event, []string{"log", id, "--kind", "note", "--text", "-"}},
+		{"event log data from standard input, no agent", Event, []string{"log", id, "--kind", "review", "--text", "x", "--data", "-"}},
+		{"event log with step zero", Event, []string{"log", id, "--kind", "note", "--text", "-", "--step", "0", "--agent", "hicks"}},
+		{"step add title from standard input, no agent", Step, []string{"add", id, "--title", "-"}},
+		{"step add with a negative after", Step, []string{"add", id, "--title", "-", "--after", "-1", "--agent", "hicks"}},
+		{"step update summary from standard input, no agent", Step, []string{"update", id, "1", "--action", "finish", "--summary", "-"}},
+		{"step plan from standard input, no agent", Step, []string{"plan", id, "--json-input"}},
+		{"task start title from standard input, no agent", Task, []string{"start", "--title", "-", "--goal", "g"}},
+		{"task close summary from standard input, no agent", Task, []string{"close", id, "--outcome", "done", "--summary", "-"}},
+		{"task close json input, no agent", Task, []string{"close", id, "--outcome", "done", "--summary", "s", "--json-input"}},
+		{"task update reason from standard input, no agent", Task, []string{"update", id, "--status", "blocked", "--reason", "-"}},
+		{"task update json input, no agent", Task, []string{"update", id, "--json-input"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			in := &countingReader{r: strings.NewReader("input the command must not read\n")}
+			opened := false
+			open := func() (Session, error) {
+				opened = true
+				return Session{Svc: &fakeWrites{}, Ctx: core.WithCaller(context.Background(), testCaller)}, nil
+			}
+			var out, errOut bytes.Buffer
+			code := c.cmd(open, c.args, in, &out, &errOut)
+			if code != 2 || in.n != 0 || opened {
+				t.Errorf("exit %d, read %d bytes of standard input, opened %v, stderr %q; want a usage error with no read and no open", code, in.n, opened, errOut.String())
+			}
+		})
 	}
 }
 

@@ -40,6 +40,10 @@ func taskStart(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 		fmt.Fprintf(stderr, "%s: takes no task id, got %q\n", verb, pos)
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.TaskStartRequest{Priority: core.Priority(*priority), Queue: *queue}
 	var err error
@@ -61,10 +65,6 @@ func taskStart(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 			return usageErr(stderr, verb, err)
 		}
 		req.Criteria, req.KeyFiles, req.Steps = body.Criteria, body.KeyFiles, body.Steps
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {
@@ -112,6 +112,10 @@ func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 		fmt.Fprintln(stderr, verb+": name one task id: cairn task close <id> --outcome done --summary s")
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.TaskCloseRequest{ID: pos[0], Outcome: core.TaskStatus(*outcome)}
 	var err error
@@ -127,10 +131,6 @@ func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 			return usageErr(stderr, verb, err)
 		}
 		req.Criteria, req.Lessons, req.Mistakes, req.Deliverables = body.Criteria, body.Lessons, body.Mistakes, body.Deliverables
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {
@@ -183,6 +183,10 @@ func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 		fmt.Fprintln(stderr, verb+": name one task id: cairn task update <id> --status active")
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.TaskUpdateRequest{ID: pos[0]}
 	var err error
@@ -224,10 +228,6 @@ func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 			return usageErr(stderr, verb, err)
 		}
 		req.Criteria, req.KeyFiles = body.Criteria, body.KeyFiles
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {

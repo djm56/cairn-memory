@@ -54,6 +54,10 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 		fmt.Fprintln(stderr, verb+": --after must be a step number, 0 or more; leave it out to add the step last")
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.StepAddRequest{TaskID: pos[0], Agent: *assignee}
 	var err error
@@ -63,10 +67,6 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 	if given(fl, "after") {
 		ref := core.NumberRef(*after)
 		req.After = &ref
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {
@@ -106,6 +106,10 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 		fmt.Fprintf(stderr, "%s: the step is a number, 1 or more, as the steps list shows it: got %q\n", verb, pos[1])
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	req := core.StepUpdateRequest{TaskID: pos[0], Step: core.NumberRef(number), Action: core.StepAction(*action)}
 	if req.Summary, err = in.text("summary", *summary); err != nil {
@@ -114,10 +118,6 @@ func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 	if given(fl, "assignee") {
 		a := *assignee
 		req.Agent = &a
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
-		return 2
 	}
 	s, err := open()
 	if err != nil {
@@ -162,6 +162,10 @@ func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 		fmt.Fprintln(stderr, verb+": the new steps come from standard input: give --json-input, with {\"steps\": [...]}")
 		return 2
 	}
+	name, ok := agentName(fl, *agent, true, verb, stderr)
+	if !ok {
+		return 2
+	}
 	in := &inputs{stdin: stdin}
 	var body planInput
 	if err := in.decode("json-input", &body); err != nil {
@@ -169,10 +173,6 @@ func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 	if body.Steps == nil {
 		fmt.Fprintln(stderr, verb+": standard input has no steps list: give {\"steps\": [...]}, or [] to remove every pending step")
-		return 2
-	}
-	name, ok := agentName(fl, *agent, true, verb, stderr)
-	if !ok {
 		return 2
 	}
 	s, err := open()
