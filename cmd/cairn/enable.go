@@ -228,22 +228,17 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 			}
 		}
 	}
-	for _, r := range results {
-		state := "already present"
-		switch {
-		case r.added:
-			state = "added"
-		case r.differs:
-			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
-		}
-		fmt.Fprintf(stdout, "%-12s %-17s %s\n", r.hook.event, state, r.hook.cmdline)
-	}
+	// The per-hook lines are built now and printed only when the outcome is known: on the unchanged and dry-run paths,
+	// and after the rename. A refusal after this point therefore leaves stdout empty, and stderr says why.
+	lines := hookLines(results)
 	if !changed {
+		fmt.Fprint(stdout, lines)
 		fmt.Fprintf(stdout, "unchanged: %s\n", path)
 		warnIfNotOnPath(stderr)
 		return 0
 	}
 	if dryRun {
+		fmt.Fprint(stdout, lines)
 		fmt.Fprintf(stdout, "dry run: nothing written to %s\n", path)
 		warnIfNotOnPath(stderr)
 		return 0
@@ -265,12 +260,30 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "cairn enable: write %s: %v; the file was not replaced\n", path, err)
 		return 1
 	}
+	fmt.Fprint(stdout, lines)
 	fmt.Fprintf(stdout, "wrote %s\n", path)
 	if backup != "" {
 		fmt.Fprintf(stdout, "backup %s\n", backup)
 	}
 	warnIfNotOnPath(stderr)
 	return 0
+}
+
+// hookLines is the line enable prints for each hook, one per result and in order: the event, what became of its hook, and
+// the command. The lines are text, so the caller decides when they are printed.
+func hookLines(results []hookResult) string {
+	var b bytes.Buffer
+	for _, r := range results {
+		state := "already present"
+		switch {
+		case r.added:
+			state = "added"
+		case r.differs:
+			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
+		}
+		fmt.Fprintf(&b, "%-12s %-17s %s\n", r.hook.event, state, r.hook.cmdline)
+	}
+	return b.String()
 }
 
 // warnIfNotOnPath warns on stderr when cairn is not on the PATH of this shell. The hooks run the bare command cairn,

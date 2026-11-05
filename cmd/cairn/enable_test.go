@@ -747,8 +747,8 @@ func TestEnableRefusesAFileThatChangesWhileItIsWritten(t *testing.T) {
 	if code != 1 || !strings.Contains(stderr, "changed after enable read it") || !strings.Contains(stderr, "nothing was replaced") {
 		t.Errorf("exit %d, stderr %q: want 1 and the refusal named", code, stderr)
 	}
-	if strings.Contains(stdout, "wrote ") {
-		t.Errorf("stdout says the file was written:\n%s", stdout)
+	if stdout != "" {
+		t.Errorf("stdout is %q, want nothing: the refusal came after the lines were ready, and they are printed only on success", stdout)
 	}
 	if string(readBytes(t, path)) != other {
 		t.Errorf("the other writer's file was replaced:\n%s", readBytes(t, path))
@@ -824,9 +824,12 @@ func TestEnableKeepsTheFileWhenTheRenameFails(t *testing.T) {
 	renameFile = func(string, string) error { return errors.New("injected rename failure") }
 	t.Cleanup(func() { renameFile = prev })
 
-	code, _, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
 	if code != 1 || !strings.Contains(stderr, "the file was not replaced") {
 		t.Errorf("exit %d, stderr %q: want 1 and the file named as not replaced", code, stderr)
+	}
+	if stdout != "" {
+		t.Errorf("stdout is %q, want nothing: the hook lines are printed only once the file is in place", stdout)
 	}
 	if string(readBytes(t, path)) != existingSettings {
 		t.Errorf("the old file is not intact:\n%s", readBytes(t, path))
