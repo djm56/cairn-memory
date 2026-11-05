@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -396,13 +395,14 @@ func TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink(t *testing.T) {
 	}
 }
 
-// TestNoHardLinksNamesOnlyTheErrnosThatMeanNoLinks checks the errnos that make the hard-link clause
-// of a backup refusal. Only the not-supported errnos qualify. A name that is taken, and any other
-// failure, do not, so their messages do not blame the filesystem.
-func TestNoHardLinksNamesOnlyTheErrnosThatMeanNoLinks(t *testing.T) {
+// TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos fails the backup's link with each errno
+// in turn, through the linkBackup seam. A not-supported errno must carry the hard-link hint. EEXIST
+// must be the already-exists refusal with no hint, and so must any other failure. Each case must
+// leave no staging directory behind and no output name.
+func TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos(t *testing.T) {
 	cases := map[string]struct {
 		err  error
-		want bool
+		hint bool
 	}{
 		"EPERM":      {syscall.EPERM, true},
 		"ENOTSUP":    {syscall.ENOTSUP, true},
@@ -411,11 +411,42 @@ func TestNoHardLinksNamesOnlyTheErrnosThatMeanNoLinks(t *testing.T) {
 		"ENOSYS":     {syscall.ENOSYS, true},
 		"EEXIST":     {syscall.EEXIST, false},
 		"EIO":        {syscall.EIO, false},
-		"ENOENT":     {fs.ErrNotExist, false},
 	}
 	for name, c := range cases {
-		if got := noHardLinks(&os.LinkError{Op: "link", Old: "a", New: "b", Err: c.err}); got != c.want {
-			t.Errorf("noHardLinks(%s) = %v, want %v", name, got, c.want)
-		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			db := filepath.Join(dir, "cairn.db")
+			createDB(t, db)
+			out := filepath.Join(dir, "backup.db")
+
+			prev := linkBackup
+			linkBackup = func(oldname, newname string) error {
+				return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: c.err}
+			}
+			t.Cleanup(func() { linkBackup = prev })
+
+			_, err := Backup(context.Background(), db, out)
+			if err == nil {
+				t.Fatalf("Backup with the link failing with %s: want a refusal", name)
+			}
+			if got := strings.Contains(err.Error(), "does not support hard links"); got != c.hint {
+				t.Errorf("Backup with the link failing with %s: hint = %v, want %v (err: %v)", name, got, c.hint, err)
+			}
+			if name == "EEXIST" && !strings.Contains(err.Error(), "already exists") {
+				t.Errorf("Backup with the link failing with EEXIST: err = %v, want the already-exists refusal", err)
+			}
+			if _, serr := os.Lstat(out); !os.IsNotExist(serr) {
+				t.Errorf("a refused backup left the output %s behind", out)
+			}
+			entries, rerr := os.ReadDir(dir)
+			if rerr != nil {
+				t.Fatal(rerr)
+			}
+			for _, e := range entries {
+				if strings.HasPrefix(e.Name(), ".cairn-backup-") {
+					t.Errorf("a refused backup left the staging directory %s behind", e.Name())
+				}
+			}
+		})
 	}
 }

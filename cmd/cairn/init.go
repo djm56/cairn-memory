@@ -12,12 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/BurntSushi/toml"
 
 	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
+	"github.com/djm56/cairn-memory/internal/hardlink"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
@@ -315,7 +315,7 @@ func writeNew(path, project, server string) error {
 		return fmt.Errorf("write %s: %w", path, cause(err))
 	}
 	if err := linkFile(tmp, path); err != nil {
-		if errors.Is(err, fs.ErrExist) || !noHardLinks(err) {
+		if errors.Is(err, fs.ErrExist) || !hardlink.Unsupported(err) {
 			return fmt.Errorf("write %s: %w", path, cause(err))
 		}
 		if err := writeDirect(path, content); err != nil {
@@ -370,19 +370,6 @@ func finishFile(f *os.File, content []byte) error {
 		err = cerr
 	}
 	return err
-}
-
-// noHardLinks reports whether a failed link means the filesystem cannot make one: EPERM
-// (FAT and exFAT on macOS), ENOTSUP and EOPNOTSUPP (one value on Linux, two on macOS),
-// EXDEV, and ENOSYS (a mount that does not implement link). It is false for EEXIST, and
-// for every other failure, which is returned rather than worked around.
-func noHardLinks(err error) bool {
-	for _, errno := range []syscall.Errno{syscall.EPERM, syscall.ENOTSUP, syscall.EOPNOTSUPP, syscall.EXDEV, syscall.ENOSYS} {
-		if errors.Is(err, errno) {
-			return true
-		}
-	}
-	return false
 }
 
 // syncDir makes the new name durable, where the platform lets a directory be synced. It
