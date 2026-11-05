@@ -104,28 +104,45 @@ func newUI(cfg Config) *ui {
 	return &ui{cfg: cfg, log: logger}
 }
 
-// handler builds the route table of DESIGN §5.5.
+// route is one entry of the route table: the method it answers, its path pattern, and its
+// handler. The mux answers another method on the same path with 405.
+type route struct {
+	method, pattern string
+	handler         http.HandlerFunc
+}
+
+// routes is the route table of DESIGN §5.5. handler registers exactly these routes and no
+// others, so a test that reads the table knows every route the mux answers.
+func (u *ui) routes() []route {
+	return []route{
+		{http.MethodGet, "/ui", redirectToRoot},
+		{http.MethodGet, "/ui/{$}", u.page(u.dashboard)},
+		{http.MethodGet, pathTasks, u.page(u.tasks)},
+		{http.MethodGet, pathTask, u.page(u.task)},
+		{http.MethodGet, pathLearnings, u.page(u.learnings)},
+		{http.MethodGet, pathProjLearning, u.page(u.projectLearnings)},
+		{http.MethodGet, pathDirectives, u.page(u.directives)},
+		{http.MethodGet, pathProjects, u.page(u.projects)},
+		{http.MethodGet, pathSettings, u.page(u.projectSettings)},
+		{http.MethodGet, pathRatify, u.operatorPage(u.ratifyForm)},
+		{http.MethodPost, pathDecide, u.form(u.learningDecide)},
+		{http.MethodPost, pathDirectives, u.form(u.directiveRatify)},
+		{http.MethodPost, pathRetire, u.form(u.directiveRetire)},
+		{http.MethodPost, pathReaffirm, u.form(u.directiveReaffirm)},
+		{http.MethodPost, pathSettings, u.form(u.projectSettingsSet)},
+		{http.MethodGet, pathSignin, u.signinPage},
+		{http.MethodPost, pathSignin, u.signinPost},
+		{http.MethodGet, pathSignout, u.signout},
+		{http.MethodGet, pathStyles, serveStyles},
+	}
+}
+
+// handler builds the mux from the route table, wrapped in the security headers.
 func (u *ui) handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /ui", redirectToRoot)
-	mux.HandleFunc("GET /ui/{$}", u.page(u.dashboard))
-	mux.HandleFunc("GET "+pathTasks, u.page(u.tasks))
-	mux.HandleFunc("GET "+pathTask, u.page(u.task))
-	mux.HandleFunc("GET "+pathLearnings, u.page(u.learnings))
-	mux.HandleFunc("GET "+pathProjLearning, u.page(u.projectLearnings))
-	mux.HandleFunc("GET "+pathDirectives, u.page(u.directives))
-	mux.HandleFunc("GET "+pathProjects, u.page(u.projects))
-	mux.HandleFunc("GET "+pathSettings, u.page(u.projectSettings))
-	mux.HandleFunc("GET "+pathRatify, u.operatorPage(u.ratifyForm))
-	mux.HandleFunc("POST "+pathDecide, u.form(u.learningDecide))
-	mux.HandleFunc("POST "+pathDirectives, u.form(u.directiveRatify))
-	mux.HandleFunc("POST "+pathRetire, u.form(u.directiveRetire))
-	mux.HandleFunc("POST "+pathReaffirm, u.form(u.directiveReaffirm))
-	mux.HandleFunc("POST "+pathSettings, u.form(u.projectSettingsSet))
-	mux.HandleFunc("GET "+pathSignin, u.signinPage)
-	mux.HandleFunc("POST "+pathSignin, u.signinPost)
-	mux.HandleFunc("GET "+pathSignout, u.signout)
-	mux.HandleFunc("GET "+pathStyles, serveStyles)
+	for _, r := range u.routes() {
+		mux.HandleFunc(r.method+" "+r.pattern, r.handler)
+	}
 	return secureHeaders(u.cfg.HSTS, mux)
 }
 
