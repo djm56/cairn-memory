@@ -106,3 +106,32 @@ func TestResultUnderTheCeilingIsAnswered(t *testing.T) {
 		t.Errorf("the task read does not carry its goal (%d bytes of answer)", len(text))
 	}
 }
+
+// TestResultAtTheCeilingIsAnsweredAndOneMoreIsRefused checks the boundary of #111 at 64 KiB:
+// an answer of exactly that many bytes is answered, and one of a byte more is a tool error.
+// The test sets the size of the answer from a probe: the answer grows one byte for each byte
+// of goal, so a goal of one byte gives the base size, and the goal that makes the answer the
+// ceiling is found from it. The probe's size is checked, so the test cannot pass on a size
+// it did not set. A check of > written as >= would fail the first half here.
+func TestResultAtTheCeilingIsAnsweredAndOneMoreIsRefused(t *testing.T) {
+	const ceiling = 64 << 10
+	probe, isErr := call(t, connect(t, longTask{goal: "a"}, acme), "task_get", map[string]any{"id": "task-20261030-01"})
+	if isErr {
+		t.Fatalf("the probe read returned a tool error: %s", probe)
+	}
+	goal := strings.Repeat("a", ceiling-len(probe)+1)
+
+	text, isErr := call(t, connect(t, longTask{goal: goal}, acme), "task_get", map[string]any{"id": "task-20261030-01"})
+	if isErr {
+		t.Fatalf("an answer of exactly %d bytes was refused: %s", ceiling, text)
+	}
+	if len(text) != ceiling {
+		t.Fatalf("the answer is %d bytes, want exactly %d: the probe did not set the size", len(text), ceiling)
+	}
+
+	over, isErr := call(t, connect(t, longTask{goal: goal + "a"}, acme), "task_get", map[string]any{"id": "task-20261030-01"})
+	got := errorOf(t, over, isErr)
+	if got.Kind != "invalid" {
+		t.Errorf("an answer of %d bytes: kind %q, want invalid (%s)", ceiling+1, got.Kind, over)
+	}
+}
