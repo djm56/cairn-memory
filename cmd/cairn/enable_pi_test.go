@@ -483,6 +483,19 @@ func TestPiBlockNamesBothPrefixes(t *testing.T) {
 	}
 }
 
+// TestPiSaysTheProjectMustBeTrusted checks that enable's own output for pi says pi reads the project file only after the
+// project is trusted, on the run that writes the file.
+func TestPiSaysTheProjectMustBeTrusted(t *testing.T) {
+	enableProject(t)
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if want := reportLine("trust", "needs trust", "pi reads "+piConfig+" only after the project is trusted"); !strings.Contains(stdout, want) {
+		t.Errorf("stdout lacks %q:\n%s", want, stdout)
+	}
+}
+
 // TestPiUpdatesAnOlderCairnBlock checks a whole block that cairn wrote with older text: the block between its markers is
 // replaced by the current text, the text on either side is kept byte for byte, and the original is copied to the backup first.
 func TestPiUpdatesAnOlderCairnBlock(t *testing.T) {

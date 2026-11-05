@@ -302,7 +302,8 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 	}
 	report := func() string {
 		return reportLine("mcp", serverState, piConfig+" mcpServers.cairn") +
-			reportLine("instructions", blockState, piAgents+" block")
+			reportLine("instructions", blockState, piAgents+" block") +
+			reportLine("trust", "needs trust", "pi reads "+piConfig+" only after the project is trusted")
 	}
 	return enableWrites([]fileWrite{config, agents}, name, dryRun, report, stdout, stderr)
 }

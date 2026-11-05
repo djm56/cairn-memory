@@ -70,12 +70,14 @@ var claudeHooks = []claudeHook{
 // hookResult is what enable found for one hook: added to the file, or already registered under its event. When it
 // was already there, matcher is the matcher of the entry that runs it, and differs is set when the hook names a
 // matcher and that entry has another. enable reports such an entry and leaves it as it is. A matcher that still
-// covers compact (coversCompact) is reported without the word "not", since doctor reads it as a working entry.
+// covers compact (coversCompact) is reported without the word "not", since doctor reads it as a working entry. notString
+// is set when that entry's matcher is not a string, so enable says so rather than naming the matcher as none.
 type hookResult struct {
-	hook    claudeHook
-	added   bool
-	matcher string
-	differs bool
+	hook      claudeHook
+	added     bool
+	matcher   string
+	differs   bool
+	notString bool
 }
 
 // hookEntry and hookCommand are the shape the settings format gives an entry under an event: a matcher, and a list
@@ -394,6 +396,9 @@ func hookLines(results []hookResult) string {
 		switch {
 		case r.added:
 			state = "added"
+		case r.notString:
+			// The matcher is not a string, so it is not a name enable can show: the entry is left as it is.
+			state = "already present, matcher is not a string"
 		case r.differs && coversCompact(r.matcher):
 			// The entry still does what the hook is for, so it is named, and not called a fault.
 			state = fmt.Sprintf("already present, matcher is %s", shownMatcher(r.matcher))
@@ -448,7 +453,7 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 			}
 		}
 		if found := commandEntries(entries, h.cmdline); len(found) > 0 {
-			results = append(results, hookResult{hook: h, matcher: found[0].matcher, differs: h.matcher != "" && found[0].matcher != h.matcher})
+			results = append(results, hookResult{hook: h, matcher: found[0].matcher, differs: h.matcher != "" && found[0].matcher != h.matcher, notString: found[0].notString})
 			continue
 		}
 		entry, err := marshalRaw(hookEntry{Matcher: h.matcher, Hooks: []hookCommand{{Type: "command", Command: h.cmdline}}})

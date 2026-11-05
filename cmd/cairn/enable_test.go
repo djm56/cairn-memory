@@ -347,6 +347,24 @@ func TestEnableReportsAMatcherThatDiffers(t *testing.T) {
 	}
 }
 
+// TestEnableSaysAMatcherIsNotAString checks an existing entry whose matcher is a number: enable says the matcher is not a
+// string, and does not name it as none, which would be false.
+func TestEnableSaysAMatcherIsNotAString(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, settingsIn(dir), `{"hooks": {"SessionStart": [{"matcher": 5, "hooks": [{"type": "command", "command": "cairn hook session-start"}]}]}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if want := reportLine("SessionStart", "already present, matcher is not a string", "cairn hook session-start"); !strings.Contains(stdout, want) {
+		t.Errorf("stdout lacks %q:\n%s", want, stdout)
+	}
+	if strings.Contains(stdout, "matcher is (none)") {
+		t.Errorf("stdout names a non-string matcher as none:\n%s", stdout)
+	}
+}
+
 // TestEnableRunTwiceGivesTheSameFile checks idempotence from both starting points. A second run writes nothing:
 // the file keeps the bytes the first run left, and no second backup is made.
 func TestEnableRunTwiceGivesTheSameFile(t *testing.T) {

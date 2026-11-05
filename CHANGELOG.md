@@ -172,6 +172,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - M4 doctor, opencode and pi (EXPERIMENTAL): the cairn server entry is compared on the fields enable writes, its type and command for OpenCode and its command, args and exposure for pi. Another value a person set, such as a timeout or an extra key, is not called a fault. `cairn enable` still reports an entry whose fields differ as differing, and leaves it as it is.
 - M4 enable, all clients: a file over 1 MiB is refused and left as it is, as doctor does not read it. The limit applies to `settings.local.json`, `opencode.json`, `.pi/mcp.json` and `AGENTS.md`, so a file a clone supplies cannot make enable read a large file whole.
 - M4 doctor: the usage line names all three agents, `claude-code`, `opencode` and `pi`.
+- M4 enable: an existing Claude Code hook whose matcher is not a string is reported as `matcher is not a string`, not as `(none)`. The output for `--agent pi` says that pi reads `.pi/mcp.json` only after the project is trusted.
 - M4 enable help (EXPERIMENTAL): the OpenCode instruction path, `.cairn/instructions.md`, is taken relative to the project root, and no real OpenCode run has confirmed that yet.
 
 ### Changed
