@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -756,5 +757,59 @@ func TestEnableRefusesAFileThatAppearsWhileItIsWritten(t *testing.T) {
 	}
 	if string(readBytes(t, path)) != other {
 		t.Errorf("the file that appeared was replaced:\n%s", readBytes(t, path))
+	}
+}
+
+// TestEnableRefusesABackupNameThatIsTaken checks that a backup is never written over an earlier one. The name a run
+// would give its backup is already a file, so enable exits 1 before it changes the settings file, and the earlier
+// file is kept.
+func TestEnableRefusesABackupNameThatIsTaken(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, existingSettings)
+	backup := backupIn(t, "acme-api")
+	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const earlier = "an earlier backup\n"
+	writeFile(t, filepath.Dir(backup), filepath.Base(backup), earlier)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "nothing was changed") {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and nothing changed", code, stdout, stderr)
+	}
+	if string(readBytes(t, path)) != existingSettings {
+		t.Errorf("the settings file changed:\n%s", readBytes(t, path))
+	}
+	if string(readBytes(t, backup)) != earlier {
+		t.Errorf("the earlier backup was written over:\n%s", readBytes(t, backup))
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file and nothing else", got)
+	}
+}
+
+// TestEnableKeepsTheFileWhenTheRenameFails checks a rename that fails: the old file is intact, no temporary file is
+// left beside it, and the backup holds the original.
+func TestEnableKeepsTheFileWhenTheRenameFails(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, existingSettings)
+	prev := renameFile
+	renameFile = func(string, string) error { return errors.New("injected rename failure") }
+	t.Cleanup(func() { renameFile = prev })
+
+	code, _, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 1 || !strings.Contains(stderr, "the file was not replaced") {
+		t.Errorf("exit %d, stderr %q: want 1 and the file named as not replaced", code, stderr)
+	}
+	if string(readBytes(t, path)) != existingSettings {
+		t.Errorf("the old file is not intact:\n%s", readBytes(t, path))
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !slices.Equal(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file and no temporary file", got)
+	}
+	if !bytes.Equal(readBytes(t, backupIn(t, "acme-api")), []byte(existingSettings)) {
+		t.Errorf("the backup is not the original file")
 	}
 }

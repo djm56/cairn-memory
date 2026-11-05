@@ -200,13 +200,29 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "cairn enable: %s %v. Nothing was changed: fix the file by hand, then run cairn enable again\n", path, err)
 		return 1
 	}
-	// The backup's place is found before anything is printed or written, so a project whose cache directory cannot be
-	// found is refused with nothing changed, and nothing is reported as done.
+	// The new content and the backup are made before anything is printed or written to the project, so a refusal here
+	// reports nothing as done. The backup's directory is made before the project's directory, so a failed backup
+	// leaves the project's directory as it was.
+	var content []byte
 	var backup string
-	if exists && changed && !dryRun {
-		if backup, err = backupPath(name, enableNow()); err != nil {
-			fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed\n", path, err)
+	if changed && !dryRun {
+		if content, err = encodeSettings(doc); err != nil {
+			fmt.Fprintf(stderr, "cairn enable: encode %s: %v; nothing was changed\n", path, err)
 			return 1
+		}
+		if exists {
+			if backup, err = backupPath(name, enableNow()); err != nil {
+				fmt.Fprintf(stderr, "cairn enable: find a place for the backup of %s: %v; nothing was changed\n", path, err)
+				return 1
+			}
+			if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
+				fmt.Fprintf(stderr, "cairn enable: create %s: %v; nothing was changed\n", filepath.Dir(backup), err)
+				return 1
+			}
+			if err := copyNew(backup, raw, mode); err != nil {
+				fmt.Fprintf(stderr, "cairn enable: back up %s: %v; nothing was changed\n", path, err)
+				return 1
+			}
 		}
 	}
 	for _, r := range results {
@@ -230,23 +246,6 @@ func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) 
 		return 0
 	}
 
-	content, err := encodeSettings(doc)
-	if err != nil {
-		fmt.Fprintf(stderr, "cairn enable: encode %s: %v\n", path, err)
-		return 1
-	}
-	// The backup's directory is made before the project's directory, so a failed backup leaves the project's directory
-	// as it was.
-	if exists {
-		if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
-			fmt.Fprintf(stderr, "cairn enable: create %s: %v; nothing was changed\n", filepath.Dir(backup), err)
-			return 1
-		}
-		if err := copyNew(backup, raw, mode); err != nil {
-			fmt.Fprintf(stderr, "cairn enable: back up %s: %v; nothing was changed\n", path, err)
-			return 1
-		}
-	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "cairn enable: create %s: %v\n", dir, err)
 		return 1
@@ -284,6 +283,9 @@ func warnIfNotOnPath(stderr io.Writer) {
 // It returns the document with the missing entries added, one result per hook, and whether anything was added. An
 // error means the file cannot be merged, and nothing is returned to write. The error text completes the sentence
 // "<path> ...". Every key and entry enable does not add to is kept as its raw JSON, so its value is unchanged.
+//
+// A top-level key that appears twice in raw keeps its last value, since the document is decoded into a map. The new
+// file holds that last value only. The backup holds the original text, with both.
 func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]json.RawMessage, []hookResult, bool, error) {
 	doc := map[string]json.RawMessage{}
 	if exists {
@@ -428,6 +430,9 @@ var errChanged = errors.New("it changed after enable read it")
 // change the settings file at that moment.
 var beforeRename = func() {}
 
+// renameFile is the rename that puts the new file in place. It is a variable so a test can make it fail.
+var renameFile = os.Rename
+
 // unchangedCheck returns the check replaceFile runs before its rename. The file must still be the one enable read: the
 // same size and modification time, or still absent when read is nil, which is when enable found no file. A file that
 // is there now, when none was read, or that is gone, or that has changed, is errChanged, so nothing is replaced.
@@ -481,7 +486,7 @@ func replaceFile(path string, content []byte, mode fs.FileMode, keepMode bool, u
 	if err := unchanged(); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := renameFile(tmp, path); err != nil {
 		return err
 	}
 	syncDir(dir)
