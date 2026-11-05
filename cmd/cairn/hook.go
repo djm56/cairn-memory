@@ -65,7 +65,7 @@ func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 		fmt.Fprintf(stderr, "cairn hook session-start: no context added: %s\n", reason(err))
 		return 0
 	}
-	cur, err := t.svc.TaskCurrent(t.ctx)
+	cur, err := currentFor(t)
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn hook session-start: no context added: %s\n", reason(err))
 		return 0
@@ -73,13 +73,15 @@ func runSessionStart(args []string, stdout, stderr io.Writer) (code int) {
 	// The block is built whole and written once, so a fault cannot leave part of it on
 	// stdout.
 	var block bytes.Buffer
-	writeSessionStart(&block, t.project.Name, cur)
+	writeSessionStart(&block, t.project.Name, cur, t.role)
 	_, _ = stdout.Write(block.Bytes())
 	return 0
 }
 
-// writeSessionStart writes the block for cur. With no active task it is one line.
-func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
+// writeSessionStart writes the block for cur. With no active task it is one line. role is the
+// agent role the counts were read for; with none, the block says agent-scoped directives were not
+// counted.
+func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string) {
 	if cur.Task == nil {
 		fmt.Fprintf(w, "Cairn: no task is active in %s.\n", project)
 		return
@@ -102,9 +104,10 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "Other active tasks: %d.\n", cur.OtherActive)
 	}
 	fmt.Fprintf(w, "Directives that apply: %d.\n", len(cur.Directives))
-	// The same note as cairn status: the CLI names no role, so no agent-scoped directive is
-	// counted.
-	fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
+	// The same note as cairn status: with no role, no agent-scoped directive is counted.
+	if role == "" {
+		fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
+	}
 	// The agent reads this block, so a directive left out is said so, with the reason.
 	if cur.Expired > 0 {
 		fmt.Fprintf(w, "Directives expired and left out (past review_by): %d.\n", cur.Expired)

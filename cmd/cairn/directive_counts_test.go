@@ -20,7 +20,7 @@ func TestSessionStartNamesExpiredAndOmittedDirectives(t *testing.T) {
 	cur := countsTask()
 	cur.Expired, cur.Omitted = 2, 3
 	var out bytes.Buffer
-	writeSessionStart(&out, "acme-api", cur)
+	writeSessionStart(&out, "acme-api", cur, "")
 	for _, want := range []string{
 		"Directives expired and left out (past review_by): 2.",
 		"Directives omitted (beyond the cap of 12): 3.",
@@ -31,7 +31,7 @@ func TestSessionStartNamesExpiredAndOmittedDirectives(t *testing.T) {
 	}
 
 	var clean bytes.Buffer
-	writeSessionStart(&clean, "acme-api", countsTask())
+	writeSessionStart(&clean, "acme-api", countsTask(), "")
 	if strings.Contains(clean.String(), "expired") || strings.Contains(clean.String(), "omitted") {
 		t.Errorf("session start with no counts = %q, want no expired or omitted line", clean.String())
 	}

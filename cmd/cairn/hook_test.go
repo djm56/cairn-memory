@@ -132,6 +132,7 @@ func TestSessionStartFoldsServerText(t *testing.T) {
 	t.Setenv("CAIRN_SERVER", url)
 	t.Setenv("CAIRN_PROJECT", "acme-api")
 	id := seedNamedTask(t, local, "acme-api", foldedTitle, foldedNext)
+	t.Setenv("CAIRN_AGENT", "")
 
 	code, stdout, stderr := runCmd(t, "hook", "session-start")
 	if code != 0 || stderr != "" {

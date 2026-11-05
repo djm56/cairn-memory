@@ -21,7 +21,7 @@ func TestStatusAndHookSayNoRoleWasCounted(t *testing.T) {
 	}
 
 	var hook bytes.Buffer
-	writeSessionStart(&hook, "acme-api", cur)
+	writeSessionStart(&hook, "acme-api", cur, "")
 	if !strings.Contains(hook.String(), "Agent-scoped directives were not counted: no agent role is set.\n") {
 		t.Errorf("the session-start hook does not say agent-scoped directives were not counted:\n%s", hook.String())
 	}
