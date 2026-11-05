@@ -26,9 +26,10 @@ const cliClient = "cairn-cli"
 // directives not scoped to one, and the line says so. A role comes from CAIRN_AGENT (roleFromEnv).
 const noRoleNote = "agent-scoped directives not counted: no agent role is set"
 
-// refusedRoleNote is the line status prints when CAIRN_AGENT is set but the wire form refuses it.
-// It names the variable and the reason, so a person does not read it as the variable being unset.
-const refusedRoleNote = "agent-scoped directives not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)"
+// refusedRoleNote is the sentence status prints, and the session-start hook prints in its block, when
+// CAIRN_AGENT is set but the wire form refuses it. One constant holds it, so the two cannot drift. It
+// names the variable and the reason, so a person does not read it as the variable being unset.
+const refusedRoleNote = "Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)."
 
 // target is what a command needs to call the server for the project it runs in.
 type target struct {

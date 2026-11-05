@@ -16,10 +16,6 @@ import (
 // that never answers, rather than the real five seconds.
 var sessionStartTimeout = 5 * time.Second
 
-// refusedRoleSentence is the line the session-start block says when CAIRN_AGENT is set but refused.
-// It is the hook's form of refusedRoleNote, in the block's own words.
-const refusedRoleSentence = "Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)."
-
 // runHook is the sub-command `cairn hook <event>`: the output a client's hook reads
 // (DESIGN.md §5.2). session-start is built. pre-compact and stop are M4 and are named
 // as not built.
@@ -112,7 +108,7 @@ func writeSessionStart(w io.Writer, project string, cur *core.TaskCurrent, role 
 	// The same note as cairn status: with no role, no agent-scoped directive is counted.
 	if role == "" {
 		if refused {
-			fmt.Fprintln(w, refusedRoleSentence)
+			fmt.Fprintln(w, refusedRoleNote)
 		} else {
 			fmt.Fprintln(w, "Agent-scoped directives were not counted: no agent role is set.")
 		}

@@ -157,7 +157,7 @@ func TestStatusAndHookWithARoleFromTheVariable(t *testing.T) {
 		t.Errorf("status with a refused CAIRN_AGENT: exit %d, stderr %q, want the refused note, output:\n%s", code, errOut, status)
 	}
 	code, hook, errOut = runCmd(t, "hook", "session-start")
-	if code != 0 || errOut != "" || !strings.Contains(hook, refusedRoleSentence) || strings.Contains(hook, "no agent role is set") {
+	if code != 0 || errOut != "" || !strings.Contains(hook, refusedRoleNote) || strings.Contains(hook, "no agent role is set") {
 		t.Errorf("hook with a refused CAIRN_AGENT: exit %d, stderr %q, want the refused sentence, output:\n%s", code, errOut, hook)
 	}
 }
