@@ -78,8 +78,8 @@ func TestDoctorAgentFindsEachLocation(t *testing.T) {
 	}
 }
 
-// TestDoctorAgentNoneInstalled checks that a project with no cairn hooks reports each event as not installed, as a
-// warning, and that no check fails.
+// TestDoctorAgentNoneInstalled checks that a project with no cairn hooks reports SessionStart and Stop as not installed,
+// as a warning. PreCompact is an operator decision, so its absence is ok, with the note. No check fails.
 func TestDoctorAgentNoneInstalled(t *testing.T) {
 	dir := agentProject(t)
 
@@ -89,8 +89,12 @@ func TestDoctorAgentNoneInstalled(t *testing.T) {
 		for _, c := range checks {
 			if c.name == event {
 				found = true
-				if c.status != "warn" || !strings.HasPrefix(c.detail, "not installed") {
-					t.Errorf("%s is %s %q, want a warning that it is not installed", event, c.status, c.detail)
+				want := "warn"
+				if event == "PreCompact" {
+					want = "ok"
+				}
+				if c.status != want || !strings.HasPrefix(c.detail, "not installed") {
+					t.Errorf("%s is %s %q, want %s, saying it is not installed", event, c.status, c.detail, want)
 				}
 			}
 		}
@@ -156,6 +160,97 @@ func TestDoctorAgentFlagsAMatcherThatDoesNotNameCompact(t *testing.T) {
 	}
 	if !strings.Contains(session.detail, local) {
 		t.Errorf("the warning does not name the file: %q", session.detail)
+	}
+}
+
+// TestDoctorAgentWarnsOnANonStringMatcher checks a matcher that is there but is not a string: doctor cannot read it, so
+// the line is a warning that says why. A matcher that is null is no matcher, as the settings format reads it.
+func TestDoctorAgentWarnsOnANonStringMatcher(t *testing.T) {
+	cases := []struct {
+		name   string
+		entry  string
+		status string
+	}{
+		{"a number", `"matcher":5,`, "warn"},
+		{"an object", `"matcher":{"x":1},`, "warn"},
+		{"null", `"matcher":null,`, "ok"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := agentProject(t)
+			writeSettings(t, settingsIn(dir), `{"hooks":{"SessionStart":[{`+tc.entry+`"hooks":[{"type":"command","command":"cairn hook session-start"}]}]}}`)
+
+			session := checkNamed(claudeCodeChecks(dir), "SessionStart")
+			if session == nil || session.status != tc.status {
+				t.Fatalf("SessionStart is %+v, want %s", session, tc.status)
+			}
+			if tc.status == "warn" && !strings.Contains(session.detail, "its matcher is not a string") {
+				t.Errorf("the warning lacks the reason: %q", session.detail)
+			}
+		})
+	}
+}
+
+// settingsSkip returns the settings check that skips, or nil when there is none.
+func settingsSkip(checks []check) *check {
+	for i := range checks {
+		if checks[i].name == "settings" && checks[i].status == "skip" {
+			return &checks[i]
+		}
+	}
+	return nil
+}
+
+// TestDoctorAgentNamesWhyThereAreNoProjectSettings checks the skip line for the project's settings. A directory with no
+// project file says so. CAIRN_PROJECT with no file says that. A project file that cannot be read gives its reason, and
+// does not say there is no project file.
+func TestDoctorAgentNamesWhyThereAreNoProjectSettings(t *testing.T) {
+	t.Run("no project file", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		want := "no project file, so the project's settings are not read"
+		if c := settingsSkip(claudeCodeChecks(dir)); c == nil || c.detail != want {
+			t.Errorf("skip is %+v, want %q", c, want)
+		}
+	})
+	t.Run("CAIRN_PROJECT with no file", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		t.Setenv("CAIRN_PROJECT", "acme-api")
+		want := "CAIRN_PROJECT names the project, but there is no project file to find its settings from, so the project's settings are not read"
+		if c := settingsSkip(claudeCodeChecks(dir)); c == nil || c.detail != want {
+			t.Errorf("skip is %+v, want %q", c, want)
+		}
+	})
+	t.Run("a project file that is broken", func(t *testing.T) {
+		dir := agentProject(t)
+		writeFile(t, dir, ".cairn.toml", "project = 5\n")
+		c := settingsSkip(claudeCodeChecks(dir))
+		if c == nil || strings.Contains(c.detail, "no project file") || !strings.Contains(c.detail, "could not be read") {
+			t.Errorf("skip is %+v, want the reason the file could not be read, not no project file", c)
+		}
+	})
+}
+
+// TestJudgeDryRunWarnsOnSilence checks the rule for a dry run that prints nothing. session-start and pre-compact always
+// print their block when they work, so silence is a warning, with stderr or without it. stop may print nothing and be
+// ok, unless stderr says why.
+func TestJudgeDryRunWarnsOnSilence(t *testing.T) {
+	cases := []struct {
+		arg    string
+		errOut []byte
+		status string
+	}{
+		{"session-start", nil, "warn"},
+		{"pre-compact", nil, "warn"},
+		{"session-start", []byte("cairn: no server\n"), "warn"},
+		{"stop", nil, "ok"},
+		{"stop", []byte("cairn: no server\n"), "warn"},
+	}
+	for _, tc := range cases {
+		if c := judgeDryRun(tc.arg, 0, nil, tc.errOut); c.status != tc.status {
+			t.Errorf("%s with stderr %q is %s %q, want %s", tc.arg, tc.errOut, c.status, c.detail, tc.status)
+		}
 	}
 }
 
@@ -337,6 +432,7 @@ func TestDoctorUsageErrors(t *testing.T) {
 		{"an argument after the flags", []string{"doctor", "--agent", "claude-code", "extra"}, "takes flags only"},
 		{"an unknown flag", []string{"doctor", "--nope"}, "run cairn doctor --help"},
 		{"an agent with no value", []string{"doctor", "--agent"}, "run cairn doctor --help"},
+		{"an empty agent", []string{"doctor", "--agent", ""}, "needs a name"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

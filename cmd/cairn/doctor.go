@@ -55,6 +55,13 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn doctor: takes flags only, got %q\n", fl.Args())
 		return 2
 	}
+	// An empty --agent is a mistake, not a request for the plain doctor: when the flag is given, it names an agent.
+	given := false
+	fl.Visit(func(f *flag.Flag) { given = given || f.Name == "agent" })
+	if given && *agent == "" {
+		fmt.Fprintln(stderr, "cairn doctor: --agent needs a name: use --agent claude-code")
+		return 2
+	}
 	switch *agent {
 	case "", "claude-code":
 	case "opencode", "pi":

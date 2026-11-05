@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/cli"
+	"github.com/djm56/cairn-memory/internal/core"
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
@@ -20,11 +21,13 @@ import (
 const settingsFileName = "settings.json"
 
 // installedHook is one cairn hook found in a settings file: the file, the event it is registered under, and the
-// matcher of the entry that holds it. An entry with no matcher has "".
+// matcher of the entry that holds it. An entry with no matcher has "". notString is set when the entry has a matcher
+// that is not a string, which the settings format does not allow: doctor cannot read such a matcher, and says so.
 type installedHook struct {
-	path    string
-	event   string
-	matcher string
+	path      string
+	event     string
+	matcher   string
+	notString bool
 }
 
 // claudeCodeChecks is the section cairn doctor --agent claude-code adds after its own checks. It reads the Claude Code
@@ -38,11 +41,18 @@ type installedHook struct {
 func claudeCodeChecks(wd string) []check {
 	var checks []check
 	var files []string
-	if project, err := identity.Resolve(wd); err == nil && project.Path != "" {
+	project, err := identity.Resolve(wd)
+	switch {
+	case err == nil && project.Path != "":
 		root := filepath.Dir(project.Path)
 		files = append(files, filepath.Join(root, settingsDir, settingsName), filepath.Join(root, settingsDir, settingsFileName))
-	} else {
+	case err == nil:
+		// CAIRN_PROJECT names the project, and the project directory is found from a file, so with no file there is none.
+		checks = append(checks, check{name: "settings", status: "skip", detail: "CAIRN_PROJECT names the project, but there is no project file to find its settings from, so the project's settings are not read"})
+	case errors.Is(err, core.ErrNoProject):
 		checks = append(checks, check{name: "settings", status: "skip", detail: "no project file, so the project's settings are not read"})
+	default:
+		checks = append(checks, check{name: "settings", status: "skip", detail: "the project file could not be read, so the project's settings are not read: " + reason(err)})
 	}
 	if home, err := os.UserHomeDir(); err == nil {
 		files = append(files, filepath.Join(home, ".claude", settingsFileName))
@@ -68,10 +78,19 @@ func claudeCodeChecks(wd string) []check {
 			}
 		}
 		if count == 0 {
-			checks = append(checks, check{name: h.event, status: "warn", detail: "not installed in any settings file read: run cairn enable --agent claude-code"})
+			checks = append(checks, absentHookLine(h))
 		}
 	}
 	return checks
+}
+
+// absentHookLine is the line for a cairn hook that no settings file read holds. A missing hook is a warning, and enable
+// is the fix. PreCompact is an operator decision (D15), so its absence is ok, with the same note hookLine gives.
+func absentHookLine(h claudeHook) check {
+	if h.event == "PreCompact" {
+		return check{name: h.event, status: "ok", detail: "not installed in any settings file read; installed per D15, but Claude Code does not show its output, so this is an operator decision"}
+	}
+	return check{name: h.event, status: "warn", detail: "not installed in any settings file read: run cairn enable --agent claude-code"}
 }
 
 // dryRunChecks runs each cairn hook once, in-process, and reports what each printed (dryRunCheck). The hooks read the
@@ -95,8 +114,13 @@ func dryRunCheck(h claudeHook) check {
 	arg := strings.TrimPrefix(h.cmdline, "cairn hook ")
 	var stdout, stderr bytes.Buffer
 	code := runHook([]string{arg}, &stdout, &stderr)
-	out := stdout.Bytes()
+	return judgeDryRun(arg, code, stdout.Bytes(), stderr.Bytes())
+}
 
+// judgeDryRun is the check for one hook's dry run, given the hook's name, its exit code, and what it printed on each
+// stream. session-start and pre-compact always print their block when they work, so printing nothing is a warning, with
+// stderr or without it. stop prints nothing when it has nothing to say, and that is ok when stderr is empty too.
+func judgeDryRun(arg string, code int, out, errOut []byte) check {
 	status := "ok"
 	parts := []string{fmt.Sprintf("%s: exit %d, %d bytes", arg, code, len(out))}
 	switch {
@@ -108,17 +132,20 @@ func dryRunCheck(h claudeHook) check {
 	case arg == "stop" && len(out) > 0:
 		status = "fail"
 		parts = append(parts, "not one JSON object with a systemMessage")
-	case len(out) == 0 && stderr.Len() == 0:
+	case len(out) == 0 && arg != "stop":
+		status = "warn"
+		parts = append(parts, "nothing printed, but the block is always printed when the hook works")
+	case len(out) == 0 && len(errOut) > 0:
+		status = "warn"
 		parts = append(parts, "nothing printed")
 	case len(out) == 0:
-		status = "warn"
 		parts = append(parts, "nothing printed")
 	}
 	if len(out) > 0 {
 		parts = append(parts, "first line: "+cli.Plain(firstLine(out)))
 	}
-	if stderr.Len() > 0 {
-		parts = append(parts, "stderr: "+cli.Plain(firstLine(stderr.Bytes())))
+	if len(errOut) > 0 {
+		parts = append(parts, "stderr: "+cli.Plain(firstLine(errOut)))
 	}
 	return check{name: "dry run", status: status, detail: strings.Join(parts, ", ")}
 }
@@ -183,8 +210,8 @@ func readSettingsHooks(path string) ([]installedHook, error) {
 		if err := json.Unmarshal(eventRaw, &entries); err != nil || entries == nil {
 			return nil, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array%s`, h.event, tailRefused)
 		}
-		for _, matcher := range commandMatchers(entries, h.cmdline) {
-			found = append(found, installedHook{path: path, event: h.event, matcher: matcher})
+		for _, e := range commandEntries(entries, h.cmdline) {
+			found = append(found, installedHook{path: path, event: h.event, matcher: e.matcher, notString: e.notString})
 		}
 	}
 	return found, nil
@@ -244,6 +271,8 @@ func hookLine(f installedHook) check {
 		matcher = "matcher " + shownMatcher(f.matcher)
 	}
 	switch {
+	case f.notString:
+		return check{name: f.event, status: "warn", detail: where + "its matcher is not a string, so doctor cannot read it: edit the entry by hand, since enable leaves an existing entry as it is"}
 	case f.event == "SessionStart" && !coversCompact(f.matcher):
 		return check{name: f.event, status: "warn", detail: where + "matcher " + shownMatcher(f.matcher) + " does not name compact, so the task is not carried across /compact: edit the matcher to startup|resume|clear|compact, since enable leaves an existing entry as it is"}
 	case f.event == "PreCompact":

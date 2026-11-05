@@ -330,8 +330,8 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 				return nil, nil, false, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array`, h.event)
 			}
 		}
-		if matchers := commandMatchers(entries, h.cmdline); len(matchers) > 0 {
-			results = append(results, hookResult{hook: h, matcher: matchers[0], differs: h.matcher != "" && matchers[0] != h.matcher})
+		if found := commandEntries(entries, h.cmdline); len(found) > 0 {
+			results = append(results, hookResult{hook: h, matcher: found[0].matcher, differs: h.matcher != "" && found[0].matcher != h.matcher})
 			continue
 		}
 		entry, err := marshalRaw(hookEntry{Matcher: h.matcher, Hooks: []hookCommand{{Type: "command", Command: h.cmdline}}})
@@ -358,11 +358,19 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 	return doc, results, true, nil
 }
 
-// commandMatchers returns the matcher of each entry that already runs cmdline in one of its handlers, in order. The
+// commandEntry is an entry that already runs a cairn command: its matcher, and notString, which is set when the entry has
+// a matcher that is not a string. The settings format gives a matcher as a string, so such a matcher is one neither
+// enable nor doctor can read.
+type commandEntry struct {
+	matcher   string
+	notString bool
+}
+
+// commandEntries returns each entry that already runs cmdline in one of its handlers, in order, with its matcher. The
 // test is on the command string alone, so an entry with another matcher still counts. An entry with no matcher gives
 // "". An entry or a handler that is not shaped as the settings format gives it is not a match, and is left as it is.
-func commandMatchers(entries []json.RawMessage, cmdline string) []string {
-	var matchers []string
+func commandEntries(entries []json.RawMessage, cmdline string) []commandEntry {
+	var found []commandEntry
 	for _, raw := range entries {
 		var entry struct {
 			Matcher any               `json:"matcher"`
@@ -379,13 +387,13 @@ func commandMatchers(entries []json.RawMessage, cmdline string) []string {
 				continue
 			}
 			if s, ok := h.Command.(string); ok && s == cmdline {
-				matcher, _ := entry.Matcher.(string)
-				matchers = append(matchers, matcher)
+				matcher, isString := entry.Matcher.(string)
+				found = append(found, commandEntry{matcher: matcher, notString: entry.Matcher != nil && !isString})
 				break
 			}
 		}
 	}
-	return matchers
+	return found
 }
 
 // shownMatcher is a matcher as the output names it. An entry with no matcher matches every occurrence, so it is
