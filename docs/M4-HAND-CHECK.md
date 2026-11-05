@@ -231,8 +231,11 @@ times in UTC, as you read them from your own clock. Do not estimate a time.
 - The `cairn doctor` output lines, verbatim, with every path replaced by its placeholder
   and the server address replaced by `<server-url>`. The doctor's server line carries the
   address the client was given, so that line needs the replacement.
-- For section 3: the time of `/compact`, the agent's first reply after it (up to three
-  lines), and the debug log's `SessionStart` entry, with paths redacted.
+- For section 3: the time of `/compact`; whether a turn started by itself and, if you sent
+  the neutral message from 3.8, its exact text and the time; the marker from 3.6; the
+  agent's first reply after the compact (up to three lines), and whether it names or acts
+  on the marker; any task read the agent made on its own; and the debug log's
+  `SessionStart` entry, with paths redacted.
 - For sections 4 and 5: the path or prefix each client reported, and whether it matched
   the expected one, as a yes or a no.
 - A verdict for sections 3, 4 and 5: pass, fail, or not run, with the reason.
@@ -262,7 +265,9 @@ Paste these, in this order, in one message:
 2. The `cairn doctor --agent claude-code` output from 3.4, with the server address as
    `<server-url>` and the paths as their placeholders, as section 6 says, and the verdict
    for section 3.
-3. The time of `/compact` and the agent's first reply after it, from 3.7 and 3.8.
+3. The time of `/compact`, whether a turn started by itself or the neutral message from
+   3.8 was sent (with its text and time), the marker from 3.6, and the agent's first reply
+   after the compact, from 3.7 and 3.8, with any task read the agent made on its own.
 4. The `SessionStart` debug log entry from 3.9, redacted.
 5. The Stop warning from 3.10, if you ran it.
 6. For sections 4 and 5: the paths and prefixes each client reported, the yes or no for
