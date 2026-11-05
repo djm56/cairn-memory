@@ -201,7 +201,7 @@ func readSettingsHooks(path string, user bool) ([]installedHook, error) {
 		return nil, err
 	}
 	if !json.Valid(raw) {
-		return nil, errors.New("is not valid JSON" + tail)
+		return nil, errors.New("is not plain JSON (comments or a syntax error)" + tail)
 	}
 	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {

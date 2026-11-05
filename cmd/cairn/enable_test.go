@@ -392,14 +392,14 @@ func TestEnableRunTwiceGivesTheSameFile(t *testing.T) {
 	}
 }
 
-// TestEnableRefusesAFileItCannotMerge checks that a file which is not valid JSON, or not the shape enable merges
+// TestEnableRefusesAFileItCannotMerge checks that a file which is not plain JSON, or not the shape enable merges
 // into, is refused with exit 1. The file is left as it was, and nothing else is written beside it.
 func TestEnableRefusesAFileItCannotMerge(t *testing.T) {
 	cases := []struct {
 		name    string
 		content string
 	}{
-		{"not valid JSON", `{"hooks": `},
+		{"not plain JSON", `{"hooks": `},
 		{"an empty file", ``},
 		{"a top level that is an array", `[]`},
 		{"hooks that is an array", `{"hooks": []}`},

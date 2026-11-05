@@ -200,7 +200,7 @@ func TestPiRefusesWhatItCannotMerge(t *testing.T) {
 		wantFile string // the file the refusal names
 		reason   string
 	}{
-		{"a project file that is not valid JSON", `{"mcpServers": `, "", "config", "is not valid JSON"},
+		{"a project file that is not plain JSON", `{"mcpServers": `, "", "config", "is not plain JSON (comments or a syntax error)"},
 		{"a project file that is an array", `[]`, "", "config", "is not a JSON object"},
 		{"mcpServers that is an array", `{"mcpServers": []}`, "", "config", `has a "mcpServers" key that is not a JSON object`},
 		{"a start marker without its end", "", "# Notes\n" + piBegin + " -->\n", "agents", "has a cairn block that is not whole"},

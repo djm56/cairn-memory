@@ -205,8 +205,8 @@ func TestOpenCodeRefusesWhatItCannotMerge(t *testing.T) {
 		content string
 		reason  string
 	}{
-		{"not valid JSON", `{"mcp": `, "is not valid JSON"},
-		{"JSON with comments", "{\n  // a comment\n}\n", "is not valid JSON"},
+		{"not plain JSON", `{"mcp": `, "is not plain JSON (comments or a syntax error)"},
+		{"JSON with comments", "{\n  // a comment\n}\n", "is not plain JSON (comments or a syntax error)"},
 		{"a top level that is an array", `[]`, "is not a JSON object"},
 		{"mcp that is an array", `{"mcp": []}`, `has a "mcp" key that is not a JSON object`},
 		{"instructions that is a string", `{"instructions": "x.md"}`, `has a "instructions" key that is not an array of strings`},
@@ -315,6 +315,25 @@ func TestOpenCodeCountsLineEndingsAsNoDifference(t *testing.T) {
 	}
 	if got := listDir(t, filepath.Dir(ocInstructionsBackup(t))); len(got) != 0 {
 		t.Errorf("a backup was made of a file that did not change: %v", got)
+	}
+}
+
+// TestOpenCodeRefusesAJsoncConfig checks a project with opencode.jsonc. OpenCode reads that file, so enable does not write an
+// opencode.json beside it: it refuses with exit 1, names the file, and changes nothing.
+func TestOpenCodeRefusesAJsoncConfig(t *testing.T) {
+	dir := enableProject(t)
+	const jsonc = "{\n  // the person's own config\n  \"model\": \"x\"\n}\n"
+	writeSettings(t, filepath.Join(dir, openCodeJSONC), jsonc)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "opencode.jsonc is there") || !strings.Contains(stderr, "Nothing was changed") {
+		t.Errorf("exit %d, stdout %q, stderr %q: want 1, nothing on stdout and the file named", code, stdout, stderr)
+	}
+	if string(readBytes(t, filepath.Join(dir, openCodeJSONC))) != jsonc {
+		t.Errorf("opencode.jsonc changed:\n%s", readBytes(t, filepath.Join(dir, openCodeJSONC)))
+	}
+	if got := listDir(t, dir); !slices.Equal(got, []string{".cairn.toml", openCodeJSONC}) {
+		t.Errorf("the project holds %v, want the jsonc file and the project file alone", got)
 	}
 }
 

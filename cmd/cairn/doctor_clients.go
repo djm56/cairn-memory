@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -30,9 +31,19 @@ func experimentalChecks(agent, wd string) []check {
 	return piChecks(root)
 }
 
-// openCodeChecks reads the OpenCode files of the project at root: the cairn server under mcp, and the instruction list and
-// file. A config that cannot be merged is one warning, with the reason.
+// openCodeChecks reads the OpenCode files of the project at root. An opencode.jsonc there is a warning first: OpenCode reads
+// it, and enable refuses to write a config beside it. The rest is openCodeConfigChecks.
 func openCodeChecks(root string) []check {
+	var checks []check
+	if _, err := os.Lstat(filepath.Join(root, openCodeJSONC)); err == nil {
+		checks = append(checks, check{name: "config", status: "warn", detail: filepath.Join(root, openCodeJSONC) + " is there, and OpenCode reads it: cairn enable refuses to write beside it, so add the cairn entry to it by hand"})
+	}
+	return append(checks, openCodeConfigChecks(root)...)
+}
+
+// openCodeConfigChecks reads the OpenCode files of the project at root: the cairn server under mcp, and the instruction list
+// and file. A config that cannot be merged is one warning, with the reason.
+func openCodeConfigChecks(root string) []check {
 	cfg := filepath.Join(root, openCodeFile)
 	doc, err := readObjectFile(cfg)
 	if errors.Is(err, fs.ErrNotExist) {

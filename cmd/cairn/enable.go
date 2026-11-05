@@ -163,7 +163,7 @@ func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "The hooks run cairn by name, so cairn must be on the PATH Claude Code uses; enable warns when it is not on its own PATH.")
 	fmt.Fprintln(w, "Before it writes an existing file, it copies the original to cairn/backups/<project> in the user's cache directory (~/Library/Caches on macOS, ~/.cache on Linux), outside the project, and prints the path.")
 	fmt.Fprintln(w, "The backup is not kept for good: nothing prunes it, and a cleaner may clear the cache directory. Keep a copy of a backup you need.")
-	fmt.Fprintln(w, "A file that is not valid JSON is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
+	fmt.Fprintln(w, "A file that is not plain JSON (comments or a syntax error) is refused, and left as it is. If the cache directory cannot be found, it refuses and changes nothing.")
 	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL, and every line they print says so.")
 	fmt.Fprintln(w, "opencode: adds the cairn MCP server to opencode.json under mcp, lists .cairn/instructions.md in its instructions, and writes that file with the task loop. A JSON file with comments is refused.")
 	fmt.Fprintln(w, "pi: adds the cairn MCP server to .pi/mcp.json with exposure direct, and writes the task loop into AGENTS.md between two markers. Text outside the markers is never changed, and a block cairn wrote earlier is updated to the current text.")
@@ -403,7 +403,7 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 	doc := map[string]json.RawMessage{}
 	if exists {
 		if !json.Valid(raw) {
-			return nil, nil, false, errors.New("is not valid JSON")
+			return nil, nil, false, errors.New("is not plain JSON (comments or a syntax error)")
 		}
 		if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {
 			return nil, nil, false, errors.New("is not a JSON object")

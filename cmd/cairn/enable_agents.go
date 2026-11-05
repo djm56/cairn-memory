@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -24,10 +26,26 @@ var instructionsTemplate string
 // written at the same place.
 const (
 	openCodeFile         = "opencode.json"
+	openCodeJSONC        = "opencode.jsonc"
 	openCodeInstructions = ".cairn/instructions.md"
 	openCodeToolPrefix   = "cairn_"
 	openCodeTimeoutMS    = 30000
 )
+
+// openCodeConfigAlias refuses when opencode.jsonc is in the project at root. OpenCode reads that file as well as
+// opencode.json, and enable does not write a second config beside it, so the person adds the entry by hand. A file that
+// cannot be looked for is refused too. Nothing is changed.
+func openCodeConfigAlias(root string) error {
+	path := filepath.Join(root, openCodeJSONC)
+	_, err := os.Lstat(path)
+	switch {
+	case err == nil:
+		return fmt.Errorf("%s is there, and OpenCode reads it: enable does not add a second config beside it, so add the cairn entry to %s by hand, or move it aside and run cairn enable again. Nothing was changed", path, openCodeJSONC)
+	case errors.Is(err, fs.ErrNotExist):
+		return nil
+	}
+	return fmt.Errorf("look for %s: %v. Nothing was changed", path, err)
+}
 
 // openCodeEntry is the mcp entry enable writes for the cairn server. DESIGN §6.2 asks for a timeout above the 5 s default:
 // the OpenCode docs page gives 30 s as the default, while the schema gives 5 s, so 30 s is written here.
@@ -83,6 +101,10 @@ func hasInstructionsMarker(raw []byte) bool {
 // a backup first. An instruction file without the marker is someone's own, so it is left as it is, and the config is still
 // merged. A refusal of the config refuses the run, and nothing is written.
 func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
+	if err := openCodeConfigAlias(root); err != nil {
+		fmt.Fprintf(stderr, "cairn enable: %v\n", err)
+		return 1
+	}
 	var mcpState, listState, fileState string
 	want := []byte(openCodeInstructionsText())
 	file := fileWrite{
@@ -286,7 +308,7 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 }
 
 // jsonObject decodes raw as the top-level object of a JSON file, keeping each member as its raw JSON. A file that is not
-// there is an empty object. JSON with comments is not valid JSON here, so it is refused. The errors complete the sentence
+// there is an empty object. JSON with comments is not plain JSON here, so it is refused. The errors complete the sentence
 // "<path> ...".
 func jsonObject(raw []byte, exists bool) (map[string]json.RawMessage, error) {
 	doc := map[string]json.RawMessage{}
@@ -294,7 +316,7 @@ func jsonObject(raw []byte, exists bool) (map[string]json.RawMessage, error) {
 		return doc, nil
 	}
 	if !json.Valid(raw) {
-		return nil, errors.New("is not valid JSON")
+		return nil, errors.New("is not plain JSON (comments or a syntax error)")
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil || doc == nil {
 		return nil, errors.New("is not a JSON object")

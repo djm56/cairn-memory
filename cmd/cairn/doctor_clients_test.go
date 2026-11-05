@@ -63,6 +63,21 @@ func TestDoctorOpenCodeAfterEnable(t *testing.T) {
 	}
 }
 
+// TestDoctorOpenCodeWarnsOnAJsoncConfig checks a project with opencode.jsonc: doctor warns that OpenCode reads that file and
+// enable refuses to write beside it, and nothing fails.
+func TestDoctorOpenCodeWarnsOnAJsoncConfig(t *testing.T) {
+	dir := agentProject(t)
+	writeSettings(t, filepath.Join(dir, openCodeJSONC), "{}\n")
+
+	checks := experimentalChecks("opencode", dir)
+	if c := checkNamed(checks, "config"); c == nil || c.status != "warn" || !strings.Contains(c.detail, "is there, and OpenCode reads it") {
+		t.Errorf("config is %+v, want a warning about opencode.jsonc", c)
+	}
+	if anyFailed(checks) {
+		t.Errorf("an opencode.jsonc failed the check: %v", checks)
+	}
+}
+
 // TestDoctorIgnoresTheRestOfTheCairnEntry checks that doctor compares the fields enable writes and no others. An OpenCode
 // entry with another timeout and an extra key is ok, and so is a pi entry with an extra key. A pi exposure other than direct
 // is still a warning, since the default would hide the tools from the model.
@@ -145,9 +160,9 @@ func TestDoctorOpenCodeFlagsWhatIsNotRight(t *testing.T) {
 			check: "instructions", status: "warn", contain: "holds an older cairn task loop",
 		},
 		{
-			name:   "a config that is not valid JSON",
+			name:   "a config that is not plain JSON",
 			config: `{"mcp": `,
-			check:  "config", status: "warn", contain: "is not valid JSON: cairn enable refuses it",
+			check:  "config", status: "warn", contain: "is not plain JSON (comments or a syntax error): cairn enable refuses it",
 		},
 	}
 	for _, tc := range cases {

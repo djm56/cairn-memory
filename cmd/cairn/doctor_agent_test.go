@@ -262,8 +262,8 @@ func TestDoctorAgentReportsAMalformedFile(t *testing.T) {
 		content string
 		reason  string
 	}{
-		{"not valid JSON", `{"hooks": `, "is not valid JSON"},
-		{"an empty file", ``, "is not valid JSON"},
+		{"not plain JSON", `{"hooks": `, "is not plain JSON (comments or a syntax error)"},
+		{"an empty file", ``, "is not plain JSON (comments or a syntax error)"},
 		{"a top level that is an array", `[]`, "is not a JSON object"},
 		{"hooks that is an array", `{"hooks": []}`, `has a "hooks" key that is not a JSON object`},
 		{"an event that is an object", `{"hooks": {"SessionStart": {}}}`, `has a "hooks" entry for SessionStart that is not a JSON array`},
