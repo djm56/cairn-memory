@@ -47,9 +47,10 @@ const exitProject = "exit-check"
 
 // TestExitCheckAgentWithOnlyBashCompletesAndClosesATask is M4's exit check: an agent with only bash
 // completes and closes a task through the CLI. The agent is exitScript, run by bash with a PATH that
-// holds only the cairn binary, so a command it runs that is not cairn is not found and fails the run.
+// holds only the cairn binary, so a bare command name it runs that is not cairn is not found and fails the run.
 // The server is an in-process loopback server over a real core, and the task is read back through the
-// API to show it closed done.
+// API to show it closed done: its status and outcome, its step done, the note and the close in its journal,
+// and the criterion result the agent submitted, met, with its evidence.
 func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
@@ -59,14 +60,16 @@ func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	srv := httptest.NewServer(api.Handler(local, api.UnauthenticatedHeaderCaller, nil))
 	t.Cleanup(srv.Close)
 
-	// The PATH holds one directory, with cairn in it and nothing else.
+	// The PATH holds one directory, with cairn in it and nothing else. PATH confines bare command names
+	// only: a script that runs a file by its path, such as /bin/cat, is not confined by it, so the script
+	// runs none.
 	dir := t.TempDir()
 	binDir := filepath.Join(dir, "bin")
 	if err := os.Mkdir(binDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(cairnBin, filepath.Join(binDir, "cairn")); err != nil {
-		t.Fatalf("link cairn into the PATH: %v", err)
+		t.Skipf("the exit check needs a symbolic link to put cairn on the PATH, and this platform refused one: %v", err)
 	}
 	script := filepath.Join(dir, "agent.sh")
 	if err := os.WriteFile(script, []byte(exitScript), 0o600); err != nil {
@@ -119,13 +122,28 @@ func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var noted bool
+	var noted, closed bool
 	for _, e := range events.Events {
 		if e.Kind == core.EventNote && e.Text == "Checked the step by hand." {
 			noted = true
 		}
+		if e.Kind == core.EventClose {
+			closed = true
+		}
 	}
 	if !noted {
 		t.Errorf("the event the agent logged is not in the task's journal: %+v", events.Events)
+	}
+	// The close is in the journal as a close event, which the server writes with the close (CONTRACT §4).
+	if !closed {
+		t.Errorf("the task's journal has no close event after the close: %+v", events.Events)
+	}
+	// The criterion result the agent submitted is the one the task holds, met, with its evidence (CONTRACT §2).
+	closing, err := hc.TaskGet(ctx, core.TaskGetRequest{ID: taskID, Section: core.SectionClose})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closing.Criteria) != 1 || closing.Criteria[0].Result != core.CriterionMet || closing.Criteria[0].Evidence != "the step and the close ran" {
+		t.Errorf("criteria = %+v, want the one criterion met with the evidence the agent gave", closing.Criteria)
 	}
 }
