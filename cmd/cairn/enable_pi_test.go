@@ -352,3 +352,13 @@ func TestEnableHelpSaysWhatTheExperimentalClientsWrite(t *testing.T) {
 		}
 	}
 }
+
+// TestEnableTagsOnlyTheExperimentalClients checks that the tag is for the experimental clients alone: a usage error for an
+// unknown agent names the agent, and says nothing about an experimental client.
+func TestEnableTagsOnlyTheExperimentalClients(t *testing.T) {
+	enableProject(t)
+	_, _, stderr := runCmd(t, "enable", "--agent", "nope")
+	if strings.Contains(stderr, "EXPERIMENTAL") || !strings.Contains(stderr, "unknown agent") {
+		t.Errorf("stderr %q: an unknown agent must not be tagged EXPERIMENTAL", stderr)
+	}
+}

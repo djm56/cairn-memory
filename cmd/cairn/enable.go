@@ -112,7 +112,7 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn enable: %v; run cairn enable --help for the flags\n", err)
 		return 2
 	}
-	if *agent != "claude-code" && *agent != "" {
+	if *agent == "opencode" || *agent == "pi" {
 		// Every line enable prints for an experimental client says so, including its refusals.
 		stdout, stderr = tagLines(stdout, experimentalPrefix(*agent)), tagLines(stderr, experimentalPrefix(*agent))
 	}
