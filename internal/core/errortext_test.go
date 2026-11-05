@@ -24,8 +24,10 @@ var unsafeAdvice = []string{"--force", "rm ", "reset"}
 // name it (#108).
 const auditRoot = "../.."
 
-// skipDirs are the directories the audit's walk does not enter. They hold no Go source of
-// the product: version control, the wiki and docs, build output and vendored code.
+// skipDirs are the directories the audit's walk does not enter when they sit directly under
+// the root. They hold no Go source of the product: version control, the wiki and docs, build
+// output and vendored code. A directory of the same name lower in the tree is a package like
+// any other, and is audited (6-W5).
 var skipDirs = map[string]bool{
 	".git": true, "wiki": true, "docs": true, "bin": true, "vendor": true, ".claude": true,
 }
@@ -104,8 +106,10 @@ func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 
 // TestAuditWalkFindsEveryPackage checks the walk that picks the audited packages: a
 // directory with a non-test Go file is audited, one with only test files is not, and the
-// directories in skipDirs are not entered, so a package added anywhere in the tree is
-// found without a list naming it.
+// directories in skipDirs are not entered when they sit directly under the root, so a
+// package added anywhere in the tree is found without a list naming it. A skip-listed name
+// lower in the tree (internal/docs, cmd/cairn/bin) is a package and is audited (6-W5). A
+// testdata directory is not audited at any depth.
 func TestAuditWalkFindsEveryPackage(t *testing.T) {
 	root := t.TempDir()
 	write := func(rel string) {
@@ -125,12 +129,19 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 	write(".git/hooks/h.go")
 	write("wiki/w.go")
 	write("newpkg/n.go")
+	write("internal/docs/d.go")
+	write("cmd/cairn/bin/b.go")
+	write("a/testdata/t.go")
+	write("testdata/r.go")
 
 	got, err := auditDirs(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "newpkg")}
+	want := []string{
+		filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "cmd", "cairn", "bin"),
+		filepath.Join(root, "internal", "docs"), filepath.Join(root, "newpkg"),
+	}
 	sort.Strings(want)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("auditDirs = %q, want %q", got, want)
@@ -138,7 +149,9 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 }
 
 // auditDirs returns, in order, the directories under root that hold a non-test Go file.
-// A directory named in skipDirs is not entered, below the root.
+// A directory named in skipDirs is not entered when it sits directly under root. A directory
+// named testdata is not entered at any depth, as the go tool ignores it; its files are test
+// inputs, not packages, and one that does not parse would fail the audit.
 func auditDirs(root string) ([]string, error) {
 	seen := map[string]bool{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -146,7 +159,7 @@ func auditDirs(root string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if path != root && skipDirs[d.Name()] {
+			if path != root && (d.Name() == "testdata" || (filepath.Dir(path) == root && skipDirs[d.Name()])) {
 				return filepath.SkipDir
 			}
 			return nil
