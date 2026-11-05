@@ -163,6 +163,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 ### Changed
 
+- Behaviour change, M4 CLI (#87): `cairn learning list --kind` refuses a kind that is not finding, pattern or agent-note as a usage error, exit 2, before any call, where the server used to answer. `cairn directive list` prints `no directives` for an empty list, where it printed `no directives apply`, so a script that matches the old words must change. `cairn task list` and `cairn learning list` print `no tasks` and `no learnings` when they hold nothing, where they printed nothing.
 - Behaviour change, M3 (issue #163): `directive_retire` refuses a code of the wrong form (not `D-` and four or more digits) as `invalid`, as `directive_reaffirm` already did. Before, a malformed code was `not_found`. A well-formed code with no row is still `not_found`.
 - Behaviour change, M3 (issue #164): an operator call that names a project with no row, a `directive_ratify` of project scope or a `project_settings_set`, is refused as `not_found` in core, for every caller (CONTRACT §8). Before, only the web UI refused it, and core created the row. Agent calls still create a project's row on its first call.
 - Behaviour change, M3 follow-ups (#121): a 404 whose body is not a cairn answer, such as a reverse proxy's page, names the base URL the client was given and says the body was not a cairn answer, as the `no_route` message does. Other statuses are unchanged.
