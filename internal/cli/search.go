@@ -19,8 +19,10 @@ import (
 // would refuse it. A --query with no word to match is not an error: the search has no hit.
 //
 // The text form is a summary. It prints one line for each hit with its kind, id, project and title, and
-// the hit's snippet on the line under it. A search with no hit prints the empty-list line. --json keeps
-// the task id of each hit, which the summary leaves out.
+// the hit's snippet on the line under it. A search with no hit prints the empty-list line. In a snippet,
+// the words in square brackets are the words the search matched. The brackets are markers the server
+// adds, not text of the row; --json keeps the snippet as the server gives it. --json keeps the task id of each hit, which the
+// summary leaves out.
 //
 // Exit codes: 0 when the answer was printed, 1 when the open or the call failed, 2 for a usage error.
 func Search(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
