@@ -586,6 +586,36 @@ func TestInitOutsideTheProjectDirectoryCompares(t *testing.T) {
 	}
 }
 
+// TestInitAcceptsTheProjectDirectoryUnderAnotherCase checks #114: a run from the project
+// directory named in another case is inside it, and writes the project's file. It needs a
+// case-insensitive filesystem, such as macOS's default, where the second name is the same
+// directory; on a case-sensitive one there is no second name, and the test is skipped.
+func TestInitAcceptsTheProjectDirectoryUnderAnotherCase(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "acme")
+	variant := filepath.Join(base, "ACME")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(variant); err != nil || !os.SameFile(info, rootInfo) {
+		t.Skip("the filesystem is case-sensitive: the project has no second name in another case")
+	}
+
+	useDir(t, variant)
+	t.Setenv("CLAUDE_PROJECT_DIR", root)
+	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0 (stdout %q, stderr %q)", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".cairn.toml")); err != nil {
+		t.Errorf("the project file was not written in the project: %v", err)
+	}
+}
+
 // TestInitDoesNotPrintACredentialFromAnExistingFile checks that a file that
 // already names a server with a user name and a password is refused by a run with other
 // values, and the refusal shows the server without them.

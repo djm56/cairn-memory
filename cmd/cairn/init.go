@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -159,8 +158,9 @@ func initDir() (string, error) {
 // by Claude Code and inherited by the shells it starts, so a cd into another project would
 // otherwise write that project's file into the first one's root, and exit 0. Both
 // directories are resolved through their symlinks before they are compared, and the
-// comparison is by path elements, so a sibling whose name starts the same way is outside.
-// With no variable set there is nothing to check.
+// comparison is of the directories on disk, not of their names (within), so a sibling
+// whose name starts the same way is outside, and the same directory under another case
+// is inside (#114). With no variable set there is nothing to check.
 func checkProjectDir() error {
 	env := os.Getenv(identity.EnvProjectDir)
 	if env == "" {
@@ -182,15 +182,42 @@ func checkProjectDir() error {
 	if err != nil {
 		return fmt.Errorf("the working directory %s cannot be read: %w", wd, err)
 	}
-	rel, err := filepath.Rel(projReal, wdReal)
+	inside, err := within(wdReal, projReal)
 	if err != nil {
-		return fmt.Errorf("%s is %s, and the working directory is %s: %w", identity.EnvProjectDir, proj, wd, err)
+		return fmt.Errorf("the working directory %s cannot be compared with %s: %w", wd, proj, err)
 	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+	if !inside {
 		return fmt.Errorf("%s is %s, but the working directory %s is not inside it, and cairn init would write into %s: unset %s, or cd into the project and run cairn init again",
 			identity.EnvProjectDir, proj, wd, proj, identity.EnvProjectDir)
 	}
 	return nil
+}
+
+// within reports whether dir is root or lies below it. The two are compared as directories
+// on disk, with os.SameFile on each element of dir's path, not as strings. So on a
+// case-insensitive filesystem, such as macOS's default, a directory that differs from root
+// only in case is root, and is not refused as a second path that looks the same (#114). A
+// walk up the path of dir is taken, so dir must already be resolved through its symlinks: a
+// path that holds a symlink does not walk up to the physical parent.
+func within(dir, root string) (bool, error) {
+	rootInfo, err := os.Stat(root)
+	if err != nil {
+		return false, err
+	}
+	for d := dir; ; {
+		info, err := os.Stat(d)
+		if err != nil {
+			return false, err
+		}
+		if os.SameFile(info, rootInfo) {
+			return true, nil
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return false, nil
+		}
+		d = parent
+	}
 }
 
 // shownServer describes a server value read from an existing file, for a message. A
