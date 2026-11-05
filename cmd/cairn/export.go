@@ -91,8 +91,15 @@ func writeExport(stdout, stderr io.Writer, what string, doc []byte) int {
 // argument, and it reads only the caller's project through the server: the task list, every page of it, and
 // then each task.
 //
-// The whole document is built before anything is written, so a failed read prints nothing. A project with no
-// task prints one line that says so.
+// The export is all or nothing. The whole document is built before anything is written, so a failed read prints
+// nothing and names the task it failed on, and a failed write is reported on stderr. A project with no task
+// prints one line that says so. There is no --json: the output is the Markdown document, and one blank line
+// separates a task from the next, with no other marker.
+//
+// It is not a snapshot. The task list and then each task are read in separate calls, with no transaction around
+// them: a task updated while the list is paged can be missed, and a task removed after the list is read fails the
+// export. A task costs at least two calls, its detail and its journal page by page, so a large project is many
+// round trips to the server.
 //
 // Exit codes: 0 when the project was printed, 1 when a call failed, 2 for a usage error.
 func runExportProject(args []string, stdout, stderr io.Writer) int {
