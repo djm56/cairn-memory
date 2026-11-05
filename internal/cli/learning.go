@@ -118,8 +118,9 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 // and --kind may each be given more than once; left out, every status or kind is listed. A --kind that
 // is not one of the three learning kinds is a usage error, as it is for learning add, so it exits 2
 // before the call. A --status is judged by the server. The list is the caller's project only: the
-// all_projects argument is not offered here, as it needs an operator or viewer role that the CLI does
-// not hold.
+// all_projects argument is not offered here, as a deliberate scope choice for the CLI, which lists one
+// project at a time. It is not a role gate: an agent with a project can read every project's learnings
+// through the server.
 func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
 	const verb = "cairn learning list"
 	fl, asJSON := newFlags(verb)
