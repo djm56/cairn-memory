@@ -62,6 +62,49 @@ func TestEventLogReviewData(t *testing.T) {
 	}
 }
 
+// TestEventLogDataMustBeAJSONObject checks that a --data which is not one JSON object is a usage
+// error naming --data, exit 2, with no call: text that is not JSON, an empty or blank value, an
+// array, a string, and a JSON object followed by more text. A JSON object with edge spaces is
+// accepted.
+func TestEventLogDataMustBeAJSONObject(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	cases := []struct {
+		name string
+		data string
+	}{
+		{"not JSON", "verdict=approved"},
+		{"empty", ""},
+		{"blank", "   "},
+		{"an array", `[{"verdict":"approved"}]`},
+		{"a string", `"approved"`},
+		{"an object then more text", `{"verdict":"approved"} trailing`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeWrites{event: &core.Event{}}
+			code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", c.data, "--agent", "hicks")
+			if code != 2 || !strings.Contains(errOut, "--data") || svc.calls != 0 {
+				t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming --data and no call", code, errOut, svc.calls)
+			}
+		})
+	}
+	svc := &fakeWrites{event: &core.Event{ID: 9}}
+	if code, _, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", ` {"verdict":"approved"} `, "--agent", "hicks"); code != 0 {
+		t.Errorf("an object with edge spaces: exit %d, stderr %q; want it accepted", code, errOut)
+	}
+}
+
+// TestEventLogDataFromStandardInputMustBeAJSONObject checks the same refusal for --data -: a
+// standard input that is not one JSON object is a usage error naming --data, and no call is made.
+func TestEventLogDataFromStandardInputMustBeAJSONObject(t *testing.T) {
+	t.Setenv(EnvAgent, "")
+	svc := &fakeWrites{event: &core.Event{}}
+	code, _, errOut := runWrite(t, Event, svc, "not a review\n", "log", "task-20261030-01", "--kind", "review", "--text", "x", "--data", "-", "--agent", "hicks")
+	if code != 2 || !strings.Contains(errOut, "--data") || svc.calls != 0 {
+		t.Errorf("exit %d, stderr %q, calls %d; want a usage error naming --data and no call", code, errOut, svc.calls)
+	}
+}
+
 // TestEventLogRefusedByServer checks a refusal of the server: one line on stderr, exit 1.
 func TestEventLogRefusedByServer(t *testing.T) {
 	t.Setenv(EnvAgent, "")
