@@ -267,6 +267,8 @@ func TestLearningListUsageErrors(t *testing.T) {
 	}{
 		{"an empty status", []string{"list", "--status", " "}, "a status must be named"},
 		{"an empty kind", []string{"list", "--kind", ""}, "a kind must be named"},
+		{"an unknown kind", []string{"list", "--kind", "idea"}, "--kind must be finding, pattern or agent-note"},
+		{"an unknown kind after a known one", []string{"list", "--kind", "finding", "--kind", "idea"}, "--kind must be finding, pattern or agent-note"},
 		{"a limit of zero", []string{"list", "--limit", "0"}, "--limit must be 1 or more"},
 		{"a positional argument", []string{"list", "task-20261105-01"}, "takes no positional argument"},
 	}

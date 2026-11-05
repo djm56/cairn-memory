@@ -115,9 +115,11 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 
 // learningList is `cairn learning list [--status s]... [--kind k]... [--target t] [--limit n]
 // [--cursor c] [--json]`: the project's learnings, newest first (CONTRACT §5, learning_list). --status
-// and --kind may each be given more than once; left out, every status or kind is listed. The list is
-// the caller's project only: the all_projects argument is not offered here, as it needs an operator
-// or viewer role that the CLI does not hold.
+// and --kind may each be given more than once; left out, every status or kind is listed. A --kind that
+// is not one of the three learning kinds is a usage error, as it is for learning add, so it exits 2
+// before the call. A --status is judged by the server. The list is the caller's project only: the
+// all_projects argument is not offered here, as it needs an operator or viewer role that the CLI does
+// not hold.
 func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
 	const verb = "cairn learning list"
 	fl, asJSON := newFlags(verb)
@@ -138,6 +140,12 @@ func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
 	if len(pos) > 0 {
 		fmt.Fprintf(stderr, "%s: takes no positional argument, got %q\n", verb, pos)
 		return 2
+	}
+	for _, k := range kinds.vals {
+		if !validLearningKind(string(k)) {
+			fmt.Fprintf(stderr, "%s: --kind must be finding, pattern or agent-note, not %q: cairn learning list --kind finding\n", verb, k)
+			return 2
+		}
 	}
 	s, err := open()
 	if err != nil {
@@ -168,8 +176,8 @@ func validLearningKind(kind string) bool {
 
 // listFlag collects a repeatable flag into a list of named values, such as learning statuses. Its
 // empty value is refused, since leaving the flag out is how a person lists every value. Whether a
-// value is a real one is the server's to say, so each is passed on as it is written. name is the
-// flag's name, for that message.
+// value is a real one is the server's to say, so each is passed on as it is written, except where the
+// verb checks its own kinds before the call. name is the flag's name, for that message.
 type listFlag[T ~string] struct {
 	name string
 	vals []T
