@@ -25,13 +25,13 @@ func primeRun(svc core.Service, args ...string) (int, string, string, int) {
 }
 
 // primeBlockNoRole is the session-start block prime writes for activeTask with no role: the block the
-// hook writes, closed by the CLI pointer rather than the MCP one.
+// hook writes, closed by prime's pointer rather than the MCP one.
 const primeBlockNoRole = `Cairn task: "Add rate limit" (task-20261030-01, active) in acme-api.
 Next action: write the test
 Current step: 1 of 2, "Write test" (active).
 Directives that apply: 0.
 Agent-scoped directives were not counted: no agent role is set.
-The brief, steps and recent events follow; run cairn directive list for all directives.
+The brief, steps and recent events follow.
 `
 
 // TestPrimeHumanWithAnActiveTask checks the human output of prime with a task and no role: the block,
@@ -111,6 +111,42 @@ func TestPrimeNamesTheCLIWhenDirectivesAreOmitted(t *testing.T) {
 	}
 	if strings.Contains(out, "directive_list") {
 		t.Errorf("prime names the MCP tool, which its agent does not have:\n%s", out)
+	}
+}
+
+// TestPrimeWritesTheDirectiveCountsOnce checks that the expired line, the omitted line and the CLI command
+// the omitted line names are each written once. The block gives them, and the summary after it does not
+// repeat them. With nothing omitted, the command is not named at all.
+func TestPrimeWritesTheDirectiveCountsOnce(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	task := activeTask()
+	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps(), Expired: 2, Omitted: 3}}
+	code, out, errOut, _ := primeRun(svc)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
+	}
+	for _, want := range []string{
+		"Directives expired and left out (past review_by): 2.",
+		"Directives omitted (beyond the cap of 12): 3. Call cairn directive list for all.",
+		"cairn directive list",
+	} {
+		if n := strings.Count(out, want); n != 1 {
+			t.Errorf("prime output has %q %d times, want once:\n%s", want, n, out)
+		}
+	}
+	for _, summaryLine := range []string{"expired     ", "omitted     "} {
+		if strings.Contains(out, summaryLine) {
+			t.Errorf("the summary repeats the counts with %q:\n%s", summaryLine, out)
+		}
+	}
+
+	svc = &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps()}}
+	code, out, errOut, _ = primeRun(svc)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
+	}
+	if strings.Contains(out, "directive list") {
+		t.Errorf("prime names the directive list with nothing omitted:\n%s", out)
 	}
 }
 

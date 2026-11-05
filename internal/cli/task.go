@@ -371,10 +371,10 @@ func writeCurrent(w io.Writer, cur *core.TaskCurrent) {
 	writeCurrentSummary(w, cur, true)
 }
 
-// writeCurrentSummary is writeCurrent, with the directive count written only when countDirectives is
-// true. Prime writes the session-start block before this summary, and the block already gives the count,
-// so prime passes false and the count is printed once.
-func writeCurrentSummary(w io.Writer, cur *core.TaskCurrent, countDirectives bool) {
+// writeCurrentSummary is writeCurrent, with the directive counts written only when counts is true. Prime
+// writes the session-start block before this summary, and the block already gives the count, the expired
+// line and the omitted line, so prime passes false and each is printed once.
+func writeCurrentSummary(w io.Writer, cur *core.TaskCurrent, counts bool) {
 	if cur.Task == nil {
 		fmt.Fprintln(w, "no task is active")
 		return
@@ -391,7 +391,7 @@ func writeCurrentSummary(w io.Writer, cur *core.TaskCurrent, countDirectives boo
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)
 	}
 	writeEvents(w, "recent events, newest first", cur.RecentEvents)
-	writeDirectives(w, cur, countDirectives)
+	writeDirectives(w, cur, counts)
 }
 
 // currentStep returns the step to work on: the active one, else the first pending one,
@@ -522,11 +522,12 @@ func writeEvents(w io.Writer, label string, events []core.Event) {
 
 // writeDirectives prints the directive count of the active task, then each directive that
 // applies: its code, its scope, its title, and its rule on the next line. The title and the rule go
-// through Plain, so each is capped to one line, as the directive list is. The count is written only
-// when count is true; without it, a heading is written over the list when there is one. The expired
-// and omitted counts follow when they are not zero, as the MCP tool counts them.
-func writeDirectives(w io.Writer, cur *core.TaskCurrent, count bool) {
-	if count {
+// through Plain, so each is capped to one line, as the directive list is. When counts is true, the count
+// is written and the expired and omitted counts follow when they are not zero, as the MCP tool counts
+// them. When it is false, a heading is written over the list when there is one, and the two counts are
+// left out: the caller has already written them.
+func writeDirectives(w io.Writer, cur *core.TaskCurrent, counts bool) {
+	if counts {
 		fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
 	} else if len(cur.Directives) > 0 {
 		fmt.Fprintln(w, "directives")
@@ -536,6 +537,9 @@ func writeDirectives(w io.Writer, cur *core.TaskCurrent, count bool) {
 		if rule := Plain(d.Rule); rule != "" {
 			fmt.Fprintf(w, "          %s\n", rule)
 		}
+	}
+	if !counts {
+		return
 	}
 	if cur.Expired > 0 {
 		fmt.Fprintf(w, "expired     %d past review_by, left out\n", cur.Expired)

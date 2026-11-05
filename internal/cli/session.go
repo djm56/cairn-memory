@@ -27,12 +27,14 @@ const HookPointer = "Call task_current for the brief, the steps and recent event
 const HookOmittedCall = "directive_list"
 
 // PrimePointer is the closing line of the session-start block prime prints. Prime writes the summary of
-// the task directly after the block, so the pointer says that the brief, steps and events follow, and it
-// names the one CLI command the summary does not show.
-const PrimePointer = "The brief, steps and recent events follow; run cairn directive list for all directives."
+// the task directly after the block, so the pointer says that the brief, steps and events follow. It names
+// no command: the directives the summary lists are all of them unless the omitted line names the CLI
+// command for the rest.
+const PrimePointer = "The brief, steps and recent events follow."
 
 // PrimeOmittedCall is the call the omitted-directives line of prime's block names. Prime's agent has only
-// a shell, so the call is the CLI command.
+// a shell, so the call is the CLI command. It is the one place prime names it, and only when directives
+// are omitted.
 const PrimeOmittedCall = "cairn directive list"
 
 // SessionStart writes the session-start block for cur: the active task, its next action and current

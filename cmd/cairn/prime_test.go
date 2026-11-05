@@ -46,7 +46,7 @@ func TestPrimeWithNoTaskOverTheServer(t *testing.T) {
 // TestPrimeRoundTripWithARoleFromTheVariable runs prime against a real server. Two agent-scoped
 // directives are seeded, one for hicks and one for another role. With CAIRN_AGENT=hicks the count
 // includes hicks's own directive, in the block, the summary and the JSON, and the block closes with the
-// CLI pointer. With the variable unset the count is the unscoped one and the no-role sentence is
+// pointer to the brief. With the variable unset the count is the unscoped one and the no-role sentence is
 // written. A value the wire form refuses is a usage error, exit 2.
 func TestPrimeRoundTripWithARoleFromTheVariable(t *testing.T) {
 	local, url := newServer(t, nil)
@@ -57,7 +57,7 @@ func TestPrimeRoundTripWithARoleFromTheVariable(t *testing.T) {
 	seedAgentDirective(t, local, "hicks", "Hicks reads the schema first")
 	seedAgentDirective(t, local, "reviewer", "Reviewer checks the diff")
 
-	const pointer = "The brief, steps and recent events follow; run cairn directive list for all directives.\n"
+	const pointer = "The brief, steps and recent events follow.\n"
 
 	t.Setenv("CAIRN_AGENT", "hicks")
 	code, out, errOut := runCmd(t, "prime")

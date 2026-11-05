@@ -18,9 +18,9 @@ type primeResult struct {
 
 // Prime is `cairn prime [--agent role] [--json]`: the session-start view for an agent that has only a
 // shell and no hook. It makes the one call task current makes. It writes the session-start block, the
-// same lines the hook writes, closed by a pointer to the CLI commands. When a task is active it then
-// writes a blank line and the summary task current writes, without the directive count the block has
-// already given. With no active task the block is the whole answer.
+// same lines the hook writes, closed by a pointer to the brief. When a task is active it then writes a
+// blank line and the summary task current writes, without the directive counts and expired and omitted
+// lines the block has already given. With no active task the block is the whole answer.
 //
 // --agent names the caller's role, and CAIRN_AGENT names it when the flag is left out, as task current
 // reads it. A name the wire form refuses is a usage error, exit 2, before the project is opened. Prime
