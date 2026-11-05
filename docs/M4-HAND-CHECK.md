@@ -173,8 +173,9 @@ agent used its output, so it does not decide the verdict.
 `cairn enable --agent opencode` writes `opencode.json` and `.cairn/instructions.md`
 relative to the project root. [DESIGN.md §6.2](DESIGN.md#62-other-clients) and the
 enable help say so, but no real OpenCode run has confirmed that base path. This section
-is the check. Record what OpenCode actually does, whatever it is. A finding here is
-useful, and it is not a failure of the check.
+is the check. Record what OpenCode actually does. Pass for this section means every
+expected path or prefix in 4.3 and 4.4 is reported matched. A mismatch is recorded as a
+finding, with what OpenCode showed, and it counts as a fail of that sub-check.
 
 - [ ] **4.1 Enable OpenCode in the scratch project.** From `<project-dir>`, run
   `cairn enable --agent opencode --dry-run`, then the same command without it. Note the
@@ -215,8 +216,11 @@ been confirmed against a real pi run.
   settings and have not been checked in pi. Record what pi shows.
 - [ ] **5.4 Run `cairn doctor --agent pi`.** Record its output. It changes nothing.
 
-Record the pi version. The same rule as section 4 applies: a path or a prefix that
-differs from the cairn text is a finding, to be recorded and not patched by hand.
+Record the pi version. Pass for this section means every expected path or prefix in 5.2
+and 5.3 is reported matched. For 5.2, the cairn tools being absent before trust is the
+expected result, so it counts as matched. A path or a prefix that differs from the cairn
+text is recorded as a finding, with what pi showed, and not patched by hand. It counts
+as a fail of that sub-check.
 
 ## 6. What a hand checker records
 
