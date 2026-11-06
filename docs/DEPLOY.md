@@ -626,8 +626,9 @@ starts the old build again, on a database that no migration has changed. The new
 `/home/you/cairn-linux` after `make push`, which copies it to the home directory of the SSH
 user. On a server you built on the server, it is `bin/cairn` in the checkout. Use the file
 you copied. The `ls -l` line is the gate: do not install until it lists the backup. Fill in
-`<user>` and `<host>`. The stamp is set on the first line, so run the whole upgrade in the
-same shell.
+`<host>`. The block runs as root, as the wiki's does, so its lines run without `sudo` except
+the `backup` line, which runs as `cairn`. The stamp is set on the first line, so run the
+whole upgrade in the same shell.
 
 Migrations run when the server starts, so the first start after an upgrade may change the
 schema. Keep `cairn.prev-<UTC time>` and the pre-upgrade backup until the new server has run

@@ -24,6 +24,8 @@ systemctl start cairn
 
 **Stop if any line fails.** From `version` to `systemctl start cairn` the lines are joined with `&&`, so each one runs only when the one before it succeeded. If any line prints an error, nothing after it has run, and the old binary is still installed. If the error came after the server was stopped, `systemctl start cairn` starts the old build again, on a database that no migration has touched. Do not run the `install` line by hand to get past a failed backup.
 
+If `systemctl start cairn` fails after the install, the new binary is already in place, so do not install it again. Read the journal, then follow [step 6](#6-start-the-server) for what a failed start means, and [step 9](#9-roll-back) for the rollback.
+
 Then verify:
 
 ```bash
@@ -170,13 +172,16 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 cd cairn-memory
 git pull
 make build
-cp -p ~/.local/bin/cairn ~/.local/bin/cairn.prev-$STAMP
+if [ -f ~/.local/bin/cairn ]; then cp -p ~/.local/bin/cairn ~/.local/bin/cairn.prev-$STAMP; fi
 install -m 0755 bin/cairn ~/.local/bin/cairn
 cairn version
+cd ~/my-project   # your project folder, the one with .cairn.toml
 cairn doctor
 ```
 
-**You should see** the new hash from `cairn version`, and `doctor` with `ok` on each line.
+The `cp` line keeps the old binary when there is one. On a first install there is no `~/.local/bin/cairn` to keep, so the guard skips the copy.
+
+**You should see** the new hash from `cairn version`, and `doctor` with `ok` on each line. Run `doctor` from the project folder, the one that holds `.cairn.toml`.
 
 If you also run `cairn serve` on this machine, stop it first, back up its database, then start the new build on the same `--db`. The steps are those of the server upgrade above, with your own paths. Back up with `cairn backup --db <file> <out>`, and keep the old binary as `cairn.prev-<UTC time>` beside the new one.
 

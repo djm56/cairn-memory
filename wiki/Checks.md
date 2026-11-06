@@ -59,7 +59,7 @@ The summary line reads `smoke-check: N passed, N failed, N skipped`.
 **You should see**, for a healthy install, seven `PASS` lines and the summary:
 
 ```text
-PASS  binary   found at /usr/local/bin/cairn
+PASS  binary   found at /Users/you/.local/bin/cairn
 PASS  version  cairn 8b651da
 PASS  doctor   exit 0: no check failed
 PASS  healthz  GET /healthz answered 200 with status ok
@@ -193,6 +193,6 @@ The guides under `docs/` are human checks for each milestone. Their status, as r
 |---|---|---|
 | [M2-LIVE-RUN.md](https://github.com/djm56/cairn-memory/blob/main/docs/M2-LIVE-RUN.md) | Exit check passed on 2026-11-02 (#19) | Its steps match the code. Its `systemd-analyze security` score was recorded by the run and was not re-checked for this page |
 | [M3-UI-CHECK.md](https://github.com/djm56/cairn-memory/blob/main/docs/M3-UI-CHECK.md) | An optional hand test. The automated M3 exit test is `TestM3ExitCheck` | The headers, the cookie, sign-in with operator and viewer keys, the refusals and the upgrade section. Issue #169 is partly open: its rollback section still has gaps |
-| [M4-HAND-CHECK.md](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) | Section 3, the `/compact` check, was run on 2026-11-06 and passed by operator ruling. Sections 4 and 5, for opencode and pi, are not run | Its setup steps and the close steps. Two lines are out of date: section 3.1 says the dry run shows the `compact` matcher, but the dry run lists event names only, and the matcher is written to the file. Issue #203 is open on the restart wording and one phrasing |
+| [M4-HAND-CHECK.md](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) | Section 3, the `/compact` check, was run on 2026-11-06 and passed by operator ruling. Sections 4 and 5, for opencode and pi, are not run | Its setup steps and the close steps, as checked against the code. Section 3.1 says the dry run lists the three hook event names and that the `compact` matcher is checked after the install, which is what the dry run does. Issue #203 asked for three items: the restart wording, the section 3.5 phrasing and a DESIGN reflow. All three are in the tree at this page's commit |
 
 The M4 guide's own record is the authority for its status. This page repeats it.

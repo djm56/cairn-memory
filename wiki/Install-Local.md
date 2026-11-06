@@ -1,6 +1,6 @@
 # Install locally
 
-_Status as of 2026-11-06: M5 (Plugin) is current. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 8b651da._
+_Status as of 2026-11-06: M5 (Plugin) is current and in progress, and the plugin is not shipped yet. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 8b651da._
 
 This page is the detailed version of [Quick-Start](Quick-Start), for a developer machine. It covers what you need, what each step does, the files `cairn` reads and writes, and the environment variables it reads. Use it when you want to know why a step works, or when the Quick-Start does not match what you see.
 
@@ -167,7 +167,7 @@ cairn enable --agent claude-code --dry-run
 cairn enable --agent claude-code
 ```
 
-It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin, which will do both, is M5 work.
+It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin, which will do both, is M5 work in progress and is not shipped yet.
 
 ## Run a local server for development
 

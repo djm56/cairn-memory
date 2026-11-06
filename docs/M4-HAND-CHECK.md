@@ -76,9 +76,12 @@ practice. The reference does not run a session for you.
   cairn enable --agent claude-code --dry-run
   ```
 
-  It should list three hooks by event name: `SessionStart`, `PreCompact` and `Stop`. The
-  dry run prints the event names only, not the matcher, so the `compact` matcher is checked
-  after the install, in 3.2 and 3.4. Nothing is written by a dry run.
+  It should list three hooks by event name, `SessionStart`, `PreCompact` and `Stop`, each
+  with the command it would install. Where it would change the settings file, the output
+  ends with a `dry run: nothing written to` line for that file. A dry run shows a matcher
+  only for a hook already present in that file. For a hook it would add, no matcher is
+  shown, so the `compact` matcher is checked after the install, in 3.2 and 3.4. Nothing is
+  written by a dry run.
 - [ ] **3.2 Install the hooks.** Run the same command without `--dry-run`. It writes
   `.claude/settings.local.json` in `<project-dir>`. Check that the file holds the three
   cairn hooks and nothing else you did not expect. It writes no MCP registration for
@@ -151,9 +154,10 @@ What to look for:
   about the matcher in 3.4 and the matcher was not fixed.
 - **Not run.** The agent made a task read of its own after the compact, as the note
   below describes. Before a second attempt, close the first task as section 7.1 says,
-  finishing or skipping its steps. A second active task is refused unless the project allows
-  parallel tasks, and a fresh Claude Code session does not clear the first one. Then start again from 3.5 with a new task
-  and a new marker. Record that the run was a second attempt.
+  finishing or skipping its steps. A second active task is refused unless the project
+  allows parallel tasks, and a fresh Claude Code session does not clear the first one.
+  Then start again from 3.5 with a new task and a new marker. Record that the run was a
+  second attempt.
 
 A note on evidence. The marker is the evidence. It was set outside the session, so the
 conversation before `/compact` cannot hold it, and the compaction summary cannot carry

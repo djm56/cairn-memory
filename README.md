@@ -49,18 +49,22 @@ machine, with Go 1.26 or later:
 git clone https://github.com/djm56/cairn-memory.git
 cd cairn-memory
 make build
+mkdir -p ~/.local/bin
 install -m 0755 bin/cairn ~/.local/bin/cairn
 mkdir -p ~/cairn-data
 cairn serve --db ~/cairn-data/cairn.db                              # in a second terminal, left running
 cairn key add --db ~/cairn-data/cairn.db --name laptop --scope agent  # copy the key it prints, now
+mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
+printf 'API key: ' >&2; read -rs K; echo >&2                         # type the key you copied; it is not echoed
+(umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
 cairn init --project my-project --server http://127.0.0.1:8788      # in your project folder
 cairn enable --agent claude-code
 claude mcp add cairn -- "$(command -v cairn)" mcp
 cairn doctor
 ```
 
-Store the key in `~/.config/cairn/client.env` before `cairn doctor` runs, as the Quick-Start
-gives it. `cairn doctor` should show five lines, each `ok`.
+The block stores the key in `~/.config/cairn/client.env` before `cairn doctor` runs, as the
+Quick-Start gives it. `cairn doctor` should show five lines, each `ok`.
 
 `.cairn.toml` is committed to the project. It names the project and the server, and `server` is
 required (D11). The API key does not go in this file, and neither does a user name or password in
