@@ -1,12 +1,12 @@
 # M4 hand check: hooks, `/compact` and the clients
 
-Status as of 2026-11-05: not yet run. M4's exit check is that, on Claude Code, a task
-started before `/compact` continues after it with no user prompt, and that an agent
+Status as of 2026-11-06: section 3 was run on 2026-11-06 and passed by operator
+ruling; sections 4 and 5 are not yet run. M4's exit check is that, on Claude Code, a
+task started before `/compact` continues after it with no user prompt, and that an agent
 with only a shell completes and closes a task through the CLI. The automated tests
 cover the CLI, the hooks and `enable`. The automated exit test covers the shell-only
 close. No automated test runs `/compact` on Claude Code, so section 3 is the check for
-that part. Until it is recorded, the status lines in the README, PLAN and the wiki stay
-at "M4 is current", as [PLAN §9](PLAN.md#9-project-management) requires.
+that part. The result is under [Recorded result](#recorded-result).
 
 This guide follows the shape of [M3-UI-CHECK.md](M3-UI-CHECK.md): numbered steps, exact
 commands, what to look for, and a list of what to paste back. It takes about forty
@@ -250,10 +250,19 @@ including the one in the doctor's server line, with `<server-url>`.
 
 ## 7. Cleanup
 
-- [ ] **7.1 Close the task.** Close the test task on the server with
-  `cairn task close <task-id> --outcome done --summary "hand check" --agent <agent-name>`.
-  A close may be refused for a missing lesson or a missing review. Give what it lists, or
-  leave the task open and say so.
+- [ ] **7.1 Close the task.** The close policy refuses a task with an active step, or
+  with no lessons and no mistakes given. Finish or skip each step first: finish an
+  active step, and skip a pending one. Then close it with empty lists and a reason:
+
+  ```bash
+  cairn step update <task-id> 1 --action finish --summary "checked" --agent <agent-name>
+  cairn step update <task-id> 2 --action skip --summary "not needed" --agent <agent-name>
+  echo '{"lessons":[],"mistakes":[]}' | cairn task close <task-id> --outcome done \
+    --summary "hand check" --no-lessons-reason "test task only" --json-input --agent <agent-name>
+  ```
+
+  A step the agent has already started is finished, not skipped: only a pending or
+  failed step is skipped.
 - [ ] **7.2 Remove the hooks from the scratch project.** Delete `<project-dir>` when you
   are done with it. A backup of a settings file that `enable` made is in the user's
   cache directory, under `cairn/backups/<project>`, outside the project. Delete the
@@ -286,3 +295,31 @@ Never paste:
 - an unredacted debug log.
 
 If a key is pasted anywhere, revoke it and make a new one.
+
+## Recorded result
+
+Section 3 was run on 2026-11-06 with `cairn eb34088` against the operator's server, which
+was upgraded to the same build first. Sections 4 and 5 were not run.
+
+- **Hooks.** `cairn doctor --agent claude-code` reported `SessionStart`, `PreCompact` and
+  `Stop` as `ok`, with the matcher `startup|resume|clear|compact`.
+- **Order.** The Claude Code session was started first, while no task was active, so the
+  startup hook reported no task. The task, its two steps and the marker were then set
+  from a second terminal.
+- **`/compact`.** The `PreCompact` hook ran at 13:36:21 UTC and `SessionStart:compact`
+  ran at 13:36:34 UTC. The debug log shows the `SessionStart` output with the task, the
+  current step and the marker as the next action.
+- **No turn by itself.** A manual `/compact` did not start a turn. The neutral message
+  `continue` was sent at 13:37:20 UTC, as 3.8 allows.
+- **Reply.** The agent first called `task_current`, then named the marker, said it had
+  read it in the system reminder after the compaction, finished step 1 and started
+  step 2.
+- **Stop warning (3.10).** When the turn ended with step 2 active, the `Stop` hook's
+  warning named step 2 and said it had no summary.
+
+**Verdict: pass, by operator ruling.** Under the rule above, a task read of the agent's
+own after the compact makes the attempt not run. The operator ruled it a pass, because
+the debug log shows the hook delivered the marker before the call, and the agent named
+the post-compaction reminder as its source. The hook's own text ends with "Call
+task_current for the brief", which asks for that call, so a repeat run would read the task
+the same way. The conflict between the hook text and this rule is a follow-up for M5.

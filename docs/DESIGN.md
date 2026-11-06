@@ -1,6 +1,6 @@
 # Cairn Memory — Design
 
-**Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and
 their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
@@ -438,8 +438,8 @@ https://code.claude.com/docs/en/hooks.md:
 - `session-start` prints the block above. `enable` registers it with the
   matcher `startup|resume|clear|compact`, so it runs again after `/compact`. The
   reference says a SessionStart hook's plain stdout is added to Claude's context.
-  This is what carries a task across `/compact` in Claude Code. The live run that
-  confirms it is M4's open exit check: see [M4-HAND-CHECK.md](M4-HAND-CHECK.md).
+  This is what carries a task across `/compact` in Claude Code. The M4 hand check
+  confirmed it on 2026-11-06: see [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
 - `pre-compact` prints the same block. It is installed, as D15 names it, but it
   is inert in Claude Code. The reference says plain stdout is written to the debug
   log and not shown in the transcript, except for four events, and PreCompact is

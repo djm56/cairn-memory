@@ -180,6 +180,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 - Docs, M4 exit check: `docs/M4-HAND-CHECK.md`, an optional hand-check guide for the `/compact` exit check on Claude Code, and for the OpenCode and pi registrations, which are EXPERIMENTAL and have not been run. Linked from the README's CLI section.
 - Docs, M4: the README, DESIGN and the wiki describe the CLI verbs, the three hooks, `enable --agent claude-code` (hooks only), `doctor --agent` and `export project` as built, with the OpenCode and pi registrations marked EXPERIMENTAL. The DESIGN command table has the exit codes in §5.2.2. The status lines are unchanged, since the M4 exit check has not passed.
+- M4 exit check (#206): the `/compact` hand check ran on 2026-11-06 and passed by operator ruling. `docs/M4-HAND-CHECK.md` records the result, and its cleanup step 7.1 now finishes or skips the steps and passes empty lessons and mistakes, since the close policy refuses the old command. The status lines, the `cairn-milestone` marker and the wiki roadmap move to M5. DESIGN §4.1 says the run confirmed the SessionStart carry.
 
 ### Changed
 
