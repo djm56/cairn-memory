@@ -31,14 +31,14 @@ The verbs of the `cairn` binary, one line each, as `cairn help` lists them. The 
 | `restore` | Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup> |
 <!-- cairn-cli-verbs:end -->
 
-The binary has 21 entries in its dispatch table: the 19 verbs above, plus `help` and `version`, which are in the table too. `import` is planned for M6 and is not a verb yet: `cairn import` is an unknown command.
+The table has 21 rows, one for each entry in the binary's dispatch table: 19 verbs, plus `help` and `version`. `import` is planned for M6 and is not a verb yet: `cairn import` is an unknown command.
 
 ## Conventions
 
 - **Usage.** `cairn <verb> [subcommand] [flags]`. A verb group such as `task` or `step` takes no `--help` of its own. Its subcommand does: `cairn task get --help`.
 - **Help.** `cairn help`, `cairn -h`, `cairn -help` and `cairn --help` print the list of verbs and the exit-code table, to stdout, and exit 0. With no arguments, the same text goes to stderr and the exit is 2.
 - **Unknown command.** A message on stderr, the list of verbs, and exit 2.
-- **`--agent`.** On the verbs that take it, it names the caller. When it is left out, `CAIRN_AGENT` is used. `directive list` does not read `CAIRN_AGENT`: it lists every role unless `--agent` is given. A write needs an agent name, and a missing one is refused with exit 3.
+- **`--agent`.** On the verbs that take it, it names the caller. When it is left out, `CAIRN_AGENT` is used. `directive list` does not read `CAIRN_AGENT`: it lists every role unless `--agent` is given. A write needs an agent name. On the CLI, a write with no name is refused before any call, with exit 2 and the message on stderr: `<verb>: no agent name: give --agent <name>, or set CAIRN_AGENT to one`. Over MCP the same case is an `invalid` refusal (exit 3 where a verb reports it), and the adapter asks for the `agent` argument instead.
 - **Text from standard input.** A text flag given the value `-` reads standard input, for example `--summary -`. `task start`, `task update`, `task close`, `step plan`, `step add` and `search` take their long text this way.
 - **JSON from standard input.** `--json-input` reads one JSON object from standard input. It is on `task start`, `task update`, `task close` and `step plan`. A list left out of the object is absent. On `task update`, a list given replaces the whole list.
 - **Lists.** A list with nothing in it prints `no <items>`, such as `no tasks`, `no directives` or `no learnings`. That is not an error, and the exit is 0.
@@ -46,17 +46,17 @@ The binary has 21 entries in its dispatch table: the 19 verbs above, plus `help`
 
 ### Environment variables
 
-These are the only environment variables the binary reads. [Install-Local](Install-Local) explains how to set them.
+These are the environment variables the verbs read directly. [Install-Local](Install-Local) explains how to set them.
 
 | Variable | Read by | Meaning |
 |---|---|---|
 | `CAIRN_PROJECT` | Every project-scoped verb | The project name. It wins over `.cairn.toml` |
 | `CAIRN_SERVER` | Every verb that calls the server | The server's base URL. It wins over the `server` line of `.cairn.toml` |
 | `CAIRN_API_KEY` | Every verb that calls the server | The API key. Read before `~/.config/cairn/client.env` |
-| `CAIRN_AGENT` | `task current`, `recall`, `prime`, and every write verb | The caller's name, when `--agent` is left out |
+| `CAIRN_AGENT` | `task current`, `recall`, `prime`, `status`, `hook session-start`, and every write verb | The caller's name, when `--agent` is left out. `status` and the session-start hook use it only to count the directives for that role. A value with a control character, or a space at either end, is refused by every verb with exit 2, reads included |
 | `CLAUDE_PROJECT_DIR` | Any verb that looks for `.cairn.toml`, and `init` | The directory to search from, and where `init` writes `.cairn.toml` |
 
-`HOME` is read indirectly, for `~/.config/cairn/client.env` and the backup folder of `enable`. `XDG_CONFIG_HOME` is not read.
+Two more are read indirectly. `HOME` gives the path of `~/.config/cairn/client.env`, and the cache folder of `enable`'s backups on macOS. `XDG_CACHE_HOME`, on Linux, moves that cache folder: `enable` uses it when it is set, and `~/.cache` when it is not. `XDG_CONFIG_HOME` is not read.
 
 ### Exit codes
 
@@ -67,7 +67,7 @@ The verbs that take `--json` exit with the code of the error kind of a failed ca
 | 0 | none | Success |
 | 1 | none, or `internal` | A failure with no kind: an internal failure of the server, or one raised on this machine. A missing, malformed, unknown or revoked key (401) also exits 1, and so does a viewer's write (403 `read_only`). Both reach the CLI as plain errors (issue #195) |
 | 2 | none | A usage error, refused before any call. The message is on stderr |
-| 3 | `invalid` | The request is malformed, a value is unknown, or there is no project or agent |
+| 3 | `invalid` | The request is malformed, a value is unknown, or there is no project. A missing agent name on the CLI is exit 2, not this |
 | 4 | `not_found` | The task, step, learning or directive is not in the caller's project |
 | 5 | `refused` | A rule forbids the call now: a status move, the close policy, a second active task, or a change to a closed task |
 | 6 | `operator_only` | An operator call without the operator role |
@@ -79,9 +79,11 @@ The codes 3 to 8 apply to the verbs `task`, `step`, `event`, `learning`, `direct
 Example, from a shell, with a task whose close policy is not yet met:
 
 ```bash
-cairn task close task-20261106-01 --outcome done --json
+cairn task close task-20261106-01 --outcome done --json --agent main
 echo $?
 ```
+
+A close is a write, so it needs the caller's name: `--agent main` here, or `CAIRN_AGENT=main` in the environment. Without one the command exits 2 and prints the usage message on stderr, with no JSON.
 
 **You should see** `{"error":{"kind":"refused","message":"close policy not met: summary, lessons, mistakes","missing":["summary","lessons","mistakes"]}}` on stdout, nothing on stderr, and then `5`.
 

@@ -62,7 +62,7 @@ The design and the contract are in the repository. This wiki summarises them, an
 - [Install-Server](Install-Server): a server other machines reach, with TLS by files or behind a proxy.
 - [Upgrade](Upgrade): upgrading a running server or a local install, and rolling back.
 - [Binaries](Binaries): every Makefile target, version strings, supported systems and where the binary goes.
-- [CLI-Reference](CLI-Reference): the 21 verbs of `cairn`, with their flags, environment and exit codes.
+- [CLI-Reference](CLI-Reference): the 19 verbs of `cairn`, plus `help` and `version`, with their flags, environment and exit codes.
 - [MCP-Tools](MCP-Tools): the 15 tools `cairn mcp` serves, one section each.
 - [Connecting-Agents](Connecting-Agents): Claude Code, opencode (experimental), pi (experimental), and the hooks.
 - [Operations](Operations): keys and roles, backup, restore, logs and common tasks.

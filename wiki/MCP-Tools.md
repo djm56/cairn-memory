@@ -32,7 +32,7 @@ The fifteen tools that `cairn mcp` serves to an agent. Eight write and seven rea
 - **The key.** Every call sends `Authorization: Bearer <key>`. The key comes from `CAIRN_API_KEY`, else from `~/.config/cairn/client.env`. The file must not be readable by other users.
 - **Start-up refusals.** `cairn mcp` will not start with no server (`invalid: no server: ...`) or with no key (`invalid: no API key: ...`). Both exit 1. With no project it starts, and every call is refused with the reason.
 - **The project.** The project is read once, when the session starts, from `CAIRN_PROJECT` or the nearest `.cairn.toml`. A fix made later is not seen until the session restarts. The refusal says so.
-- **The caller's name.** A write tool needs its `agent` argument, which is the caller's name, such as `main` or `hicks`. A blank `agent` on a write is refused as `invalid`, and the message asks for the name. A read tool takes `agent` only where it is listed below. Over MCP the adapter sends no caller name on a read, so a read that takes `agent` lists no agent-scoped directives unless `agent` is given.
+- **The caller's name.** A write tool needs its `agent` argument, which is the caller's name, such as `main` or `hicks`. A blank `agent` on a write is refused as `invalid`, and the message asks for the name. A read tool takes `agent` only where it is listed below. Over MCP the adapter sends no caller name on a read. So `recall` and `task_current` list no agent-scoped directives unless their `agent` argument is given. Other reads, such as `directive_list`, list every role when `agent` is left out.
 
 ## Who may call which tool
 

@@ -156,7 +156,7 @@ The full list of verbs and flags that use them is in [CLI-Reference](CLI-Referen
 | `bin/cairn` in the clone | `make build` | you | no |
 | `~/.local/bin/cairn` (or your choice) | you, with `install` | the shell, and Claude Code's hooks | no |
 
-`enable` copies the original of any file it rewrites into the user cache directory, which is `~/Library/Caches` on macOS and `~/.cache` on Linux. Nothing prunes that folder. Keep a copy of a backup you need.
+`enable` copies the original of any file it rewrites into the user cache directory, which is `~/Library/Caches` on macOS. On Linux it is `$XDG_CACHE_HOME/cairn/backups/<project>` when `XDG_CACHE_HOME` is set, and `~/.cache/cairn/backups/<project>` when it is not. Nothing prunes that folder. Keep a copy of a backup you need.
 
 ## 9. Connect the client
 

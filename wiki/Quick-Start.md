@@ -29,7 +29,7 @@ command -v cairn
 
 If `command -v` prints nothing, `~/.local/bin` is not on your PATH. Add it in your shell profile and open a new terminal.
 
-**You should see** the full path to the binary, such as `/Users/<you>/.local/bin/cairn`. Then `cairn version` prints the same hash as step 1.
+**You should see** the full path to the binary, such as `/Users/you/.local/bin/cairn`. Then `cairn version` prints the same hash as step 1.
 
 ## 3. Start a server on this machine
 
@@ -89,13 +89,15 @@ echo $?
 
 ```bash
 cairn enable --agent claude-code
-claude mcp add --scope user cairn -- "$(command -v cairn)" mcp
+claude mcp add cairn -- "$(command -v cairn)" mcp
 claude mcp list
 ```
 
 **You should see** three lines from `enable`: `SessionStart added`, `PreCompact added` and `Stop added`, then `wrote` and the path of `.claude/settings.local.json`. Run `enable` again and the lines say `already present`, and nothing changes. Then `claude mcp list` shows `cairn`. `enable` writes the hooks into `.claude/settings.local.json` in the project. It does not register the MCP server: the `claude mcp add` line does that. The `claude mcp add` syntax is from Claude Code 2.1.311; this page was not run end to end in Claude Code. [Connecting-Agents](Connecting-Agents) has the details and the other clients.
 
-Start Claude Code in the project folder. Claude Code starts `cairn mcp` from there, and `cairn` finds `.cairn.toml` from its working directory.
+The line has no `--scope`, so Claude Code's default, `local`, applies. `--scope user` would make the entry available in every project. In a project with no `.cairn.toml` that names a `server`, and no `CAIRN_SERVER`, `cairn mcp` exits 1 at start, so that entry would fail there.
+
+Start Claude Code in the project folder. `cairn mcp` finds the server and the key the same way every other command does: `.cairn.toml` from `CLAUDE_PROJECT_DIR` when Claude Code sets it, and from the working directory otherwise. How Claude Code sets those for an MCP server is the M5 check, and this page does not claim it. [Connecting-Agents](Connecting-Agents) has the details.
 
 ## 8. Run the operator check
 

@@ -21,7 +21,7 @@ Run `make <target>` from the root of the repository. `make` with no target runs 
 | `fmt-check` | `gofmt -l .`, and fails if any file is listed | none |
 | `cross` | `go build` and `go vet` for Windows, macOS, FreeBSD and OpenBSD. A compile check: nothing runs | none |
 | `scan-invisible` | `git grep` for bidirectional, invisible and tag characters, and a byte-order mark | none |
-| `scan-local-paths` | `git grep` for local user or machine paths, such as `/Users/<name>/`, except the placeholder `you` | none |
+| `scan-local-paths` | `git grep` for local user or machine paths, such as a home folder path on macOS or Linux, except the placeholder `you` | none |
 | `run` | `go run` with the version stamped, passing `ARGS` to the binary | none |
 | `mutation` | Gremlins (pinned to v0.5.1) on `internal/core` and then `internal/store`. Slow, and not run in CI | none |
 

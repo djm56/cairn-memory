@@ -8,16 +8,21 @@ Upgrade the server before its clients. [DESIGN.md §5.4](https://github.com/djm5
 
 ## Quick version: a server under systemd
 
-Run as root, unless a line says `sudo -u cairn`. The new binary is the file you built or copied in [Install-Server](Install-Server), Part 1. Use its full path. The example below uses `/home/<user>/cairn-linux`.
+Run as root, unless a line says `sudo -u cairn`. The new binary is the file you built or copied in [Install-Server](Install-Server), Part 1. Use its full path. The example below uses `/home/you/cairn-linux`, where `you` is your SSH user.
 
 ```bash
-/usr/local/bin/cairn version
-systemctl stop cairn
-cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev
-sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).db"
-install -m 0755 /home/<user>/cairn-linux /usr/local/bin/cairn
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+/usr/local/bin/cairn version && \
+install -d -m 0700 -o cairn -g cairn /var/backups/cairn && \
+systemctl stop cairn && \
+cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev-$STAMP && \
+sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db && \
+ls -l /var/backups/cairn/pre-upgrade-$STAMP.db && \
+install -m 0755 /home/you/cairn-linux /usr/local/bin/cairn && \
 systemctl start cairn
 ```
+
+**Stop if any line fails.** From `version` to `systemctl start cairn` the lines are joined with `&&`, so each one runs only when the one before it succeeded. If any line prints an error, nothing after it has run, and the old binary is still installed. If the error came after the server was stopped, `systemctl start cairn` starts the old build again, on a database that no migration has touched. Do not run the `install` line by hand to get past a failed backup.
 
 Then verify:
 
@@ -29,56 +34,67 @@ curl -sS https://<host>:8788/healthz
 
 **You should see** the new `cairn <hash>` from `version`, a `listening` line in the journal with `tls=` or `behind_proxy=` as before, and `{"status":"ok"}` from `healthz`. For setup (b), use the proxy's address in place of `https://<host>:8788`.
 
-The `/var/backups/cairn` folder must exist, owned by `cairn`, before the backup runs. Install-Server, Part 6, and [DEPLOY.md, Backup](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#backup) show how.
+The first line of the block makes `/var/backups/cairn`, owned by `cairn`, mode 0700. It is the same command as [Operations, Backup](Operations#backup) and [DEPLOY.md, Backup](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#backup). It runs without `sudo` because the block runs as root. Install-Server, Part 2, makes the folder on a fresh install. Running the line again does not touch the files in it.
 
 ## Detailed version
 
-### 1. Check the current version
+The stamp in step 1 names every file this upgrade makes. Use the same value in every later command, in the same shell.
+
+### 1. Check the current version and set the stamp
 
 The version is the one the binary prints. `/healthz` does not show it.
 
 ```bash
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 /usr/local/bin/cairn version
-/home/<user>/cairn-linux version
+/home/you/cairn-linux version
 ```
 
-The first line is what runs now. The second is the new build. A binary built with a plain `go build` prints `cairn dev`. The version strings are in [Binaries](Binaries).
+The first version line is what runs now. The second is the new build. A binary built with a plain `go build` prints `cairn dev`. The version strings are in [Binaries](Binaries).
 
 Read the release notes for the new build in the [CHANGELOG](https://github.com/djm56/cairn-memory/blob/main/CHANGELOG.md) before you go on. A build can change the schema, the wire form or the commands.
 
-### 2. Stop the server
+### 2. Make the backup folder and stop the server
 
 ```bash
+install -d -m 0700 -o cairn -g cairn /var/backups/cairn
 systemctl stop cairn
 ```
+
+If the first line prints an error, stop here. The server is still running and nothing has changed.
 
 Stop first, then back up. `cairn backup` takes a consistent copy while the server runs, but a write made between a backup taken while the server is up and the stop would be missing from a rollback. A backup taken after the stop holds every write up to the upgrade.
 
 ### 3. Keep the previous binary
 
 ```bash
-cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev
+cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev-$STAMP
 ```
 
-Keep it under `/usr/local/bin`, not in your home directory. `make push` copies over `~/cairn-linux` each time it runs, so the copy in your home directory is not a safe record of the old build.
+The name carries the stamp, so running the upgrade again does not overwrite the copy of the build you were running. Keep it under `/usr/local/bin`, not in your home directory. `make push` copies over `~/cairn-linux` each time it runs, so the copy in your home directory is not a safe record of the old build.
+
+If this line prints an error, start the server again with `systemctl start cairn`, and go no further.
 
 ### 4. Back up the database
 
 ```bash
-sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).db"
+sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db
+ls -l /var/backups/cairn/pre-upgrade-$STAMP.db
 ```
+
+**Gate.** Do not go on unless the backup line printed no error and `ls -l` lists the file. If the backup prints an error, the server is stopped and the database is unchanged. Start the server again with `systemctl start cairn`, which runs the old build, and fix the cause before you try again.
 
 `backup` writes a new file at mode 0600, and refuses a name that already exists. It opens the database **without** migrating it, so the copy keeps the schema it had. Keep this file until the new server has run cleanly.
 
 ### 5. Install the new binary
 
+Install only after the `ls -l` in step 4 has listed the backup file. The install does not change the database. The first start in step 6 is the first point at which it changes.
+
 ```bash
-install -m 0755 /home/<user>/cairn-linux /usr/local/bin/cairn
+install -m 0755 /home/you/cairn-linux /usr/local/bin/cairn
 ```
 
-For a server you built on the server itself, the file is `bin/cairn` in the checkout, and the command is `install -m 0755 bin/cairn /usr/local/bin/cairn`.
-
-[DEPLOY.md's upgrade block](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#upgrade) shows `install -m 0755 bin/cairn`. On a server that received its binary with `make push`, that path is wrong: the file is `~/cairn-linux`. Use the file you copied.
+For a server you built on the server itself, the file is `bin/cairn` in the checkout, and the command is `install -m 0755 bin/cairn /usr/local/bin/cairn`. On a server that received its binary with `make push`, the file is `/home/you/cairn-linux`, not `bin/cairn`. Use the file you copied.
 
 ### 6. Start the server
 
@@ -111,7 +127,7 @@ CAIRN_API_KEY="$(sed -n 's/^CAIRN_API_KEY=//p' ~/.config/cairn/client.env)" \
 
 **You should see** `active (running)` from `status`, the `listening` line from the journal, `{"status":"ok"}` from `healthz`, and seven `PASS` lines from the check. If `doctor` shows `reach` as `fail`, see [Troubleshooting](Troubleshooting).
 
-Keep `cairn.prev` and the pre-upgrade backup until the new server has run cleanly for as long as you need.
+Keep `cairn.prev-<UTC time>` and the pre-upgrade backup until the new server has run cleanly for as long as you need. `<UTC time>` is the stamp from step 1.
 
 ### 8. Upgrade the clients
 
@@ -119,11 +135,11 @@ Each client with a local binary upgrades its own copy. See [Upgrading a local in
 
 ### 9. Roll back
 
-Rolling back needs both the old binary and the pre-upgrade backup. The old binary cannot read the new schema, so it cannot run on the upgraded database:
+Rolling back needs both the old binary and the pre-upgrade backup. The old binary cannot read the new schema, so it cannot run on the upgraded database. Use the stamp from step 1. If you no longer have it, `ls /usr/local/bin/cairn.prev-* /var/backups/cairn/pre-upgrade-*` lists the names.
 
 ```bash
 systemctl stop cairn
-install -m 0755 /usr/local/bin/cairn.prev /usr/local/bin/cairn
+install -m 0755 /usr/local/bin/cairn.prev-<UTC time> /usr/local/bin/cairn
 sudo -u cairn /usr/local/bin/cairn restore --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-<UTC time>.db
 systemctl start cairn
 journalctl -u cairn -n 20
@@ -139,6 +155,8 @@ journalctl -u cairn -n 20
 
 **No.** The older build refuses. Its migrator reads the schema version, and when the database is newer than the build it stops with `database is at schema version N, newer than this build (M)`. That check runs on every command that opens the database. It was tested on a copy of a database at version 8, with a build at 7: `cairn key list` and `cairn key add` both refused, with exit code 1.
 
+`cairn backup` and `cairn restore` refuse the same database with a slightly different line: `store: <path> is at schema version N, newer than this build (M)`. After an upgrade, take backups with the new binary. The old one cannot take a copy of a newer database.
+
 A backup from a newer build is refused by `restore` too, because `restore` checks the schema version before it moves anything.
 
 So the old binary is never enough on its own. Put it back together with the backup taken before the upgrade, which has the old schema.
@@ -148,10 +166,11 @@ So the old binary is never enough on its own. Put it back together with the back
 A local install has no server and no database, so there is no migration to think about.
 
 ```bash
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 cd cairn-memory
 git pull
 make build
-cp -p ~/.local/bin/cairn ~/.local/bin/cairn.prev
+cp -p ~/.local/bin/cairn ~/.local/bin/cairn.prev-$STAMP
 install -m 0755 bin/cairn ~/.local/bin/cairn
 cairn version
 cairn doctor
@@ -159,7 +178,7 @@ cairn doctor
 
 **You should see** the new hash from `cairn version`, and `doctor` with `ok` on each line.
 
-If you also run `cairn serve` on this machine, stop it first, back up its database, then start the new build on the same `--db`. The steps are those of the server upgrade above, with your own paths. Back up with `cairn backup --db <file> <out>`, and keep the old binary as `cairn.prev` beside the new one.
+If you also run `cairn serve` on this machine, stop it first, back up its database, then start the new build on the same `--db`. The steps are those of the server upgrade above, with your own paths. Back up with `cairn backup --db <file> <out>`, and keep the old binary as `cairn.prev-<UTC time>` beside the new one.
 
 ## Versions of this page
 

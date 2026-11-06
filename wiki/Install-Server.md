@@ -11,7 +11,7 @@ If you only want Cairn on one developer machine, read [Install-Local](Install-Lo
 - [ ] A Linux server with systemd, root or sudo access, and SSH to it. The live run used Ubuntu 24.04. Other distributions are not tested.
 - [ ] A `cairn` binary for the server's CPU: `amd64` by default, or `arm64` (step 1).
 - [ ] The binary at `/usr/local/bin/cairn`.
-- [ ] A service user `cairn` and a state directory `/var/lib/cairn`, mode 0700.
+- [ ] A service user `cairn`, a state directory `/var/lib/cairn` and a backup folder `/var/backups/cairn`, both mode 0700 and owned by `cairn`.
 - [ ] A first operator key, made as the `cairn` user.
 - [ ] Setup (a), TLS by certificate files, or setup (b), behind a reverse proxy. Pick one.
 - [ ] The systemd unit installed, with the override for your setup, and the service running.
@@ -59,13 +59,13 @@ make push SERVER=<user>@<host>
 Add `SSH_PORT=<port>` when SSH is not on port 22. `make push` does three things, in this order:
 
 1. Builds `bin/cairn-linux` for Linux on `amd64`. On a server whose `uname -m` prints `aarch64`, add `LINUX_ARCH=arm64`.
-2. Copies it with `scp` to `cairn-linux` in the **home directory of the SSH user**: `/home/<user>/cairn-linux`, or `/root/cairn-linux` when you connect as root.
+2. Copies it with `scp` to `cairn-linux` in the **home directory of the SSH user**: `/home/you/cairn-linux` for the user `you`. When you connect as root, the file is in root's home directory, which a root shell reaches as `~`.
 3. Runs `./cairn-linux version` on the server, from that home directory.
 
 It installs nothing. On the server, install the file, using its full path:
 
 ```bash
-sudo install -m 0755 /home/<user>/cairn-linux /usr/local/bin/cairn
+sudo install -m 0755 /home/you/cairn-linux /usr/local/bin/cairn
 ```
 
 Use the full path, not `~/cairn-linux`. In a root shell, such as one from `sudo -s`, `~` is `/root`, and the file is not there. `make push` copies over the old `~/cairn-linux` each time, so keep the previous binary under `/usr/local/bin`, as [Upgrade](Upgrade) does.
@@ -78,18 +78,21 @@ Use the full path, not `~/cairn-linux`. In a root shell, such as one from `sudo 
 
 which prints `cairn <hash>`. A binary made with a plain `go build` prints `cairn dev`; use `make build` or `make build-linux`, which stamp the hash. [Binaries](Binaries) explains the version strings.
 
-## Part 2: The service user and the state directory
+## Part 2: The service user, the state directory and the backup folder
 
 Run these on the server, as root or with sudo. The `cairn` user owns the database and runs the service:
 
 ```bash
 sudo useradd --system --no-create-home --home-dir /var/lib/cairn --shell /usr/sbin/nologin cairn
 sudo install -d -m 0700 -o cairn -g cairn /var/lib/cairn
+sudo install -d -m 0700 -o cairn -g cairn /var/backups/cairn
 ```
 
 `useradd` also makes the group `cairn`. The state directory is owner-only, so no other account on the host reads the database.
 
 `key add` creates the database **file**, not the directory, so the directory must exist first.
+
+The backup folder is made here, on a fresh install, so the first backup and the first upgrade have somewhere to write. Its mode is 0700 and it is owned by `cairn`, the same as [DEPLOY.md, Backup](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#backup) gives. [Upgrade](Upgrade) relies on it.
 
 ## Part 3a: Setup (a), TLS by files
 
@@ -119,11 +122,19 @@ The server reads the certificate once, at start. When a certificate renews, the 
 
 ### Step 3: The unit, with the setup (a) override
 
-Install the unit file. Its full text is in [docs/deploy/cairn.service](https://github.com/djm56/cairn-memory/blob/main/docs/deploy/cairn.service), and [DEPLOY.md, The systemd unit](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#the-systemd-unit) shows it. Copy it from your checkout to the server:
+Install the unit file. Its full text is in [docs/deploy/cairn.service](https://github.com/djm56/cairn-memory/blob/main/docs/deploy/cairn.service), and [DEPLOY.md, The systemd unit](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#the-systemd-unit) shows it. The server may have no checkout, so copy the file to the server first, from the checkout on your machine:
 
 ```bash
-sudo install -m 0644 docs/deploy/cairn.service /etc/systemd/system/cairn.service
+scp docs/deploy/cairn.service <user>@<host>:
 ```
+
+Then, on the server, install it from the home directory the copy went to:
+
+```bash
+sudo install -m 0644 /home/you/cairn.service /etc/systemd/system/cairn.service
+```
+
+When you connect as root, the copy is in root's home directory, so use `~/cairn.service` from a root shell. If the commands run from a checkout on the server, `docs/deploy/cairn.service` in that checkout works in place of the copy.
 
 Then add the override. `systemctl edit` opens an editor, and reloads systemd when you save. The override replaces `ExecStart` with the address clients reach, and the certificate files:
 
@@ -147,7 +158,7 @@ sudo systemctl enable --now cairn
 sudo systemctl status cairn
 ```
 
-**You should see** `active (running)`. The log line in step 6 should show `tls=true`.
+**You should see** `active (running)`. The log line in Part 5, step 2 should show `tls=true`.
 
 ### Step 5: The firewall
 
@@ -159,10 +170,10 @@ Run these in this order on a fresh host. Parts 1 and 2 come first.
 
 ### Step 1: The unit, on loopback
 
-The shipped unit listens on `127.0.0.1:8788`, so only processes on this host reach the server. Install it and start it. A loopback server may start with no key. It prints `no active API key` and refuses every call with 401 until a key exists:
+The shipped unit listens on `127.0.0.1:8788`, so only processes on this host reach the server. Install it and start it. A loopback server may start with no key. It prints `no active API key` and refuses every call with 401 until a key exists. Copy the file to the server first, as Part 3a, step 3 shows (`scp docs/deploy/cairn.service <user>@<host>:` from your checkout), then:
 
 ```bash
-sudo install -m 0644 docs/deploy/cairn.service /etc/systemd/system/cairn.service
+sudo install -m 0644 /home/you/cairn.service /etc/systemd/system/cairn.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now cairn
 sudo systemctl status cairn
@@ -200,16 +211,22 @@ ExecStart=
 ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788 --behind-proxy
 ```
 
-The same override ships as [docs/deploy/cairn-behind-proxy.conf](https://github.com/djm56/cairn-memory/blob/main/docs/deploy/cairn-behind-proxy.conf). Use the file for this setup only. The flag makes the session cookie `Secure`, so the browser keeps it only on an `https` page.
+The same override ships as [docs/deploy/cairn-behind-proxy.conf](https://github.com/djm56/cairn-memory/blob/main/docs/deploy/cairn-behind-proxy.conf), a systemd drop-in. Use the file for this setup only. The flag makes the session cookie `Secure`, so the browser keeps it only on an `https` page. To use the file instead of the inline override, copy it to the server from your checkout, then install it as a drop-in:
 
-Then restart. Use `restart`, not `start`: `start` does nothing to a unit that is already running:
+```bash
+scp docs/deploy/cairn-behind-proxy.conf <user>@<host>:
+sudo install -d -m 0755 /etc/systemd/system/cairn.service.d
+sudo install -m 0644 /home/you/cairn-behind-proxy.conf /etc/systemd/system/cairn.service.d/cairn-behind-proxy.conf
+```
+
+Use one or the other, not both. Then restart. Use `restart`, not `start`: `start` does nothing to a unit that is already running:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart cairn
 ```
 
-**You should see** `behind_proxy=true` in the log line in step 5.
+**You should see** `behind_proxy=true` in the log line in Part 5, step 2.
 
 ### A proxy on another host
 
@@ -226,7 +243,7 @@ The server checks its settings in a fixed order, and refuses to start when they 
 | Setting | What the server refuses | The message |
 |---|---|---|
 | `--addr` is not loopback, and there are no TLS files and no `--behind-proxy` | Start | `the address is not loopback, so it needs TLS: give --tls-cert and --tls-key, or --behind-proxy if a proxy in front terminates TLS` |
-| `--addr` is not loopback, and there is no active key | Start | `the address is not loopback, so it needs at least one active API key` |
+| `--addr` is not loopback, and there is no active key | Start | `the address is not loopback, so it needs at least one active API key (DESIGN §8)` |
 | `--tls-cert` without `--tls-key`, or the reverse | Start (usage error, exit 2) | `--tls-cert and --tls-key go together: give both, or neither` |
 | A loopback address and no key | Starts, with a warning | `no active API key: every call will be refused with 401 until a key exists` |
 
@@ -267,7 +284,7 @@ Run these after the server starts.
 ## Part 6: After the install
 
 - **Agent keys.** Make one key per client, with `--scope agent`. [Operations](Operations) covers keys, roles and rotation.
-- **Backups.** Schedule `cairn backup` and check that a copy restores. DEPLOY.md has the cron line and the cautions: [Backup](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#backup) and [Restore](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#restore). [Operations](Operations) summarises them.
+- **Backups.** Schedule `cairn backup` and check that a copy restores. The folder `/var/backups/cairn` was made in Part 2. DEPLOY.md has the cron line and the cautions: [Backup](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#backup) and [Restore](https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md#restore). [Operations](Operations) summarises them.
 - **Upgrades.** Read [Upgrade](Upgrade) before you replace the binary. A newer build changes the database when it starts, and the older build cannot open that database again.
 - **Logs.** `journalctl -u cairn`. The server never logs a header, a body or a key.
 

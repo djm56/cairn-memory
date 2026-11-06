@@ -14,7 +14,7 @@ If a symptom is not here, run `cairn doctor` in the project folder. Its five lin
 | `cairn version` prints `cairn dev` | The binary was built with a plain `go build`, without the version stamp | Build with `make build`. [Binaries](Binaries) |
 | `no project: run cairn init in the project, or set CAIRN_PROJECT` | No `.cairn.toml` is found, searching up from `CLAUDE_PROJECT_DIR` or the working directory, and `CAIRN_PROJECT` is not set | Go to the project folder, or run `cairn init --project <name> --server <url>` there |
 | `no server: run cairn init in the project to write one, or set CAIRN_SERVER` | The `.cairn.toml` has no `server` line, and `CAIRN_SERVER` is not set | Add `server = "..."` to `.cairn.toml`, or set `CAIRN_SERVER` |
-| `missing: set CAIRN_API_KEY, or write CAIRN_API_KEY=<key> to ~/.config/cairn/client.env` | No key on the client | Store the key as [Install-Local](Install-Local), step 4, describes |
+| `missing: set CAIRN_API_KEY, or write CAIRN_API_KEY=<key> to /home/you/.config/cairn/client.env` (the binary prints your home folder's full path) | No key on the client | Store the key as [Install-Local](Install-Local), step 4, describes |
 | `cairn mcp: invalid: no API key: ...` (exit 1) | `cairn mcp` will not start without a key | As above. The key must be in the environment of the process that starts `cairn mcp`, or in `client.env` |
 | The client refuses `client.env`, and says `chmod 600` | The file is readable or writable by another user | `chmod 600 ~/.config/cairn/client.env`, and make the folder `chmod 700` |
 | `the server refused the API key` (exit 1, kind `internal`) | The key is wrong, has been revoked, or is malformed | Check the key in `client.env` or `CAIRN_API_KEY`. If it was revoked, ask the operator for a new one. Keys are shown once, so a lost key is replaced |
@@ -31,7 +31,8 @@ If a symptom is not here, run `cairn doctor` in the project folder. Its five lin
 
 | What you see | Cause | Fix |
 |---|---|---|
-| `this call writes, so the caller needs an agent name` (exit 3), or, over MCP, the same message ending `pass your name as the agent argument` | A write was made with no agent name | Give `--agent <name>` on the CLI, set `CAIRN_AGENT`, or pass `agent` in the MCP arguments |
+| `<verb>: no agent name: give --agent <name>, or set CAIRN_AGENT to one` (CLI, exit 2, on stderr) | A CLI write was made with no agent name, and `CAIRN_AGENT` is not set | Give `--agent <name>`, or set `CAIRN_AGENT` to the caller's name. [CLI-Reference](CLI-Reference#environment-variables) |
+| `this call writes, so the caller needs an agent name` (exit 3, over MCP the same message ending `pass your name as the agent argument`) | An MCP write, or a server call, arrived with no agent name | Pass `agent` in the MCP arguments, such as `main` or `hicks` |
 | `no task is active; give the task id` (`export task`, exit 1) | `export task` with no id, and no active task | Give the task's id: `cairn export task <id>` |
 | `task ... not found` (exit 4) | The id is wrong, or the task is in another project | Check the id with `cairn task list`. A task belongs to one project |
 | `step number 9 not found in task ...` (exit 4) | The task has no step with that number | Check the steps with `cairn task get <id> --section steps` |
@@ -59,10 +60,11 @@ If a symptom is not here, run `cairn doctor` in the project folder. Its five lin
 | What you see | Cause | Fix |
 |---|---|---|
 | `the address is not loopback, so it needs TLS: give --tls-cert and --tls-key, or --behind-proxy if a proxy in front terminates TLS` | `--addr` is not a loopback address, and there is no TLS and no proxy flag | Add the certificate files, or `--behind-proxy` when a proxy terminates TLS. [Install-Server](Install-Server) |
-| `the address is not loopback, so it needs at least one active API key` | A network address and no key | Make a key with `cairn key add`, then start the server |
+| `the address is not loopback, so it needs at least one active API key (DESIGN §8)` | A network address and no key | Make a key with `cairn key add`, then start the server |
 | `--tls-cert and --tls-key go together: give both, or neither` (exit 2) | One of the two files is missing | Give both, or neither |
 | `no active API key: every call will be refused with 401 until a key exists` | A loopback server with no key. It starts, and refuses calls | Make a key. This line is expected until you do |
-| `database is at schema version 8, newer than this build (7)` | The database was made or changed by a newer build | Use the newer build, or roll back with the pre-upgrade backup. An older build cannot read a newer database. [Upgrade](Upgrade) |
+| `database is at schema version 8, newer than this build (7)` | The database was made or changed by a newer build. `serve` and the `key` commands print this | Use the newer build, or roll back with the pre-upgrade backup. An older build cannot read a newer database. [Upgrade](Upgrade) |
+| `store: <path> is at schema version 8, newer than this build (7)` | The same, from `cairn backup` or `cairn restore` | Run the backup with the newer build. The older one cannot copy a newer database. [Upgrade](Upgrade) |
 | The server does not start after an upgrade, and the journal shows a migration error | A migration failed. The earlier migrations stay applied | Roll back: the old binary and the pre-upgrade backup. [Upgrade](Upgrade), step 9 |
 | The service restarts in a loop after you revoke a key | The server listens beyond loopback, and revoking the last key leaves it with none | Make a new key, then restart. Revoke a key only after a replacement is in place |
 | The server answers `a call is a POST with a JSON body` (405) | A `GET` was sent to an API route | Send a `POST` with a JSON body. Only `/healthz` takes `GET` |
