@@ -41,11 +41,17 @@ jobs:
       - name: go test -race
         run: make test
 
-      - name: Cross-build for Windows and macOS
-        # A compile check only, so a platform break is caught on the pull request. It does not make
-        # Windows a supported target: nothing here runs the binaries built for it.
-        run: GOOS=windows go build ./... && GOOS=darwin go build ./...
+      - name: Cross-compile and vet for Windows, macOS, FreeBSD and OpenBSD
+        # A compile check only, so a platform break is caught on the pull request. None of these
+        # is run here, and Windows is not a supported target. The targets are in the Makefile
+        # (cross), where go vet compiles the _test.go files as well.
+        run: make cross
 
       - name: Invisible and bidirectional characters
         # Refuses a tracked file that holds one, including a byte-order mark (Makefile, scan-invisible).
         run: make scan-invisible
+
+      - name: Local paths
+        # Refuses a tracked file that names a local user or machine layout, such as a home or
+        # volume path, other than the placeholder user "you" (Makefile, scan-local-paths).
+        run: make scan-local-paths

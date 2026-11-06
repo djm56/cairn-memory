@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"sort"
+
+	"github.com/djm56/cairn-memory/internal/cli"
 )
 
 // version is set at build time with -ldflags "-X main.version=..." from
@@ -27,18 +29,27 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"version": {summary: "Print the cairn version", run: runVersion},
-		"help":    {summary: "List the sub-commands", run: runHelp},
-		"mcp":     {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
-		"init":    {summary: "Write .cairn.toml: the project name and the server", run: runInit},
-		"export":  {summary: "Print a task as Markdown: export task [id]", run: runExport},
-		"hook":    {summary: "Output for a client hook: session-start", run: runHook},
-		"status":  {summary: "Show the server, the project and the active task", run: runStatus},
-		"doctor":  {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
-		"serve":   {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
-		"key":     {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
-		"backup":  {summary: "Copy the server's database to a new file: backup --db <file> <out>", run: runBackup},
-		"restore": {summary: "Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup>", run: runRestore},
+		"version":   {summary: "Print the cairn version", run: runVersion},
+		"help":      {summary: "List the sub-commands", run: runHelp},
+		"mcp":       {summary: "Serve the MCP tools over stdio, through the Cairn server", run: runMCP},
+		"init":      {summary: "Write .cairn.toml: the project name and the server", run: runInit},
+		"export":    {summary: "Print a task, or the project's tasks, as Markdown: export task [id] or export project", run: runExport},
+		"hook":      {summary: "Output for a client hook: session-start, pre-compact or stop", run: runHook},
+		"enable":    {summary: "Install a client's hooks into the project: enable --agent claude-code [--dry-run]", run: runEnable},
+		"status":    {summary: "Show the server, the project and the active task", run: runStatus},
+		"task":      {summary: "Read or write a task: task current|get|list|start|update|close, each with --json", run: runTask},
+		"step":      {summary: "Add, update or plan the steps of a task: step add|update|plan, each with --json", run: runStep},
+		"event":     {summary: "Log an event on a task: event log, with --json", run: runEvent},
+		"learning":  {summary: "Propose a learning or list them: learning add|list, each with --json", run: runLearning},
+		"directive": {summary: "List the directives that apply: directive list, with --json", run: runDirective},
+		"recall":    {summary: "What applies to a goal: recall --goal text [--agent role], with --json", run: runRecall},
+		"search":    {summary: "Full-text search of tasks, events, learnings, directives and notes: search --query text, with --json", run: runSearch},
+		"prime":     {summary: "The session-start view for an agent with only a shell: prime [--agent role], with --json", run: runPrime},
+		"doctor":    {summary: "Check the project file, the server and the connection; changes nothing", run: runDoctor},
+		"serve":     {summary: "Run the Cairn server: serve --db <file> [--addr host:port]", run: runServe},
+		"key":       {summary: "Make, list and revoke API keys: key add|list|revoke --db <file>", run: runKey},
+		"backup":    {summary: "Copy the server's database to a new file: backup --db <file> <out>", run: runBackup},
+		"restore":   {summary: "Replace the server's database from a backup, after a typed confirmation: restore --db <file> <backup>", run: runRestore},
 	}
 }
 
@@ -90,4 +101,6 @@ func usage(w io.Writer) {
 	for _, name := range names {
 		fmt.Fprintf(w, "  %-10s %s\n", name, commands[name].summary)
 	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, cli.ExitCodeHelp)
 }

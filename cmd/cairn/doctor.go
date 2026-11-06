@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,13 +31,47 @@ type check struct {
 // read-only. The reachability call carries no project, so the server refuses it
 // before any read or write, and it creates nothing (CONTRACT §9 item 38).
 //
+// With --agent claude-code it adds a section after those checks: the cairn hooks
+// found in the Claude Code settings files, and a dry run of each hook (doctor_agent.go).
+// That dry run is not read-only on the server: the first read of a project the server
+// has not seen creates the project's row, as the hooks do.
+// With --agent opencode or pi it adds a section, EXPERIMENTAL, that reads whether the
+// registration and the instructions of that client are in the project (doctor_clients.go).
+// That section writes no file, and it makes no dry run.
+//
 // Every check runs, even after one fails, so the output shows every fault. Exit
-// codes: 0 when no check failed, 1 when one did, 2 for a usage error.
+// codes: 0 when no check failed, 1 when one did, 2 for a usage error. A usage error
+// is found before any check runs, so it prints nothing on stdout.
 func runDoctor(args []string, stdout, stderr io.Writer) int {
-	if len(args) > 0 {
-		fmt.Fprintf(stderr, "cairn doctor: takes no arguments yet, got %q\n", args)
+	fl := flag.NewFlagSet("cairn doctor", flag.ContinueOnError)
+	fl.SetOutput(io.Discard)
+	agent := fl.String("agent", "", "also check a client: claude-code (its hooks), or opencode and pi (their registration; both EXPERIMENTAL)")
+	if err := fl.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			writeDoctorHelp(stdout, fl)
+			return 0
+		}
+		fmt.Fprintf(stderr, "cairn doctor: %v; run cairn doctor --help for the flags\n", err)
 		return 2
 	}
+	if fl.NArg() > 0 {
+		fmt.Fprintf(stderr, "cairn doctor: takes flags only, got %q\n", fl.Args())
+		return 2
+	}
+	// An empty --agent is a mistake, not a request for the plain doctor: when the flag is given, it names an agent.
+	given := false
+	fl.Visit(func(f *flag.Flag) { given = given || f.Name == "agent" })
+	if given && *agent == "" {
+		fmt.Fprintln(stderr, "cairn doctor: --agent needs a name: use --agent claude-code")
+		return 2
+	}
+	switch *agent {
+	case "", "claude-code", "opencode", "pi":
+	default:
+		fmt.Fprintf(stderr, "cairn doctor: unknown agent %q: use --agent claude-code, opencode or pi\n", *agent)
+		return 2
+	}
+
 	wd, err := workDir()
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn doctor: the working directory: %v\n", err)
@@ -76,10 +111,40 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	for _, c := range checks {
 		fmt.Fprintf(stdout, "%-8s %-5s %s\n", c.name, c.status, c.detail)
 	}
-	if anyFailed(checks) {
+	failed := anyFailed(checks)
+	if *agent == "claude-code" {
+		agentChecks := append(claudeCodeChecks(wd), dryRunChecks()...)
+		fmt.Fprintln(stdout, "hooks for claude-code")
+		for _, c := range agentChecks {
+			fmt.Fprintf(stdout, "%-12s %-5s %s\n", c.name, c.status, c.detail)
+		}
+		failed = failed || anyFailed(agentChecks)
+	}
+	if *agent == "opencode" || *agent == "pi" {
+		// The section is tagged, so every line it prints says the client is experimental.
+		section := tagLines(stdout, experimentalPrefix(*agent))
+		fmt.Fprintf(section, "registration for %s, read only\n", *agent)
+		agentChecks := experimentalChecks(*agent, wd)
+		for _, c := range agentChecks {
+			fmt.Fprintf(section, "%-12s %-5s %s\n", c.name, c.status, c.detail)
+		}
+		failed = failed || anyFailed(agentChecks)
+	}
+	if failed {
 		return 1
 	}
 	return 0
+}
+
+// writeDoctorHelp prints the usage of cairn doctor, and its flags, to w.
+func writeDoctorHelp(w io.Writer, fl *flag.FlagSet) {
+	fmt.Fprintln(w, "Usage: cairn doctor [--agent claude-code|opencode|pi]")
+	fmt.Fprintln(w, "Checks the binary, the project file, the server and whether it answers as a Cairn server. Without --agent it changes nothing.")
+	fmt.Fprintln(w, "With --agent claude-code it also lists the cairn hooks in the Claude Code settings files, and runs each hook once against the server. No file is written.")
+	fmt.Fprintln(w, "Each hook reads the active task. The first read of a project the server has not seen creates the project's row, as the hooks do.")
+	fmt.Fprintln(w, "Agents: claude-code, opencode, pi. opencode and pi are EXPERIMENTAL: with either, doctor reports whether the registration and the instructions that cairn enable writes are in the project, and changes nothing.")
+	fl.SetOutput(w)
+	fl.PrintDefaults()
 }
 
 // anyFailed reports whether a check failed. Only "fail" fails the command: "warn" is printed

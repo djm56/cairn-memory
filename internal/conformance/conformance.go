@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -40,33 +41,85 @@ func Run(t *testing.T, newService func(t *testing.T) core.Service) {
 	RunWith(t, newService, nil)
 }
 
+// Deferral is why a backend does not pass a case, and what the case's failure must say. A deferred case is
+// skipped with its Reason, so it counts as neither a pass nor a fail, but only while it fails the way Match
+// says it does.
+type Deferral struct {
+	// Reason is what the case checks that the backend cannot give. It is shown in the skip.
+	Reason string
+	// Match is the substrings the failures of the case must contain. Each failure message must contain at
+	// least one of them, so a deferred case that fails for another reason fails the run. A Match with no
+	// substring, or with an empty one, is refused, since an empty substring matches every message.
+	Match []string
+}
+
 // RunWith is Run for a backend that does not yet implement the whole suite.
 // Each case named in deferred is reported as skipped, with the reason its
-// backend gave, so it counts as neither a pass nor a fail. Two things fail the
+// backend gave, so it counts as neither a pass nor a fail. Three things fail the
 // run. A name that is not in the suite fails it, so a renamed case cannot be
 // skipped by accident. A deferred case that passes against the backend fails
-// it too, so a stale entry cannot hide a case that is now live. A log line
-// would not do: a green run does not read its log, and the entry would stay.
-func RunWith(t *testing.T, newService func(t *testing.T) core.Service, deferred map[string]string) {
+// it too, so a stale entry cannot hide a case that is now live. A deferred case
+// whose failure is not one its Match names fails it, so a deferral cannot hide a
+// different fault. A log line would not do: a green run does not read its log,
+// and the entry would stay.
+func RunWith(t *testing.T, newService func(t *testing.T) core.Service, deferred map[string]Deferral) {
 	cases := Cases()
 	for _, name := range unknownDeferred(cases, deferred) {
 		t.Errorf("deferred case %q is not in the suite", name)
 	}
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			reason, ok := deferred[c.Name]
+			d, ok := deferred[c.Name]
 			if !ok {
 				c.Run(t, newService(t))
 				return
 			}
+			if msg := matchFault(c.Name, d.Match); msg != "" {
+				t.Error(msg)
+			}
 			// The case runs on a fresh service and its outcome is only read.
-			passes, _ := probe(c, newService(t))
+			passes, failures := probe(c, newService(t))
 			if msg := deferredFailure(c.Name, passes); msg != "" {
 				t.Error(msg)
 			}
-			t.Skip("deferred: " + reason)
+			for _, msg := range unmatchedFailures(d.Match, failures) {
+				t.Errorf("deferred case %q fails for another reason, not one its deferral names (%q): %s", c.Name, d.Match, msg)
+			}
+			t.Skip("deferred: " + d.Reason)
 		})
 	}
+}
+
+// matchFault is the failure RunWith reports for a deferral whose Match is empty or holds an empty
+// substring, which would match every failure. It is "" for a usable Match.
+func matchFault(name string, match []string) string {
+	if len(match) == 0 {
+		return fmt.Sprintf("deferred case %q names no failure it must match: give a substring its failure contains", name)
+	}
+	if slices.Contains(match, "") {
+		return fmt.Sprintf("deferred case %q has an empty substring to match: an empty one matches every failure", name)
+	}
+	return ""
+}
+
+// unmatchedFailures returns the failure messages that contain none of match, in order. RunWith fails the
+// run for each one, since a deferred case is failing for a reason its deferral does not name. It returns
+// nothing when the case passed, which has no failures.
+func unmatchedFailures(match []string, failures []string) []string {
+	var out []string
+	for _, msg := range failures {
+		matched := false
+		for _, want := range match {
+			if strings.Contains(msg, want) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			out = append(out, msg)
+		}
+	}
+	return out
 }
 
 // deferredFailure is the failure RunWith reports for a deferred case, given
@@ -81,8 +134,9 @@ func deferredFailure(name string, passes bool) string {
 }
 
 // unknownDeferred returns the names in deferred that no case of cases has, in
-// sorted order. RunWith fails for each of them.
-func unknownDeferred(cases []Case, deferred map[string]string) []string {
+// sorted order. RunWith fails for each of them. It takes the deferrals of any value
+// type, so it reads only their names.
+func unknownDeferred[V any](cases []Case, deferred map[string]V) []string {
 	known := map[string]bool{}
 	for _, c := range cases {
 		known[c.Name] = true

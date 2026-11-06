@@ -5,7 +5,7 @@ APP=cairn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt fmt-check scan-invisible run mutation
+.PHONY: build test vet fmt fmt-check cross scan-invisible scan-local-paths run mutation
 
 build:
 	mkdir -p bin
@@ -27,20 +27,48 @@ fmt-check:
 	  echo "Not gofmt-formatted (run 'make fmt'):"; echo "$$unformatted"; exit 1; \
 	fi
 
-# Fails and lists the files when a tracked file holds a bidirectional override or isolate
-# (U+202A to U+202E, U+2066 to U+2069), a zero-width or invisible character (U+200B to U+200F,
-# U+2060 to U+2064), or a byte-order mark (U+FEFF). A byte-order mark is refused anywhere, even at
-# the start of a file. Such characters can make source read differently from the bytes that run.
-# git grep exits 0 on a match and 1 on none, so the result is inverted here. The locale must be
-# UTF-8, or \x{...} is read as a byte and is too large; C.UTF-8 exists on the CI runner. CI runs
-# this on every pull request.
+# Cross-compiles and vets the module for each other system the code is built for. go vet
+# compiles the _test.go files too, which go build skips, so a break in a test file is caught.
+# This is a compile check only: nothing here runs the binaries. Linux is the test target, and
+# the other systems are compiled, not run. CI runs it on every pull request.
+cross:
+	GOOS=windows go build ./... && GOOS=windows go vet ./... && GOOS=darwin go build ./... && GOOS=darwin go vet ./... && GOOS=freebsd go build ./... && GOOS=freebsd go vet ./... && GOOS=openbsd go build ./... && GOOS=openbsd go vet ./...
+
+# Fails and lists the files when a tracked file holds a bidirectional override, isolate or mark
+# (U+202A to U+202E, U+2066 to U+2069, U+061C), a zero-width or invisible character (U+200B to
+# U+200F, U+2060 to U+2065, U+180E, U+00AD), a tag character (U+E0000 to U+E007F), or a
+# byte-order mark (U+FEFF). A byte-order mark is refused anywhere, even at the start of a file.
+# Such characters can make source read differently from the bytes that run. git grep exits 0 on a
+# match and 1 on none, so the result is inverted here. The locale must be UTF-8, or \x{...} is read
+# as a byte and is too large; C.UTF-8 exists on the CI runner. CI runs this on every pull request.
 scan-invisible:
-	@hits="$$(LC_ALL=C.UTF-8 git grep -I -l -P '[\x{202A}-\x{202E}\x{2060}-\x{2069}\x{200B}-\x{200F}\x{FEFF}]')"; \
+	@hits="$$(LC_ALL=C.UTF-8 git grep -I -l -P '[\x{202A}-\x{202E}\x{2060}-\x{2069}\x{200B}-\x{200F}\x{FEFF}\x{061C}\x{180E}\x{00AD}\x{E0000}-\x{E007F}]')"; \
 	status=$$?; \
 	if [ $$status -eq 0 ]; then \
 	  echo "Bidirectional or invisible characters found in these tracked files:"; echo "$$hits"; exit 1; \
 	elif [ $$status -ne 1 ]; then \
 	  echo "scan-invisible: git grep failed (exit $$status)"; exit $$status; \
+	fi
+
+# Fails and lists the lines when a tracked file holds a local path that names a user or a machine
+# layout: a macOS, Linux or root home directory, a mounted volume, or a Windows user directory. The
+# placeholder user "you" is allowed, so docs can show where a file goes (/Users/you/ and /home/you/).
+# A path is skipped only when a letter, digit, "_", ".", "-", "~" or "$" comes right before it.
+# After anything else, such as a backtick, a bracket, a pipe, a comma, a colon or a space, the path
+# is caught. So internal/root/x and ../home/x are skipped, and a path in backticks or in a file URL
+# is caught. The Windows form is a drive letter, a colon, slashes or backslashes, Users in any case,
+# then more slashes or backslashes, and it follows the same rule. Not seen: a WSL path such as
+# /mnt/c/Users/..., which has a letter before its slash, and a path after "..." or a period, which
+# is skipped. The whole tree is scanned; no file is excluded. git grep exits 0 on a match and 1 on
+# none, so the result is inverted here. CI runs this on every pull request.
+# The ++ after users is possessive: a doubled separator before you is not split or flagged.
+scan-local-paths:
+	@hits="$$(git grep -I -n -P '(?<![A-Za-z0-9_.~$$-])(/(Users|home|root|Volumes)/(?!you/)|(?i:[a-z]:[\\/]+users[\\/]++)(?!you[\\/]))')"; \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+	  echo "Local user or machine paths found in these tracked files (file:line:text):"; printf '%s\n' "$$hits"; exit 1; \
+	elif [ $$status -ne 1 ]; then \
+	  echo "scan-local-paths: git grep failed (exit $$status)"; exit $$status; \
 	fi
 
 # ARGS is passed to the binary: make run ARGS=version

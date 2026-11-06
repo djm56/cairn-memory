@@ -22,8 +22,9 @@ type Local struct {
 	st *store.Store
 
 	// betweenReads is a test seam. When it is set, TaskCurrent calls it inside
-	// its read transaction, after the active task is read and before its steps
-	// and events are. It is nil in production (CONTRACT §9 item 35).
+	// its read transaction, after the snapshot is taken and before any of its
+	// reads: directives, the task, criteria, steps and events. It is nil in
+	// production (CONTRACT §9 item 35).
 	betweenReads func()
 
 	// clock is a test seam for the server's time. When it is set, now returns

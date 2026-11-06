@@ -16,7 +16,7 @@ import (
 // deferred lists the conformance cases that core.Local does not yet pass. It is
 // empty: every case is live. RunWith still fails a name here that is not in the
 // suite, or that passes, so an entry added later cannot hide a case.
-var deferred = map[string]string{}
+var deferred = map[string]conformance.Deferral{}
 
 // openLocal returns a Service over a new database in a temporary directory,
 // and the store under it, for tests that check the rows directly.

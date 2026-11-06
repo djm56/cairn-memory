@@ -26,9 +26,9 @@ WorkingDirectory=/var/lib/cairn
 UMask=0077
 
 # Hardening. Chosen by reading what the server does: no privilege gain, no write outside
-# the state directory, no kernel or device access, no extra address families. This unit
-# has NOT been run under systemd yet. The M2 live run is its first start, so check it
-# there (DEPLOY.md, "The systemd unit"): systemd-analyze verify, then systemctl status.
+# the state directory, no kernel or device access, no extra address families. The unit
+# was first started under systemd in the M2 live run, on 2026-11-02 (DEPLOY.md, "The
+# systemd unit"). Check it on your own host: systemd-analyze verify, then systemctl status.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

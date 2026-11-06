@@ -253,7 +253,7 @@ type directiveListIn struct {
 
 type recallIn struct {
 	Goal  string `json:"goal" jsonschema:"what the task is for, in a sentence"`
-	Agent string `json:"agent,omitempty" jsonschema:"the caller's role; names its agent-scoped directives. Without it, none are listed"`
+	Agent string `json:"agent,omitempty" jsonschema:"the caller's role; names its agent-scoped directives. Without it, the caller's own agent name is used; with neither, none are listed"`
 	Limit int    `json:"limit,omitempty" jsonschema:"items per list, 5 by default"`
 }
 

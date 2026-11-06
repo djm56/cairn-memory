@@ -87,14 +87,6 @@ func TestDoctorFailsOnAProjectFileThatIsBroken(t *testing.T) {
 	assertNoDestructive(t, stdout)
 }
 
-// TestDoctorTakesNoArguments checks the usage error, since --agent is not built yet.
-func TestDoctorTakesNoArguments(t *testing.T) {
-	code, _, stderr := runCmd(t, "doctor", "--agent", "claude-code")
-	if code != 2 || !strings.Contains(stderr, "takes no arguments yet") {
-		t.Errorf("exit %d, stderr %q: want 2 and the usage error", code, stderr)
-	}
-}
-
 // TestDoctorDoesNotFollowARedirect checks the redirect rule at the command: a
 // server that redirects the reach call to another server makes reach fail, and the other server
 // receives no request, so the key is not sent there. The output holds no key.

@@ -1,7 +1,10 @@
 package ui
 
 import (
+	"maps"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +40,8 @@ func checkHeaders(t *testing.T, label string, rec *recorder, hsts bool) {
 }
 
 // TestHeadersOnEveryAnswer checks the headers on a page, on the redirects, on the stylesheet,
-// and on the mux's own 404 and 405 answers. It runs with and without HSTS.
+// and on the mux's own 404 answer. It runs with and without HSTS. The mux's 405 answers are
+// checked by TestRouteTableAnswers405ToEveryDisallowedMethod.
 func TestHeadersOnEveryAnswer(t *testing.T) {
 	for _, hsts := range []bool{false, true} {
 		hr := newHarness(t, true, hsts)
@@ -50,7 +54,6 @@ func TestHeadersOnEveryAnswer(t *testing.T) {
 			{"the /ui redirect", http.MethodGet, "/ui", http.StatusMovedPermanently},
 			{"the stylesheet", http.MethodGet, "/ui/static/app.css", http.StatusOK},
 			{"an unlisted path (404)", http.MethodGet, "/ui/nope", http.StatusNotFound},
-			{"a wrong method (405)", http.MethodPost, "/ui/", http.StatusMethodNotAllowed},
 			{"a sign-in with no body", http.MethodPost, "/ui/signin", http.StatusForbidden},
 			{"HEAD of the sign-in page", http.MethodHead, "/ui/signin", http.StatusOK},
 			{"a trailing slash on the sign-in page (404)", http.MethodGet, "/ui/signin/", http.StatusNotFound},
@@ -63,8 +66,89 @@ func TestHeadersOnEveryAnswer(t *testing.T) {
 			}
 			checkHeaders(t, c.label, rec, hsts)
 		}
-		if got := hr.do(http.MethodPost, "/ui/", "", nil, nil).Header().Get("Allow"); got != "GET, HEAD" {
-			t.Errorf("405 Allow = %q, want GET, HEAD", got)
+	}
+}
+
+// routePath is one pattern of the route table: a path that matches it, and the methods the
+// table registers for it.
+type routePath struct {
+	path    string
+	methods map[string]bool
+}
+
+// routePaths groups the route table by pattern. Each wildcard is filled with "x" and the end
+// anchor {$} is dropped, so each path matches its pattern.
+func routePaths(u *ui) []routePath {
+	wildcard := regexp.MustCompile(`\{[^}]*\}`)
+	index := map[string]int{}
+	var out []routePath
+	for _, r := range u.routes() {
+		i, ok := index[r.pattern]
+		if !ok {
+			i = len(out)
+			index[r.pattern] = i
+			path := wildcard.ReplaceAllString(strings.ReplaceAll(r.pattern, "{$}", ""), "x")
+			out = append(out, routePath{path: path, methods: map[string]bool{}})
+		}
+		out[i].methods[r.method] = true
+	}
+	return out
+}
+
+// hasRoute reports whether paths holds path, registered for method.
+func hasRoute(paths []routePath, path, method string) bool {
+	for _, rp := range paths {
+		if rp.path == path && rp.methods[method] {
+			return true
+		}
+	}
+	return false
+}
+
+// TestRouteTableAnswers405ToEveryDisallowedMethod checks the mux's own 405 on every route of the
+// table. For each path, each method the table does not register for it is refused with 405, and
+// the Allow header names exactly the methods that are registered, with HEAD where GET is. The
+// headers are checked on each answer. The paths and methods come from the table, so a route
+// added to it is covered too.
+func TestRouteTableAnswers405ToEveryDisallowedMethod(t *testing.T) {
+	candidates := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions, http.MethodTrace}
+	for _, hsts := range []bool{false, true} {
+		hr := newHarness(t, true, hsts)
+		// The loop below checks what the table holds, so an empty table would pass it. The table
+		// must hold routes, and a known one: POST on pathDecide, with {id} filled as routePaths
+		// fills it.
+		paths := routePaths(hr.u)
+		if len(paths) == 0 {
+			t.Fatal("the route table is empty, so no 405 is checked")
+		}
+		if !hasRoute(paths, "/ui/learnings/x/decide", http.MethodPost) {
+			t.Fatal("the route table has no POST on /ui/learnings/x/decide (pathDecide)")
+		}
+		for _, rp := range paths {
+			allowed := map[string]bool{}
+			for m := range rp.methods {
+				allowed[m] = true
+			}
+			if allowed[http.MethodGet] {
+				allowed[http.MethodHead] = true
+			}
+			wantAllow := slices.Sorted(maps.Keys(allowed))
+			for _, method := range candidates {
+				if allowed[method] {
+					continue
+				}
+				label := method + " " + rp.path + " (405)"
+				rec := hr.do(method, rp.path, "", nil, nil)
+				if rec.status() != http.StatusMethodNotAllowed {
+					t.Errorf("%s: status %d, want 405", label, rec.status())
+				}
+				gotAllow := strings.Split(rec.Header().Get("Allow"), ", ")
+				slices.Sort(gotAllow)
+				if !slices.Equal(gotAllow, wantAllow) {
+					t.Errorf("%s: Allow = %q, want %q", label, rec.Header().Get("Allow"), strings.Join(wantAllow, ", "))
+				}
+				checkHeaders(t, label, rec, hsts)
+			}
 		}
 	}
 }

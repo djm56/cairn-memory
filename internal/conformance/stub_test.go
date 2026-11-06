@@ -1,6 +1,7 @@
 package conformance
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -25,7 +26,7 @@ func TestEveryCaseFailsAgainstStub(t *testing.T) {
 			t.Errorf("%s: passed against the stub", c.Name)
 			continue
 		}
-		t.Logf("%-45s fails: %s", c.Name, r.first)
+		t.Logf("%-45s fails: %s", c.Name, strings.Join(r.failures, "; "))
 	}
 }
 

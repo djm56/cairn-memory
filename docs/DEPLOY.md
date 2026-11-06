@@ -539,8 +539,11 @@ database.
 `cairn restore` replaces the database. It is confirmed at a terminal, by typing the
 database path, and it never deletes anything: the old database is moved aside.
 
-1. Stop the server. The restore checks for a running server on a readable database,
-   but a file it cannot read is not checked, so stop it yourself first:
+1. Stop the server. The restore checks a readable database for a running server. For
+   a file it cannot read as SQLite, it probes the file's lock bytes. That refuses when
+   it finds a lock, but it cannot see every holder, and on some systems it cannot check
+   at all ([DESIGN.md §5.2.1](DESIGN.md#521-backup-and-restore-m2-74)). So stop the
+   server yourself first:
 
    ```bash
    systemctl stop cairn

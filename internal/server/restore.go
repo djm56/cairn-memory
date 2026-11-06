@@ -76,10 +76,10 @@ type move struct {
 //     the file alone holds the state (store.ExclusiveLock.Consolidate). A file that is not
 //     readable is not checkpointed, and holds no lock through the prompt, so its lock bytes are
 //     probed again just before the first move: a holder that started while the path was typed
-//     refuses the restore with nothing moved. Then the files of the set that exist (the database, -wal and
-//     -shm) are moved to pre-restore names, each reported, and never deleted. An absent database
-//     with a stray -wal or -shm beside its path is refused before step 2, and nothing is moved
-//     (the operator moves those files aside, by hand, and runs the restore again);
+//     refuses the restore with nothing moved. Then the files of the set that exist (the database,
+//     -wal and -shm) are moved to pre-restore names, each reported, and never deleted. An absent
+//     database with a stray -wal or -shm beside its path is refused before step 2, and nothing is
+//     moved (the operator moves those files aside, by hand, and runs the restore again);
 //  6. the checked copy is renamed to the database path, and the database is opened, which
 //     migrates it to this build's schema.
 //

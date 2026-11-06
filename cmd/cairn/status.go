@@ -31,7 +31,7 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairn status: %s\n", reason(err))
 		return 1
 	}
-	cur, err := t.svc.TaskCurrent(t.ctx)
+	cur, err := currentFor(t)
 	if err != nil {
 		fmt.Fprintf(stderr, "cairn status: %s\n", reason(err))
 		return 1
@@ -63,9 +63,17 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 		fmt.Fprintf(w, "other       %d other active task(s)\n", cur.OtherActive)
 	}
 	fmt.Fprintf(w, "directives  %d apply to this project\n", len(cur.Directives))
-	// The CLI names no agent role, so the server counts only directives that are not scoped to
-	// one. That is said here, not left for a person to infer.
-	fmt.Fprintf(w, "            %s\n", noRoleNote)
+	// With no agent role the server counts only directives that are not scoped to one. That is
+	// said here, not left for a person to infer. With a role the count includes its own, so the
+	// line is left out. When CAIRN_AGENT is set but refused, the line says so, since a value was
+	// given and it is not the same fault as none.
+	if t.role == "" {
+		note := noRoleNote
+		if t.roleRefused {
+			note = refusedRoleNote
+		}
+		fmt.Fprintf(w, "            %s\n", note)
+	}
 	// The two counts are shown only when there is one, so a clean project reads as before.
 	// A directive left out is named, not dropped without a word.
 	if cur.Expired > 0 {
