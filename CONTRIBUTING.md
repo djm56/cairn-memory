@@ -14,12 +14,14 @@ make test        # go test -race ./...
 make vet         # go vet ./...
 make fmt         # gofmt -w .
 make fmt-check   # fails if any file is not gofmt-formatted
+make cross       # compile and vet for Windows, macOS, FreeBSD and OpenBSD (compile only, nothing is run)
 make scan-invisible  # fails if a tracked file holds a bidirectional or invisible character
+make scan-local-paths  # fails if a tracked file names a local user or machine path, other than the placeholder "you"
 ```
 
-CI runs build, `vet`, `fmt-check`, `test`, `scan-invisible` and the Windows and macOS
-cross-builds (`GOOS=windows go build ./...` and `GOOS=darwin go build ./...`) on every pull
-request. Run the same checks before you push.
+CI runs build, `vet`, `fmt-check`, `test`, `make cross` (the Windows, macOS, FreeBSD and
+OpenBSD compile and vet), `scan-invisible` and `scan-local-paths` on every pull request.
+Run the same checks before you push.
 
 ### Mutation testing
 
@@ -119,6 +121,19 @@ the reason. Adopted decisions are listed in PLAN.md §8.
   or Later), and the two values match. `scripts/check-docs.sh` checks that they
   agree. When the marker and the status lines change is set out in
   [PLAN §9](docs/PLAN.md#9-project-management).
+- **Docs drift tests.** `internal/mcp/docs_drift_test.go` and `cmd/cairn/docs_drift_test.go`
+  run under `make test`. They fail when the tool names in [wiki/MCP-Tools.md](wiki/MCP-Tools.md)
+  differ from the names the server registers, or the verb names in
+  [wiki/CLI-Reference.md](wiki/CLI-Reference.md) differ from the binary's dispatch table. They
+  compare names only, not descriptions, parameters or prose, so a wrong sentence on either page
+  passes them. The tests read the table between each page's markers (`<!-- cairn-mcp-tools:begin -->`
+  and `:end`, `<!-- cairn-cli-verbs:begin -->` and `:end`), so keep the markers, and keep the first
+  column as one name in backticks. A rename on either side fails them.
+- **Operator smoke check.** [scripts/smoke-check.sh](scripts/smoke-check.sh) is a read-only check
+  of an install, run by an operator against a binary and, with `--server`, a server. It is not a CI
+  step. Its checks, and what it changes (one `last_used_at` on the key it uses), are on the
+  [Checks](https://github.com/djm56/cairn-memory/wiki/Checks) wiki page. Its tests are in
+  `internal/smokecheck`, and run under `make test`.
 - **Contract changes.** DESIGN.md, CONTRACT.md, `internal/core` and
   `internal/conformance` change together. See
   [Changes to the design](#changes-to-the-design) above.

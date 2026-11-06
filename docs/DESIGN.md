@@ -438,8 +438,11 @@ https://code.claude.com/docs/en/hooks.md:
 - `session-start` prints the block above. `enable` registers it with the
   matcher `startup|resume|clear|compact`, so it runs again after `/compact`. The
   reference says a SessionStart hook's plain stdout is added to Claude's context.
-  This is what carries a task across `/compact` in Claude Code. The M4 hand check
-  confirmed it on 2026-11-06: see [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
+  This is what is meant to carry a task across `/compact` in Claude Code. The M4 hand
+  check (section 3) passed on 2026-11-06 by operator ruling, not under its rule as
+  written: the agent also called `task_current` after the compact, which the hook text
+  asks for and the rule counts as not run. The conflict is tracked in #206. See
+  [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
 - `pre-compact` prints the same block. It is installed, as D15 names it, but it
   is inert in Claude Code. The reference says plain stdout is written to the debug
   log and not shown in the transcript, except for four events, and PreCompact is
@@ -582,9 +585,9 @@ nothing changed unless the step says otherwise:
    says the lock could not be checked. The probe runs again just before the first
    move. It is built for Linux, macOS, FreeBSD and OpenBSD. Its tests run on Linux,
    the CI runner, and are run by the developer on macOS, which CI does not run; FreeBSD
-   and OpenBSD are built and vetted, not run. On any other system the lock cannot be checked. The file is
-   moved as it is at step 5, and the operator confirms that `cairn serve` is
-   stopped. A readable database must not be
+   and OpenBSD are built and vetted, not run. On any other system the lock cannot be
+   checked. The file is moved as it is at step 5, and the operator confirms that
+   `cairn serve` is stopped. A readable database must not be
    in use. An exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
    or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
    do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is

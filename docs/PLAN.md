@@ -2,7 +2,7 @@
 
 <!-- cairn-milestone: M5 -->
 
-**Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4's exit check passed by operator ruling on 2026-11-06: the /compact hand check, section 3 of [M4-HAND-CHECK.md](M4-HAND-CHECK.md), was run and passed. Sections 4 and 5 of that guide (OpenCode and pi) are not run, and #206 is open. Phases 0 to 2 are done, and
 their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
 §3. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the

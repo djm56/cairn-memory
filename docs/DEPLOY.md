@@ -2,9 +2,14 @@
 
 This is how to run `cairn serve` on a server that other machines reach. It covers
 the two TLS setups of [DESIGN.md §5.3](DESIGN.md#53-the-server) (decision D20), the
-systemd unit, keys, backup and restore, and upgrades. The client side is in
-[the wiki's Getting Started](https://github.com/djm56/cairn-memory/wiki/Getting-Started)
-and in [M2-LIVE-RUN.md](M2-LIVE-RUN.md).
+systemd unit, keys, backup and restore, and upgrades. The wiki's
+[Install-Server](https://github.com/djm56/cairn-memory/wiki/Install-Server) page
+walks through the same install in order, and
+[Upgrade](https://github.com/djm56/cairn-memory/wiki/Upgrade) gives the upgrade
+steps in more detail. The client side is in the wiki's
+[Install-Local](https://github.com/djm56/cairn-memory/wiki/Install-Local) and
+[Quick-Start](https://github.com/djm56/cairn-memory/wiki/Quick-Start) pages, and in
+[M2-LIVE-RUN.md](M2-LIVE-RUN.md). The wiki is canonical for the procedures.
 
 Every command below runs on the server, as root or with `sudo`, unless it says
 `sudo -u cairn`.
@@ -489,6 +494,11 @@ sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name l
 sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
 ```
 
+`key add`, `key list` and `key revoke` open the database with the same migrator as
+`serve`. A newer binary therefore upgrades an older database when you run any of them,
+even `key list`, which only reads. Run key commands with the new binary only once you
+are ready to upgrade, and take the backup first ([Upgrade](#upgrade)).
+
 `--scope` is `operator` for decisions and ratification, `agent` for the MCP tools, or
 `viewer` for read-only access. `key add` prints the key once, on stdout. Copy it then,
 to the place the client needs it. It is shown once and never again: the database keeps
@@ -590,20 +600,37 @@ fails".
 
 Upgrade the server before its clients ([DESIGN.md §5.4](DESIGN.md#54-the-http-wire-form)).
 Migrations are one-way: a new binary changes the schema when it starts, and an old binary
-cannot read it back. So keep the old binary and take the backup first; both are needed
-to go back.
+cannot read it back. So keep the old binary, and take the backup after the server has
+stopped and before the new binary starts, so that no write is missed. Both are needed to
+go back. The order below is the one [the wiki's Upgrade page](https://github.com/djm56/cairn-memory/wiki/Upgrade)
+gives. It stops first, then backs up, and the backup must exist before anything is installed.
 
 ```bash
-systemctl stop cairn
-cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev
-sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).db"
-install -m 0755 bin/cairn /usr/local/bin/cairn
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+install -d -m 0700 -o cairn -g cairn /var/backups/cairn && \
+systemctl stop cairn && \
+cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev-$STAMP && \
+sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db && \
+ls -l /var/backups/cairn/pre-upgrade-$STAMP.db && \
+install -m 0755 /home/you/cairn-linux /usr/local/bin/cairn && \
 systemctl start cairn
+/usr/local/bin/cairn version
 journalctl -u cairn -n 20
+curl -sS https://<host>:8788/healthz
 ```
 
+The lines before `systemctl start cairn` are joined with `&&`. Each runs only when the one
+before it succeeded. If one prints an error, stop there. Nothing after it has run, and the
+old binary is still installed. If the server was already stopped, `systemctl start cairn`
+starts the old build again, on a database that no migration has changed. The new binary is
+`/home/you/cairn-linux` after `make push`, which copies it to the home directory of the SSH
+user. On a server you built on the server, it is `bin/cairn` in the checkout. Use the file
+you copied. The `ls -l` line is the gate: do not install until it lists the backup. Fill in
+`<user>` and `<host>`. The stamp is set on the first line, so run the whole upgrade in the
+same shell.
+
 Migrations run when the server starts, so the first start after an upgrade may change the
-schema. Keep `cairn.prev` and the pre-upgrade backup until the new server has run
+schema. Keep `cairn.prev-<UTC time>` and the pre-upgrade backup until the new server has run
 cleanly.
 
 **Roll back.** Restoring the old binary alone is not enough: the old binary does not
@@ -611,10 +638,13 @@ understand the new schema. Put back the old binary **and** the pre-upgrade backu
 
 ```bash
 systemctl stop cairn
-install -m 0755 /usr/local/bin/cairn.prev /usr/local/bin/cairn
+install -m 0755 /usr/local/bin/cairn.prev-<UTC time> /usr/local/bin/cairn
 sudo -u cairn /usr/local/bin/cairn restore --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-<UTC time>.db
 systemctl start cairn
 ```
+
+`<UTC time>` is the stamp from the upgrade. If you no longer have it,
+`ls /usr/local/bin/cairn.prev-* /var/backups/cairn/pre-upgrade-*` lists the names.
 
 Anything written after the upgrade started is in the database that `restore` moves aside
 (`cairn.db.pre-restore-<UTC time>`), not in the restored one. See [Restore](#restore).
