@@ -1,6 +1,6 @@
 # Glossary
 
-_Status as of 2026-11-03: M4 (Hooks + CLI) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 The terms follow [DESIGN.md §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts) and the sections it links. Cairn says **task**, not mission (decision D1).
 

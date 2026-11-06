@@ -184,6 +184,7 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   (`LINUX_ARCH=amd64` or `arm64`), and `make push SERVER=user@host [SSH_PORT=n]` copies it to the
   server and runs its `version` there. DEPLOY.md and M3-UI-CHECK.md route B use them, and DEPLOY.md says
   to install the copied file by its full path, since `~` is `/root` in a root shell.
+- M4 exit check (#206): the `/compact` hand check ran on 2026-11-06 and passed by operator ruling. `docs/M4-HAND-CHECK.md` records the result, and its cleanup step 7.1 now finishes or skips the steps and passes empty lessons and mistakes, since the close policy refuses the old command. The status lines, the `cairn-milestone` marker and the wiki roadmap move to M5. DESIGN §4.1 says the run confirmed the SessionStart carry.
 
 ### Changed
 
