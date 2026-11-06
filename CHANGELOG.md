@@ -182,7 +182,8 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Docs, M4: the README, DESIGN and the wiki describe the CLI verbs, the three hooks, `enable --agent claude-code` (hooks only), `doctor --agent` and `export project` as built, with the OpenCode and pi registrations marked EXPERIMENTAL. The DESIGN command table has the exit codes in §5.2.2. The status lines are unchanged, since the M4 exit check has not passed.
 - `make build-linux` builds `bin/cairn-linux` for a Linux server from any machine
   (`LINUX_ARCH=amd64` or `arm64`), and `make push SERVER=user@host [SSH_PORT=n]` copies it to the
-  server and runs its `version` there. DEPLOY.md and M3-UI-CHECK.md route B use them.
+  server and runs its `version` there. DEPLOY.md and M3-UI-CHECK.md route B use them, and DEPLOY.md says
+  to install the copied file by its full path, since `~` is `/root` in a root shell.
 
 ### Changed
 

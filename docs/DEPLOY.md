@@ -30,7 +30,9 @@ writes `bin/cairn-linux` for Linux on `amd64`; add `LINUX_ARCH=arm64` when the s
 `uname -m` prints `aarch64`. `make push SERVER=<user>@<server>` builds it, copies it to
 `~/cairn-linux` on the server, and runs its `version` there; add `SSH_PORT=<port>` when
 SSH is not on port 22. Then install that file in
-place of `bin/cairn`, here and in [Upgrade](#upgrade).
+place of `bin/cairn`, here and in [Upgrade](#upgrade). Name it by its full path,
+`/home/you/cairn-linux` for the user `you`: in a root shell, such as one opened with `sudo -s`, `~` is
+`/root`, and the file is not there.
 
 ## Choose a setup
 
