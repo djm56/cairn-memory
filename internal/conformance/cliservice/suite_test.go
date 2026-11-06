@@ -20,6 +20,9 @@ type deferral struct {
 // deferrals is the list the deferred map is made from. Each reason names what the case checks that the CLI
 // cannot give, and each match is the text the adapter's failure for that gap carries, so a failure for any
 // other reason fails the run.
+//
+// The three empty step reference cases and the two all_projects cases are permanent by operator decision
+// (PLAN §8, D30 and D31; issues #198 and #199): the CLI will not add a flag for them.
 var deferrals = []deferral{
 	{
 		name:   "identity/viewer_first_read_is_not_found",
@@ -37,6 +40,7 @@ var deferrals = []deferral{
 		match:  []string{"with the session"},
 	},
 
+	// Permanent: D30 (#198) for this case and the next two.
 	{
 		name:   "step/empty_ref_is_invalid",
 		reason: "step add --after an empty step reference: an absent --after means last, so no flag carries an empty reference; and step update on number 0 is refused by the CLI as a usage error before the call, which carries no kind",
@@ -55,6 +59,7 @@ var deferrals = []deferral{
 		match:  []string{"an empty step reference"},
 	},
 
+	// Permanent: D31 (#199) for this case and the next.
 	{
 		name:   "learning/operator_decides",
 		reason: "learning list over all projects: the CLI lists one project and does not offer all_projects, by its own documented choice",

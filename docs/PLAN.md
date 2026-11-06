@@ -452,6 +452,19 @@ that is not a numbered decision here, and the table says what.
   [CONTRACT.md §8](CONTRACT.md#8-operator-calls). *Replaces: retire and ratify
   as the way to reaffirm. That route still works.*
 
+**Operator decision, 2026-11-06: D30 and D31.**
+
+- **D30. The CLI sends no empty step reference.** An absent `--after` means last
+  and an absent `--step` means the task, so no flag carries an empty reference.
+  The three conformance cases that check the server refuses one
+  (`step/empty_ref_is_invalid`, `event/step_refs_must_name_a_step` and
+  `task_get/bad_paging_refused`) stay deferred through the CLI for good. They
+  pass against the local service and over HTTP (issue #198).
+- **D31. `cairn learning list` lists one project.** The CLI does not offer
+  `all_projects`; operators read across projects in the web UI or over MCP. The
+  cases `learning/operator_decides` and `web/learning_all_projects_for_readers`
+  stay deferred through the CLI for good (issue #199).
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
