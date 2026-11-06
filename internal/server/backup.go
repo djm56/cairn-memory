@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/djm56/cairn-memory/internal/hardlink"
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
@@ -131,12 +132,12 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 		return 0, errors.Join(err, removeEntries(sr))
 	}
 	beforeLink(tmp)
-	if err := os.Link(tmp, out); err != nil {
+	if err := linkBackup(tmp, out); err != nil {
 		if errors.Is(err, fs.ErrExist) {
 			return 0, errors.Join(errExistsBackup(out), removeStage(sr, stage, made))
 		}
 		lerr := fmt.Errorf("create the backup file %s: %w", out, err)
-		if noHardLinks(err) {
+		if hardlink.Unsupported(err) {
 			lerr = fmt.Errorf("%w (this filesystem does not support hard links, which the backup needs: the output directory must be on one that does)", lerr)
 		}
 		return 0, errors.Join(lerr, removeStage(sr, stage, made))
@@ -145,8 +146,21 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	// followed a swapped staging directory (see Backup). Then the name is removed, and nothing is
 	// reported made.
 	if now, err := os.Lstat(out); err != nil || !os.SameFile(now, copyInfo) {
-		_ = os.Remove(out)
-		return 0, errors.Join(fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name was removed", out, stage), removeEntries(sr))
+		// This call made the name, so it removes it. A name already gone is not a failure. The
+		// refusal reports the removal's real result, so it never says the name was removed when it
+		// was not.
+		rerr := os.Remove(out)
+		if errors.Is(rerr, fs.ErrNotExist) {
+			rerr = nil
+		}
+		refusal := fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name was removed", out, stage)
+		if rerr != nil {
+			refusal = fmt.Errorf("the backup file %s is not the copy made: the staging directory %s was swapped while the copy was linked, and the name could not be removed: %w", out, stage, rerr)
+		}
+		// The staging directory goes as on every other refusal, through the root. Where its name has
+		// been swapped, removeStage refuses to remove by name and says so. Its entries are removed in
+		// either case.
+		return 0, errors.Join(refusal, removeStage(sr, stage, made))
 	}
 	// out holds the copy now. The staging name goes. If it cannot be removed, the backup is not
 	// reported made, so out, which this call created, is removed as well.
@@ -228,18 +242,10 @@ func copyOwnerOnly(ctx context.Context, st *store.Store, path string) error {
 	return copyBackup(ctx, st, path)
 }
 
-// noHardLinks reports whether a failed link means the filesystem cannot make one: EPERM (FAT and
-// exFAT on macOS), ENOTSUP and EOPNOTSUPP, EXDEV, and ENOSYS. It is false for EEXIST and every
-// other failure. The list is the one cmd/cairn's noHardLinks uses (init.go). The two are kept in
-// step by hand, because package main cannot be imported.
-func noHardLinks(err error) bool {
-	for _, errno := range []syscall.Errno{syscall.EPERM, syscall.ENOTSUP, syscall.EOPNOTSUPP, syscall.EXDEV, syscall.ENOSYS} {
-		if errors.Is(err, errno) {
-			return true
-		}
-	}
-	return false
-}
+// linkBackup is the hard link that gives the copy its name: os.Link. It is a seam, so a test can
+// make the link fail with each errno and check the message that follows. It is put back when a
+// test ends.
+var linkBackup = os.Link
 
 // afterCopy runs once the copy is in place, before the check that follows it. It does nothing. A
 // test replaces it to move the staging name while the root-held copy is still there, so the check

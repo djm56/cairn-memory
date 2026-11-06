@@ -35,6 +35,9 @@ var (
 	checkReadable = store.CheckReadable
 	// acquireExclusive takes the probe's lock of step 3.
 	acquireExclusive = store.AcquireExclusive
+	// probeRaw is the read-only lock probe of a file that is not a readable database, run at step 3
+	// and again just before the first move of step 5.
+	probeRaw = rawInUse
 )
 
 // RestoreOptions is what cairn restore starts with. DB is the database to replace and Backup
@@ -65,11 +68,15 @@ type move struct {
 //     integrity_check, and its schema is not newer than this build's migrations;
 //  3. the database, if it exists, is not in use: an exclusive lock is taken, and an idle server
 //     holding it is enough to refuse (store.AcquireExclusive). A file that is not a readable
-//     SQLite database cannot be in use, so it takes no lock and goes to step 5 as bytes;
+//     SQLite database cannot be opened as one, so no lock is taken. A read-only probe of its lock
+//     bytes (rawInUse) refuses it when another process holds them; otherwise it goes to step 5 as
+//     bytes, and the prompt says whether the probe found no holder or could not tell;
 //  4. the operator types the database path exactly as given;
 //  5. for a database that is readable, its -wal is folded into it and it leaves WAL mode, so
 //     the file alone holds the state (store.ExclusiveLock.Consolidate). A file that is not
-//     readable is not checkpointed. Then the files of the set that exist (the database, -wal and
+//     readable is not checkpointed, and holds no lock through the prompt, so its lock bytes are
+//     probed again just before the first move: a holder that started while the path was typed
+//     refuses the restore with nothing moved. Then the files of the set that exist (the database, -wal and
 //     -shm) are moved to pre-restore names, each reported, and never deleted. An absent database
 //     with a stray -wal or -shm beside its path is refused before step 2, and nothing is moved
 //     (the operator moves those files aside, by hand, and runs the restore again);
@@ -152,11 +159,24 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	// The readability check is read-only: a read-write open of a file that cannot be read makes
 	// SQLite delete the -wal beside it on close, so an unreadable file is never opened that way.
 	raw := false
+	// rawProbed says the read-only probe of the lock bytes ran and found no holder. It stays false
+	// when the probe could not tell, and the prompt then keeps the plain warning.
+	rawProbed := false
 	if exists {
 		err = checkReadable(ctx, o.DB)
 		switch {
 		case errors.Is(err, store.ErrNotDatabase):
 			raw = true
+			// No connection can be opened to ask a file that is not a database, so its lock bytes are
+			// read instead: no change to the file, no lock taken. A holder refuses here, before anything
+			// moves.
+			held, perr := probeRaw(o.DB)
+			switch {
+			case held:
+				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+			case perr == nil:
+				rawProbed = true
+			}
 		case err != nil:
 			return checkFailure(o.DB, err)
 		default:
@@ -182,8 +202,14 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		fmt.Fprintf(o.Out, "The database there now is moved to %s, after its -wal is folded into it, with any -shm beside it. Nothing is deleted.\n", pre)
 		if raw {
 			fmt.Fprintf(o.Out, "%s is not a readable SQLite database: its files are moved as they are, with no checkpoint.\n", o.DB)
-			// A file that cannot be read cannot be locked, so a server holding it is not seen.
-			fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
+			if rawProbed {
+				// The probe cannot see an idle connection in rollback-journal mode, which holds no lock,
+				// so the operator is still told to stop the server.
+				fmt.Fprintf(o.Out, "A read-only probe found no lock on %s. The probe cannot see every holder. Stop cairn serve before you type the path if it runs against this file.\n", o.DB)
+			} else {
+				// The probe could not tell, so a server holding the file is not seen.
+				fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
+			}
 		}
 	} else {
 		fmt.Fprintf(o.Out, "No database is at %s now. This creates it from the backup %s.\n", o.DB, o.Backup)
@@ -203,6 +229,19 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 	all := presentSuffixes(o.DB, dbSet)
 	if err := checkFree(pre, all); err != nil {
 		return fmt.Errorf("%w; %s", err, unchanged(lock != nil))
+	}
+	// A raw file holds no lock through the prompt, so a server may have started on it while the path
+	// was typed. Its lock bytes are probed again here, the last point before the first move. A holder
+	// refuses. So does a probe that cannot tell now when it could before the prompt, because the
+	// prompt said no lock was found.
+	if raw {
+		held, perr := probeRaw(o.DB)
+		switch {
+		case held:
+			return fmt.Errorf("the database %s is in use: a holder started on it after the check before the prompt. Stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+		case perr != nil && rawProbed:
+			return fmt.Errorf("the lock on %s could not be checked again before the move: %w; nothing was changed", o.DB, perr)
+		}
 	}
 	if lock != nil {
 		if err := lock.Consolidate(ctx); err != nil {
