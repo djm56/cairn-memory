@@ -1,6 +1,6 @@
 # How we work
 
-_Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-11-06: M5 (Plugin) is current. The exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4 (hooks and CLI) passed its /compact hand check by operator ruling, recorded 2026-11-06; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) have not been run, and #206 is open. Phases 0 to 2 are done. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
 ## The path of a change
 
@@ -43,7 +43,7 @@ The labels are defined in [labels.json](https://github.com/djm56/cairn-memory/bl
 
 - Each milestone (M1 to M8, and Later) is a GitHub milestone.
 - A milestone's epic, a `type:epic` issue, holds its work, its exit check and a list of its child issues.
-- M4, M7 and M8 have no epic yet. Their work is in [roadmap.json](https://github.com/djm56/cairn-memory/blob/main/.github/roadmap.json) as task issues, and the epics are still to be added.
+- M4, M7 and M8 have no epic yet, as of 2026-11-06. Their work is in [roadmap.json](https://github.com/djm56/cairn-memory/blob/main/.github/roadmap.json) as task issues, and the epics are still to be added.
 - Each piece of work is a `type:task` issue. The roadmap task form asks for the milestone, the area, what to build and an acceptance check a reviewer can run.
 
 Roadmap issues are created from [roadmap.json](https://github.com/djm56/cairn-memory/blob/main/.github/roadmap.json).
@@ -66,7 +66,7 @@ Issues opened from the forms are not read or changed by the bootstrap script. Th
 - **Changelog.** Every pull request adds an entry to [CHANGELOG.md](https://github.com/djm56/cairn-memory/blob/main/CHANGELOG.md) under Unreleased, unless it carries the `skip-changelog` label.
 - **Contract changes.** DESIGN.md, CONTRACT.md, `internal/core` and `internal/conformance` change together, in one pull request. The rule is in [CLAUDE.md](https://github.com/djm56/cairn-memory/blob/main/CLAUDE.md) and in the [pull request template](https://github.com/djm56/cairn-memory/blob/main/.github/pull_request_template.md). A change that departs from DESIGN.md or PLAN.md updates them in the same pull request, with the date and the reason ([CONTRIBUTING.md](https://github.com/djm56/cairn-memory/blob/main/CONTRIBUTING.md#changes-to-the-design)).
 - **Decisions.** A decision that departs from [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions) is raised with the operator first.
-- **Wiki.** A pull request that changes user-facing behaviour updates the wiki page. Edit the wiki in `wiki/` by pull request. The pages are published to the GitHub wiki when a change lands on `main` ([wiki.yml](https://github.com/djm56/cairn-memory/blob/main/.github/workflows/wiki.yml)). The publish makes the wiki match `wiki/` exactly. A page edited directly on the GitHub wiki is overwritten, and a page that is not in `wiki/` is deleted ([publish-wiki.sh](https://github.com/djm56/cairn-memory/blob/main/scripts/github/publish-wiki.sh)).
+- **Wiki.** A pull request that changes user-facing behaviour updates the wiki page. Edit the wiki in `wiki/` by pull request. The pages are published to the GitHub wiki when a change lands on `main` ([wiki.yml](https://github.com/djm56/cairn-memory/blob/main/.github/workflows/wiki.yml)). A new page needs no list elsewhere: the publish copies the whole folder, so add a link to the new page in [_Sidebar.md](https://github.com/djm56/cairn-memory/blob/main/wiki/_Sidebar.md) and that is all. The publish makes the wiki match `wiki/` exactly. A page edited directly on the GitHub wiki is overwritten, and a page that is not in `wiki/` is deleted ([publish-wiki.sh](https://github.com/djm56/cairn-memory/blob/main/scripts/github/publish-wiki.sh)).
 
 ## Bootstrap script
 
