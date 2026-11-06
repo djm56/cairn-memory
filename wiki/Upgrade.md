@@ -173,6 +173,7 @@ cd cairn-memory
 git pull
 make build
 if [ -f ~/.local/bin/cairn ]; then cp -p ~/.local/bin/cairn ~/.local/bin/cairn.prev-$STAMP; fi
+mkdir -p ~/.local/bin
 install -m 0755 bin/cairn ~/.local/bin/cairn
 cairn version
 cd ~/my-project   # your project folder, the one with .cairn.toml
