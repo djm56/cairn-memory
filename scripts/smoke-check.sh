@@ -1,19 +1,26 @@
 #!/usr/bin/env bash
-# smoke-check.sh — a read-only operator check of a Cairn install (CONTRIBUTING.md).
+# smoke-check.sh — an operator check of a Cairn install (CONTRIBUTING.md).
 #
 # Local checks: the cairn binary is found and prints its version, and cairn doctor runs
 # when the binary lists it. Server checks, when --server is given: GET /healthz answers;
 # an unauthenticated call to the agent API is refused; an authenticated call is accepted;
 # and cairn mcp starts and answers initialize and tools/list.
 #
-# Read-only by design. It writes no file, creates no project, and changes no task, step,
-# event, learning or directive. It sends the API key only in an Authorization header, read
-# from CAIRN_API_KEY, never a flag, so the key stays out of the shell history and the process
-# list. Two calls can still write one thing each, and the operator should know it:
-#   - the authenticated call sets last_used_at on the key, which the server does for every
-#     call that uses a key (at most once a minute per key);
-#   - cairn doctor, when a key is set, makes the same call as its reach check.
-# A run without CAIRN_API_KEY makes neither.
+# What it changes: no task or project data. It writes no file and creates no project. An
+# authenticated call that the server accepts sets last_used_at on that key, at most once a
+# minute per key. That is the one write this script can cause.
+#
+# cairn doctor makes that same authenticated call as its reach check whenever it finds a
+# key, and it finds one in CAIRN_API_KEY or in ~/.config/cairn/client.env. So a run without
+# CAIRN_API_KEY set can still make the call, when client.env holds a key. The script's own
+# key and mcp checks read CAIRN_API_KEY only, so they then report SKIP.
+#
+# cairn doctor needs a project directory: a .cairn.toml above the working directory, or
+# CAIRN_PROJECT set. Run outside one, its project check FAILs, so the doctor line is FAIL.
+# --help says how to read that.
+#
+# The script sends its key only in an Authorization header, read from CAIRN_API_KEY, never
+# a flag, so the key stays out of the shell history and the process list.
 #
 # Usage:
 #   CAIRN_API_KEY=cairn_... scripts/smoke-check.sh [--bin PATH] [--server URL]
@@ -32,10 +39,11 @@ Usage: scripts/smoke-check.sh [--bin PATH] [--server URL]
   --server URL   The server's base URL, http:// or https://. Enables the server checks:
                    healthz   GET /healthz answers 200 with status ok.
                    refused   POST /v1/agent/task_current with no key is refused, 401.
-                   key       POST /v1/agent/task_current with CAIRN_API_KEY is accepted.
-                             The call names no project, so the server refuses it before it
-                             reads anything, with kind invalid. That answer shows the key was
-                             accepted. A key is needed; without one the check is skipped.
+                   key       POST /v1/agent/task_current with CAIRN_API_KEY is accepted: the
+                             server answers 400 with kind invalid. The call names no project,
+                             so the server refuses it before it reads anything. That answer
+                             shows the key was accepted. A key is needed; without one the
+                             check is skipped.
                    mcp       cairn mcp starts and answers initialize and tools/list. It needs
                              CAIRN_API_KEY, since cairn mcp will not start without a key.
   --help         Show this help.
@@ -43,8 +51,18 @@ Usage: scripts/smoke-check.sh [--bin PATH] [--server URL]
 Local checks, always run: binary (the file is found), version (it prints "cairn ..."), and
 doctor (cairn doctor, when cairn help lists it; exit 0 is PASS, and a failing line is printed).
 
+doctor needs a project directory. It finds the project from CAIRN_PROJECT, or from the
+nearest .cairn.toml, searched upward from CLAUDE_PROJECT_DIR when that is set and otherwise
+from the working directory. Run the script from inside the project. Outside one, doctor's
+project check FAILs and doctor exits 1, so the doctor line is FAIL even when the binary,
+server and key are sound. The detail names the failing line; a project line there is about
+where the script ran, not about the install. A broken .cairn.toml fails the same way.
+
 Environment:
-  CAIRN_API_KEY  The API key. Read from the environment only.
+  CAIRN_API_KEY  The API key. The script's key and mcp checks read it from the environment
+                 only. cairn doctor and cairn mcp also read ~/.config/cairn/client.env when
+                 CAIRN_API_KEY is not set. So doctor may make its reach call, and cairn mcp
+                 may start, with a key these two checks do not see; they then report SKIP.
 
 The API key is never printed. The output is one PASS, FAIL or SKIP line per check, then a
 summary line.
@@ -75,7 +93,8 @@ while [ "$#" -gt 0 ]; do
       SERVER="$2"
       shift 2
       ;;
-    --key)
+    --key|--key=*)
+      # Both forms are refused by name. The argument itself is never echoed, since it may be a key.
       usage_error "the key is not a flag: set CAIRN_API_KEY in the environment"
       ;;
     --help|-h)
@@ -83,7 +102,8 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     *)
-      usage_error "unknown argument: $1"
+      # No value is printed here: an unknown argument may be a mistyped key.
+      usage_error "unknown argument"
       ;;
   esac
 done
@@ -213,10 +233,10 @@ else
           report FAIL key "no answer from the server"
         elif [ "$code" = "401" ] || [ "$code" = "403" ]; then
           report FAIL key "the server refused the key ($code ${kind:-no kind}): check CAIRN_API_KEY, and whether the key was revoked"
-        elif [ "$kind" = "invalid" ]; then
-          report PASS key "the key was accepted: the call named no project, so the server refused it before any read (kind invalid)"
+        elif [ "$code" = "400" ] && [ "$kind" = "invalid" ]; then
+          report PASS key "the key was accepted: the call named no project, so the server refused it before any read (400, kind invalid)"
         else
-          report FAIL key "POST /v1/agent/task_current with the key answered $code (kind ${kind:-none}), not kind invalid"
+          report FAIL key "POST /v1/agent/task_current with the key answered $code (kind ${kind:-none}), not 400 with kind invalid"
         fi
       fi
     fi

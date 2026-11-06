@@ -5,6 +5,7 @@
 package smokecheck
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -286,5 +287,139 @@ func TestSmokeCheckHelpNamesTheReadsAndTheKey(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("--help does not mention %q\n%s", want, out)
 		}
+	}
+}
+
+// TestSmokeCheckHelpSaysWhereDoctorAndTheKeyComeFrom checks W2, W3 and W4: the help says doctor needs
+// a project directory and what a doctor FAIL outside one means, says that doctor and mcp also read
+// client.env while the script's own checks do not, and no longer calls the script read-only.
+func TestSmokeCheckHelpSaysWhereDoctorAndTheKeyComeFrom(t *testing.T) {
+	out, code := runScript(t, nil, "--help")
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0\n%s", code, out)
+	}
+	for _, want := range []string{"doctor needs a project directory", ".cairn.toml", "doctor exits 1", "~/.config/cairn/client.env", "400"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--help does not mention %q\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "read-only") {
+		t.Errorf("--help still calls the script read-only\n%s", out)
+	}
+}
+
+// TestSmokeCheckHeaderDoesNotCallItselfReadOnly checks W2 against the file itself: the header, which
+// is the part before the first line of code, makes no read-only claim.
+func TestSmokeCheckHeaderDoesNotCallItselfReadOnly(t *testing.T) {
+	src, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, _, _ := strings.Cut(string(src), "set -euo pipefail")
+	if strings.Contains(strings.ToLower(header), "read-only") {
+		t.Errorf("the script header still calls the script read-only\n%s", header)
+	}
+}
+
+// TestSmokeCheckNeverEchoesAKeyGivenAsAnArgument checks W1: a key passed in the equals form, in an
+// unknown flag, or as a bare argument is refused with exit 2, and the value reaches neither stdout
+// nor stderr. The streams are read separately, so a leak to either one is caught.
+func TestSmokeCheckNeverEchoesAKeyGivenAsAnArgument(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash is not on PATH, so the smoke check cannot run")
+	}
+	cases := map[string][]string{
+		"the key in the equals form": {"--key=" + testKey},
+		"the key in an unknown flag": {"--keyx=" + testKey},
+		"the key as a bare argument": {testKey},
+	}
+	for name, args := range cases {
+		t.Run(name, func(t *testing.T) {
+			cmd := exec.Command(bash, append([]string{scriptPath}, args...)...)
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			runErr := cmd.Run()
+			var exitErr *exec.ExitError
+			if !errors.As(runErr, &exitErr) || exitErr.ExitCode() != 2 {
+				t.Fatalf("run = %v, want exit 2\nstdout: %s\nstderr: %s", runErr, stdout.String(), stderr.String())
+			}
+			if strings.Contains(stdout.String(), testKey) {
+				t.Errorf("stdout prints the key\n%s", stdout.String())
+			}
+			if strings.Contains(stderr.String(), testKey) {
+				t.Errorf("stderr prints the key\n%s", stderr.String())
+			}
+		})
+	}
+}
+
+// TestSmokeCheckKeyNeedsA400 checks S1: a key answer of kind invalid is not enough by itself. A
+// server that answers 200 with kind invalid fails the key check.
+func TestSmokeCheckKeyNeedsA400(t *testing.T) {
+	bin, _, _ := setup(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("Authorization") != "" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"error":{"kind":"invalid","message":"no project"}}`)
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, `{"error":{"kind":"unauthenticated","message":"the request needs a valid API key"}}`)
+	}))
+	t.Cleanup(srv.Close)
+	out, code := runScript(t, []string{"CAIRN_API_KEY=" + testKey}, "--bin", bin, "--server", srv.URL)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1\n%s", code, out)
+	}
+	if !hasStatus(out, "FAIL", "key") {
+		t.Errorf("a 200 with kind invalid passed the key check; want FAIL\n%s", out)
+	}
+	if hasStatus(out, "PASS", "key") {
+		t.Errorf("the key check passed without a 400\n%s", out)
+	}
+}
+
+// doctorFailStub is a cairn binary whose doctor fails its project check, as it does when run outside
+// a project directory. Its reach and key lines are absent, so the only failing line is the project one.
+const doctorFailStub = `#!/usr/bin/env bash
+case "$1" in
+  version) echo "cairn test" ;;
+  help) printf 'Commands:\n  doctor     Check the project file\n' ;;
+  doctor)
+    printf 'binary   ok    cairn test\nproject  fail  no .cairn.toml found above the working directory\n'
+    exit 1
+    ;;
+  *) echo "unexpected: $*" >&2; exit 2 ;;
+esac
+`
+
+// TestSmokeCheckDoctorFailOutsideAProjectIsFail checks W3, the choice made: a doctor that fails its
+// project check outside a project directory makes the script's doctor line FAIL, with the failing
+// project line in the detail. It is not SKIP, because the script cannot tell a missing project from a
+// broken .cairn.toml, and a SKIP would hide the second.
+func TestSmokeCheckDoctorFailOutsideAProjectIsFail(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is not on PATH, so the smoke check cannot run")
+	}
+	bin := filepath.Join(t.TempDir(), "cairn")
+	if err := os.WriteFile(bin, []byte(doctorFailStub), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	out, code := runScript(t, nil, "--bin", bin)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1\n%s", code, out)
+	}
+	if !hasStatus(out, "FAIL", "doctor") {
+		t.Errorf("no FAIL line for doctor\n%s", out)
+	}
+	if hasStatus(out, "SKIP", "doctor") {
+		t.Errorf("doctor was SKIPped; a project FAIL must stay FAIL\n%s", out)
+	}
+	if !strings.Contains(out, "no .cairn.toml found above the working directory") {
+		t.Errorf("the doctor FAIL does not name the failing project line\n%s", out)
 	}
 }
