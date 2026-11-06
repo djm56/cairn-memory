@@ -5,11 +5,31 @@ APP=cairn
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt fmt-check cross scan-invisible scan-local-paths run mutation
+.PHONY: build build-linux push test vet fmt fmt-check cross scan-invisible scan-local-paths run mutation
 
 build:
 	mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/$(APP) ./cmd/cairn
+
+# A Linux binary for a server, built on any machine. The SQLite driver is pure
+# Go, so no C toolchain is needed. LINUX_ARCH is amd64 when the server's
+# uname -m prints x86_64, and arm64 when it prints aarch64.
+LINUX_ARCH ?= amd64
+
+build-linux:
+	mkdir -p bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(LINUX_ARCH) go build -ldflags "$(LDFLAGS)" -o bin/$(APP)-linux ./cmd/cairn
+
+# Builds bin/cairn-linux, copies it to the home directory on SERVER, and runs
+# its version there. It installs nothing: DEPLOY.md, Upgrade, does that.
+# make push SERVER=user@host [SSH_PORT=4422]
+SSH_PORT ?= 22
+
+push:
+	@test -n "$(SERVER)" || { echo "Set SERVER, as in: make push SERVER=user@host"; exit 1; }
+	$(MAKE) build-linux
+	scp -P $(SSH_PORT) bin/$(APP)-linux $(SERVER):$(APP)-linux
+	ssh -p $(SSH_PORT) $(SERVER) ./$(APP)-linux version
 
 test:
 	go test -race ./...

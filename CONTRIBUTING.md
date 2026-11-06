@@ -9,6 +9,7 @@ Go 1.26 or later. No C toolchain: SQLite is `modernc.org/sqlite`.
 
 ```bash
 make build       # bin/cairn, version from git describe
+make build-linux # bin/cairn-linux for a Linux server (LINUX_ARCH=amd64|arm64)
 make test        # go test -race ./...
 make vet         # go vet ./...
 make fmt         # gofmt -w .

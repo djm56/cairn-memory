@@ -55,20 +55,20 @@ cannot read the new schema. The backup in this step is **the rollback point**. S
 cannot run without it. The server is stopped before the copy is taken, so nothing writes
 between the copy and the upgrade. Do not start step 3 until 2.5 has shown the file.
 
-- [ ] **2.1 Make the backups directory, if it does not exist.** It is owner-only and
+- [x] **2.1 Make the backups directory, if it does not exist.** It is owner-only and
   owned by the service user, as [DEPLOY.md, "Backup"](DEPLOY.md#backup) sets it:
 
   ```bash
   sudo install -d -m 0700 -o cairn -g cairn /var/backups/cairn
   ```
 
-- [ ] **2.2 Stop the server.** It stays stopped until step 3.2 starts it.
+- [x] **2.2 Stop the server.** It stays stopped until step 3.2 starts it.
 
   ```bash
   sudo systemctl stop cairn
   ```
 
-- [ ] **2.3 Back up the database while the server is stopped.** `cairn backup` makes a
+- [x] **2.3 Back up the database while the server is stopped.** `cairn backup` makes a
   consistent copy, and refuses to overwrite a file. It opens the database file without
   migrating it, so it works on a stopped server. The command is the one DEPLOY.md gives:
 
@@ -76,14 +76,14 @@ between the copy and the upgrade. Do not start step 3 until 2.5 has shown the fi
   sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/pre-m3-ui-$(date -u +%Y%m%dT%H%M%SZ).db"
   ```
 
-- [ ] **2.4 Confirm the file exists.** It must be non-empty, owned by `cairn`, and
+- [x] **2.4 Confirm the file exists.** It must be non-empty, owned by `cairn`, and
   mode `-rw-------`:
 
   ```bash
   sudo ls -l /var/backups/cairn/
   ```
 
-- [ ] **2.5 This file is the rollback point.** Write its name down; step 12 names it.
+- [x] **2.5 This file is the rollback point.** Write its name down; step 12 names it.
   Keep it until the upgraded server has run cleanly and the check is finished.
 
 ## 3. Upgrade
@@ -96,23 +96,23 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 - **Route A, build on the server.** Needs Go 1.26 and a checkout of `main` on the
   server. From the checkout: `make build`, which writes `bin/cairn`.
 - **Route B, build on the Mac for the server's CPU.** Needs Go 1.26 and a checkout of
-  `main` on the Mac. On the server, `uname -m` prints `x86_64` (use `amd64`) or
-  `aarch64` (use `arm64`). On the Mac, from the checkout, run only the line for that CPU:
+  `main` on the Mac. On the server, `uname -m` prints `x86_64` (use `amd64`, the
+  default) or `aarch64` (use `arm64`). On the Mac, from the checkout:
 
   ```bash
-  GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=$(git describe --tags --always --dirty)" -o cairn-linux ./cmd/cairn
-  GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=$(git describe --tags --always --dirty)" -o cairn-linux ./cmd/cairn
+  make push SERVER=<user>@<server>                    # x86_64 server
+  make push SERVER=<user>@<server> LINUX_ARCH=arm64   # aarch64 server
   ```
 
-  Copy `cairn-linux` to the server with `scp`, in this shape:
+  `make push` runs `make build-linux`, which writes `bin/cairn-linux` with the version
+  stamp. It copies that file to `~/cairn-linux` on the server and runs its `version`
+  there. It installs nothing. When SSH listens on another port, add `SSH_PORT=<port>`.
+  To build without copying, run `make build-linux`, and
+  copy `bin/cairn-linux` yourself.
 
-  ```bash
-  scp cairn-linux <user>@<server>:<remote-dir>/cairn-linux
-  ```
+  Then install it there in 3.2, from `~/cairn-linux`.
 
-  Then install it there in 3.2, from the path you copied it to.
-
-- [ ] **3.1 Keep the old binary, on the server and off it.** DEPLOY.md keeps one copy,
+- [x] **3.1 Keep the old binary, on the server and off it.** DEPLOY.md keeps one copy,
   `cairn.prev`. Look at what is there first, without copying anything yet:
 
   ```bash
@@ -137,7 +137,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   Also copy the current `/usr/local/bin/cairn` to the Mac, with `scp`. Step 12 needs
   it if the server's copy is lost.
 
-- [ ] **3.2 Install the new binary, and start.** The server is still stopped from 2.2.
+- [x] **3.2 Install the new binary, and start.** The server is still stopped from 2.2.
   Use the file from route A or B:
 
   ```bash
@@ -148,7 +148,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   Route B: replace `bin/cairn` with the path where you put the copy, such as
   `~/cairn-linux`.
 
-- [ ] **3.3 Check that the unit runs with `--behind-proxy`.** The shipped unit does not
+- [x] **3.3 Check that the unit runs with `--behind-proxy`.** The shipped unit does not
   pass it: [`docs/deploy/cairn.service:18`](deploy/cairn.service) ends its `ExecStart`
   line at `--addr 127.0.0.1:8788`. Read the line systemd actually runs:
 
@@ -185,7 +185,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   With the flag, the server expects `https://` and sets the cookie as
   `__Secure-cairn_ui`. Do not open the UI until 3.4 passes.
 
-- [ ] **3.4 Check the journal and the service.** Expect a `msg=listening` line, with
+- [x] **3.4 Check the journal and the service.** Expect a `msg=listening` line, with
   `behind_proxy=true` and `tls=false`, and no `level=ERROR`. If the listening line shows
   `behind_proxy=false`, the drop-in did not take: go back to 3.3.
 
@@ -202,7 +202,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   The upgrade is confirmed by three things together: `is-active` prints `active`, the
   listening line is as above, and the UI page loads at step 5.1.
 
-- [ ] **3.5 Check the version.**
+- [x] **3.5 Check the version.**
 
   ```bash
   /usr/local/bin/cairn version
@@ -213,7 +213,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 
 ## 4. Keys
 
-- [ ] **4.1 Reuse `<operator-key>`.** It is the operator key. Check that it, and the
+- [x] **4.1 Reuse `<operator-key>`.** It is the operator key. Check that it, and the
   Mac's `<agent-key>`, are listed and not revoked:
 
   ```bash
@@ -223,7 +223,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   The list shows names, scopes and times. It never shows a key. If `<operator-key>` is
   missing or revoked, stop: step 5 cannot sign in.
 
-- [ ] **4.2 Make a viewer key.** Choose its name, and put it in place of `<viewer-key>`.
+- [x] **4.2 Make a viewer key.** Choose its name, and put it in place of `<viewer-key>`.
   The key prints once, on stdout:
 
   ```bash
@@ -232,16 +232,16 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 
   Save the printed key in the password manager now.
 
-- [ ] **4.3 Handle keys with care.** Keys live in the password manager. Never paste a
+- [x] **4.3 Handle keys with care.** Keys live in the password manager. Never paste a
   key into a chat, a file, a ticket or a command line. Anything that prints a key is
   left out of what you paste back.
 
 ## 5. Sign in as operator
 
-- [ ] **5.1 Open the UI.** In a browser, open `https://cairn.example.net/ui/`. Without a
+- [x] **5.1 Open the UI.** In a browser, open `https://cairn.example.net/ui/`. Without a
   session you are sent to `/ui/signin`. The page has the heading "Sign in", a field
   labelled "API key", and a "Sign in" button.
-- [ ] **5.2 Sign in.** Paste the `<operator-key>` key into the field and press "Sign in".
+- [x] **5.2 Sign in.** Paste the `<operator-key>` key into the field and press "Sign in".
 
   **If sign-in fails, read the message on the page first.** A wrong key and a refused
   form look different:
@@ -259,7 +259,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
     in step 3.3, check the `ExecStart` line, and sign in again only after 3.3 passes. If
     the journal gives a different `form refused` reason, stop and paste that line.
 
-- [ ] **5.3 Expect the dashboard.** The page heading is "Dashboard". The top bar shows
+- [x] **5.3 Expect the dashboard.** The page heading is "Dashboard". The top bar shows
   the key's name and role, as `<operator-key> (operator)`, followed by "Sign out". The UI
   prints no "Signed in as" text; the name and role in the top bar are the sign-in
   confirmation. Note what you actually see, and say so if it differs.
@@ -269,7 +269,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 Use the browser's developer tools. In Chrome, these are the Network and Application
 tabs. In Firefox, they are the Network and Storage tabs.
 
-- [ ] **6.1 Check the response headers.** Reload `/ui/`. In the Network tab, select the
+- [x] **6.1 Check the response headers.** Reload `/ui/`. In the Network tab, select the
   document request for `/ui/`, and read its response headers:
 
   | Header | Expected | Yes or no |
@@ -283,7 +283,7 @@ tabs. In Firefox, they are the Network and Storage tabs.
   The fifth row is an absence check. DEPLOY.md and DESIGN.md §5.5 say HSTS is not sent
   behind a proxy, so the header should not appear. If it does appear, record it.
 
-- [ ] **6.2 Check the cookie.** In the Application (or Storage) tab, open Cookies, then
+- [x] **6.2 Check the cookie.** In the Application (or Storage) tab, open Cookies, then
   the site's name. Find the session cookie, and read its attributes:
 
   | Attribute | Expected | Yes or no |
@@ -300,7 +300,7 @@ tabs. In Firefox, they are the Network and Storage tabs.
   is in place, sign out and sign in again: the old cookie has the old name. Record the
   first result in step 13.
 
-- [ ] **6.3 What to report, and what never to report.** Report the two tables, with
+- [x] **6.3 What to report, and what never to report.** Report the two tables, with
   yes or no in each row. Never paste the cookie's value, and never send a screenshot
   that shows the Value column. Crop it out, or hide it first.
 
@@ -325,21 +325,21 @@ which the first agent write creates.
   If `cairn hook session-start` in 7.4 reports an unknown event, the Mac's binary
   predates M4. Rebuild it as M2-LIVE-RUN.md 2.1 says.
 
-- [ ] **7.2 Open Claude Code in `m3-ui-check`.** Approve the `cairn` server if asked,
+- [x] **7.2 Open Claude Code in `m3-ui-check`.** Approve the `cairn` server if asked,
   then run `/mcp` and check that `cairn` is connected.
 
-- [ ] **7.3 Start a task and record a proposed learning.** Paste this into the session:
+- [x] **7.3 Start a task and record a proposed learning.** Paste this into the session:
 
-  > Using the cairn MCP tools, not the shell: start a task titled "M3 UI check" with a
+  > Using the cairn MCP tools, not the shell: start a task titled "M3 UI check two" with a
   > one-line goal, using `task_start` with `agent` set to `claude-code`. Leave the task
   > open. Then record one proposed learning with `learning_add`: agent `claude-code`,
-  > kind `finding`, title "M3 UI check: a proposed learning", body "A test learning for
+  > kind `finding`, title "M3 UI check two: a proposed learning", body "A test learning for
   > the M3 hand check." Tell me the task id and the learning id.
 
   The task stays open. The hook in 7.4 and 7.8 reports directives only while a task is
   active.
 
-- [ ] **7.4 Take the baseline count, before any directive exists.** From the shell, in
+- [x] **7.4 Take the baseline count, before any directive exists.** From the shell, in
   the project directory:
 
   ```bash
@@ -355,17 +355,19 @@ which the first agent write creates.
   `cairn hook session-start: no context added:`, the hook could not read the project.
   Fix that first, and do not read it as "no task".
 
-- [ ] **7.5 See the learning in the browser.** Open
+- [x] **7.5 See the learning in the browser.** Open
   `https://cairn.example.net/ui/p/m3-ui-check/learnings`, or use the "Learnings" link
   and the project link in the top bar. The default filter shows `proposed` learnings,
   so "M3 UI check: a proposed learning" should appear in the list.
 
-- [ ] **7.6 Accept it with a note.** Open the learning. Under "Decision", choose
+- [x] **7.6 Accept it with a note.** Open the learning. Under "Decision", choose
   `accepted`. Enter a note in "Note, required". Press "Record decision". Expect a return
   to the project's learnings page. The learning leaves the default `proposed` list. To
   see it again, set the Status filter to `accepted`.
 
-- [ ] **7.7 Ratify a directive from it.** Set the Status filter to `accepted`. On the
+  I cant see this
+
+- [x] **7.7 Ratify a directive from it.** Set the Status filter to `accepted`. On the
   accepted learning, follow "Ratify as a directive". The link appears only on accepted
   learnings. The form says "From learning …". Fill it in:
 
@@ -379,7 +381,7 @@ which the first agent write creates.
   Note its code, for example `D-0001`. The learning's status is now `applied`, which
   you can see with the Status filter.
 
-- [ ] **7.8 Check the directive in a new session.** Quit Claude Code and open it again in
+- [x] **7.8 Check the directive in a new session.** Quit Claude Code and open it again in
   `m3-ui-check`.
 
   - From the shell, run `cairn hook session-start` again. Expect `Directives that apply: 1.`
@@ -392,7 +394,7 @@ which the first agent write creates.
   The hook counts only; `task_current` gives the text. This is the same check
   `TestM3ExitCheck` makes.
 
-- [ ] **7.9 Reaffirm and retire a throwaway directive.** Ratify a second directive with
+- [x] **7.9 Reaffirm and retire a throwaway directive.** Ratify a second directive with
   no learning behind it: open `/ui/directives/new`, and set Scope `project`, Project
   `m3-ui-check`, Title `M3 UI check throwaway`, Rule `Throwaway for the M3 hand check.
   Retire it.` Press "Ratify".
@@ -412,10 +414,10 @@ which the first agent write creates.
 
 ## 8. Viewer refusal
 
-- [ ] **8.1 Sign out.** Press "Sign out" in the top bar. Expect the sign-in page.
-- [ ] **8.2 Sign in with the viewer key.** Paste `<viewer-key>`. Expect the dashboard, with
+- [x] **8.1 Sign out.** Press "Sign out" in the top bar. Expect the sign-in page.
+- [x] **8.2 Sign in with the viewer key.** Paste `<viewer-key>`. Expect the dashboard, with
   `<viewer-key> (viewer)` in the top bar.
-- [ ] **8.3 Visit every page, and look for forms.** Open each of these, and confirm that
+- [x] **8.3 Visit every page, and look for forms.** Open each of these, and confirm that
   none of them shows an action:
 
   - `/ui/`
@@ -431,13 +433,13 @@ which the first agent write creates.
   no settings form. To check it rather than trust the eye, open the page source
   (View Source, or Cmd-Option-U or Ctrl-U) and search for `<form`. Expect no match. The
   "Sign out" link is a link, not a form.
-- [ ] **8.4 Refusal of the ratify form.** Open `/ui/directives/new`. Expect HTTP 403, and
+- [x] **8.4 Refusal of the ratify form.** Open `/ui/directives/new`. Expect HTTP 403, and
   the text "This key is read-only." Read the status in the Network tab.
 
 ## 9. Agent key refused at sign-in
 
-- [ ] **9.1 Sign out** of the viewer session. Expect the sign-in page.
-- [ ] **9.2 Paste the agent key.** Paste `<agent-key>` from the password manager into the
+- [x] **9.1 Sign out** of the viewer session. Expect the sign-in page.
+- [x] **9.2 Paste the agent key.** Paste `<agent-key>` from the password manager into the
   "API key" field, and press "Sign in".
 
   If `<agent-key>` is not in the password manager, do not look for it elsewhere. Either
@@ -451,17 +453,17 @@ which the first agent write creates.
 
   Save the printed key in the password manager, then paste it here. It prints once.
 
-- [ ] **9.3 Expect a refusal.** The sign-in page comes back, with HTTP 401 in the Network
+- [x] **9.3 Expect a refusal.** The sign-in page comes back, with HTTP 401 in the Network
   tab, and the message "This is an agent key. The web UI signs in operator and viewer
   keys." The key field is empty. The key must not appear anywhere on the page. If it
   does, that is a finding: stop, and do not paste the page.
 
 ## 10. Sign out
 
-- [ ] **10.1 Sign in, then sign out.** Sign in with the operator or the viewer key. Press
+- [x] **10.1 Sign in, then sign out.** Sign in with the operator or the viewer key. Press
   "Sign out". Expect the sign-in page. In the Network tab, the sign-out response clears
   the cookie with `Max-Age=0`.
-- [ ] **10.2 Check that the UI redirects.** Open `/ui/` directly. Expect a redirect to
+- [x] **10.2 Check that the UI redirects.** Open `/ui/` directly. Expect a redirect to
   `/ui/signin`.
 
 ## 11. Cleanup
@@ -470,7 +472,7 @@ Nothing here is deleted. Directives are retired, never removed, and a learning i
 removed from the list. Each step is the operator's choice; a step left out is recorded
 in step 13.
 
-- [ ] **11.1 Sign in with `<operator-key>`, and retire the test directive,** `M3 UI check
+- [x] **11.1 Sign in with `<operator-key>`, and retire the test directive,** `M3 UI check
   directive`, from the directives page, with "Confirm" ticked. Retiring is final. Skip
   this step if the operator wants to keep it. Sign in first: step 10 ended signed out,
   and the directives page needs an operator session.
@@ -482,20 +484,20 @@ in step 13.
 
   A revoked key stops working at its next call. Its name is not reused.
 
-- [ ] **11.3 Revoke the temporary agent key,** only if step 9.2 made one:
+- [x] **11.3 Revoke the temporary agent key,** only if step 9.2 made one:
 
   ```bash
   sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name <temp-agent-key>
   ```
 
-- [ ] **11.4 Leave the test learning.** It stays as history, with the status `applied`.
+- [x] **11.4 Leave the test learning.** It stays as history, with the status `applied`.
   Nothing in the UI removes a learning.
-- [ ] **11.5 Close the test task on the Mac.** Ask Claude Code to call `task_close` with
+- [x] **11.5 Close the test task on the Mac.** Ask Claude Code to call `task_close` with
   outcome done and a one-line summary. If the close is refused, the reply lists what is
   missing. Supply it, then close again.
-- [ ] **11.6 Remove the Mac's `.mcp.json`** from `m3-ui-check` if the machine is not kept
+- [x] **11.6 Remove the Mac's `.mcp.json`** from `m3-ui-check` if the machine is not kept
   for further runs.
-- [ ] **11.7 Keep the step 2 backup** until the upgraded server has run cleanly. Deleting
+- [x] **11.7 Keep the step 2 backup** until the upgraded server has run cleanly. Deleting
   it is the operator's decision.
 
 ## 12. Rollback
@@ -511,7 +513,7 @@ order.
   sudo systemctl stop cairn
   ```
 
-- [ ] **12.2 Put back the previous binary.** Use the copy that holds the build which ran
+- [x] **12.2 Put back the previous binary.** Use the copy that holds the build which ran
   before this upgrade. That is `cairn.prev`, or `cairn.pre-m3-ui` if step 3.1 made that
   copy. If neither is on the server, use the copy kept on the Mac in step 3.1. The
   example uses `cairn.prev`:
@@ -539,7 +541,7 @@ order.
   proxy on this host, for example after a move to the SSH tunnel or to setup (a). On
   plain HTTP the flag makes the server expect `https://`, and every form is then refused.
 
-- [ ] **12.3 Restore the step 2 backup.** Run this from an interactive terminal. The
+- [x] **12.3 Restore the step 2 backup.** Run this from an interactive terminal. The
   restore asks you to type the database path to confirm.
 
   ```bash
@@ -551,7 +553,7 @@ order.
   started is in that moved-aside file, not in the restored database. Keep it until the
   restored server checks out, then delete it by hand, as DEPLOY.md says.
 
-- [ ] **12.4 Start the service, and check the journal.**
+- [x] **12.4 Start the service, and check the journal.**
 
   ```bash
   sudo systemctl start cairn
