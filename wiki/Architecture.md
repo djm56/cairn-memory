@@ -1,8 +1,8 @@
 # Architecture
 
-_Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and their exit checks passed. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
+_Status as of 2026-11-06: M5 (Plugin) is current. The exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4 (hooks and CLI) passed its /compact hand check by operator ruling, recorded 2026-11-06; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) have not been run, and #206 is open. Phases 0 to 2 are done. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-Parts that are not built yet are marked in [Getting started](Getting-Started#what-exists-and-what-is-later).
+Parts that are not built yet are marked in the [Roadmap](Roadmap), and each part's commands are in [CLI-Reference](CLI-Reference) and [MCP-Tools](MCP-Tools).
 
 This page summarises [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md). Each section links to the part of the design it comes from. DESIGN.md and PLAN.md are the contract for this repository ([CONTRIBUTING.md](https://github.com/djm56/cairn-memory/blob/main/CONTRIBUTING.md#changes-to-the-design)), so where this page and the design differ, the design is right and this page needs fixing.
 
@@ -40,7 +40,7 @@ _Design: [DESIGN.md §5.1](https://github.com/djm56/cairn-memory/blob/main/docs/
 
 ## Data model
 
-SQLite, through `modernc.org/sqlite`. Every table carries the project. Times are UTC and set by the server. Schema changes are numbered migrations that run at start-up.
+SQLite, through `modernc.org/sqlite`. Every table carries the project. Times are UTC and set by the server. Schema changes are numbered migrations. They run when the server starts, and when a key command opens the database, so an upgrade can change the schema. See [Upgrade](Upgrade).
 
 _Design: [DESIGN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#3-data-model)._
 
@@ -66,7 +66,7 @@ _Design: [DESIGN.md §6](https://github.com/djm56/cairn-memory/blob/main/docs/DE
 
 ## Security
 
-Clients open no database and listen on nothing. `cairn serve` binds to loopback by default, and it refuses any other address unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes.
+Clients open no database and listen on nothing. `cairn serve` binds to loopback by default. It refuses any other address unless the address has TLS files or sits behind a proxy (`--behind-proxy`), and unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes. The setup is in [Install-Server](Install-Server), and the rules for keys are in [Operations](Operations).
 
 _Design: [DESIGN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#8-security)._
 

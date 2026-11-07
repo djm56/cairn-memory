@@ -1,6 +1,6 @@
 # Cairn Memory — Design
 
-**Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19), M3 (the web UI exit-check test) and M4 (the /compact hand check) have passed. Phases 0 to 2 are done, and
+**Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4's exit check passed by operator ruling on 2026-11-06: the /compact hand check, section 3 of `docs/M4-HAND-CHECK.md`, was run and passed. Sections 4 and 5 of that guide (OpenCode and pi) are not run, and #206 is open. Phases 0 to 2 are done, and
 their exit checks passed. Live progress is on the
 [milestones](https://github.com/djm56/cairn-memory/milestones) and the
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).**
@@ -438,8 +438,11 @@ https://code.claude.com/docs/en/hooks.md:
 - `session-start` prints the block above. `enable` registers it with the
   matcher `startup|resume|clear|compact`, so it runs again after `/compact`. The
   reference says a SessionStart hook's plain stdout is added to Claude's context.
-  This is what carries a task across `/compact` in Claude Code. The M4 hand check
-  confirmed it on 2026-11-06: see [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
+  This is what is meant to carry a task across `/compact` in Claude Code. The M4 hand
+  check (section 3) passed on 2026-11-06 by operator ruling, not under its rule as
+  written: the agent also called `task_current` after the compact, which the hook text
+  asks for and the rule counts as not run. The conflict is tracked in #206. See
+  [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
 - `pre-compact` prints the same block. It is installed, as D15 names it, but it
   is inert in Claude Code. The reference says plain stdout is written to the debug
   log and not shown in the transcript, except for four events, and PreCompact is
@@ -572,23 +575,24 @@ nothing changed unless the step says otherwise:
    this build. The checked copy is the one put in place, so the bytes verified
    are the bytes restored. A refused copy is removed with any `-wal` or `-shm`
    beside it, after the copy is closed.
-3. If the database exists, it is first checked with a read-only open. A file that
-   cannot be read as SQLite is not opened for writing at all, and takes no lock.
-   Its SQLite lock bytes are read instead, with a read-only `F_GETLK` probe
-   (`internal/server/inuse_unix.go`), which changes nothing and takes no lock. A
-   lock held by another process refuses the restore, with nothing moved. When the
-   probe finds none, the output says it cannot see every holder: an idle connection
-   in rollback-journal mode holds no lock. Where the probe cannot run, the output
-   says the lock could not be checked. The probe runs again just before the first
-   move. It is built for Linux, macOS, FreeBSD and OpenBSD. Its tests run on Linux,
-   the CI runner, and are run by the developer on macOS, which CI does not run; FreeBSD
-   and OpenBSD are built and vetted, not run. On any other system the lock cannot be checked. The file is
-   moved as it is at step 5, and the operator confirms that `cairn serve` is
-   stopped. A readable database must not be
-   in use. An exclusive lock is taken with `locking_mode=EXCLUSIVE` and a read, and an idle
-   or busy open server holds the lock against it. `BEGIN EXCLUSIVE` alone does not
-   do this in WAL mode, where it behaves as `BEGIN IMMEDIATE` and an idle reader is
-   not blocked. The lock is held through the moves.
+3. If the database exists, it is first checked with a read-only open. A file
+   that cannot be read as SQLite is not opened for writing at all, and takes no
+   lock. Its SQLite lock bytes are read instead, with a read-only `F_GETLK`
+   probe (`internal/server/inuse_unix.go`), which changes nothing and takes no
+   lock. A lock held by another process refuses the restore, with nothing moved.
+   When the probe finds none, the output says it cannot see every holder: an
+   idle connection in rollback-journal mode holds no lock. Where the probe
+   cannot run, the output says the lock could not be checked. The probe runs
+   again just before the first move. It is built for Linux, macOS, FreeBSD and
+   OpenBSD. Its tests run on Linux, the CI runner, and are run by the developer
+   on macOS, which CI does not run; FreeBSD and OpenBSD are built and vetted,
+   not run. On any other system the lock cannot be checked. The file is moved as
+   it is at step 5, and the operator confirms that `cairn serve` is stopped. A
+   readable database must not be in use. An exclusive lock is taken with
+   `locking_mode=EXCLUSIVE` and a read, and an idle or busy open server holds
+   the lock against it. `BEGIN EXCLUSIVE` alone does not do this in WAL mode,
+   where it behaves as `BEGIN IMMEDIATE` and an idle reader is not blocked. The
+   lock is held through the moves.
 4. The operator types the database path. A prompt for an absent database says so.
 5. For a readable database, under the lock and before any move, its `-wal` is
    folded in with `PRAGMA wal_checkpoint(TRUNCATE)`, which must report no busy

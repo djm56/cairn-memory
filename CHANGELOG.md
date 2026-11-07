@@ -186,6 +186,18 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   to install the copied file by its full path, since `~` is `/root` in a root shell.
 - M4 exit check (#206): the `/compact` hand check ran on 2026-11-06 and passed by operator ruling. `docs/M4-HAND-CHECK.md` records the result, and its cleanup step 7.1 now finishes or skips the steps and passes empty lessons and mistakes, since the close policy refuses the old command. The status lines, the `cairn-milestone` marker and the wiki roadmap move to M5. DESIGN §4.1 says the run confirmed the SessionStart carry.
 - Decisions D30 and D31 (#198, #199): the CLI sends no empty step reference, and `cairn learning list` lists one project. The five conformance cases these leave deferred through the CLI are permanent, and the CLI suite's list says so. PLAN §8 and the wiki record both.
+- Docs, operator checks and the wiki, one entry for this pull request: `scripts/smoke-check.sh`,
+  a read-only check of an install (the binary, `cairn doctor`, and with `--server`, `/healthz`,
+  an authenticated call and `cairn mcp`), with its tests in `internal/smokecheck`; docs-drift
+  tests in `internal/mcp` and `cmd/cairn` that fail when the tool or verb names on the wiki differ
+  from the code, compared by name only; the wiki reorganised into install, upgrade, operate and
+  reference pages, with eleven new pages: Quick-Start, Install-Local, Install-Server, Upgrade,
+  Binaries, MCP-Tools, CLI-Reference, Checks, Operations, Troubleshooting and Connecting-Agents;
+  README, DEPLOY, CONTRIBUTING, PLAN and the M4 hand-check guide corrected to the M4 status and to
+  the checks CI runs; the upgrade sequence on the wiki and in DEPLOY creates the backup folder,
+  stops if the backup fails, and checks the backup file before it installs the new binary (the
+  old quick block could migrate a database with no backup); the decision issue form no longer
+  lists decision numbers.
 
 ### Changed
 
