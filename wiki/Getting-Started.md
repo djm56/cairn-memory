@@ -43,7 +43,7 @@ Run the checks before you push. CI runs `build`, `vet`, `fmt-check`, `test`, `cr
   - `core.Local`, the local service over SQLite (`internal/core`): all 106 pass.
   - The HTTP client (`internal/client`): all 106 pass.
   - The listener of `cairn serve`, reached over HTTP (`internal/server`): all 106 pass.
-  - The CLI (`internal/conformance/cliservice`): **98 pass and 8 are deferred**. Three of the eight are the empty step reference, which decision D30 keeps out of the CLI. Two are the learning list over all projects, which D31 keeps out of the CLI. The other three are identity fields the CLI does not send: its client name, its session, and a viewer's role. No decision number is recorded for those three; the reasons are in `internal/conformance/cliservice/suite_test.go`.
+  - The CLI (`internal/conformance/cliservice`): **98 pass and 8 are deferred**. Three of the eight are the empty step reference, which decision D30 keeps out of the CLI. Two are the learning list over all projects, which D31 keeps out of the CLI. The other three are identity fields the CLI does not send: its client name, its session, and a viewer's role, which decision D33 keeps out of the CLI; the reasons are in `internal/conformance/cliservice/suite_test.go`.
 - **`internal/store`** includes the two-process task-id test.
 - **`internal/mcp` and `cmd/cairn`** include the drift tests, which check [MCP-Tools](MCP-Tools) and [CLI-Reference](CLI-Reference) against the code.
 - **`internal/smokecheck`** runs `scripts/smoke-check.sh` against a stub binary and a stub server.

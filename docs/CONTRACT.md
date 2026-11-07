@@ -1,9 +1,10 @@
 # Cairn Memory — Contract
 
-**Status as of 2026-10-31.** Items 1–11 of §9 are operator-approved (2026-10-28,
-phase 1 exit). Item 12 is deferred by the operator. Items 13 and
-later are Bishop defaults, pending operator approval: each is marked *Bishop
-default, pending operator approval.* where it is written. None of them is
+**Status as of 2026-11-07.** Items 1–11 of §9 are operator-approved (2026-10-28,
+phase 1 exit). Item 12 is deferred by the operator. Item 39 is adopted as D32
+(operator decision, 2026-11-07). Every item from 13 on except item 39 is a Bishop
+default, pending operator approval: each is marked *Bishop default, pending
+operator approval.* where it is written. Apart from item 39, none of them is
 approved.
 `core.Local` passes all 82 cases in `internal/conformance` (count as of
 2026-10-30), and none is deferred. The Go form is `internal/core` (`Service`,
@@ -26,8 +27,9 @@ an MCP client sees. The MCP adapter (M1) maps each tool's arguments to
 one request type, and each result back, without adding rules.
 
 §9 lists what this contract settles that DESIGN.md left open. Items 1–11 are
-operator-approved (2026-10-28), item 12 is deferred, and every item from 13 on
-is a Bishop default, pending operator approval.
+operator-approved (2026-10-28), item 12 is deferred, item 39 is adopted (D32,
+2026-11-07), and every item from 13 on except item 39 is a Bishop default,
+pending operator approval.
 
 ## 1. Conventions
 
@@ -567,9 +569,10 @@ the base is not zero. The read returns the counts only.
 ## 9. Settled here, for review
 
 Each item answers a question that DESIGN.md left open. Items 1–11 are
-operator-approved (2026-10-28), and item 12 is deferred. Every item from 13 on
-is a Bishop default, pending operator approval, and is marked so; a marked item
-is not approved until the operator says it is. From item 13 on, an item is
+operator-approved (2026-10-28), item 12 is deferred, and item 39 is adopted
+(D32, 2026-11-07). Every item from 13 on except item 39 is a Bishop default,
+pending operator approval, and is marked so; a marked item is not approved
+until the operator says it is. From item 13 on, an item is
 checked by a conformance case unless it is marked `(core test only)`, where
 only a core test checks it. An item with no check of its own is marked
 `(not tested)`. No item is marked so today.
@@ -585,9 +588,9 @@ only a core test checks it. An item with no check of its own is marked
    `task_update`, and `task_close` covers only `done` and `failed`.
 5. **The brief is frozen once any step starts.** DESIGN says "before work
    starts". This is the precise form.
-6. **Agents cannot log `started`, `finished` or `close` events.** A `review`
-   is the exception, per item 39 (D32, 2026-11-07). The calls they record write
-   them, so the journal cannot claim work that the step table does not show.
+6. **Agents cannot log `started`, `finished` or `close` events.** The calls
+   they record write them, so the journal cannot claim work that the step table
+   does not show. A `review` is not barred: see item 39 (D32, 2026-11-07).
 7. **Step refs are an object.** `{"number": n}` or `{"id": n}`, never a
    bare integer, which could mean either.
 8. **`fail` and `skip` need a summary.** A failed attempt with no reason

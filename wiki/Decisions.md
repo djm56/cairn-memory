@@ -49,17 +49,21 @@ To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/iss
 
 ## Settled in the contract
 
-[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 were approved by the operator on 2026-10-28. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), which Plan v1 moves to Later. Items 13 and later are Bishop's defaults, written during phase 2, and they await the operator's approval. They are not listed here until approved. Only the titles of items 1 to 12 are listed here.
+[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 were approved by the operator on 2026-10-28. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), which Plan v1 moves to Later. Items 13 and later are Bishop's defaults, written during phase 2, and they await the operator's approval, except item 39, which the operator adopted as D32 on 2026-11-07. They are not listed here until approved. Only the titles of items 1 to 12 and of item 39 are listed here.
 
 1. Operator calls are part of `Service`
 2. The project is needed for reads too
 3. `task_start` makes the task active by default
 4. `blocked` and `abandoned` need a reason
 5. The brief is frozen once any step starts
-6. Agents cannot log `started`, `finished`, `review` or `close` events
+6. Agents cannot log `started`, `finished` or `close` events
 7. Step refs are an object
 8. `fail` and `skip` need a summary
 9. `missing` uses fixed keys
 10. Rows in another project are `not_found`
 11. Agent-scoped directives apply in every project
 12. Deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), now Later: the step-review rule in project settings
+
+Item 39 was adopted as D32 on 2026-11-07. It is listed on its own, since a list after item 12 would number it 13:
+
+39. A review is an `event_log` entry
