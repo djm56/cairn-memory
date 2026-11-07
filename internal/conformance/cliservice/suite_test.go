@@ -21,9 +21,12 @@ type deferral struct {
 // cannot give, and each match is the text the adapter's failure for that gap carries, so a failure for any
 // other reason fails the run.
 //
+// The three identity cases are permanent by operator decision (PLAN §8, D33; issue #220): the CLI carries no
+// viewer role, client name or session, so it cannot send what they check.
 // The three empty step reference cases and the two all_projects cases are permanent by operator decision
 // (PLAN §8, D30 and D31; issues #198 and #199): the CLI will not add a flag for them.
 var deferrals = []deferral{
+	// Permanent: D33 (#220) for this case and the next two.
 	{
 		name:   "identity/viewer_first_read_is_not_found",
 		reason: "a viewer's read: the CLI calls as an agent only and cannot carry the viewer role",
