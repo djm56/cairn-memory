@@ -585,9 +585,9 @@ only a core test checks it. An item with no check of its own is marked
    `task_update`, and `task_close` covers only `done` and `failed`.
 5. **The brief is frozen once any step starts.** DESIGN says "before work
    starts". This is the precise form.
-6. **Agents cannot log `started`, `finished`, `review` or `close` events.**
-   The calls they record write them, so the journal cannot claim work that
-   the step table does not show.
+6. **Agents cannot log `started`, `finished` or `close` events.** A `review`
+   is the exception, per item 39 (D32, 2026-11-07). The calls they record write
+   them, so the journal cannot claim work that the step table does not show.
 7. **Step refs are an object.** `{"number": n}` or `{"id": n}`, never a
    bare integer, which could mean either.
 8. **`fail` and `skip` need a summary.** A failed attempt with no reason
@@ -723,11 +723,11 @@ only a core test checks it. An item with no check of its own is marked
     "warnings": n}`, each count 0 or more (§4). A missing or malformed field, a
     verdict outside the two values, or a negative count is `invalid`, and the
     message names the fix. The step is optional and may be in any status
-    (item 33). The reviewer is the calling agent. This amends item 6 for
-    `review` only: `review_record` is cut from v1 (§4), so the review event is
-    the only record of a review. A review event recorded before M1 has no
-    `data`, since it was written by `review_record`. A reader of review events
-    must tolerate one with no data. *Bishop default, pending operator approval.*
+    (item 33). The reviewer is the calling agent. Item 6 was amended to match
+    (D32). `review_record` is cut from v1 (§4), so the review event is the only
+    record of a review. A review event recorded before M1 has no `data`, since
+    it was written by `review_record`. A reader of review events must tolerate
+    one with no data. *Adopted: operator decision, 2026-11-07 (D32, issue #219).*
 40. **Request keys are exact, and none is repeated (2026-10-31).** A request
     key must be written as its field is named, in the same case: `{"Title": "x"}`
     is `invalid`, and so is a key given twice, at any level. An unknown key stays
