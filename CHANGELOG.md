@@ -198,6 +198,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
   stops if the backup fails, and checks the backup file before it installs the new binary (the
   old quick block could migrate a database with no backup); the decision issue form no longer
   lists decision numbers.
+- Decisions D32 and D33 (issues #219 and #220): agents may log `review` events, so CONTRACT §9 item 6
+  bars only `started`, `finished` and `close`, and item 39 is adopted; the three CLI identity
+  conformance cases stay deferred through the CLI for good. The How-We-Work epic claim no longer
+  goes stale (issue #202), and the README names `cairn export project`.
 
 ### Changed
 

@@ -104,6 +104,7 @@ the server over HTTP with the key from `CAIRN_API_KEY` or `~/.config/cairn/clien
 and needs `server` in `.cairn.toml` or `CAIRN_SERVER`, as `cairn mcp` does. The verbs
 that take `--json` write, on one line, the object the MCP tool returns. The full list of
 verbs is in [CLI-Reference](https://github.com/djm56/cairn-memory/wiki/CLI-Reference).
+`cairn export project` prints every task of the project as Markdown on stdout; redirect it to a file to keep it.
 
 `--agent` names the calling agent. The write verbs, `task current`, `recall`, `prime`,
 `status` and `hook session-start` take it from `CAIRN_AGENT` when the flag is left out.

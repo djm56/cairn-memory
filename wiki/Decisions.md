@@ -2,7 +2,7 @@
 
 _Status as of 2026-11-06: M5 (Plugin) is current. The exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4 (hooks and CLI) passed its /compact hand check by operator ruling, recorded 2026-11-06; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) have not been run, and #206 is open. Phases 0 to 2 are done. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). D22 was adopted on 2026-11-03 (operator decision, issue #72). D23 to D25 were adopted on 2026-11-03 by the operator (D24 from issue #82, D25 from issue #143), and D26 was chosen by Bishop under the operator's veto the same day. D30 and D31 were adopted by the operator on 2026-11-06 (issues #198 and #199). D27 to D29 are Bishop defaults from the M3 follow-up review. They are pending operator approval and are not yet adopted, so they sit under their own heading below the adopted list. The wording of each adopted decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions), and the wording of each pending one is in its source issue. The lines below only name each one. Reopening a decision needs the operator.
+D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #71), and D20 on 2026-10-31 (operator decision, issue #78). D21 was chosen by Bishop under the operator's veto on 2026-10-31 (issue #109). D22 was adopted on 2026-11-03 (operator decision, issue #72). D23 to D25 were adopted on 2026-11-03 by the operator (D24 from issue #82, D25 from issue #143), and D26 was chosen by Bishop under the operator's veto the same day. D30 and D31 were adopted by the operator on 2026-11-06 (issues #198 and #199). D32 and D33 were adopted by the operator on 2026-11-07 (issues #219 and #220). D27 to D29 are Bishop defaults from the M3 follow-up review. They are pending operator approval and are not yet adopted, so they sit under their own heading below the adopted list. The wording of each adopted decision is in [PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions), and the wording of each pending one is in its source issue. The lines below only name each one. Reopening a decision needs the operator.
 
 ## Adopted decisions
 
@@ -37,6 +37,8 @@ D1 to D10 were adopted on 2026-10-27, D11 to D19 on 2026-10-30 (D19 from issue #
 - **D26. Directives are reaffirmed in place.** The directive page reaffirms a directive through a new operator call, `DirectiveReaffirm`, which sets its `review_by` in place and writes a `directive_reaffirmations` row. The code, the rule and the link to the source learning are kept. Retire and ratify still work. Chosen by Bishop under the operator's veto, 2026-11-03. [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D30. The CLI sends no empty step reference.** The three conformance cases that check the server refuses one stay deferred through the CLI for good; they pass against the local service and over HTTP. Operator decision, 2026-11-06 (issue #198). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 - **D31. `cairn learning list` lists one project.** The CLI does not offer `all_projects`, and its two cases stay deferred through the CLI for good. Operator decision, 2026-11-06 (issue #199). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
+- **D32. Agents may log review events.** CONTRACT §9 item 39 is adopted, and item 6 now bars only `started`, `finished` and `close`. Operator decision, 2026-11-07 (issue #219). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
+- **D33. The CLI carries no viewer role, client name or session.** Its three identity cases stay deferred through the CLI for good. Operator decision, 2026-11-07 (issue #220). [PLAN §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions)
 To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/issues/new?template=decision.yml). The form asks which decision it touches, the options with their costs, and a recommendation.
 
 ## Pending operator approval
@@ -47,17 +49,21 @@ To reopen one, open a [decision issue](https://github.com/djm56/cairn-memory/iss
 
 ## Settled in the contract
 
-[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 were approved by the operator on 2026-10-28. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), which Plan v1 moves to Later. Items 13 and later are Bishop's defaults, written during phase 2, and they await the operator's approval. They are not listed here until approved. Only the titles of items 1 to 12 are listed here.
+[CONTRACT.md §9](https://github.com/djm56/cairn-memory/blob/main/docs/CONTRACT.md#9-settled-here-for-review) lists the questions the design left open and how the contract answers them. Items 1 to 11 were approved by the operator on 2026-10-28. Item 12 is deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), which Plan v1 moves to Later. Items 13 and later are Bishop's defaults, written during phase 2, and they await the operator's approval, except item 39, which the operator adopted as D32 on 2026-11-07. They are not listed here until approved. Only the titles of items 1 to 12 and of item 39 are listed here.
 
 1. Operator calls are part of `Service`
 2. The project is needed for reads too
 3. `task_start` makes the task active by default
 4. `blocked` and `abandoned` need a reason
 5. The brief is frozen once any step starts
-6. Agents cannot log `started`, `finished`, `review` or `close` events
+6. Agents cannot log `started`, `finished` or `close` events
 7. Step refs are an object
 8. `fail` and `skip` need a summary
 9. `missing` uses fixed keys
 10. Rows in another project are `not_found`
 11. Agent-scoped directives apply in every project
 12. Deferred to phase 8 ([#41](https://github.com/djm56/cairn-memory/issues/41)), now Later: the step-review rule in project settings
+
+Item 39 was adopted as D32 on 2026-11-07. It is listed on its own, since a list after item 12 would number it 13:
+
+39. A review is an `event_log` entry

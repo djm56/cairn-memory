@@ -465,6 +465,16 @@ that is not a numbered decision here, and the table says what.
   cases `learning/operator_decides` and `web/learning_all_projects_for_readers`
   stay deferred through the CLI for good (issue #199).
 
+**Operator decision, 2026-11-07: D32 and D33.**
+
+- **D32. Agents may log review events.** CONTRACT §9 item 39 is adopted, and
+  item 6 now bars only `started`, `finished` and `close` (issue #219).
+- **D33. The CLI carries no viewer role, client name or session.** The cases
+  `identity/viewer_first_read_is_not_found`, `identity/client_name_refused` and
+  `identity/session_name_refused` stay deferred through the CLI for good.
+  Changing that would change the CLI's identity model, which is a larger
+  decision (issue #220).
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
