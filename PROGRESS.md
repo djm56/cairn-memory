@@ -2,11 +2,11 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-11 against main 18fc813.
+Last synced: 2026-11-11, main at time of writing (18fc813).
 
-Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
+Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
-Issue counts in this file come from the issue list. The milestone API counts include merged pull requests, so they are not used.
+Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md) and [docs/QUICK-UPDATE.md](docs/QUICK-UPDATE.md).
 
 ## Quick read
 
@@ -40,6 +40,11 @@ Issue counts in this file come from the issue list. The milestone API counts inc
 - #193: the plugin `hooks.json` and `cairn enable` may both run SessionStart. Decide before M5 ships.
 - #206: the hook text asks for `task_current`, which the M4 hand check counts as not run.
 - Plugin key handling: DESIGN §6.1 puts `api_key` in the plugin's sensitive `userConfig`, while wiki/Connecting-Agents.md:19 says the key lives in `client.env`.
+- Pending operator approval (wiki/Decisions.md:46-48):
+  - D27: an operator write to an unknown project is refused.
+  - D28: the shipped unit stays without `--behind-proxy`.
+  - D29: restore refuses a stray `-wal` or `-shm` instead of moving it aside. The code already does this (`internal/server/restore.go:128-133`), so the approval records shipped behaviour.
+- Bishop defaults in docs/CONTRACT.md §9, items 13 onward except item 39 (adopted as D32), are not approved. CONTRACT.md:5-8 says so.
 - #91: choose the pilot project and two developers.
 - #92: choose a second operator.
 - Whether the root file "Cairn — Unified Plan v1 (company edition).md" is archived. It is not moved or deleted here.
@@ -68,8 +73,8 @@ Left before the exit check passes:
 2. `/cairn:init` and `/cairn:status` have no issue. To be filed.
 3. Decide #193 and #206 before #22 and #25.
 4. Live-confirm the tool names and the `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` behaviour (#26).
-5. Operator decision on key handling: DESIGN §6.1 puts `api_key` in the plugin's sensitive `userConfig`, while wiki/Connecting-Agents.md:19 says the key lives only in `client.env`.
-6. Epic #20 names `CAIRN_HOME/bin`, which is in neither DESIGN nor the code. Decide or drop.
+5. Operator decision on key handling: DESIGN §6.1 puts `api_key` in the plugin's sensitive `userConfig`, while wiki/Connecting-Agents.md:19 says the key lives in `client.env` or `CAIRN_API_KEY`, not the MCP entry.
+6. Epic #20 names `CAIRN_HOME/bin`, which is in neither DESIGN nor the code. Decide or drop. The decision touches #23 as well, since `CAIRN_HOME` is also named in the cairn-launch issue (`.github/roadmap.json:344`).
 7. No release archives exist, so a clean-machine install means a source build with Go 1.26. The exit check does not say whether that counts. No issue covers the exit run itself.
 
 ### M6 Import (planned)
@@ -121,7 +126,7 @@ Left before the exit check passes:
 
 1. No issue exists for the scratch-server restore drill. wiki/Operations.md:87 says to restore a copy to a scratch path on another host, but no procedure is written down. The rollback text in wiki/Upgrade.md:138-154 is not a scratch drill.
 
-### Later (later)
+### Later (opens after M8)
 
 - **Goal:** Scheduled review loop, per-harness plugins, public releases, Postgres store, documentation ingestion (PLAN §3).
 - **Status:** Later. 20 issues open, 0 closed. Not scheduled.
@@ -136,39 +141,97 @@ Left before the exit check passes:
 
 ### Closed milestones (history)
 
-### Phase 0 Skeleton
+#### Phase 0 Skeleton
+
+- **Goal:** The Go module, `cairn version`, the Makefile and CI.
+- **Status:** Closed 2026-10-30, 1 issue. Exit passed.
+- **Exit check:** "`make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`." (PLAN §3)
+- **Next action:** None, closed.
+
+**Detail**
 
 Closed 2026-10-30, 1 issue. Exit passed. Delivered the Go module, `cairn version`, the Makefile and CI.
 
-### Phase 1 Contract
+#### Phase 1 Contract
+
+- **Goal:** The `Service` interface, the request and result types, CONTRACT.md and the conformance suite.
+- **Status:** Closed 2026-10-30, 2 issues. Exit passed.
+- **Exit check:** "`CONTRACT.md` covers every tool in DESIGN.md §4. The conformance suite compiles and reports every case as failing against the stub. Review of the contract by the operator before phase 2 starts." (PLAN §3)
+- **Next action:** None, closed.
+
+**Detail**
 
 Closed 2026-10-30, 2 issues. Exit passed. CONTRACT §9 items 1 to 11 approved 2026-10-28. Delivered the `Service` interface, CONTRACT.md and the conformance suite.
 
-### Phase 2 Core and local store
+#### Phase 2 Core and local store
 
-Closed 2026-10-30, 12 issues. Exit passed. Evidence: `TestConformance` in `internal/core/local_test.go` runs all 106 cases against `core.Local`, and all pass. Delivered the SQLite store, migrations, core rules and identity.
+- **Goal:** The SQLite store, migrations, core rules and identity.
+- **Status:** Closed 2026-10-30, 12 issues. Exit passed.
+- **Exit check:** "The conformance suite passes against the local `Service`. Two processes writing the same database at once allocate distinct task ids (a test). `go test -race` is clean." (PLAN §3)
+- **Next action:** None, closed.
 
-### M1 Server-mode MCP
+**Detail**
+
+Closed 2026-10-30, 12 issues. Exit passed. Evidence: `TestConformance` in `internal/core/local_test.go:38` passed at close (82 cases then; 106 now) against `core.Local`. Delivered the SQLite store, migrations, core rules and identity.
+
+#### M1 Server-mode MCP
+
+- **Goal:** `cairn mcp` over the client and the API, with init, status, doctor and export task.
+- **Status:** Closed 2026-11-03, 15 issues. Exit passed.
+- **Exit check:** "An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live Claude Code run against `cairn serve` on another machine is M2's exit check (#19)." (PLAN §3)
+- **Next action:** None, closed.
+
+**Detail**
 
 Closed 2026-11-03, 15 issues. Exit passed. Evidence: the stdio flow test `TestExitCheckMCPFlowThenExport` (`cmd/cairn/export_test.go:312`). Delivered `cairn mcp` over the client and API, and init, status, doctor and export task.
 
-### M2 Server
+#### M2 Server
 
-Closed 2026-11-02, 11 issues. Exit passed. Evidence: live run #19 (`docs/M2-LIVE-RUN.md`), and conformance over HTTP (`internal/server/exit_test.go:315`). Delivered `cairn serve`, key scopes, backup and restore, the directive cap and `review_by`.
+- **Goal:** `cairn serve`, key scopes, backup and restore.
+- **Status:** Closed 2026-11-02, 11 issues. Exit passed.
+- **Exit check:** "Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it" (PLAN §3)
+- **Next action:** None, closed.
 
-### M3 Web UI + dashboard
+**Detail**
+
+Closed 2026-11-02, 11 issues. Exit passed. Evidence: live run #19 (`docs/M2-LIVE-RUN.md`), and `TestConformanceOverRealListener` (`internal/server/exit_test.go:314`), which runs the suite over HTTP. Delivered `cairn serve`, key scopes, backup and restore, the directive cap and `review_by`.
+
+#### M3 Web UI + dashboard
+
+- **Goal:** Web pages, sign-in, viewer mode and the dashboard.
+- **Status:** Closed 2026-11-06, 33 issues. Exit passed.
+- **Exit check:** "A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action" (PLAN §3)
+- **Next action:** None, closed.
+
+**Detail**
 
 Closed 2026-11-06, 33 issues. Exit passed. Evidence: `TestM3ExitCheck` (`internal/server/ui_actions_test.go:137`). Delivered the web pages, sign-in, viewer mode and the dashboard.
 
-### M4 Hooks + CLI
+#### M4 Hooks + CLI
+
+- **Goal:** Claude Code hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
+- **Status:** Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only.
+- **Exit check:** "On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI" (PLAN §3)
+- **Next action:** None, closed.
+
+**Detail**
 
 Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only (`docs/M4-HAND-CHECK.md` §3). Sections 4 and 5 (OpenCode, pi) are not run; #206 is open under M5. Shell-only close test: `TestExitCheckAgentWithOnlyBashCompletesAndClosesATask` (`internal/conformance/cliservice/exitcheck_test.go:54`). Delivered the pre-compact and stop hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
 
-### Phase 9 and Phase 10 (closed, empty)
+#### Phase 9 and Phase 10 (closed, empty)
+
+- **Goal:** None. The two milestones held no issues.
+- **Status:** Closed, empty.
+- **Exit check:** Not in PLAN §3.
+- **Next action:** None here. Retiring the two milestones is for the operator.
+
+**Detail**
 
 Milestones #10 and #11 are closed and hold no issues. They are left over from before Plan v1, which moved their work to Later. Retiring them is proposed; the operator decides, and nothing is changed here.
 
-## Health at 18fc813
+## Health snapshot (2026-11-11, main 18fc813)
+
+This is a snapshot; re-run the gates for current state.
 
 - Build, vet and test pass across the 16 Go packages (`go build`, `go vet`, `go test ./...`).
 - Conformance: 106 of 106 against `core.Local`. Through the CLI, 98 PASS and 8 deferred (D30, D31, D33).
@@ -186,46 +249,11 @@ Milestones #10 and #11 are closed and hold no issues. They are left over from be
 
 ## Known doc drift
 
-Line numbers are as on main, 18fc813. Items 5 to 7 are fixed on this branch. The rest are to be filed as issues at publish.
-
-| # | Where | Truth | This branch |
-|---|---|---|---|
-| 1 | The status paragraph, in 24 files (`grep` for "Status as of") | The status is restated in each file, so one milestone change means 24 edits. | To be filed |
-| 2 | Line 3 of 11 wiki pages: Quick-Start, Install-Local, Install-Server, Upgrade, Binaries, Checks, CLI-Reference, Connecting-Agents, MCP-Tools, Operations, Troubleshooting | The stamp says "checked against the code at 8b651da". Main is at 18fc813. | To be filed |
-| 3 | docs/CONTRACT.md:9 "passes all 82 cases" | 106 cases (#223). | To be filed |
-| 4 | docs/CONTRACT.md:15-17 "M1 removes …" (future tense) | Done. `note_put`, `note_get`, `review_record` and `event_list` are gone from the code (#66, #67). | To be filed |
-| 5 | CLAUDE.md:9-10 phase order | PLAN §2 is milestones M1 to M8, then Later. | Fixed here |
-| 6 | CLAUDE.md:18 "Decisions D1–D10 … adopted" | Adopted decisions are listed in PLAN §8. Pending ones are in wiki/Decisions.md. | Fixed here |
-| 7 | CLAUDE.md:24 "the `cairn-phase` marker" | The marker is `cairn-milestone`. | Fixed here |
-| 8 | docs/PLAN.md:84 "Go 1.25" | go.mod says Go 1.26. | To be filed |
-| 9 | README.md:246 "one per milestone, M1 to M8 and Later" | GitHub also has the empty Phase 9 and Phase 10 milestones. | To be filed |
-| 10 | Root file "Cairn — Unified Plan v1 (company edition).md", dated Oct 30, 2026 on line 3 | Linked from nothing. Line 135 says "M1 is current". Its open questions (line 172) are tracked in PLAN §10. Archiving it is an operator decision. Not moved or deleted here. | To be filed |
-| 11 | Root file line 97 and `.github/roadmap.json:521, :524` (also #85): "`cairn enable` writes `hooks.json` entries" | `cairn enable` writes `.claude/settings.local.json` (`cmd/cairn/enable.go:26, :408`). | To be filed |
-| 12 | docs/PLAN.md:146 M4 exit "with no user prompt" | The hand check (`docs/M4-HAND-CHECK.md:136-143`) allows one neutral "continue". | To be filed |
-| 13 | Epic #29 against PLAN §5.1 | The epic includes grades; PLAN §5.1 moves them to Later. | To be filed (operator decision) |
-| 14 | Epic #20 | Names `CAIRN_HOME`, which is in neither DESIGN nor the code. | To be filed |
-| 15 | wiki/Decisions.md:44-48 | Lists D27 to D29 as pending. PLAN §8 has no D27 to D29. | To be filed |
-| 16 | wiki/Decisions.md, D29 | Listed as pending, but already implemented (`internal/server/restore.go:128-133`). | To be filed |
-| 17 | #218 | The operator's decision is recorded only in the issue body. | To be filed |
-| 18 | wiki/Install-Local.md:16 "A `cairn` binary never opens a database" | Wrong for `serve`, `key`, `backup` and `restore`. | To be filed |
-| 19 | wiki/Connecting-Agents.md:51 leads with `--scope user` | Quick-Start and README use the default scope. | To be filed |
-| 20 | docs/DEPLOY.md:608-620 and wiki/Upgrade.md:13-23 | Two differing copies of the upgrade procedure. | To be filed |
-| 21 | CONTRIBUTING.md:72-74 "a Bishop default awaiting ratification" | Cairn does not use the word Bishop (CLAUDE.md:53-54). | To be filed |
-| 22 | `cmd/cairn/key.go:28` help text "The key add prints is shown once" | Garbled. It should name the key that `key add` prints. | To be filed |
-| 23 | docs/DEPLOY.md:455 "a score of 3.2" | Quoted as a result, without the command output that produced it. | To be filed |
-
-### Tracker hygiene
-
-- #223 should be M5 and `area:docs`. It is in Later with no labels.
-- #214 and #126 are M5 carry-over. They sit in Later.
-- #221's install items (Upgrade PATH and clone-location assumptions) belong in M5. The rest is docs polish.
-- #135 has the `m3` label and the Later milestone. They disagree.
-- #193 is a decision and has no decision label.
-- 19 open issues are not on the Roadmap board: #191 to #197, #200, #201, #206, #212 to #218, #221, #223. Checked 2026-11-11 against the board's 121 items.
+Doc drift found on 2026-11-11 is tracked in one GitHub issue, "Doc drift sweep 2026-11-11" (label `area:docs`), filed when this change was published. Items fixed by this change: CLAUDE.md phase order, decision pointer, marker name. The tracker hygiene items (labels, milestones and board membership) are tracked in that issue too.
 
 ## Keeping this file current
 
 - Update it in the same pull request that closes an issue, passes an exit check, records a decision or opens a milestone.
-- Refresh "Last synced" with the date and the commit.
+- Refresh "Last synced" with the date and the main commit at the time of writing.
 - Copy, never invent. A fact here must already be true on GitHub or in the repo.
 - When in doubt, check GitHub and fix this file.

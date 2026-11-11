@@ -483,6 +483,11 @@ that is not a numbered decision here, and the table says what.
 - **`.github/roadmap.json`** holds copies of each milestone's exit check, and
   the issues that §3 and the Plan v1 issue list name. Change §3 and
   roadmap.json together.
+- **Milestone shape.** Each milestone is written Quick read first (Goal, Status,
+  Exit check, Next action), then the detail, in PROGRESS.md and in its GitHub
+  milestone description. The milestone descriptions in `.github/roadmap.json`
+  should carry the same shape when that file is next edited; this is not yet
+  done.
 - **Board, labels and bootstrap.** The labels (`m1` to `m8`, `later`), the
   Projects board and the roadmap issues are set up by
   `scripts/github/bootstrap.sh`. It is a dry run by default. `--apply` fills
@@ -505,9 +510,9 @@ that is not a numbered decision here, and the table says what.
   board](https://github.com/djm56/cairn-memory/projects).
 - **Progress mirror.** [PROGRESS.md](../PROGRESS.md) at the repository root is
   the offline mirror of live progress. GitHub stays the place for live progress:
-  the milestones, the issues and the board. A pull request that finishes work,
-  closes an issue, passes an exit check, records a decision or opens a milestone
-  updates PROGRESS.md in the same pull request. If the two disagree, GitHub wins
+  the milestones, the issues and the board. A pull request that closes an issue,
+  passes an exit check, records a decision or opens a milestone updates
+  PROGRESS.md in the same pull request. If the two disagree, GitHub wins
   and PROGRESS.md is fixed. The status line and the marker are not part of this
   mirror and keep the rule above.
 

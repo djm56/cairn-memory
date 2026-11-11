@@ -19,7 +19,7 @@ in Cairn leaves the same kind of marker.
 > [bishop-memory](https://github.com/djm56/bishop-memory), which keeps
 > running until the move is done.
 
-At-a-glance progress (offline): [PROGRESS.md](PROGRESS.md)
+At-a-glance progress (offline): [PROGRESS.md](PROGRESS.md). Quick install and update for a test server: [QUICK-INSTALL](docs/QUICK-INSTALL.md) and [QUICK-UPDATE](docs/QUICK-UPDATE.md).
 
 [![CI](https://github.com/djm56/cairn-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/djm56/cairn-memory/actions/workflows/ci.yml)
 

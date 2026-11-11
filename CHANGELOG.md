@@ -205,6 +205,10 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Progress tracking: [PROGRESS.md](PROGRESS.md) at the repository root, an offline
   mirror of the milestones, issues and the Roadmap board. GitHub stays the source of
   truth. CLAUDE.md and CONTRIBUTING.md name the rule that keeps the mirror current.
+- Quick install and quick update for a test server: `docs/QUICK-INSTALL.md` builds `cairn` from
+  source on macOS and runs `cairn serve` on loopback, with its keys, a project and a Claude Code
+  client; `docs/QUICK-UPDATE.md` moves that install to the latest main, with a backup taken first,
+  and rolls it back. Both are short runbooks that link to the wiki for the full procedure.
 
 ### Changed
 
@@ -411,3 +415,4 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 - Behaviour change, M4 (issue #114): `cairn init` accepts a working directory that is the project directory under another case, on a case-insensitive filesystem such as macOS's default. Before, it refused that directory as outside `CLAUDE_PROJECT_DIR`, with two paths that looked the same. The check now compares the directories on disk, not their names.
 - Behaviour change, M4 (issue #111): an MCP tool result over 64 KiB is a tool error, not the whole result. A `task_get` with no section on a long task was the case that reached it. The error names the `section` and `limit` arguments, which narrow the read, and `cursor`, which pages it. A brief over the cap cannot be narrowed by section, so it is refused as well; the cap is a judgement and is in `internal/mcp/result.go`.
 - Docs: CLAUDE.md corrects the phase order (now milestones M1 to M8 and Later), the decision range (now a pointer to PLAN §8 and wiki/Decisions.md) and the marker name (`cairn-milestone`). PLAN §9 names PROGRESS.md as the offline mirror.
+- Progress mirror: the milestone shape (Quick read first) is named in CLAUDE.md, CONTRIBUTING.md and PLAN §9, and the trigger sentence is the same in all three. PROGRESS.md gives each closed milestone the same block, moves the known doc drift table into one tracking issue, and cites the Phase 2 conformance count as it stood at close (82 cases, then 106).

@@ -43,10 +43,9 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
 - GitHub milestones, issues and the
   [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)
   are the source of truth for progress.
-- [PROGRESS.md](PROGRESS.md) is the offline mirror. Every session or pull
-  request that finishes work updates it in the same pull request. The triggers
-  are: an issue closes, an exit check passes, a decision is recorded, or a
-  milestone opens.
+- [PROGRESS.md](PROGRESS.md) is the offline mirror. A pull request that closes
+  an issue, passes an exit check, records a decision or opens a milestone
+  updates PROGRESS.md in the same pull request.
 - Every milestone is written Quick read first (Goal, Status, Exit check, Next
   action), then the detail. That applies in PROGRESS.md and in the GitHub
   milestone descriptions.
