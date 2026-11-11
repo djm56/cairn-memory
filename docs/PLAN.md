@@ -503,6 +503,13 @@ that is not a numbered decision here, and the table says what.
   is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and
   the [Cairn Memory Roadmap
   board](https://github.com/djm56/cairn-memory/projects).
+- **Progress mirror.** [PROGRESS.md](../PROGRESS.md) at the repository root is
+  the offline mirror of live progress. GitHub stays the place for live progress:
+  the milestones, the issues and the board. A pull request that finishes work,
+  closes an issue, passes an exit check, records a decision or opens a milestone
+  updates PROGRESS.md in the same pull request. If the two disagree, GitHub wins
+  and PROGRESS.md is fixed. The status line and the marker are not part of this
+  mirror and keep the rule above.
 
 ## 10. Open questions
 

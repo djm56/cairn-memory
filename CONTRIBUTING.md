@@ -116,6 +116,10 @@ the reason. Adopted decisions are listed in PLAN.md §8.
 
 - **Changelog.** Every pull request adds an entry under `## [Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md), unless it carries the `skip-changelog` label.
+- **Progress.** A pull request that finishes work, closes an issue, passes an
+  exit check, records a decision or opens a milestone updates
+  [PROGRESS.md](PROGRESS.md) in the same pull request. See
+  [CLAUDE.md](CLAUDE.md#progress-tracking-github-first-progressmd-mirror).
 - **Milestone marker.** README.md and docs/PLAN.md each carry one
   `<!-- cairn-milestone: M -->` marker, naming the current milestone (M1 to M8,
   or Later), and the two values match. `scripts/check-docs.sh` checks that they
