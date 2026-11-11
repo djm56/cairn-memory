@@ -47,7 +47,6 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 - Bishop defaults in docs/CONTRACT.md §9, items 13 onward except item 39 (adopted as D32), are not approved. CONTRACT.md:5-8 says so.
 - #91: choose the pilot project and two developers.
 - #92: choose a second operator.
-- Whether the root file "Cairn — Unified Plan v1 (company edition).md" is archived. It is not moved or deleted here.
 
 ## Milestones
 
@@ -249,7 +248,7 @@ This is a snapshot; re-run the gates for current state.
 
 ## Known doc drift
 
-Doc drift found on 2026-11-11 is tracked in one GitHub issue, "Doc drift sweep 2026-11-11" (label `area:docs`), filed when this change was published. Items fixed by this change: CLAUDE.md phase order, decision pointer, marker name. The tracker hygiene items (labels, milestones and board membership) are tracked in that issue too.
+Doc drift found on 2026-11-11 is tracked in GitHub issues labelled `area:docs`: https://github.com/djm56/cairn-memory/issues?q=is%3Aissue+label%3Aarea%3Adocs. The tracker hygiene items (labels, milestones and board membership) are tracked in GitHub too.
 
 ## Keeping this file current
 
