@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-11, main at time of writing (18fc813).
+Last synced: 2026-11-11, main at time of writing (400de64).
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
@@ -53,18 +53,18 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 26 issues open, 3 closed. No plugin code exists yet.
+- **Status:** Current. Not passed. 28 issues open, 4 closed. No plugin code exists yet.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
 - **Next action:** Decide #193 and #206. Then build the layout (#21) and the launcher (#23). #22 and #25 wait on the two decisions.
 
 **Detail**
 
-Open issues, grouped (26):
+Open issues, grouped (28):
 
 - Decisions (2): #193 (plugin `hooks.json` and `cairn enable` may both run SessionStart) and #206 (hook text against the M4 "not run" rule).
 - Exit-critical build (7): #20 epic, #21 layout and marketplace, #22 skill text, #23 `cairn-launch`, #24 `claude plugin validate` in CI, #25 install guide, #26 live confirmation of tool names and hook behaviour.
 - Carry-over code and tests (13): #140 (restore: stray `-wal` and `-shm` files; the refusal is already in `internal/server/restore.go:128-133`), #191 (a `task_get` brief over the 64 KiB cap cannot be narrowed), #192, #194, #195, #196, #201, #212, #213, #215, #216, #217, #218 (MCP reads send no caller name, so agent-scoped directives are dropped).
-- Carry-over docs (4): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text).
+- Carry-over docs (6): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5).
 
 Left before the exit check passes:
 
@@ -89,8 +89,8 @@ Open issues (3): #29 epic, #89 mapping update (reviewer verdicts to `review` eve
 
 Left before the exit check passes:
 
-1. The command has no code and no issue.
-2. Idempotence and dry-run have no issue.
+1. The command has no code and no child issue; epic #29 describes it.
+2. Idempotence and dry-run have no child issue; epic #29 states them.
 3. Grades conflict: epic #29 includes grades, while PLAN §5.1 moves them to Later. Operator decision.
 
 ### M7 Pilot (planned)
@@ -248,7 +248,7 @@ This is a snapshot; re-run the gates for current state.
 
 ## Known doc drift
 
-Doc drift found on 2026-11-11 is tracked in GitHub issues labelled `area:docs`: https://github.com/djm56/cairn-memory/issues?q=is%3Aissue+label%3Aarea%3Adocs. The tracker hygiene items (labels, milestones and board membership) are tracked in GitHub too.
+Doc drift found on 2026-11-11 is tracked in #224 (Doc drift sweep 2026-11-11). Other open doc issues carry the `area:docs` label: https://github.com/djm56/cairn-memory/issues?q=is%3Aissue+label%3Aarea%3Adocs. The tracker hygiene items (labels, milestones and board membership) are tracked in GitHub too.
 
 ## Keeping this file current
 
