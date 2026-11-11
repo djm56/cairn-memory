@@ -4,7 +4,7 @@ _Status as of 2026-11-06: M5 (Plugin) is current. M4's exit check passed by oper
 
 This is the shortest correct path on one machine. It builds `cairn`, runs a server on loopback, makes a key, points a project at the server, connects Claude Code and runs the operator check. Each step ends with **You should see**. If a line differs, stop and check [Troubleshooting](Troubleshooting) before you go on.
 
-For each step in more detail, see [Install-Local](Install-Local). For a server that other machines reach, see [Install-Server](Install-Server).
+For each step in more detail, see [Install-Local](Install-Local). For a server that other machines reach, see [Install-Server](Install-Server). For a copy-paste runbook to install or update a test server, see [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md) and [QUICK-UPDATE](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-UPDATE.md).
 
 You need Go 1.26 or later (the version `go.mod` declares), git, and a shell. There is no C toolchain to install. The commands below are for bash or zsh on macOS or Linux.
 

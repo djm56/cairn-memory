@@ -5,25 +5,27 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
 
 ## Read first
 
-- [docs/PLAN.md](docs/PLAN.md) is the build plan. Work happens in its phase
-  order (§2), and each phase ends with the exit check in §3. **Check the
-  status line at the top of PLAN.md for the current phase** before starting
-  work. The rule for that line is in [PLAN §9](docs/PLAN.md#9-project-management).
+- [docs/PLAN.md](docs/PLAN.md) is the build plan. Work happens in milestone
+  order (§2: M1 to M8, then Later), and each milestone ends with the exit check
+  in §3. **Check the status line at the top of PLAN.md for the current
+  milestone** before starting work. The rule for that line is in
+  [PLAN §9](docs/PLAN.md#9-project-management).
 - [docs/DESIGN.md](docs/DESIGN.md) is the contract: concepts, data model
   (§3), the MCP tool list (§4), packages (§5.1) and commands (§5.2). Do not
   add tools, tables or commands it does not list without updating it first.
 - [docs/CONTRACT.md](docs/CONTRACT.md) is the call-level contract: each
   tool's fields, errors and rules. `internal/core` is its Go form and
   `internal/conformance` checks it; change all three together.
-- Decisions D1–D10 in PLAN.md §8 are **adopted** (2026-10-27). Do not
-  reopen them without the operator.
+- Adopted decisions are recorded in PLAN.md §8. Do not reopen them without
+  the operator. Decisions still pending are listed in
+  [wiki/Decisions.md](wiki/Decisions.md).
 - [CONTRIBUTING.md](CONTRIBUTING.md) holds the engineering rules. The short
   form: rules live only in `internal/core`; no SQL outside `internal/store`;
   the conformance suite is the gate; tests before code; tool output is small
   because a model reads it; a missing project is an error, never a default.
-- **Where status lives.** Status lines and the `cairn-phase` marker follow the
-  rule in [PLAN §9](docs/PLAN.md#9-project-management). Live progress is on the
-  milestones and the Projects board.
+- **Where status lives.** Status lines and the `cairn-milestone` marker follow
+  the rule in [PLAN §9](docs/PLAN.md#9-project-management). Live progress is on
+  the milestones and the Projects board.
 - **Before you start work,** find or open the issue, and reference it in the
   pull request (`Closes #N`).
 - **Every pull request** updates CHANGELOG.md unless it carries the
@@ -35,6 +37,21 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
   operator may merge at any time. Agents never run the bootstrap script or the
   wiki publish script with `--apply` unless the operator asks for it
   (`scripts/github/`).
+
+## Progress tracking (GitHub first, PROGRESS.md mirror)
+
+- GitHub milestones, issues and the
+  [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)
+  are the source of truth for progress.
+- [PROGRESS.md](PROGRESS.md) is the offline mirror. A pull request that closes
+  an issue, passes an exit check, records a decision or opens a milestone
+  updates PROGRESS.md in the same pull request.
+- Every milestone is written Quick read first (Goal, Status, Exit check, Next
+  action), then the detail. That applies in PROGRESS.md and in the GitHub
+  milestone descriptions.
+- Before you start work, read PROGRESS.md's Quick read, then confirm it against
+  GitHub. If they disagree, GitHub wins and PROGRESS.md is fixed in the same
+  pull request.
 
 ## Commands
 
