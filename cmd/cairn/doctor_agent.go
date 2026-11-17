@@ -43,7 +43,7 @@ type installedHook struct {
 // its event, with the file it is in and its matcher. A hook that is not installed is a warning, not a failure: the
 // hooks are optional, and a project that has not run enable is not broken. A file that enable would refuse is a
 // warning with its reason, and the other files are still read. When the cairn plugin is enabled, a cairn hook in a project
-// file is a warning as well, since it runs next to the plugin's (duplicateHooksCheck). A project file that is a link, is
+// file, or in the user's file, is a warning as well, since it runs next to the plugin's (duplicateHooksCheck). A project file that is a link, is
 // not a regular file, or is larger than maxSettingsBytes is not read at all. The user's file is the exception to the link
 // rule: it is followed, since the user owns that path and a dotfiles link is common, and its target must still be a regular
 // file under the cap. A user's link that leads to nothing is one warning that names it. wd is the directory the command runs
@@ -102,17 +102,14 @@ func claudeCodeChecks(wd string) []check {
 	return checks
 }
 
-// duplicateHooksCheck is the warning for cairn hooks in a project settings file while the cairn plugin is enabled (D34).
-// The plugin carries the same hooks, so each one would run twice. plugin is the settings file that enables the plugin.
-// It names the project files, from files, that hold a cairn hook among found, and says to remove those entries. It returns
-// false when no project file holds one. Only the project's files are checked: a cairn hook in the user's file also runs
-// alongside the plugin's, and it is not named here.
+// duplicateHooksCheck is the warning for cairn hooks in a settings file while the cairn plugin is enabled (D34). The
+// plugin carries the same hooks, so each one would run twice. plugin is the settings file that enables the plugin. It
+// names every file, from files, that holds a cairn hook among found, the project's files and the user's
+// ~/.claude/settings.json alike, in the order files gives them, and says to remove those entries. It returns false when
+// no file holds one.
 func duplicateHooksCheck(found []installedHook, files []settingsFile, plugin string) (check, bool) {
 	var paths []string
 	for _, f := range files {
-		if f.user {
-			continue
-		}
 		for _, h := range found {
 			if h.path == f.path {
 				paths = append(paths, f.path)

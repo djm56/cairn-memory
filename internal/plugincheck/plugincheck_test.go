@@ -189,6 +189,36 @@ func TestLauncherSkipsEmptyAndRelativePathEntries(t *testing.T) {
 	}
 }
 
+// TestLauncherDoesNotGlobPathEntries checks that a PATH entry holding *, ? or [ is searched as the literal directory it names.
+// Each case puts a decoy directory, xy, beside the entry: the pattern matches it, and it holds a cairn. The literal entry
+// holds no cairn, so a launcher that expanded the pattern would run the decoy, and the right result is not found (127). A
+// second case holds a cairn in the literal entry, which must run.
+func TestLauncherDoesNotGlobPathEntries(t *testing.T) {
+	skipOnWindows(t)
+	for _, literal := range []string{"x*", "x?", "x[y]"} {
+		t.Run(literal, func(t *testing.T) {
+			bin := t.TempDir()
+			home := t.TempDir()
+			writeExecutable(t, filepath.Join(bin, "xy"), "cairn", stubCairn("decoy"))
+			entry := filepath.Join(bin, literal)
+			if err := os.MkdirAll(entry, 0o755); err != nil {
+				t.Fatal(err)
+			}
+
+			code, stdout, _ := runLauncher(t, t.TempDir(), []string{"PATH=" + entry, "HOME=" + home}, "mcp")
+			if code != 127 || stdout != "" {
+				t.Errorf("PATH entry %q: exit %d, stdout %q, want 127 and the decoy not run", literal, code, stdout)
+			}
+
+			writeExecutable(t, entry, "cairn", stubCairn("literal"))
+			code, stdout, stderr := runLauncher(t, t.TempDir(), []string{"PATH=" + entry, "HOME=" + home}, "mcp")
+			if code != 0 || stderr != "" || stdout != "stub: literal\narg: mcp\n" {
+				t.Errorf("PATH entry %q: exit %d, stdout %q, stderr %q: want the literal directory's cairn run", literal, code, stdout, stderr)
+			}
+		})
+	}
+}
+
 // TestLauncherSkipsItself checks the guard: a cairn on PATH that is a link to this launcher is skipped, so the launcher does
 // not run itself, and the copy in ~/.local/bin is run instead.
 func TestLauncherSkipsItself(t *testing.T) {

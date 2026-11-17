@@ -1360,12 +1360,14 @@ plugins/claude-code/
   bin/cairn-launch             finds the cairn binary on PATH, then in ~/.local/bin
                                (D37); if neither has it, exits 127 with one line
                                naming the install command
-  hooks/hooks.json             SessionStart → cairn hook session-start
-                               (command built in M1; issue #16);
+  hooks/hooks.json             registers the same three hooks as cairn enable:
+                               SessionStart → cairn hook session-start;
                                PreCompact and Stop → cairn hook pre-compact
-                               and stop (commands built in M4, D15; PreCompact
-                               is inert in Claude Code, §4.1). This file is M5.
-  skills/cairn/SKILL.md        how to work with Cairn: the task loop below
+                               and stop (D15; PreCompact is inert in Claude
+                               Code, §4.1). Each runs through bin/cairn-launch
+  skills/cairn/SKILL.md        how to work with Cairn: the task loop below,
+                               what each hook puts in front of the agent, how
+                               to answer a refused close, and how to insert a step
   commands/init.md             /cairn:init → cairn init, with the flags given
   commands/status.md           /cairn:status
 ```

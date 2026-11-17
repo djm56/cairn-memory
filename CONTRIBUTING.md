@@ -21,7 +21,8 @@ make scan-local-paths  # fails if a tracked file names a local user or machine p
 
 CI runs build, `vet`, `fmt-check`, `test`, `make cross` (the Windows, macOS, FreeBSD and
 OpenBSD compile and vet), `scan-invisible` and `scan-local-paths` on every pull request.
-Run the same checks before you push.
+Its `plugin` job runs `claude plugin validate` on the plugin and on the marketplace file,
+with Claude Code pinned in `ci.yml`. Run the same checks before you push.
 
 ### Mutation testing
 
@@ -42,7 +43,7 @@ request as equivalent or accepted, with a reason.
 3. **Pull request.** Use the pull request template. It asks for `Closes #N`
    and the milestone.
 4. **CI.** `build, vet, fmt, test` must pass. The docs job checks the milestone
-   marker and the changelog, and shellcheck lints the scripts. Only
+   marker and the changelog, and shellcheck lints the scripts and the plugin launcher. Only
    `build, vet, fmt, test` is required on `main`.
 5. **Review.** See the rule below.
 6. **Merge.** An agent may merge a pull request once CI is green and the

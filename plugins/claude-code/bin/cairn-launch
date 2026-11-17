@@ -18,8 +18,16 @@ self=$0
 found=
 
 # Search PATH. IFS is set to ":" for the loop only, so the entries split on colons, and an empty entry stays empty
-# and is skipped. The unquoted $PATH is the split.
-oldifs=$IFS
+# and is skipped. The unquoted $PATH is the split. Pathname expansion is off for the loop too (set -f), so an entry
+# with *, ? or [ in it is searched as the directory it names, and never as the directories a pattern matches.
+# IFS is put back exactly as it was: an IFS that was unset is unset again, not set to empty.
+set -f
+if [ "${IFS+set}" = set ]; then
+  ifs_was_set=1
+  oldifs=$IFS
+else
+  ifs_was_set=
+fi
 IFS=:
 for dir in ${PATH:-}; do
   case $dir in
@@ -31,7 +39,12 @@ for dir in ${PATH:-}; do
       ;;
   esac
 done
-IFS=$oldifs
+set +f
+if [ -n "$ifs_was_set" ]; then
+  IFS=$oldifs
+else
+  unset IFS
+fi
 
 # Then the per-user install directory, when there is a home directory and it is absolute.
 if [ -z "$found" ]; then
