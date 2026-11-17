@@ -17,7 +17,7 @@ The plugin is the recommended route for Claude Code. It brings the MCP server an
 
 ## 2. Install `cairn`
 
-Choose the block for where M5 is. Both start with a clone. If you already have a checkout, run the `cd` line and the lines after it in that checkout. The commands follow [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1.
+Choose the block for where M5 is. Both start with a clone. If you already have a checkout, skip the `git clone` line and run from the `cd` line onward in that checkout. The commands follow [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1.
 
 ### After M5 is on `main`
 
@@ -32,7 +32,7 @@ command -v cairn
 
 ### Before M5 is on `main`
 
-Before the `m5-plugin` branch is pushed, a clean machine cannot follow this block. A fresh clone has only `main`, so `git switch m5-plugin` has no branch to find. Until the branch is pushed, use a local checkout that already carries it, and run the lines from `git switch m5-plugin` onward in that checkout. Section 5b reads the plugin from that checkout.
+Before the `m5-plugin` branch is pushed, a clean machine cannot follow this block. A fresh clone has only `main`, so `git switch m5-plugin` has no branch to find. Until the branch is pushed, use a local checkout that already carries it, skip the `git clone` line, and run from the `cd` line onward in that checkout. Section 5b reads the plugin from that checkout.
 
 ```bash
 git clone https://github.com/djm56/cairn-memory.git
@@ -170,7 +170,7 @@ This check runs the plugin from inside Claude Code and reads the result from a t
 Before the session, run two checks in the project folder. They make sure the session uses the plugin's server and no other.
 
 1. Run `cairn status`. It should print `task        none active`, with eight spaces between `task` and `none`. If it names an active task, close that task first. Section 9 covers a refused `task start`, and the close it describes applies here.
-2. Run `claude mcp list`. If it lists a `cairn` entry at user scope, remove it with `claude mcp remove cairn -s user`, as section 8 describes. A manual entry at another scope goes the same way, with its scope. Only the plugin's server should be left.
+2. Run `claude mcp get cairn`. If a manual server named exactly `cairn` is there, note its scope, then remove it with `claude mcp remove cairn -s <scope>`, as section 8 describes. Leave the plugin's own server, `plugin:cairn:cairn`, alone: it is not the entry named `cairn`. If there is no manual `cairn` entry, there is nothing to remove.
 
 3. Start Claude Code in the project folder with `claude`.
 4. Ask Claude, in your own words, to record one small piece of work as a Cairn task. Give your agent name, so Claude passes it on every write, and tell Claude to use the Cairn MCP tools, not the `cairn` command in the shell. For example:
@@ -179,7 +179,7 @@ Before the session, run two checks in the project folder. They make sure the ses
    Start a Cairn task for one small piece of work you can finish in this session. Use the Cairn MCP tools, not the cairn command in the shell. Use <your-agent-name> as the agent on every Cairn write. Add one step, start it, do the work, finish it with a summary, and close the task with a one-line outcome.
    ```
 
-   Claude uses the plugin's tools for this: `task_start`, `step_add`, `step_update` to start and finish the step, and `task_close`. A step must be started before it can be finished, and Claude does that. Claude Code asks permission the first time each Cairn tool is used. Allow them.
+   Claude uses the plugin's tools for this: `task_start`, `step_add`, `step_update` to start and finish the step, and `task_close`. A step must be started before it can be finished, and Claude does that. Claude Code may ask permission the first time each Cairn tool is used. Allow them.
 
 5. Watch the tool calls Claude makes. Claude Code shows each call's name. The check counts only when these four calls are named as shown:
 
@@ -188,7 +188,7 @@ Before the session, run two checks in the project folder. They make sure the ses
    - `mcp__plugin_cairn_cairn__step_update`
    - `mcp__plugin_cairn_cairn__task_close`
 
-   A call named `mcp__cairn__…`, or a Bash call that runs `cairn …`, means the check did not exercise the plugin. Fix the cause (for a `mcp__cairn__` call, that is a manual entry, as step 2 covers), then run the check again from step 1 in a new session. Other calls to the plugin's server, such as `task_current`, do not fail the check.
+   If a loop action is done with a `mcp__cairn__…` call, or with a Bash `cairn …` command, in place of the plugin's call, the check did not exercise the plugin. Fix the cause (for a `mcp__cairn__` call, that is a manual entry, as step 2 covers), then run the check again from step 1 in a new session. Other calls to the plugin's server, such as `task_current`, do not fail the check.
 
    A refused first `task_close` is expected when Claude leaves out something the close requires: a summary, criteria results, lessons or a reason for none, or mistakes. The refusal's `missing` list names what is short. The skill tells Claude to supply each item and close again. A refusal is not an install failure.
 
@@ -201,7 +201,7 @@ Before the session, run two checks in the project folder. They make sure the ses
 
    Replace `<task-id>` with the first word on the first line that `task list` prints.
 
-The check passes when the tool names in step 5 are as shown, and both of these hold:
+The check passes when the four calls in step 5 are named as shown, no loop action went through a `mcp__cairn__` call or a Bash `cairn` command in place of the plugin's call, and both of these hold:
 
 - `cairn task list` shows the task with status `done`, one line, for example:
 
@@ -210,6 +210,8 @@ The check passes when the tool names in step 5 are as shown, and both of these h
   ```
 
 - `cairn task get <task-id> --section steps` lists the step as `[done]`, with the summary Claude wrote.
+
+A Bash `cairn` command that is not a loop action, such as an incidental `cairn status`, does not fail the check.
 
 If the task is missing, the session and the terminal are on different projects or servers. Run `cairn status` in the same folder and compare its project and server lines with the `.cairn.toml` file.
 
