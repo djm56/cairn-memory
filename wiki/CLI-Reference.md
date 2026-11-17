@@ -180,7 +180,7 @@ cairn enable --agent pi [--dry-run]
 | `--agent <name>` | yes | `claude-code`, `opencode` or `pi`. The last two are EXPERIMENTAL |
 | `--dry-run` | no | Print what would be added, and write nothing |
 
-What each one writes is in [Connecting-Agents](Connecting-Agents#what-enable-writes). In short: `claude-code` adds three hooks to `.claude/settings.local.json` and keeps the rest of the file. It writes no MCP entry. Before it rewrites a file, it copies the original to the user's cache directory, and prints the path. A file that is not plain JSON is refused and left as it is. Any other agent name is a usage error, exit 2.
+What each one writes is in [Connecting-Agents](Connecting-Agents#what-enable-writes). In short: `claude-code` adds three hooks to `.claude/settings.local.json` and keeps the rest of the file. It writes no MCP entry. Before it rewrites a file, it copies the original to the user's cache directory, and prints the path. A file that is not plain JSON is refused and left as it is. If the cairn plugin is enabled in Claude Code settings, `claude-code` names the file that enables it, adds no hooks, writes nothing and exits 0. Any other agent name is a usage error, exit 2.
 
 `enable` warns when `cairn` is not on the PATH of its own shell, because the hooks run `cairn` by name.
 
@@ -346,7 +346,7 @@ Checks the binary, the project file, the server and the connection, and changes 
 | `key` | The key, from `CAIRN_API_KEY` or `client.env` |
 | `reach` | Whether the server answers as a Cairn server and accepts the key. This call sends no project. It sets the key's last-used time, at most once a minute |
 
-With `--agent claude-code`, it also lists the Cairn hooks in the Claude Code settings files, and runs each hook once against the server. The first read of a project the server has not seen creates the project's row, as the hooks do. With `--agent opencode` or `--agent pi`, it reports whether the registration and the instructions that `enable` writes are in place. Both of those are EXPERIMENTAL.
+With `--agent claude-code`, it also lists the Cairn hooks in the Claude Code settings files, and runs each hook once against the server. The first read of a project the server has not seen creates the project's row, as the hooks do. A hook that no settings file holds is ok when the cairn plugin is enabled in one of them, since the plugin carries it. With `--agent opencode` or `--agent pi`, it reports whether the registration and the instructions that `enable` writes are in place. Both of those are EXPERIMENTAL.
 
 Exit 0 when no line fails, 1 when one does. [Checks](Checks) explains the operator check, `scripts/smoke-check.sh`, which runs `doctor` too.
 

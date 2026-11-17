@@ -65,13 +65,13 @@ claude mcp get cairn
 cairn doctor --agent claude-code
 ```
 
-This lists the hooks in the Claude Code settings files and runs each hook once against the server, so the output shows what each hook would print. The first read of a project the server has not seen creates the project's row. `doctor` warns when a hook is not installed, and tells you to run `cairn enable --agent claude-code`.
+This lists the hooks in the Claude Code settings files and runs each hook once against the server, so the output shows what each hook would print. The first read of a project the server has not seen creates the project's row. `doctor` warns when a hook is not installed, and tells you to run `cairn enable --agent claude-code`. When the cairn plugin is enabled in one of the Claude Code settings files it reads, a hook that is not installed is ok, since the plugin carries it; `doctor` does not read the plugin's hooks.
 
 Restart Claude Code in the project after you change its MCP entry or its hooks.
 
 ### What is verified about `/compact`
 
-The `SessionStart` hook carries a task across `/compact`. The M4 hand check, section 3, was run on 2026-11-06 with a task started before `/compact` and continued after it. It passed by operator ruling. The hook's output asks the agent to call `task_current` for the brief, and the agent made that call in the run, which the guide's own rule counts against the check. The operator ruled it a pass. On 2026-11-17 the operator decided that the hook text should stop asking for that call (D35, issue #206), because the block already carries the active task, its current step and its next action. That change is M5 work and is not in the binary yet, so the hook still asks for the call until it ships. The M4 rule itself is unchanged.
+The `SessionStart` hook carries a task across `/compact`. The M4 hand check, section 3, was run on 2026-11-06 with a task started before `/compact` and continued after it. It passed by operator ruling. In that run the hook's output asked the agent to call `task_current` for the brief, and the agent made that call, which the guide's own rule counts against the check. The operator ruled it a pass. On 2026-11-17 the operator decided that the hook text should stop asking for that call (D35, issue #206), because the block already carries the active task, its current step and its next action. That change is built and not released yet, so a binary from before it still asks for the call. The M4 rule itself is unchanged.
 
 Sections 4 and 5 of the guide, for opencode and pi, have not been run.
 
@@ -141,7 +141,7 @@ pi reads `.pi/mcp.json` only after the project is trusted. No real pi run has co
 
 | Agent | Writes | Does not write |
 |---|---|---|
-| `claude-code` | Three hooks in `.claude/settings.local.json`. From M5, not written when the cairn plugin is enabled in Claude Code settings (D34; that check is not built yet) | An MCP entry. Register it with `claude mcp add` (above) |
+| `claude-code` | Three hooks in `.claude/settings.local.json`. From M5, not written when the cairn plugin is enabled in Claude Code settings (D34; that check is built and not released yet) | An MCP entry. Register it with `claude mcp add` (above) |
 | `opencode` (EXPERIMENTAL) | The Cairn server in `opencode.json` under `mcp`, the instruction file `.cairn/instructions.md`, and its listing in `instructions` | The key. The key comes from the environment or `client.env` |
 | `pi` (EXPERIMENTAL) | The Cairn server in `.pi/mcp.json`, and the task-loop block in `AGENTS.md` | The key |
 

@@ -78,6 +78,9 @@ func claudeCodeChecks(wd string) []check {
 		}
 		found = append(found, hooks...)
 	}
+	// D34: an enabled cairn plugin carries the hooks, and enable adds none then, so a missing hook is not a fault. The
+	// plugin's own hooks are not read here, so the line says so.
+	plugin, _ := cairnPluginIn(files)
 	for _, h := range claudeHooks {
 		count := 0
 		for _, f := range found {
@@ -87,17 +90,22 @@ func claudeCodeChecks(wd string) []check {
 			}
 		}
 		if count == 0 {
-			checks = append(checks, absentHookLine(h))
+			checks = append(checks, absentHookLine(h, plugin))
 		}
 	}
 	return checks
 }
 
 // absentHookLine is the line for a cairn hook that no settings file read holds. A missing hook is a warning, and enable
-// is the fix. PreCompact is an operator decision (D15), so its absence is ok, with the same note hookLine gives.
-func absentHookLine(h claudeHook) check {
+// is the fix. plugin is the settings file that enables the cairn plugin, or "" when none does; then the plugin carries the
+// hook, so the line is ok and names the file. PreCompact is an operator decision (D15), so its absence is ok, with the same
+// note hookLine gives.
+func absentHookLine(h claudeHook, plugin string) check {
 	if h.event == "PreCompact" {
 		return check{name: h.event, status: "ok", detail: "not installed in any settings file read; installed per D15, but Claude Code does not show its output, so this is an operator decision"}
+	}
+	if plugin != "" {
+		return check{name: h.event, status: "ok", detail: "not installed in any settings file read; the cairn plugin is enabled in " + plugin + ", which carries it (doctor does not read the plugin's hooks)"}
 	}
 	return check{name: h.event, status: "warn", detail: "not installed in any settings file read: run cairn enable --agent claude-code"}
 }

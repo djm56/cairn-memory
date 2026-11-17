@@ -123,15 +123,15 @@ cache directory, outside the project, before it writes. `--dry-run` writes nothi
 plugin, or by hand with `claude mcp add cairn -- "$(command -v cairn)" mcp`, which uses
 the absolute path of the binary. Once the Claude Code plugin ships, it is the recommended route.
 When the plugin is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That
-check is M5 work and is not built yet.
+check is built and not released yet.
 
 In Claude Code, the session-start hook is what is meant to carry a task across `/compact`.
 Its matcher names `compact`, so it runs again after compaction, and its output is added
 to the agent's context. The M4 hand check of that carry, [docs/M4-HAND-CHECK.md](docs/M4-HAND-CHECK.md)
 section 3, was run on 2026-11-06 and passed by operator ruling. The agent also called
-`task_current` after the compact, and the current hook text asks for that call, which the guide's
+`task_current` after the compact, and the hook text of that run asked for that call, which the guide's
 rule counts as not run. On 2026-11-17 the operator decided that the hook text stops asking for it
-(D35). That change closes with the M5 pull request (#206). The pre-compact hook is installed,
+(D35). That change is built and not released yet (#206). The pre-compact hook is installed,
 and it does nothing in Claude Code. [DESIGN.md §4.1](docs/DESIGN.md#41-session-start) has the
 design.
 

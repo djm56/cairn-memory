@@ -52,7 +52,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
 - **Status:** Current. Not passed. 28 issues open, 4 closed. No plugin code exists yet.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
-- **Next action:** D34 to D37 are decided (2026-11-17) and recorded on branch m5-plugin, not yet merged. Next: review of that change (step 3), then the #206 hook text and the #193 enable check, with tests (step 4). Then the layout (#21) and the launcher (#23). #22 and #25 no longer wait on a decision.
+- **Next action:** D34 to D37 are decided (2026-11-17). The #206 hook text and the #193 enable check are built on branch m5-plugin, with tests, and not yet merged; their review is next. Then the layout (#21) and the launcher (#23). #22 and #25 no longer wait on a decision.
 
 **Detail**
 
@@ -67,10 +67,10 @@ Left before the exit check passes:
 
 1. Build the whole DESIGN §6.1 tree. None of it exists.
 2. `/cairn:init` and `/cairn:status` have no issue. To be filed.
-3. Decided 2026-11-17: #193 (D34) and #206 (D35). The code is M5 steps 4 and 8. #193 and #206 close with the M5 pull request.
+3. Decided 2026-11-17: #193 (D34) and #206 (D35). Both are built on m5-plugin. The skill text for D35 comes with #22. #193 and #206 close with the M5 pull request.
 4. Live-confirm the tool names and the `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` behaviour (#26).
 5. Decided 2026-11-17 (D36): the API key lives only in `~/.config/cairn/client.env` or `CAIRN_API_KEY`, and the plugin has no `userConfig`. Recorded on branch m5-plugin, not yet merged.
-6. Decided 2026-11-17 (D37): `CAIRN_HOME/bin` is dropped. The launcher searches PATH, then `~/.local/bin`. Not yet done: nothing is corrected. Epic #20 and #23 still name `CAIRN_HOME/bin` on GitHub, and `.github/roadmap.json:344` still carries it. The GitHub text is corrected at publish (step 13), and roadmap.json needs its own change.
+6. Decided 2026-11-17 (D37): `CAIRN_HOME/bin` is dropped. The launcher searches PATH, then `~/.local/bin`. `.github/roadmap.json` is corrected on m5-plugin. Still outstanding: the GitHub text of epic #20 and of issue #23 still names `CAIRN_HOME/bin`, and it is corrected when the M5 pull request is opened.
 7. No release archives exist, so a clean-machine install means a source build with Go 1.26. The exit check does not say whether that counts. No issue covers the exit run itself.
 
 ### M6 Import (planned)

@@ -123,6 +123,32 @@ func TestDoctorAgentMissingHookIsAWarning(t *testing.T) {
 	}
 }
 
+// TestDoctorAgentPluginEnabledCarriesMissingHooks checks that a cairn hook missing from every settings file is ok, not a
+// warning, when the cairn plugin is enabled in one of them: the plugin carries the hook (D34), and enable adds none. The
+// line names the file, and says doctor does not read the plugin's hooks.
+func TestDoctorAgentPluginEnabledCarriesMissingHooks(t *testing.T) {
+	dir := agentProject(t)
+	user := userSettings(t)
+	writeSettings(t, user, pluginEnabled)
+
+	checks := claudeCodeChecks(dir)
+	for _, event := range []string{"SessionStart", "Stop"} {
+		c := checkNamed(checks, event)
+		if c == nil {
+			t.Fatalf("no line for %s in %v", event, checks)
+		}
+		wantDetail := "not installed in any settings file read; the cairn plugin is enabled in " + user + ", which carries it (doctor does not read the plugin's hooks)"
+		if c.status != "ok" || c.detail != wantDetail {
+			t.Errorf("%s is %s %q, want ok %q", event, c.status, c.detail, wantDetail)
+		}
+	}
+	for _, c := range checks {
+		if c.status == "warn" || c.status == "fail" {
+			t.Errorf("%s is %s %q, want no warning when the plugin is enabled", c.name, c.status, c.detail)
+		}
+	}
+}
+
 // TestDoctorAgentFlagsAMatcherThatDoesNotNameCompact checks that a SessionStart matcher which does not name compact is
 // a warning that says why. It also checks which matchers cover compact.
 func TestDoctorAgentFlagsAMatcherThatDoesNotNameCompact(t *testing.T) {

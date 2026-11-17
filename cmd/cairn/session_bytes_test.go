@@ -56,7 +56,7 @@ func sessionBlockCases() []sessionBlockCase {
 				"Directives that apply: 2.",
 				"Directives expired and left out (past review_by): 2.",
 				"Directives omitted (beyond the cap of 12): 3. Call directive_list for all.",
-				"Call task_current for the brief, the steps and recent events.",
+				"The block above is the task to continue.",
 			},
 		},
 		{
@@ -71,7 +71,7 @@ func sessionBlockCases() []sessionBlockCase {
 				"Agent-scoped directives were not counted: no agent role is set.",
 				"Directives expired and left out (past review_by): 2.",
 				"Directives omitted (beyond the cap of 12): 3. Call directive_list for all.",
-				"Call task_current for the brief, the steps and recent events.",
+				"The block above is the task to continue.",
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func sessionBlockCases() []sessionBlockCase {
 				"Current step: none open.",
 				"Directives that apply: 0.",
 				"Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end).",
-				"Call task_current for the brief, the steps and recent events.",
+				"The block above is the task to continue.",
 			},
 		},
 	}

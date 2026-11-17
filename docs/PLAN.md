@@ -481,8 +481,8 @@ that is not a numbered decision here, and the table says what.
   The Claude Code plugin is the recommended route for Claude Code.
   `cairn enable --agent claude-code` checks whether the cairn plugin is enabled
   in Claude Code settings. If it is, enable says so and does not add its own
-  hooks. Otherwise it behaves as §4.1 and §5 describe. The check is M5 work
-  (step 4, issue #193); this records the decision, not shipped behaviour.
+  hooks. Otherwise it behaves as §4.1 and §5 describe. The check is built and
+  not released yet (issue #193).
 - **D35. The session-start hook no longer asks for `task_current`.** The block
   already carries the active task, its current step and its next action, so
   the hook text drops the call. The skill's task loop step 1 becomes: the
@@ -496,7 +496,7 @@ that is not a numbered decision here, and the table says what.
 - **D37. `CAIRN_HOME/bin` is dropped.** `cairn-launch` looks for `cairn` on PATH,
   then in `~/.local/bin`. If it finds neither, it exits non-zero and prints the
   one-line install command. Epic #20 and issue #23 get decision comments when
-  the M5 pull request is opened (step 13).
+  the M5 pull request is opened.
 
 ## 9. Project management
 
