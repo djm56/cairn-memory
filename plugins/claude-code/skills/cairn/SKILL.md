@@ -13,7 +13,7 @@ Tools are named here by their short names, such as `task_current`. In Claude Cod
 
 - **Session start, resume, clear and compact.** A block is added to your context. It names the active task, its status, its current step and its next action, and it ends with "The block above is the task to continue." With no active task it is one line: "Cairn: no task is active in <project>."
 - **Before compaction.** The pre-compact hook also runs. Per the Claude Code hooks reference, its output becomes instructions for the compaction summary, not text you read after compaction. After `/compact`, rely on the session-start block.
-- **Stop.** When a step is active with no summary, Claude Code shows the user a warning. The warning is not added to your context, so finish each step with a summary yourself.
+- **Stop.** The stop hook writes a warning when a step is active with no summary. The hooks reference does not say that the warning reaches your context, so finish each step with a summary yourself.
 - **No block.** If the block is missing, the hook did not run or could not read the task. Call `task_current`.
 - **Omitted directives.** If the block says directives were omitted, call `directive_list` for all of them.
 

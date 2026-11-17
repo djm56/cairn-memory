@@ -1,6 +1,6 @@
 # Install the Claude Code plugin
 
-_Status as of 2026-11-17: this guide is written for the M5 plugin. The plugin is built on the `m5-plugin` branch and is not on `main` yet, so the GitHub install in section 5a works only after M5 merges. Live check on 2026-11-17 (issue #26), Claude Code 2.1.311, with the plugin loaded from the checkout by `--plugin-dir`. Confirmed: the plugin's server name and tool names, the `/cairn:init` and `/cairn:status` commands, the session-start block with and without a task, a task recorded from inside a session through the plugin's tools, that a step must be started before it can be finished, and that a user-scope `cairn` entry adds a second server. Not confirmed: the marketplace install in section 5 (the probe did not use it), the pre-compact hook's effect, how Claude Code shows a server or hook that exits 127, and what `/mcp` prints. The guide has not been run end to end on a clean machine, and it has not been timed._
+_Status as of 2026-11-17: this guide is written for the M5 plugin. The plugin is built on the `m5-plugin` branch and is not on `main` yet, so the GitHub install in section 5a works only after M5 merges. Live check on 2026-11-17 (issue #26), Claude Code 2.1.311, with the plugin loaded from the checkout by `--plugin-dir`. Confirmed: the plugin's server name and tool names, the `/cairn:init` and `/cairn:status` commands, the session-start block with and without a task, a task recorded from inside a session through the plugin's tools, that a step must be started before it can be finished, and that a user-scope `cairn` entry adds a second server. Not confirmed: the marketplace install in section 5 (the probe did not use it), the pre-compact hook's effect, how Claude Code shows a server or hook that exits 127, and what `/mcp` prints. The guide has not been run end to end on a clean machine, and it has not been timed. This banner is removed when M5 merges._
 
 This guide takes a developer from a clean machine to a recorded task, with no other instruction file. Run the commands in order. Replace each placeholder in angle brackets before you run its line. The first build is the slow part.
 
@@ -10,32 +10,42 @@ The plugin is the recommended route for Claude Code. It brings the MCP server an
 
 - **Go 1.26.** The version is the one in [go.mod](https://github.com/djm56/cairn-memory/blob/main/go.mod), which declares `go 1.26.0` and `toolchain go1.26.10`. There are no release archives yet, so `cairn` is built from source. No C toolchain is needed.
 - **git.** To clone the repository. `make build` reads the version from git.
-- **Claude Code.** The one-line install in section 5a needs 2.1.275 or later. The live check ran 2.1.311. Check your version with `claude --version`. CI validates the plugin with Claude Code 2.1.326; that is a check on the repository, and you do not need that version.
+- **Claude Code.** The one-line install in section 5a needs 2.1.275 or later, the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `/plugin install` with `--marketplace`. The live check ran 2.1.311. Check your version with `claude --version`. CI validates the plugin with Claude Code 2.1.326; that is a check on the repository, and you do not need that version.
 - **A server the machine can reach.** Either one you run on this machine (section 3 starts it on loopback), or a shared server whose operator gives you its URL and an agent key.
 - **A project folder.** Any folder you want Cairn to record. Use a project folder, not the clone of this repository. Section 4 writes its `.cairn.toml`.
 - **An agent key.** Section 3 makes one on a local server. On a shared server, the operator gives you one.
 
 ## 2. Install `cairn`
 
-Clone the repository. If you already have a checkout, run the `cd` line and the lines after it in that checkout. These are the commands from [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1:
+Choose the block for where M5 is. Both start with a clone. If you already have a checkout, run the `cd` line and the lines after it in that checkout. The commands follow [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1.
+
+### After M5 is on `main`
 
 ```bash
 git clone https://github.com/djm56/cairn-memory.git
 cd cairn-memory
 git switch main && git pull --ff-only
 make build && bin/cairn version
-```
-
-Expect `cairn` followed by a short commit hash. If the hash ends in `-dirty`, the checkout has local changes: deal with them first. Build with `make build`, not `go build`, which prints `cairn dev`.
-
-Before M5 merges, `main` has no plugin. Use the `m5-plugin` branch instead. Once that branch is pushed, a fresh clone runs `git switch m5-plugin` in place of `git switch main`. Until then, use a local checkout that already carries the branch, and stay on it. Section 5b reads the plugin from that checkout.
-
-Then install the binary:
-
-```bash
 mkdir -p ~/.local/bin && install -m 0755 bin/cairn ~/.local/bin/cairn
 command -v cairn
 ```
+
+### Before M5 is on `main`
+
+Before the `m5-plugin` branch is pushed, a clean machine cannot follow this block. A fresh clone has only `main`, so `git switch m5-plugin` has no branch to find. Until the branch is pushed, use a local checkout that already carries it, and run the lines from `git switch m5-plugin` onward in that checkout. Section 5b reads the plugin from that checkout.
+
+```bash
+git clone https://github.com/djm56/cairn-memory.git
+cd cairn-memory
+git switch m5-plugin
+make build && bin/cairn version
+mkdir -p ~/.local/bin && install -m 0755 bin/cairn ~/.local/bin/cairn
+command -v cairn
+```
+
+If you switch branches after building, run `make build` and the install line again. The binary is from the branch it was built on.
+
+In either block, expect `cairn` followed by a short commit hash. If the hash ends in `-dirty`, the checkout has local changes: deal with them first. Build with `make build`, not `go build`, which prints `cairn dev`.
 
 `command -v cairn` prints a path. If it prints nothing, add `~/.local/bin` to your PATH and open a new terminal. The plugin's launcher also looks in `~/.local/bin`, so the plugin finds `cairn` either way. Your shell needs the PATH for the `cairn` commands in this guide. The launcher runs the first `cairn` on PATH, so section 8 covers what to do when you update the checkout.
 
@@ -106,7 +116,7 @@ Start Claude Code in the project folder with `claude`, then type these two lines
 
 The install line opens the plugin's details. Choose a scope: user scope applies to every project on this machine, and local scope to this project only. The last line of the install summary says whether the plugin is active (`Plugin is now active.`) or needs `/reload-plugins`.
 
-With Claude Code 2.1.275 or later, one line adds the marketplace and opens the plugin's details:
+With Claude Code 2.1.275 or later, the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`, one line adds the marketplace and opens the plugin's details:
 
 ```text
 /plugin install cairn --marketplace djm56/cairn-memory
@@ -141,7 +151,7 @@ The plugin asks for no key and no server. Section 3 and section 4 provide both.
 Run these from the project folder. Start a new session with `claude` first.
 
 1. In a shell, `claude plugin list` lists `cairn@cairn-memory` with its status.
-2. In the session, type `/` and look for `/cairn:status`, which the live check's session listed. Run it. It prints the project, the server and the active task, or `task none active`.
+2. In the session, type `/` and look for `/cairn:status`, which the live check's session listed. Run it. It runs `cairn status` through the plugin's launcher and shows the output: the project, the server and the active task, or `task none active`.
 3. The session's start-up record names the plugin's server `plugin:cairn:cairn`, and in the live check it was connected. Its 15 tools are named `mcp__plugin_cairn_cairn__<tool>`. The live check did not capture `/mcp` output, so this guide does not say what `/mcp` prints. Section 7a is the check that counts.
 4. The SessionStart hook adds a block to Claude's context at the start of each session. With no active task the block is one line: `Cairn: no task is active in <project>.` With a task it is five lines, and the last one is `The block above is the task to continue.` You can print the same text yourself from the project folder with `cairn hook session-start`.
 
@@ -157,16 +167,32 @@ The plugin's skill teaches Claude this loop, with the tools under their short na
 
 This check runs the plugin from inside Claude Code and reads the result from a terminal. It is the check the install must pass. Run it in the project folder, after section 6.
 
-1. Start Claude Code in the project folder with `claude`.
-2. Ask Claude, in your own words, to record one small piece of work as a Cairn task. Give your agent name, so Claude passes it on every write. For example:
+Before the session, run two checks in the project folder. They make sure the session uses the plugin's server and no other.
+
+1. Run `cairn status`. It should print `task        none active`, with eight spaces between `task` and `none`. If it names an active task, close that task first. Section 9 covers a refused `task start`, and the close it describes applies here.
+2. Run `claude mcp list`. If it lists a `cairn` entry at user scope, remove it with `claude mcp remove cairn -s user`, as section 8 describes. A manual entry at another scope goes the same way, with its scope. Only the plugin's server should be left.
+
+3. Start Claude Code in the project folder with `claude`.
+4. Ask Claude, in your own words, to record one small piece of work as a Cairn task. Give your agent name, so Claude passes it on every write, and tell Claude to use the Cairn MCP tools, not the `cairn` command in the shell. For example:
 
    ```text
-   Start a Cairn task for one small piece of work you can finish in this session. Use <your-agent-name> as the agent on every Cairn write. Add one step, start it, do the work, finish it with a summary, and close the task with a one-line outcome.
+   Start a Cairn task for one small piece of work you can finish in this session. Use the Cairn MCP tools, not the cairn command in the shell. Use <your-agent-name> as the agent on every Cairn write. Add one step, start it, do the work, finish it with a summary, and close the task with a one-line outcome.
    ```
 
-   Claude uses the plugin's tools for this: `task_start`, `step_add`, `step_update` to start and finish the step, and `task_close`. A step must be started before it can be finished, and Claude does that. If the close is refused, the refusal names what is missing, and the skill tells Claude how to answer it.
+   Claude uses the plugin's tools for this: `task_start`, `step_add`, `step_update` to start and finish the step, and `task_close`. A step must be started before it can be finished, and Claude does that. Claude Code asks permission the first time each Cairn tool is used. Allow them.
 
-3. When Claude has closed the task, run these in a terminal in the project folder:
+5. Watch the tool calls Claude makes. Claude Code shows each call's name. The check counts only when these four calls are named as shown:
+
+   - `mcp__plugin_cairn_cairn__task_start`
+   - `mcp__plugin_cairn_cairn__step_add`
+   - `mcp__plugin_cairn_cairn__step_update`
+   - `mcp__plugin_cairn_cairn__task_close`
+
+   A call named `mcp__cairn__…`, or a Bash call that runs `cairn …`, means the check did not exercise the plugin. Fix the cause (for a `mcp__cairn__` call, that is a manual entry, as step 2 covers), then run the check again from step 1 in a new session. Other calls to the plugin's server, such as `task_current`, do not fail the check.
+
+   A refused first `task_close` is expected when Claude leaves out something the close requires: a summary, criteria results, lessons or a reason for none, or mistakes. The refusal's `missing` list names what is short. The skill tells Claude to supply each item and close again. A refusal is not an install failure.
+
+6. When Claude has closed the task, run these in a terminal in the project folder:
 
    ```bash
    cairn task list
@@ -175,7 +201,7 @@ This check runs the plugin from inside Claude Code and reads the result from a t
 
    Replace `<task-id>` with the first word on the first line that `task list` prints.
 
-The check passes when both of these hold:
+The check passes when the tool names in step 5 are as shown, and both of these hold:
 
 - `cairn task list` shows the task with status `done`, one line, for example:
 

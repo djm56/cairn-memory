@@ -77,7 +77,7 @@ project = "acme-api"
 server = "https://cairn.lan:8788"
 ```
 
-For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Once M5 is on `main`, Claude Code 2.1.275 or later installs it in one line: `/plugin install cairn --marketplace djm56/cairn-memory`. Until then, install it from a local checkout. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has both routes. Use the plugin or the lines above, not both.
+For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Once M5 is on `main`, Claude Code 2.1.275 or later (the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`) installs it in one line: `/plugin install cairn --marketplace djm56/cairn-memory`. Until then, install it from a local checkout. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has both routes. Use the plugin or the lines above, not both.
 The repository and the Go module still carry the name `cairn-memory`. Renaming them to `cairn` is
 planned (decision D18), and the rename has not been done.
 
