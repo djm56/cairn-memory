@@ -213,12 +213,15 @@ adds its entry under Unreleased, unless it carries the `skip-changelog` label
 
 - Claude Code plugin skill (issue #22): `plugins/claude-code/skills/cairn/SKILL.md` teaches the task loop, what each hook puts in front of the agent, how to answer a refused `task_close`, and how to insert a step between two. `internal/plugincheck` fails when the skill's frontmatter is invalid, or when it names a tool the server does not register.
 - Plugin validation in CI (issue #24): the `plugin` job in `.github/workflows/ci.yml` installs Claude Code at the pinned version 2.1.326, and runs `claude plugin validate ./plugins/claude-code --strict` and `claude plugin validate .`. Validation needs no API key or login. The docs workflow's shellcheck also covers `plugins/claude-code/bin/cairn-launch`.
+- Claude Code plugin install guide (issue #25): `wiki/Install-Plugin.md` takes a new developer from a clean machine to a recorded task, with no other instruction file. It covers the prerequisites, the `cairn` build and install, the key in `~/.config/cairn/client.env`, the project file, the marketplace and the plugin from GitHub or from a local checkout, the checks, a first task, the route that uses `cairn enable`, and troubleshooting, including the launcher's exit 127. It is linked from the README, the wiki sidebar and Home, and from the Claude Code sections of Connecting-Agents, Install-Local and Quick-Start. Its tool names are the short names; the exact names Claude Code shows wait for the live check (issue #26).
 
 ### Fixed
 
 - The plugin launcher, `bin/cairn-launch`, does not expand `*`, `?` or `[` in a PATH entry, and it restores an unset `IFS` as unset rather than as empty.
 - `cairn doctor --agent claude-code` names `~/.claude/settings.json` in its duplicate-hooks warning when that file holds a cairn hook while the plugin is enabled.
 - `wiki/CLI-Reference.md` documents which settings file decides whether the cairn plugin is enabled, and the duplicate-hooks warning.
+- The plugin skill says that `skip` is refused on an active step, so an active step is failed before it is skipped, and it names the arguments each write tool requires. The skill's wording on a missing block now says the hook may not have run.
+- The hooks reference says a PreCompact hook's stdout becomes instructions for the compaction summary. `docs/DESIGN.md` §4.1 and §6.1, the README and `wiki/Connecting-Agents.md` said the hook did nothing in Claude Code. They now give the documented behaviour, and say it is not confirmed in a live session (issue #26).
 
 ### Changed
 

@@ -87,6 +87,8 @@ echo $?
 
 ## 7. Connect Claude Code
 
+This is the route without the Claude Code plugin. The plugin is the recommended route, and [Install-Plugin](Install-Plugin) covers it. Use one route or the other, not both (D34).
+
 ```bash
 cairn enable --agent claude-code
 claude mcp add cairn -- "$(command -v cairn)" mcp

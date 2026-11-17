@@ -453,13 +453,12 @@ https://code.claude.com/docs/en/hooks.md:
   that conflict: the hook text no longer asks for the call. The M4 rule is not changed,
   and the change is built and not released yet (issue #206). See
   [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
-- `pre-compact` prints the same block. It is installed, as D15 names it, but it
-  is inert in Claude Code. The reference says plain stdout is written to the debug
-  log and not shown in the transcript, except for four events, and PreCompact is
-  not one of them: UserPromptSubmit, UserPromptExpansion, SessionStart and
-  PostModelSwitch add it to Claude's context. The reference also says Claude Code
-  discards a PreCompact hook's `systemMessage`. So the block does not reach the
-  model.
+- `pre-compact` prints the same block. It is installed, as D15 names it. The
+  reference says a PreCompact hook's plain stdout becomes instructions for the
+  compaction summary. That is not the same as the SessionStart route, which adds
+  stdout to Claude's context. The effect in Claude Code is not confirmed in a live
+  session (issue #26), so the skill does not rely on it: after `/compact`, the
+  session-start block is the one that reaches the agent.
 - `stop` prints one line of JSON, `{"systemMessage": ...}`, when a step of the
   active task is active with no summary, and nothing otherwise. The reference
   says `systemMessage` is a warning shown to the user. It is not added to
@@ -1363,8 +1362,11 @@ plugins/claude-code/
   hooks/hooks.json             registers the same three hooks as cairn enable:
                                SessionStart → cairn hook session-start;
                                PreCompact and Stop → cairn hook pre-compact
-                               and stop (D15; PreCompact is inert in Claude
-                               Code, §4.1). Each runs through bin/cairn-launch
+                               and stop (D15). The hooks reference says
+                               PreCompact stdout becomes instructions for the
+                               compaction summary. That is not confirmed in a
+                               live session (issue #26), so the skill does not
+                               rely on it (§4.1). Each runs through bin/cairn-launch
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below,
                                what each hook puts in front of the agent, how
                                to answer a refused close, and how to insert a step

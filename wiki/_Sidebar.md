@@ -8,6 +8,7 @@
 **Install and upgrade**
 
 - [Install locally](Install-Local)
+- [Install the Claude Code plugin](Install-Plugin)
 - [Install a server](Install-Server)
 - [Upgrade](Upgrade)
 - [Binaries](Binaries)
