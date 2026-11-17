@@ -1,0 +1,12 @@
+{
+  "name": "cairn",
+  "version": "0.1.0",
+  "description": "Task state, learnings, directives and recall for coding agents, through the cairn MCP server and its Claude Code hooks. The API key and the server come from the machine and the project, not from this plugin.",
+  "author": {
+    "name": "Donovan Maidens"
+  },
+  "homepage": "https://github.com/djm56/cairn-memory",
+  "repository": "https://github.com/djm56/cairn-memory",
+  "license": "MIT",
+  "keywords": ["memory", "tasks", "mcp", "hooks"]
+}

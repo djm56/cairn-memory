@@ -19,7 +19,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 | M2 Server | Done | Passed 2026-11-02 | `cairn serve`, key scopes, backup and restore |
 | M3 Web UI + dashboard | Done | Passed | Web pages, sign-in, viewer mode, dashboard |
 | M4 Hooks + CLI | Done | Passed by operator ruling 2026-11-06 | Claude Code hooks, CLI verbs with `--json` |
-| M5 Plugin | Current | Not passed | Plugin tree; none of it exists yet |
+| M5 Plugin | Current | Not passed | Plugin tree built on m5-plugin, not merged; skill text, CI validate and install guide open |
 | M6 Import | Planned | Not passed | `cairn import bishop-memory`; no code yet |
 | M7 Pilot | Planned | Not passed | Two weeks of real use; operator decisions first |
 | M8 Roll-out | Planned | Not passed | Every project moves; bishop-memory goes read-only |
@@ -50,9 +50,9 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 28 issues open, 4 closed. No plugin code exists yet.
+- **Status:** Current. Not passed. 28 issues open, 4 closed. The plugin tree is built on branch m5-plugin (manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `/cairn:init`, `/cairn:status`, the root marketplace file), with tests. Not merged and not released.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
-- **Next action:** D34 to D37 are decided (2026-11-17). The #206 hook text and the #193 enable check are built on branch m5-plugin, with tests, and not yet merged; their review is next. Then the layout (#21) and the launcher (#23). #22 and #25 no longer wait on a decision.
+- **Next action:** Review the plugin tree and the enable and doctor fixes on m5-plugin. Then the skill text (#22), `claude plugin validate` in CI (#24), the install guide (#25) and the live probe of tool names and hooks (#26).
 
 **Detail**
 
@@ -65,8 +65,8 @@ Open issues, grouped (28):
 
 Left before the exit check passes:
 
-1. Build the whole DESIGN §6.1 tree. None of it exists.
-2. `/cairn:init` and `/cairn:status` have no issue. To be filed.
+1. The skill text (#22) is not built. The rest of the DESIGN §6.1 tree is built on m5-plugin, not merged.
+2. `/cairn:init` and `/cairn:status` exist on m5-plugin, under #21 and #23. No issue names them on its own: to be filed, or named in the M5 pull request.
 3. Decided 2026-11-17: #193 (D34) and #206 (D35). Both are built on m5-plugin. The skill text for D35 comes with #22. #193 and #206 close with the M5 pull request.
 4. Live-confirm the tool names and the `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` behaviour (#26).
 5. Decided 2026-11-17 (D36): the API key lives only in `~/.config/cairn/client.env` or `CAIRN_API_KEY`, and the plugin has no `userConfig`. Recorded on branch m5-plugin, not yet merged.

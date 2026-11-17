@@ -1358,15 +1358,15 @@ plugins/claude-code/
                                elsewhere, as below
   .mcp.json                    server "cairn": ${CLAUDE_PLUGIN_ROOT}/bin/cairn-launch mcp
   bin/cairn-launch             finds the cairn binary on PATH, then in ~/.local/bin
-                               (D37); if neither has it, exits non-zero with the
-                               one-line install command
+                               (D37); if neither has it, exits 127 with one line
+                               naming the install command
   hooks/hooks.json             SessionStart → cairn hook session-start
                                (command built in M1; issue #16);
                                PreCompact and Stop → cairn hook pre-compact
                                and stop (commands built in M4, D15; PreCompact
                                is inert in Claude Code, §4.1). This file is M5.
   skills/cairn/SKILL.md        how to work with Cairn: the task loop below
-  commands/init.md             /cairn:init → cairn init
+  commands/init.md             /cairn:init → cairn init, with the flags given
   commands/status.md           /cairn:status
 ```
 
@@ -1374,8 +1374,11 @@ The plugin does not bundle the binary. A plugin's `bin/` is on the Bash
 tool's PATH only, and shipping per-platform binaries in a plugin is not
 documented, so the binary is installed once per machine and the launcher
 finds it. The launcher searches PATH first and then `~/.local/bin`. `CAIRN_HOME/bin`
-is not searched (D37). If `cairn` is in neither place, the launcher exits non-zero
-and prints the one-line install command.
+is not searched (D37). If `cairn` is in neither place, the launcher prints one line
+naming the install command and exits 127, the status a shell gives a command it cannot
+find. Only absolute PATH directories are searched, so an empty or relative entry never
+runs a cairn from the directory a session is in. A cairn that is the launcher itself,
+through a link on PATH, is skipped, so the launcher does not run itself.
 
 **Key and server (D36).** The plugin holds neither. The API key comes from
 `CAIRN_API_KEY` or `~/.config/cairn/client.env`, as §5.2 says, and the server comes

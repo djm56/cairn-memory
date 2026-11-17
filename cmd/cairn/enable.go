@@ -161,7 +161,7 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: cairn enable --agent <name> [--dry-run]")
 	fmt.Fprintln(w, "Installs the cairn hooks into the project's Claude Code settings: .claude/settings.local.json in the project directory.")
-	fmt.Fprintln(w, "If the cairn plugin is enabled in Claude Code settings (enabledPlugins in the project's .claude/settings.local.json or .claude/settings.json, or the user's ~/.claude/settings.json), it says so and adds no hooks, since the plugin carries them. It writes nothing then.")
+	fmt.Fprintln(w, "If the cairn plugin is enabled in Claude Code settings, it says so and adds no hooks, since the plugin carries them. It writes nothing then. The settings are read in this order: the project's .claude/settings.local.json, the project's .claude/settings.json, then the user's ~/.claude/settings.json. The first file with a cairn key in enabledPlugins decides, so a false there overrides a true later in the list.")
 	fmt.Fprintln(w, "It adds only the hooks whose command is not registered under their event yet, and keeps every other key and entry.")
 	fmt.Fprintln(w, "The file is rewritten in a new layout: its top-level keys are sorted and its whitespace is laid out again. The backup holds the original text.")
 	fmt.Fprintln(w, "The hooks run cairn by name, so cairn must be on the PATH Claude Code uses; enable warns when it is not on its own PATH.")
@@ -420,45 +420,54 @@ func pluginSettingsFiles(root string) []settingsFile {
 	return files
 }
 
-// cairnPluginIn returns the path of the first file in files that enables the cairn plugin, and true. A file that is not
-// there, that cannot be read, that a project file's link or size refuses, or that is not plain JSON enables nothing, and the
-// next file is looked at. Nothing is written.
+// cairnPluginIn returns the path of the settings file that decides whether the cairn plugin is enabled, and true when that
+// file enables it. The files are read in order, and the first one with a cairn key decides, whatever the files after it hold.
+// Claude Code lets the narrower scope win, so a false in the project's local file overrides a true in the user's file. A file
+// that is not there, that cannot be read, that a project file's link or size refuses, or that is not plain JSON is skipped,
+// and the next file is read. A file with no cairn key is skipped too. When no file decides, or the deciding file turns the
+// plugin off, the result is "", false. Nothing is written.
 func cairnPluginIn(files []settingsFile) (string, bool) {
 	for _, f := range files {
 		raw, err := readSettingsFile(f.path, f.user)
 		if err != nil {
 			continue
 		}
-		if pluginEnabledIn(raw) {
-			return f.path, true
+		if has, on := pluginKeyIn(raw); has {
+			if on {
+				return f.path, true
+			}
+			return "", false
 		}
 	}
 	return "", false
 }
 
-// pluginEnabledIn reports whether raw, the bytes of a settings file, enables the cairn plugin: its enabledPlugins object has
-// a key whose part before the last "@" is exactly pluginName, with the value true. Any other key, a value that is not the
-// boolean true, and an enabledPlugins that is not an object all leave it false. A file that is not plain JSON is false.
-func pluginEnabledIn(raw []byte) bool {
+// pluginKeyIn reports on the cairn plugin's keys in raw, the bytes of a settings file. has is true when its enabledPlugins
+// object holds a key whose part before the last "@" is exactly pluginName, with a boolean value; on is true when one of
+// those keys is true. A key whose value is not a boolean, an enabledPlugins that is not an object, and a file that is not
+// plain JSON give has false, so the file does not decide. Any other key is ignored.
+func pluginKeyIn(raw []byte) (has, on bool) {
 	var doc map[string]json.RawMessage
 	if json.Unmarshal(raw, &doc) != nil {
-		return false
+		return false, false
 	}
 	var plugins map[string]json.RawMessage
 	if json.Unmarshal(doc["enabledPlugins"], &plugins) != nil {
-		return false
+		return false, false
 	}
 	for key, value := range plugins {
 		at := strings.LastIndex(key, "@")
 		if at < 0 || key[:at] != pluginName {
 			continue
 		}
-		var on bool
-		if json.Unmarshal(value, &on) == nil && on {
-			return true
+		var v bool
+		if json.Unmarshal(value, &v) != nil {
+			continue
 		}
+		has = true
+		on = on || v
 	}
-	return false
+	return has, on
 }
 
 // enableClaudeCode merges the Claude Code hooks into the settings file of the project called name, at root. The file is
