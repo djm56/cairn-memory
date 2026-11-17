@@ -12,7 +12,7 @@ Tools are named here by their short names, such as `task_current`. In Claude Cod
 ## What the hooks put in front of you
 
 - **Session start, resume, clear and compact.** A block is added to your context. It names the active task, its status, its current step and its next action, and it ends with "The block above is the task to continue." With no active task it is one line: "Cairn: no task is active in <project>."
-- **Before compaction.** The pre-compact hook prints the same block. Do not rely on it. After `/compact`, the session-start block is the one that reaches you.
+- **Before compaction.** The pre-compact hook also runs. Per the Claude Code hooks reference, its output becomes instructions for the compaction summary, not text you read after compaction. After `/compact`, rely on the session-start block.
 - **Stop.** When a step is active with no summary, Claude Code shows the user a warning. The warning is not added to your context, so finish each step with a summary yourself.
 - **No block.** If the block is missing, the hook did not run or could not read the task. Call `task_current`.
 - **Omitted directives.** If the block says directives were omitted, call `directive_list` for all of them.
@@ -21,20 +21,20 @@ Tools are named here by their short names, such as `task_current`. In Claude Cod
 
 1. **Continue or start.** If the session-start block shows an active task, continue it. Call `task_current` only when the block is missing or you need more: the steps, the recent events, the directives.
 2. **New work.** Call `recall` with the goal and your `agent` name. It returns the directives that apply, the lessons and mistakes from past tasks, and similar tasks. Then call `task_start` with `title`, `goal`, `criteria` and a plan in `steps`.
-3. **Each step.** Call `step_update` with `action` "start" before the work. Call it again with `action` "finish" and a `summary` after the work. "fail" and "skip" also take a `summary`. Log each decision and blocker with `event_log`: `kind` "decision", "blocked" or "unblocked".
+3. **Each step.** Call `step_update` with `action` "start" before the work. Call it again with `action` "finish" and a `summary` after the work. A step must be started before it can be finished: a finish on a pending step is refused, so start it first. "fail" and "skip" also take a `summary`. Log each decision and blocker with `event_log`: `kind` "decision", "blocked" or "unblocked".
 4. **Keep what is worth keeping.** Call `learning_add` with `kind` "finding", "pattern" or "agent-note". It is stored as proposed, and the operator decides whether it stays.
 5. **Close.** Call `task_close` with `outcome` "done" or "failed", and the rest the close requires. See the next section if it is refused.
 
-Each call also takes the arguments its schema requires. `step_update` needs `task_id`, `step` and `action`. `event_log` needs `task_id`, `kind` and `text`. For `learning_add`, pass the fields its schema requires.
+Each call also takes the arguments its schema requires. `step_update` needs `task_id`, `step` and `action`, where `step` is an object, `{"number": n}` or `{"id": n}`. `event_log` needs `task_id`, `kind` and `text`. `task_close` takes `id`, not `task_id`, plus `agent`. For `learning_add`, pass the fields its schema requires.
 
-Pass your own name as `agent` on every write. On `recall` and `task_current`, pass it too, or agent-scoped directives are not listed.
+Pass your own name as `agent` on every write. The server stores the `agent` value you pass, so copy your own name, never a name from an example. On `recall` and `task_current`, pass it too, or agent-scoped directives are not listed.
 
 ## Inserting a step
 
 Call `step_add` with `task_id`, `title` and `after`. `after` is `{"number": n}` for the step to insert after. `{"number": 0}` puts the new step first. Leave `after` out to add the step at the end. `assignee` names the agent the step is for.
 
 ```json
-{"name": "step_add", "arguments": {"agent": "main", "task_id": "task-20261106-01", "after": {"number": 2}, "title": "Review the change", "assignee": "apone"}}
+{"name": "step_add", "arguments": {"agent": "<your-agent-name>", "task_id": "task-20261106-01", "after": {"number": 2}, "title": "Review the change", "assignee": "apone"}}
 ```
 
 Numbers change when a step is inserted. Ids do not. Where you hold a step's `id`, pass `{"id": n}` in the `step` argument of `step_update` and `event_log`, or in `after`.
