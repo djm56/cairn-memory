@@ -99,8 +99,9 @@ type hookCommand struct {
 // missing.
 //
 // The project is found as the other commands find it, from its .cairn.toml, and the files are in the directory of that
-// file. Exit codes: 0 when the files are in place, or a dry run was done; 1 when the project is not found or a file cannot be
-// read, merged or written; 2 for a usage error.
+// file. Exit codes: 0 when the files are in place, or a dry run was done, or (claude-code) the cairn plugin is enabled and
+// carries the hooks, so none are added (D34); 1 when the project is not found or a file cannot be read, merged or written;
+// 2 for a usage error.
 func runEnable(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairn enable", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
@@ -160,6 +161,7 @@ func runEnable(args []string, stdout, stderr io.Writer) int {
 func writeEnableHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: cairn enable --agent <name> [--dry-run]")
 	fmt.Fprintln(w, "Installs the cairn hooks into the project's Claude Code settings: .claude/settings.local.json in the project directory.")
+	fmt.Fprintln(w, "If the cairn plugin is enabled in Claude Code settings, it says so and adds no hooks, since the plugin carries them. It writes nothing then. The settings are read in this order: the project's .claude/settings.local.json, the project's .claude/settings.json, then the user's ~/.claude/settings.json. The first file with a cairn key in enabledPlugins decides, so a false there overrides a true later in the list.")
 	fmt.Fprintln(w, "It adds only the hooks whose command is not registered under their event yet, and keeps every other key and entry.")
 	fmt.Fprintln(w, "The file is rewritten in a new layout: its top-level keys are sorted and its whitespace is laid out again. The backup holds the original text.")
 	fmt.Fprintln(w, "The hooks run cairn by name, so cairn must be on the PATH Claude Code uses; enable warns when it is not on its own PATH.")
@@ -400,9 +402,84 @@ func enableWrites(files []fileWrite, root, project string, dryRun bool, report f
 	return 0
 }
 
+// pluginName is the name of the cairn Claude Code plugin. Claude Code records each enabled plugin as a key of
+// enabledPlugins, "<plugin>@<marketplace>", with a boolean value (D34). The marketplace is not checked.
+const pluginName = "cairn"
+
+// pluginSettingsFiles returns the settings files that can enable the cairn plugin for the project at root, in the order
+// they are read: the project's local file, its shared file, then the user's file when there is a home directory. They are
+// the three scopes Claude Code reads enabledPlugins from.
+func pluginSettingsFiles(root string) []settingsFile {
+	files := []settingsFile{
+		{path: filepath.Join(root, settingsDir, settingsName)},
+		{path: filepath.Join(root, settingsDir, settingsFileName)},
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		files = append(files, settingsFile{path: filepath.Join(home, ".claude", settingsFileName), user: true})
+	}
+	return files
+}
+
+// cairnPluginIn returns the path of the settings file that decides whether the cairn plugin is enabled, and true when that
+// file enables it. The files are read in order, and the first one with a cairn key decides, whatever the files after it hold.
+// Claude Code lets the narrower scope win, so a false in the project's local file overrides a true in the user's file. A file
+// that is not there, that cannot be read, that a project file's link or size refuses, or that is not plain JSON is skipped,
+// and the next file is read. A file with no cairn key is skipped too. When no file decides, or the deciding file turns the
+// plugin off, the result is "", false. Nothing is written.
+func cairnPluginIn(files []settingsFile) (string, bool) {
+	for _, f := range files {
+		raw, err := readSettingsFile(f.path, f.user)
+		if err != nil {
+			continue
+		}
+		if has, on := pluginKeyIn(raw); has {
+			if on {
+				return f.path, true
+			}
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// pluginKeyIn reports on the cairn plugin's keys in raw, the bytes of a settings file. has is true when its enabledPlugins
+// object holds a key whose part before the last "@" is exactly pluginName, with a boolean value; on is true when one of
+// those keys is true. A key whose value is not a boolean, an enabledPlugins that is not an object, and a file that is not
+// plain JSON give has false, so the file does not decide. Any other key is ignored.
+func pluginKeyIn(raw []byte) (has, on bool) {
+	var doc map[string]json.RawMessage
+	if json.Unmarshal(raw, &doc) != nil {
+		return false, false
+	}
+	var plugins map[string]json.RawMessage
+	if json.Unmarshal(doc["enabledPlugins"], &plugins) != nil {
+		return false, false
+	}
+	for key, value := range plugins {
+		at := strings.LastIndex(key, "@")
+		if at < 0 || key[:at] != pluginName {
+			continue
+		}
+		var v bool
+		if json.Unmarshal(value, &v) != nil {
+			continue
+		}
+		has = true
+		on = on || v
+	}
+	return has, on
+}
+
 // enableClaudeCode merges the Claude Code hooks into the settings file of the project called name, at root. The file is
 // read and merged in memory first, so a refusal leaves it as it was. Dry run prints the same lines and writes nothing.
+//
+// When the cairn plugin is enabled in one of the settings files of the project or the user (D34), the plugin carries the
+// hooks, so enable says where it found the plugin and adds none. It writes nothing then, dry run or not, and exits 0.
 func enableClaudeCode(root, name string, dryRun bool, stdout, stderr io.Writer) int {
+	if path, ok := cairnPluginIn(pluginSettingsFiles(root)); ok {
+		fmt.Fprintf(stdout, "cairn enable: the cairn plugin is enabled in %s, and the plugin carries the hooks, so enable adds none. Nothing was written.\n", path)
+		return 0
+	}
 	var results []hookResult
 	fw := fileWrite{
 		path: filepath.Join(root, settingsDir, settingsName),

@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-11, main at time of writing (400de64).
+Last synced: 2026-11-17, from main at b087844. Decisions D34 to D37 are recorded on branch m5-plugin, not yet merged. Decision comments are posted on #193, #206, #20 and #23. PR #229 (m5-plugin into main) is open and not merged, at 11a4b8e plus the commit that last synced this file; on merge it closes #21 to #26, #193 and #206.
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
@@ -19,7 +19,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 | M2 Server | Done | Passed 2026-11-02 | `cairn serve`, key scopes, backup and restore |
 | M3 Web UI + dashboard | Done | Passed | Web pages, sign-in, viewer mode, dashboard |
 | M4 Hooks + CLI | Done | Passed by operator ruling 2026-11-06 | Claude Code hooks, CLI verbs with `--json` |
-| M5 Plugin | Current | Not passed | Plugin tree; none of it exists yet |
+| M5 Plugin | Current | Not passed | Plugin tree, skill text, CI validate and install guide (#25) built on m5-plugin, not merged; live check (#26) done 2026-11-17 for the tool names and session start, not for the marketplace install or PreCompact |
 | M6 Import | Planned | Not passed | `cairn import bishop-memory`; no code yet |
 | M7 Pilot | Planned | Not passed | Two weeks of real use; operator decisions first |
 | M8 Roll-out | Planned | Not passed | Every project moves; bishop-memory goes read-only |
@@ -27,7 +27,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Now**
 
-- M5 Plugin: build `plugins/claude-code` and its install guide (epic #20; #21 to #26).
+- M5 Plugin: PR #229 is open against main; the operator merges it (epic #20; #21 to #26 close on merge).
 
 **Next**
 
@@ -37,9 +37,6 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Waiting on the operator**
 
-- #193: the plugin `hooks.json` and `cairn enable` may both run SessionStart. Decide before M5 ships.
-- #206: the hook text asks for `task_current`, which the M4 hand check counts as not run.
-- Plugin key handling: DESIGN §6.1 puts `api_key` in the plugin's sensitive `userConfig`, while wiki/Connecting-Agents.md:19 says the key lives in `client.env`.
 - Pending operator approval (wiki/Decisions.md:46-48):
   - D27: an operator write to an unknown project is refused.
   - D28: the shipped unit stays without `--behind-proxy`.
@@ -53,27 +50,27 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 28 issues open, 4 closed. No plugin code exists yet.
+- **Status:** Current. Not passed. 34 issues open, 4 closed. The plugin tree is built on branch m5-plugin (manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file), with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. PR #229 is open against main and not merged; not released. On merge of PR #229, #21 to #26, #193 and #206 close, leaving M5 at 26 open and 12 closed.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
-- **Next action:** Decide #193 and #206. Then build the layout (#21) and the launcher (#23). #22 and #25 wait on the two decisions.
+- **Next action:** The operator merges PR #229, then runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine.
 
 **Detail**
 
-Open issues, grouped (28):
+Open issues, grouped (34):
 
-- Decisions (2): #193 (plugin `hooks.json` and `cairn enable` may both run SessionStart) and #206 (hook text against the M4 "not run" rule).
+- Decisions (2, decided 2026-11-17, closing with PR #229 on merge): #193 (the plugin and `cairn enable` are alternatives; D34) and #206 (the hook text stops asking for `task_current`; D35). The M4 "not run" rule is unchanged.
 - Exit-critical build (7): #20 epic, #21 layout and marketplace, #22 skill text, #23 `cairn-launch`, #24 `claude plugin validate` in CI, #25 install guide, #26 live confirmation of tool names and hook behaviour.
-- Carry-over code and tests (13): #140 (restore: stray `-wal` and `-shm` files; the refusal is already in `internal/server/restore.go:128-133`), #191 (a `task_get` brief over the 64 KiB cap cannot be narrowed), #192, #194, #195, #196, #201, #212, #213, #215, #216, #217, #218 (MCP reads send no caller name, so agent-scoped directives are dropped).
-- Carry-over docs (6): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5).
+- Carry-over code and tests (16): #140 (restore: stray `-wal` and `-shm` files; the refusal is already in `internal/server/restore.go:128-133`), #191 (a `task_get` brief over the 64 KiB cap cannot be narrowed), #192, #194, #195, #196, #201, #212, #213, #215, #216, #217, #218 (MCP reads send no caller name, so agent-scoped directives are dropped), #230 (doctor reports plugin-carried hooks ok without reading `hooks/hooks.json`), #231 (PreCompact wording in `enable.go` and doctor), #232 (skill test checks argument names against each tool's InputSchema; restore `learning_add`'s required fields).
+- Carry-over docs (9): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5), #233 (MCP tool examples name the agent `main`; use a placeholder), #234 (`cairn enable --help` plugin-check rule does not match `wiki/CLI-Reference.md`), #235 (`wiki/Install-Plugin.md`: section 8 scope, `claude mcp get` fallback, relative `cd`, blank line, loop action).
 
 Left before the exit check passes:
 
-1. Build the whole DESIGN §6.1 tree. None of it exists.
-2. `/cairn:init` and `/cairn:status` have no issue. To be filed.
-3. Decide #193 and #206 before #22 and #25.
-4. Live-confirm the tool names and the `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` behaviour (#26).
-5. Operator decision on key handling: DESIGN §6.1 puts `api_key` in the plugin's sensitive `userConfig`, while wiki/Connecting-Agents.md:19 says the key lives in `client.env` or `CAIRN_API_KEY`, not the MCP entry.
-6. Epic #20 names `CAIRN_HOME/bin`, which is in neither DESIGN nor the code. Decide or drop. The decision touches #23 as well, since `CAIRN_HOME` is also named in the cairn-launch issue (`.github/roadmap.json:344`).
+1. The skill text (#22) is built on m5-plugin, and a test checks it against the tools the server registers. The CI validate job (#24) is built too. The install guide (#25) is written on m5-plugin as `wiki/Install-Plugin.md`; its tool names are confirmed by the live check (#26, 2026-11-17). The DESIGN §6.1 tree is built on m5-plugin, not merged.
+2. `/cairn:init` and `/cairn:status` exist on m5-plugin, under #21 and #23. No issue names them on its own: to be filed, or named in the M5 pull request.
+3. Decided 2026-11-17: #193 (D34) and #206 (D35). Both are built on m5-plugin. The skill text for D35 is in the skill (#22), built on m5-plugin. #193 and #206 close when PR #229 merges.
+4. Live check of #26, done 2026-11-17 on m5-plugin with Claude Code 2.1.311 and the plugin loaded by `--plugin-dir`. Confirmed: the server `plugin:cairn:cairn` and its tool names, the commands, the session-start block with and without a task, a task recorded through the plugin's tools, the rule that a step is started before it is finished, and the second server that a user-scope `cairn` entry adds. Not confirmed: the marketplace install, the PreCompact hook's effect, the launcher's exit 127 display, and what `/mcp` prints. `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` were not isolated: the probe ran in the project folder, so it cannot tell which one resolved the project.
+5. Decided 2026-11-17 (D36): the API key lives only in `~/.config/cairn/client.env` or `CAIRN_API_KEY`, and the plugin has no `userConfig`. Recorded on branch m5-plugin, not yet merged.
+6. Decided 2026-11-17 (D37): `CAIRN_HOME/bin` is dropped. The launcher searches PATH, then `~/.local/bin`. `.github/roadmap.json` is corrected on m5-plugin. The GitHub text of epic #20 and of issue #23 no longer names `CAIRN_HOME/bin`, and decision comments are posted on both.
 7. No release archives exist, so a clean-machine install means a source build with Go 1.26. The exit check does not say whether that counts. No issue covers the exit run itself.
 
 ### M6 Import (planned)
@@ -128,7 +125,7 @@ Left before the exit check passes:
 ### Later (opens after M8)
 
 - **Goal:** Scheduled review loop, per-harness plugins, public releases, Postgres store, documentation ingestion (PLAN §3).
-- **Status:** Later. 20 issues open, 0 closed. Not scheduled.
+- **Status:** Later. 22 issues open, 0 closed. Not scheduled.
 - **Exit check:** "Opened only after M8." (PLAN §3)
 - **Next action:** None until M8 closes. The operator decides #98 (rename, D18) and #99 (internal name).
 
@@ -137,6 +134,7 @@ Left before the exit check passes:
 - Epics (3): #30 scheduled review loop, #31 per-harness plugins, #32 public releases.
 - Decisions (2): #98 rename to `cairn` (D18), #99 internal name.
 - Hygiene (15): #33, #34, #35, #36, #37, #38, #41, #43, #64, #100, #126, #135, #214, #221, #223. Several are misfiled; see Known doc drift.
+- Plugin follow-ups (2): #236 (CI plugin job: try `npm install --global --ignore-scripts` for Claude Code), #237 (plugin icon: `claude plugin validate` reports ICON_MISSING).
 
 ### Closed milestones (history)
 

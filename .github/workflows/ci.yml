@@ -1,7 +1,8 @@
 name: CI
 
-# The local verification gate (CONTRIBUTING.md) on Linux. No secrets and no
-# publishing; release builds arrive with Later in docs/PLAN.md §3.
+# The local verification gate (CONTRIBUTING.md) on Linux, and the check of the
+# Claude Code plugin with the pinned Claude Code. No secrets and no publishing;
+# release builds arrive with Later in docs/PLAN.md §3.
 on:
   push:
     branches: [main]
@@ -55,3 +56,32 @@ jobs:
         # Refuses a tracked file that names a local user or machine layout, such as a home or
         # volume path, other than the placeholder user "you" (Makefile, scan-local-paths).
         run: make scan-local-paths
+
+  plugin:
+    name: claude plugin validate
+    runs-on: ubuntu-latest
+    env:
+      # The Claude Code version the plugin is validated with, pinned exactly so a new release cannot change the result.
+      # Bump it here, in the pull request that checks the new version.
+      CLAUDE_CODE_VERSION: "2.1.326"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        # Claude Code 2.1.326 needs Node 22 or later.
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Claude Code at the pinned version
+        run: |
+          npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          test "$(claude --version | awk '{print $1}')" = "${CLAUDE_CODE_VERSION}"
+
+      - name: Validate the plugin and the marketplace
+        # Validation reads the files only. It needs no API key and no login, which was checked on the pinned version
+        # with no key set and an empty home directory.
+        run: |
+          claude plugin validate ./plugins/claude-code --strict
+          claude plugin validate .

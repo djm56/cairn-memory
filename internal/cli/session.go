@@ -18,9 +18,10 @@ const NoRoleNote = "Agent-scoped directives were not counted: no agent role is s
 // it as the variable being unset.
 const RefusedRoleNote = "Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)."
 
-// HookPointer is the closing line of the session-start block the hook prints. It names the MCP tool an
-// agent with the server's tools calls for the brief.
-const HookPointer = "Call task_current for the brief, the steps and recent events."
+// HookPointer is the closing line of the session-start block the hook prints. It names no tool call: the
+// block already carries the active task, its current step and its next action, so the agent continues that
+// task (D35). SessionStart prints it only when a task is active; with no task the block is one line, with no pointer.
+const HookPointer = "The block above is the task to continue."
 
 // HookOmittedCall is the call the omitted-directives line of the hook's block names. The hook's agent has
 // the server's tools, so the call is the MCP tool.

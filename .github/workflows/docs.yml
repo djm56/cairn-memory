@@ -1,7 +1,7 @@
 name: Docs
 
 # Milestone marker and the changelog rule (scripts/check-docs.sh), and shellcheck
-# over every script. Reads only; no secrets, no publishing.
+# over every script and the plugin's launcher. Reads only; no secrets, no publishing.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -38,3 +38,7 @@ jobs:
       # are reported, so style and info notes cannot fail the PR.
       - name: shellcheck scripts
         run: find scripts -name '*.sh' -exec shellcheck --severity=warning {} +
+
+      # The plugin's launcher has no .sh name, so it is listed here. It is a sh script; shellcheck reads its shebang.
+      - name: shellcheck plugin launcher
+        run: shellcheck --severity=warning plugins/claude-code/bin/cairn-launch

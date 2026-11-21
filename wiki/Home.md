@@ -24,6 +24,7 @@ Pick the goal you have.
 | Try Cairn on your own machine | [Quick-Start](Quick-Start), then [Install-Local](Install-Local) for each step in detail |
 | Run a server that other machines reach | [Install-Server](Install-Server) |
 | Upgrade a server or a local install that is already running | [Upgrade](Upgrade) |
+| Install the Claude Code plugin, the recommended route for Claude Code | [Install-Plugin](Install-Plugin) |
 | Connect Claude Code, opencode or pi | [Connecting-Agents](Connecting-Agents) |
 | Check that an install works, or find out why a check failed | [Checks](Checks), and [Troubleshooting](Troubleshooting) |
 | Look up a command, flag, tool or exit code | [CLI-Reference](CLI-Reference), [MCP-Tools](MCP-Tools), [Binaries](Binaries) |
@@ -64,6 +65,7 @@ The design and the contract are in the repository. This wiki summarises them, an
 - [Binaries](Binaries): every Makefile target, version strings, supported systems and where the binary goes.
 - [CLI-Reference](CLI-Reference): the 19 verbs of `cairn`, plus `help` and `version`, with their flags, environment and exit codes.
 - [MCP-Tools](MCP-Tools): the 15 tools `cairn mcp` serves, one section each.
+- [Install-Plugin](Install-Plugin): installing the Claude Code plugin from a marketplace or a local checkout, checking it, and recording a first task.
 - [Connecting-Agents](Connecting-Agents): Claude Code, opencode (experimental), pi (experimental), and the hooks.
 - [Operations](Operations): keys and roles, backup, restore, logs and common tasks.
 - [Checks](Checks): the checks an operator can run, what each means, and the CI workflows.

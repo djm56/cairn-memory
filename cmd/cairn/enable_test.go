@@ -980,3 +980,272 @@ func TestEnableKeepsTheFileWhenTheRenameFails(t *testing.T) {
 		t.Errorf("the backup is not the original file")
 	}
 }
+
+// pluginEnabled is a settings file that enables the cairn plugin, from a marketplace the tests name, as Claude Code writes it.
+const pluginEnabled = `{"enabledPlugins": {"cairn@cairn-memory": true}}`
+
+// pluginScope is one of the three settings files Claude Code reads enabledPlugins from, and the path a test writes it to.
+type pluginScope struct {
+	name string
+	path func(t *testing.T, dir string) string
+}
+
+// pluginScopes are the project's local file, the project's shared file, and the user's file (D34).
+var pluginScopes = []pluginScope{
+	{name: "project local file", path: func(_ *testing.T, dir string) string { return settingsIn(dir) }},
+	{name: "project shared file", path: func(_ *testing.T, dir string) string { return filepath.Join(dir, settingsDir, settingsFileName) }},
+	{name: "user file", path: func(t *testing.T, _ string) string { return userSettings(t) }},
+}
+
+// pluginLine is the one line enable prints when the plugin is enabled in the settings file at path.
+func pluginLine(path string) string {
+	return "cairn enable: the cairn plugin is enabled in " + path + ", and the plugin carries the hooks, so enable adds none. Nothing was written.\n"
+}
+
+// TestEnableSeesThePluginAtEachScope checks that the cairn plugin enabled in any of the three settings files stops enable
+// before it writes: it names the file, exits 0, and changes nothing in the project or in that file.
+func TestEnableSeesThePluginAtEachScope(t *testing.T) {
+	for _, sc := range pluginScopes {
+		t.Run(sc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			path := sc.path(t, dir)
+			writeSettings(t, path, pluginEnabled)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+			if code != 0 || stderr != "" || stdout != pluginLine(path) {
+				t.Fatalf("exit %d, stdout %q, stderr %q: want 0, the plugin line naming %s, and nothing on stderr", code, stdout, stderr, path)
+			}
+			if got := readBytes(t, path); string(got) != pluginEnabled {
+				t.Errorf("the file the plugin is in changed:\n%s", got)
+			}
+			// Only the file the test wrote is in the project's .claude directory, so enable created no file there.
+			var want []string
+			if filepath.Dir(path) == filepath.Join(dir, settingsDir) {
+				want = []string{filepath.Base(path)}
+			}
+			if got := listDir(t, filepath.Join(dir, settingsDir)); !slices.Equal(got, want) {
+				t.Errorf(".claude holds %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+// TestEnableDryRunSaysThePluginIsEnabled checks that --dry-run reports the plugin the same way and writes nothing, at each
+// scope.
+func TestEnableDryRunSaysThePluginIsEnabled(t *testing.T) {
+	for _, sc := range pluginScopes {
+		t.Run(sc.name, func(t *testing.T) {
+			dir := enableProject(t)
+			path := sc.path(t, dir)
+			writeSettings(t, path, pluginEnabled)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code", "--dry-run")
+			if code != 0 || stderr != "" || stdout != pluginLine(path) {
+				t.Fatalf("exit %d, stdout %q, stderr %q: want 0, the plugin line naming %s, and nothing on stderr", code, stdout, stderr, path)
+			}
+			if got := readBytes(t, path); string(got) != pluginEnabled {
+				t.Errorf("the dry run changed the file:\n%s", got)
+			}
+			if _, err := os.Stat(settingsIn(dir)); err == nil && path != settingsIn(dir) {
+				t.Errorf("the dry run created %s", settingsIn(dir))
+			}
+		})
+	}
+}
+
+// TestEnableAddsTheHooksWhenThePluginIsNotEnabled checks the entries that do not enable the plugin: a false value, another
+// plugin, a key with no marketplace, and a name that only ends in cairn. enable then adds the three hooks to the project's
+// local file as it does without the plugin, and keeps what the file already holds.
+func TestEnableAddsTheHooksWhenThePluginIsNotEnabled(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		user    bool // the entry is in the user's file; otherwise it is in the project's local file, which enable merges
+	}{
+		{name: "value false", content: `{"enabledPlugins": {"cairn@cairn-memory": false}}`},
+		{name: "another plugin", content: `{"enabledPlugins": {"cairn-foo@x": true}}`, user: true},
+		{name: "no marketplace part", content: `{"enabledPlugins": {"cairn": true}}`, user: true},
+		{name: "a name that ends in cairn", content: `{"enabledPlugins": {"my-cairn@x": true}}`, user: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := enableProject(t)
+			path := settingsIn(dir)
+			if c.user {
+				path = userSettings(t)
+			}
+			writeSettings(t, path, c.content)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+			if code != 0 || stderr != "" {
+				t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+			}
+			if got := outcomes(stdout); !reflect.DeepEqual(got, allAdded) {
+				t.Errorf("outcomes %v, want every hook added", got)
+			}
+			want := map[string]any{"hooks": freshHooks()}
+			if !c.user {
+				want = decodeJSON(t, []byte(c.content))
+				want["hooks"] = freshHooks()
+			}
+			if got := decodeJSON(t, readBytes(t, settingsIn(dir))); !reflect.DeepEqual(got, want) {
+				t.Errorf("settings file holds %v, want %v", got, want)
+			}
+			if c.user && string(readBytes(t, path)) != c.content {
+				t.Errorf("enable changed the user's file:\n%s", readBytes(t, path))
+			}
+		})
+	}
+}
+
+// TestEnableTreatsAMalformedSettingsFileAsNotEnabled checks that a settings file which is not plain JSON, or whose
+// enabledPlugins is not an object, does not stop enable: it is read as not enabling the plugin, and enable adds the hooks.
+// The file itself is left as it is.
+func TestEnableTreatsAMalformedSettingsFileAsNotEnabled(t *testing.T) {
+	cases := map[string]string{
+		"a missing brace":                `{"enabledPlugins": {"cairn@cairn-memory": true}`,
+		"enabledPlugins is an array":     `{"enabledPlugins": ["cairn@cairn-memory"]}`,
+		"a comment, which JSON does not": "{\n  // the plugin\n  \"enabledPlugins\": {\"cairn@cairn-memory\": true}\n}\n",
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := enableProject(t)
+			path := userSettings(t)
+			writeSettings(t, path, content)
+
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+			if code != 0 || stderr != "" {
+				t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+			}
+			if got := outcomes(stdout); !reflect.DeepEqual(got, allAdded) {
+				t.Errorf("outcomes %v, want every hook added", got)
+			}
+			if got := decodeJSON(t, readBytes(t, settingsIn(dir))); !reflect.DeepEqual(got, map[string]any{"hooks": freshHooks()}) {
+				t.Errorf("settings file holds %v, want only the three hooks", got)
+			}
+			if string(readBytes(t, path)) != content {
+				t.Errorf("enable changed the malformed file:\n%s", readBytes(t, path))
+			}
+		})
+	}
+}
+
+// TestPluginKeyIn checks the match on the key and the value, on the text of a settings file alone. has says the file holds
+// a cairn key with a boolean value; on says one of those keys is true.
+func TestPluginKeyIn(t *testing.T) {
+	cases := []struct {
+		name    string
+		raw     string
+		has, on bool
+	}{
+		{"enabled from a marketplace", `{"enabledPlugins": {"cairn@cairn-memory": true}}`, true, true},
+		{"enabled from any marketplace", `{"enabledPlugins": {"cairn@somewhere-else": true}}`, true, true},
+		{"one enabled key among others", `{"enabledPlugins": {"cairn-foo@x": true, "cairn@cairn-memory": true}}`, true, true},
+		{"a false and a true in one file", `{"enabledPlugins": {"cairn@a": false, "cairn@b": true}}`, true, true},
+		{"value false", `{"enabledPlugins": {"cairn@cairn-memory": false}}`, true, false},
+		{"value is the string true", `{"enabledPlugins": {"cairn@cairn-memory": "true"}}`, false, false},
+		{"another plugin", `{"enabledPlugins": {"cairn-foo@x": true}}`, false, false},
+		{"no marketplace part", `{"enabledPlugins": {"cairn": true}}`, false, false},
+		{"an earlier @ only", `{"enabledPlugins": {"cairn@x@y": true}}`, false, false},
+		{"no enabledPlugins key", `{"hooks": {}}`, false, false},
+		{"enabledPlugins is not an object", `{"enabledPlugins": true}`, false, false},
+		{"not plain JSON", `{"enabledPlugins": {"cairn@cairn-memory": true},}`, false, false},
+		{"JSON null", `null`, false, false},
+		{"empty file", ``, false, false},
+	}
+	for _, c := range cases {
+		if has, on := pluginKeyIn([]byte(c.raw)); has != c.has || on != c.on {
+			t.Errorf("%s: pluginKeyIn(%q) = %v, %v, want %v, %v", c.name, c.raw, has, on, c.has, c.on)
+		}
+	}
+}
+
+// TestEnableNarrowerScopeDecides checks that the first settings file with a cairn key decides, as Claude Code reads it: a
+// false in the project's local file stops the plugin there, though the user's file enables it, so enable adds the hooks to
+// the local file. A true in the local file, with a false in the user's, names the local file.
+func TestEnableNarrowerScopeDecides(t *testing.T) {
+	t.Run("local false overrides user true", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, userSettings(t), pluginEnabled)
+		writeSettings(t, settingsIn(dir), `{"enabledPlugins": {"cairn@cairn-memory": false}}`)
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" {
+			t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+		}
+		if got := outcomes(stdout); !reflect.DeepEqual(got, allAdded) {
+			t.Errorf("outcomes %v, want every hook added", got)
+		}
+		want := map[string]any{"enabledPlugins": map[string]any{"cairn@cairn-memory": false}, "hooks": freshHooks()}
+		if got := decodeJSON(t, readBytes(t, settingsIn(dir))); !reflect.DeepEqual(got, want) {
+			t.Errorf("settings file holds %v, want %v", got, want)
+		}
+	})
+	t.Run("local and user both true name the local file", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, userSettings(t), pluginEnabled)
+		writeSettings(t, settingsIn(dir), pluginEnabled)
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" || stdout != pluginLine(settingsIn(dir)) {
+			t.Fatalf("exit %d, stdout %q, stderr %q: want 0 and the plugin line naming the local file", code, stdout, stderr)
+		}
+	})
+	t.Run("local true and user false names the local file", func(t *testing.T) {
+		dir := enableProject(t)
+		writeSettings(t, userSettings(t), `{"enabledPlugins": {"cairn@cairn-memory": false}}`)
+		writeSettings(t, settingsIn(dir), pluginEnabled)
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" || stdout != pluginLine(settingsIn(dir)) {
+			t.Fatalf("exit %d, stdout %q, stderr %q: want 0 and the plugin line naming the local file", code, stdout, stderr)
+		}
+	})
+}
+
+// TestEnableIgnoresAMalformedOrLinkedProjectFile checks the project files that enable cannot read as settings. A malformed
+// file enables nothing, and the next file is read, so the plugin in the user's file is still found. A project file that is a
+// symbolic link is skipped for the plugin, and enable then refuses to write through the link, as it does without the plugin.
+func TestEnableIgnoresAMalformedOrLinkedProjectFile(t *testing.T) {
+	t.Run("malformed local file, plugin in the user's file", func(t *testing.T) {
+		dir := enableProject(t)
+		user := userSettings(t)
+		writeSettings(t, user, pluginEnabled)
+		writeSettings(t, settingsIn(dir), `{"enabledPlugins": {"cairn@cairn-memory": true},}`)
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" || stdout != pluginLine(user) {
+			t.Fatalf("exit %d, stdout %q, stderr %q: want 0 and the plugin line naming %s", code, stdout, stderr, user)
+		}
+	})
+	t.Run("malformed shared file, plugin in the user's file", func(t *testing.T) {
+		dir := enableProject(t)
+		user := userSettings(t)
+		writeSettings(t, user, pluginEnabled)
+		shared := filepath.Join(dir, settingsDir, settingsFileName)
+		writeSettings(t, shared, "{\n  // not JSON\n}\n")
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 0 || stderr != "" || stdout != pluginLine(user) {
+			t.Fatalf("exit %d, stdout %q, stderr %q: want 0 and the plugin line naming %s", code, stdout, stderr, user)
+		}
+	})
+	t.Run("symbolic link holding the plugin key", func(t *testing.T) {
+		dir := enableProject(t)
+		writeFile(t, dir, "elsewhere.json", pluginEnabled)
+		if err := os.MkdirAll(filepath.Join(dir, settingsDir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(dir, "elsewhere.json"), settingsIn(dir)); err != nil {
+			t.Skipf("this system cannot make a symbolic link: %v", err)
+		}
+
+		code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+		if code != 1 || stdout != "" || !strings.Contains(stderr, "symbolic link") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 1 and the link refused, so the plugin in the target is not read", code, stdout, stderr)
+		}
+		if string(readBytes(t, filepath.Join(dir, "elsewhere.json"))) != pluginEnabled {
+			t.Errorf("the file the link names was changed")
+		}
+	})
+}

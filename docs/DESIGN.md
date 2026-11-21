@@ -124,8 +124,9 @@ every call, and no command prints it. The client does not follow a redirect, so
 the key is never sent to a second address. A `client.env` that is a symbolic
 link is judged by the file it names, and one that is not a regular file is
 refused. A line may begin with `export `. `cairn doctor` warns when a key would
-go over `http` to a host that is not loopback. The plugin's secure option (M5) will set
-`CAIRN_API_KEY`.
+go over `http` to a host that is not loopback. The plugin does not set the key (D36).
+Its `plugin.json` has no `userConfig`, so the key comes from `CAIRN_API_KEY` or
+`client.env`, as above.
 
 A user name or a password in the server URL stays out of output too: `cairn init`
 refuses one, and no command prints a URL with them.
@@ -397,7 +398,7 @@ differs from it only there).
 
 | Tool | Purpose |
 |---|---|
-| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply: those of the project and of the caller's role (`agent`, optional; CONTRACT §9 item 49). The first call of a session. Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
+| `task_current` | The active task: brief, steps with display numbers, the last few events, and the directives that apply: those of the project and of the caller's role (`agent`, optional; CONTRACT §9 item 49). Called when the session-start block is missing or is not enough (D35). Directives are capped at 12, ranked, with `expired` and `omitted` counts (D16). |
 | `task_start` | Create a task with its brief (title, goal, context, constraints, criteria, key files) and, optionally, its plan. Returns the id. |
 | `task_get` | One task in full, or one section of it (`brief`, `steps`, `events`, `close`). `section: events` is the journal, paged; it replaces `event_list` in M1. |
 | `task_list` | Recent tasks in this project, filtered by status. |
@@ -420,9 +421,12 @@ status, ratifies or retires a directive, deletes a task, or edits an event.
 
 `cairn hook session-start` prints, for a SessionStart hook, a short block of
 context: the active task (title, next action, current step), the count of
-directives that apply, and one line telling the agent to call `task_current`.
-When no task is active it says so in one line. It writes no task, step, event or
-learning. Its one call is a read, and the first call of a project creates the
+directives that apply, and one line saying that the block above is the task to
+continue. Decision D35 (2026-11-17) removed the line that asked the agent to call
+`task_current`: the block already carries the active task, its current step and its
+next action, so the call is needed only when the block is missing or the agent needs
+more (issue #206). When no task is active it says so in one line. It writes no
+task, step, event or learning. Its one call is a read, and the first call of a project creates the
 project's row on the server, as every first call does (CONTRACT §9 item 38). With
 no project, no server, or a server that does not answer in 5 seconds, it prints
 nothing on stdout, says why on stderr, and exits 0, so the session starts.
@@ -431,6 +435,10 @@ Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 `stop`. All three are built. `session-start` came in M1 (issue #16), and
 `pre-compact` and `stop` in M4 (issues #83 and #84). `cairn enable --agent
 claude-code` installs all three in the project's `.claude/settings.local.json`.
+Decision D34 (2026-11-17) changes this. When the cairn plugin is enabled in Claude
+Code settings, enable says so and adds none of the three, because the plugin carries
+them. The check is built (issue #193) and not released yet, so a binary from before it
+still adds them as described here.
 
 What Claude Code does with each hook's output follows the hooks reference,
 https://code.claude.com/docs/en/hooks.md:
@@ -441,15 +449,16 @@ https://code.claude.com/docs/en/hooks.md:
   This is what is meant to carry a task across `/compact` in Claude Code. The M4 hand
   check (section 3) passed on 2026-11-06 by operator ruling, not under its rule as
   written: the agent also called `task_current` after the compact, which the hook text
-  asks for and the rule counts as not run. The conflict is tracked in #206. See
+  of that run asked for and the rule counts as not run. D35 settles the design side of
+  that conflict: the hook text no longer asks for the call. The M4 rule is not changed,
+  and the change is built and not released yet (issue #206). See
   [M4-HAND-CHECK.md](M4-HAND-CHECK.md#recorded-result).
-- `pre-compact` prints the same block. It is installed, as D15 names it, but it
-  is inert in Claude Code. The reference says plain stdout is written to the debug
-  log and not shown in the transcript, except for four events, and PreCompact is
-  not one of them: UserPromptSubmit, UserPromptExpansion, SessionStart and
-  PostModelSwitch add it to Claude's context. The reference also says Claude Code
-  discards a PreCompact hook's `systemMessage`. So the block does not reach the
-  model.
+- `pre-compact` prints the same block. It is installed, as D15 names it. The
+  reference says a PreCompact hook's plain stdout becomes instructions for the
+  compaction summary. That is not the same as the SessionStart route, which adds
+  stdout to Claude's context. The effect in Claude Code is not confirmed in a live
+  session (issue #26), so the skill does not rely on it: after `/compact`, the
+  session-start block is the one that reaches the agent.
 - `stop` prints one line of JSON, `{"systemMessage": ...}`, when a step of the
   active task is active with no summary, and nothing otherwise. The reference
   says `systemMessage` is a warning shown to the user. It is not added to
@@ -521,11 +530,11 @@ any other backend. A behaviour exists when the conformance suite says so.
 | `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
 | `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` prints every task of the project, built in M4 (D22). |
 | `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
-| `cairn enable --agent <name>` | Built in M4 (#85). For `claude-code`, it adds the three hooks (`session-start`, matched on `startup`, `resume`, `clear` and `compact`; `pre-compact`; `stop`) to the project's `.claude/settings.local.json`, and writes no MCP registration: that comes through the M5 plugin or `claude mcp add`. For `opencode` and `pi`, which are EXPERIMENTAL, it also writes the MCP registration and the task-loop instructions. Before it writes an existing file, it copies the original to `cairn/backups/<project>` in the user's cache directory (`os.UserCacheDir`, outside the project), as a file of mode 0600 in a directory made 0700. `--dry-run` writes nothing. |
+| `cairn enable --agent <name>` | Built in M4 (#85). For `claude-code`, it adds the three hooks (`session-start`, matched on `startup`, `resume`, `clear` and `compact`; `pre-compact`; `stop`) to the project's `.claude/settings.local.json`, and writes no MCP registration: that comes through the M5 plugin or `claude mcp add`. D34 (2026-11-17) adds that when the cairn plugin is enabled in Claude Code settings, enable says so and adds none of the hooks; that check is built (issue #193) and not released yet. enable names the settings file that enables the plugin, adds no hooks and writes nothing, and exits 0; a settings file that is malformed or unreadable counts as not enabled. For `opencode` and `pi`, which are EXPERIMENTAL, it also writes the MCP registration and the task-loop instructions. Before it writes an existing file, it copies the original to `cairn/backups/<project>` in the user's cache directory (`os.UserCacheDir`, outside the project), as a file of mode 0600 in a directory made 0700. `--dry-run` writes nothing. |
 | `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
 | `cairn restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
 | `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
-| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1. `--agent` (`claude-code`, `opencode` or `pi`) is built in M4 (#86): for `claude-code` it lists the cairn hooks in the settings files and runs each once against the server, and it warns when the SessionStart matcher does not name `compact`; for `opencode` and `pi` (EXPERIMENTAL) it reports whether the registration and the instructions are in place. No file is written. |
+| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1. `--agent` (`claude-code`, `opencode` or `pi`) is built in M4 (#86): for `claude-code` it lists the cairn hooks in the settings files and runs each once against the server, and it warns when the SessionStart matcher does not name `compact`; a hook that no file holds is ok when the cairn plugin is enabled in one of them (D34); for `opencode` and `pi` (EXPERIMENTAL) it reports whether the registration and the instructions are in place. No file is written. |
 | `cairn task` | `current`, `get`, `list`, `start`, `update` and `close` a task, each with `--json`. Built in M4 (#87). |
 | `cairn step` | `add`, `update` and `plan` the steps of a task, each with `--json`. Built in M4 (#87). |
 | `cairn event log` | Logs an event on a task, with `--json`. Built in M4 (#87). |
@@ -1343,29 +1352,53 @@ marketplace file at the repository root.
 
 ```
 plugins/claude-code/
-  .claude-plugin/plugin.json   name "cairn"; userConfig: server (string),
-                               api_key (string, sensitive)
+  .claude-plugin/plugin.json   name "cairn"; no userConfig (D36): no server and
+                               no api_key. The key and the server come from
+                               elsewhere, as below
   .mcp.json                    server "cairn": ${CLAUDE_PLUGIN_ROOT}/bin/cairn-launch mcp
-  bin/cairn-launch             finds the cairn binary; if missing, exits
-                               with the one-line install command
-  hooks/hooks.json             SessionStart → cairn hook session-start
-                               (command built in M1; issue #16);
+  bin/cairn-launch             finds the cairn binary on PATH, then in ~/.local/bin
+                               (D37); if neither has it, exits 127 with one line
+                               naming the install command
+  hooks/hooks.json             registers the same three hooks as cairn enable:
+                               SessionStart → cairn hook session-start;
                                PreCompact and Stop → cairn hook pre-compact
-                               and stop (commands built in M4, D15; PreCompact
-                               is inert in Claude Code, §4.1). This file is M5.
-  skills/cairn/SKILL.md        how to work with Cairn: the task loop below
-  commands/init.md             /cairn:init → cairn init
+                               and stop (D15). The hooks reference says
+                               PreCompact stdout becomes instructions for the
+                               compaction summary. That is not confirmed in a
+                               live session (issue #26), so the skill does not
+                               rely on it (§4.1). Each runs through bin/cairn-launch
+  skills/cairn/SKILL.md        how to work with Cairn: the task loop below,
+                               what each hook puts in front of the agent, how
+                               to answer a refused close, and how to insert a step
+  commands/init.md             /cairn:init → cairn init, with the flags given
   commands/status.md           /cairn:status
 ```
 
 The plugin does not bundle the binary. A plugin's `bin/` is on the Bash
 tool's PATH only, and shipping per-platform binaries in a plugin is not
 documented, so the binary is installed once per machine and the launcher
-finds it.
+finds it. The launcher searches PATH first and then `~/.local/bin`. `CAIRN_HOME/bin`
+is not searched (D37). If `cairn` is in neither place, the launcher prints one line
+naming the install command and exits 127, the status a shell gives a command it cannot
+find. Only absolute PATH directories are searched, so an empty or relative entry never
+runs a cairn from the directory a session is in. A cairn that is the launcher itself,
+through a link on PATH, is skipped, so the launcher does not run itself.
+
+**Key and server (D36).** The plugin holds neither. The API key comes from
+`CAIRN_API_KEY` or `~/.config/cairn/client.env`, as §5.2 says, and the server comes
+from each project's `.cairn.toml`. Installing the plugin asks for no key and no server.
+
+**Plugin or `cairn enable` (D34).** The plugin and `cairn enable --agent claude-code`
+are alternatives, and the plugin is the recommended route for Claude Code. Enable
+checks whether the cairn plugin is enabled in Claude Code settings. If it is, enable
+says so and adds no hooks, because the plugin's `hooks/hooks.json` already carries
+them. Otherwise enable behaves as §5 describes. The check is built (issue #193) and not
+released yet, so a binary from before it still writes the hooks.
 
 **The task loop the skill teaches:**
 
-1. At session start, call `task_current`. If a task is active, continue it.
+1. The session-start block carries the active task, its current step and its next
+   action. Call `task_current` only if the block is missing or you need more (D35).
 2. For new work, call `recall` with the goal, then `task_start` with a brief
    and plan.
 3. For each step: `step_update` to start it, do the work, `step_update` to

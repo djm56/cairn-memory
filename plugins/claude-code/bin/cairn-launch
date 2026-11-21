@@ -1,0 +1,65 @@
+#!/bin/sh
+# cairn-launch runs the cairn binary for the Claude Code plugin (DESIGN.md §6.1, D37).
+#
+# The plugin does not bundle the binary, so the launcher finds the one installed on this machine. It looks on PATH
+# first, then in $HOME/.local/bin. The first cairn it finds is run with every argument it was given, and replaces this
+# process.
+#
+# Only absolute directories are searched. An empty or relative PATH entry is skipped, so a cairn in the directory a
+# session runs from is never run. A cairn that is this launcher (a link named cairn on PATH) is skipped too, so the
+# launcher never runs itself.
+#
+# When neither place has cairn, the launcher prints one line on stderr with the install command from
+# docs/QUICK-INSTALL.md, and exits 127, the status a shell gives a command it cannot find.
+#
+# It uses only shell builtins, so it runs with an empty PATH apart from what it searches.
+
+self=$0
+found=
+
+# Search PATH. IFS is set to ":" for the loop only, so the entries split on colons, and an empty entry stays empty
+# and is skipped. The unquoted $PATH is the split. Pathname expansion is off for the loop too (set -f), so an entry
+# with *, ? or [ in it is searched as the directory it names, and never as the directories a pattern matches.
+# IFS is put back exactly as it was: an IFS that was unset is unset again, not set to empty.
+set -f
+if [ "${IFS+set}" = set ]; then
+  ifs_was_set=1
+  oldifs=$IFS
+else
+  ifs_was_set=
+fi
+IFS=:
+for dir in ${PATH:-}; do
+  case $dir in
+    /*)
+      if [ -f "$dir/cairn" ] && [ -x "$dir/cairn" ] && ! [ "$dir/cairn" -ef "$self" ]; then
+        found=$dir/cairn
+        break
+      fi
+      ;;
+  esac
+done
+set +f
+if [ -n "$ifs_was_set" ]; then
+  IFS=$oldifs
+else
+  unset IFS
+fi
+
+# Then the per-user install directory, when there is a home directory and it is absolute.
+if [ -z "$found" ]; then
+  case ${HOME:-} in
+    /*)
+      if [ -f "$HOME/.local/bin/cairn" ] && [ -x "$HOME/.local/bin/cairn" ] && ! [ "$HOME/.local/bin/cairn" -ef "$self" ]; then
+        found=$HOME/.local/bin/cairn
+      fi
+      ;;
+  esac
+fi
+
+if [ -z "$found" ]; then
+  echo "cairn-launch: cairn is not on PATH or in ~/.local/bin. Install it: in your cairn checkout, run make build, then mkdir -p ~/.local/bin && install -m 0755 bin/cairn ~/.local/bin/cairn (docs/QUICK-INSTALL.md, section 1)" >&2
+  exit 127
+fi
+
+exec "$found" "$@"

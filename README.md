@@ -77,7 +77,7 @@ project = "acme-api"
 server = "https://cairn.lan:8788"
 ```
 
-Once M5 is done, the Claude Code plugin is meant to replace the hand-made `claude mcp add` line.
+For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Once M5 is on `main`, Claude Code 2.1.275 or later (the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`) installs it in one line: `/plugin install cairn --marketplace djm56/cairn-memory`. Until then, install it from a local checkout. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has both routes. Use the plugin or the lines above, not both.
 The repository and the Go module still carry the name `cairn-memory`. Renaming them to `cairn` is
 planned (decision D18), and the rename has not been done.
 
@@ -89,6 +89,7 @@ docs are canonical for the design.
 | Page | Read it for |
 |---|---|
 | [Quick-Start](https://github.com/djm56/cairn-memory/wiki/Quick-Start) | One machine, from a clone to a working client, step by step |
+| [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) | The Claude Code plugin: install it, check it, and record a first task |
 | [Install-Local](https://github.com/djm56/cairn-memory/wiki/Install-Local) | A developer machine: the files, the PATH, the key and the hooks |
 | [Install-Server](https://github.com/djm56/cairn-memory/wiki/Install-Server) | A server that other machines reach, under systemd, with TLS or behind a proxy |
 | [Upgrade](https://github.com/djm56/cairn-memory/wiki/Upgrade) | Upgrading a server or a local install, the backup before it, and the rollback |
@@ -121,15 +122,17 @@ other entry, and copies the original file to `cairn/backups/<project>` in the us
 cache directory, outside the project, before it writes. `--dry-run` writes nothing.
 `enable` writes hooks only. It does not register the MCP server. That is done by the M5
 plugin, or by hand with `claude mcp add cairn -- "$(command -v cairn)" mcp`, which uses
-the absolute path of the binary.
+the absolute path of the binary. The Claude Code plugin is the recommended route, and it is not on `main` yet.
+When the plugin is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That
+check is built and not released yet.
 
 In Claude Code, the session-start hook is what is meant to carry a task across `/compact`.
 Its matcher names `compact`, so it runs again after compaction, and its output is added
 to the agent's context. The M4 hand check of that carry, [docs/M4-HAND-CHECK.md](docs/M4-HAND-CHECK.md)
 section 3, was run on 2026-11-06 and passed by operator ruling. The agent also called
-`task_current` after the compact, and the hook text asks for that call, which the guide's
-rule counts as not run. The conflict is tracked in #206. The pre-compact hook is installed,
-and it does nothing in Claude Code. [DESIGN.md §4.1](docs/DESIGN.md#41-session-start) has the
+`task_current` after the compact, and the hook text of that run asked for that call, which the guide's
+rule counts as not run. On 2026-11-17 the operator decided that the hook text stops asking for it
+(D35). That change is built and not released yet (#206). The pre-compact hook is installed. The hooks reference says its stdout becomes instructions for the compaction summary; that is not confirmed in a live session (#26). [DESIGN.md §4.1](docs/DESIGN.md#41-session-start) has the
 design.
 
 **OpenCode and pi (EXPERIMENTAL).** `cairn enable --agent opencode` and `--agent pi` register

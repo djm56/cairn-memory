@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,6 +121,32 @@ func TestDoctorAgentMissingHookIsAWarning(t *testing.T) {
 	}
 	if want := checkLine(check{name: "Stop", status: "warn", detail: "not installed in any settings file read: run cairn enable --agent claude-code"}); !strings.Contains(stdout, want+"\n") {
 		t.Errorf("output lacks %q:\n%s", want, stdout)
+	}
+}
+
+// TestDoctorAgentPluginEnabledCarriesMissingHooks checks that a cairn hook missing from every settings file is ok, not a
+// warning, when the cairn plugin is enabled in one of them: the plugin carries the hook (D34), and enable adds none. The
+// line names the file, and says doctor does not read the plugin's hooks.
+func TestDoctorAgentPluginEnabledCarriesMissingHooks(t *testing.T) {
+	dir := agentProject(t)
+	user := userSettings(t)
+	writeSettings(t, user, pluginEnabled)
+
+	checks := claudeCodeChecks(dir)
+	for _, event := range []string{"SessionStart", "Stop"} {
+		c := checkNamed(checks, event)
+		if c == nil {
+			t.Fatalf("no line for %s in %v", event, checks)
+		}
+		wantDetail := "not installed in any settings file read; the cairn plugin is enabled in " + user + ", which carries it (doctor does not read the plugin's hooks)"
+		if c.status != "ok" || c.detail != wantDetail {
+			t.Errorf("%s is %s %q, want ok %q", event, c.status, c.detail, wantDetail)
+		}
+	}
+	for _, c := range checks {
+		if c.status == "warn" || c.status == "fail" {
+			t.Errorf("%s is %s %q, want no warning when the plugin is enabled", c.name, c.status, c.detail)
+		}
 	}
 }
 
@@ -735,5 +762,129 @@ func TestDoctorHelp(t *testing.T) {
 		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: cairn doctor [--agent claude-code|opencode|pi]") || !strings.Contains(stdout, "-agent string") {
 			t.Errorf("doctor %s: exit %d, stdout %q, stderr %q", flag, code, stdout, stderr)
 		}
+	}
+}
+
+// hooksSettings is the text of a settings file that holds the three cairn hooks, as enable writes them.
+func hooksSettings(t *testing.T) string {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{"hooks": freshHooks()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+// duplicateDetail is the detail of the plugin warning when the plugin is enabled in plugin and the hooks are in hooks.
+func duplicateDetail(plugin, hooks string) string {
+	return "the cairn plugin is enabled in " + plugin + ", which carries the cairn hooks, but cairn hooks are also in " + hooks + ", so each hook runs twice: remove the cairn hook entries from " + hooks
+}
+
+// TestDoctorAgentWarnsOnDuplicateHooksWithThePluginEnabled checks that cairn hooks in a project settings file, with the
+// cairn plugin enabled in one of the settings files, give a warning that names the file holding the hooks and says to remove
+// them (D34). It runs for each place the plugin and the hooks can be in, the same file included. The hook lines stay ok.
+func TestDoctorAgentWarnsOnDuplicateHooksWithThePluginEnabled(t *testing.T) {
+	cases := []struct {
+		name   string
+		plugin func(t *testing.T, dir string) string
+		hooks  func(dir string) string
+	}{
+		{"plugin in the user's file, hooks in the local file", func(t *testing.T, _ string) string { return userSettings(t) }, settingsIn},
+		{"plugin in the shared file, hooks in the local file", func(_ *testing.T, dir string) string { return sharedSettings(dir) }, settingsIn},
+		{"plugin in the local file, hooks in the shared file", func(_ *testing.T, dir string) string { return settingsIn(dir) }, sharedSettings},
+		{"plugin and hooks in the local file", func(_ *testing.T, dir string) string { return settingsIn(dir) }, settingsIn},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := agentProject(t)
+			plugin := c.plugin(t, dir)
+			hooks := c.hooks(dir)
+			writeSettings(t, plugin, pluginEnabled)
+			if hooks == plugin {
+				writeSettings(t, hooks, `{"enabledPlugins": {"cairn@cairn-memory": true}, "hooks": `+hooksJSON(t)+`}`)
+			} else {
+				writeSettings(t, hooks, hooksSettings(t))
+			}
+
+			checks := claudeCodeChecks(dir)
+			dup := checkNamed(checks, "plugin")
+			if dup == nil || dup.status != "warn" || dup.detail != duplicateDetail(plugin, hooks) {
+				t.Fatalf("plugin check is %v, want a warn naming %s as the file holding the hooks", dup, hooks)
+			}
+			for _, event := range []string{"SessionStart", "PreCompact", "Stop"} {
+				if hc := checkNamed(checks, event); hc == nil || hc.status != "ok" {
+					t.Errorf("%s is %v, want the hook line ok", event, hc)
+				}
+			}
+		})
+	}
+}
+
+// TestDoctorAgentNamesTheUserFileWithDuplicateHooks checks that cairn hooks in the user's settings file, ~/.claude/settings.json,
+// give the duplicate warning while the plugin is enabled, and that the warning names that file (D34). It runs with the plugin
+// in a project file, and with the plugin and the hooks both in the user's file.
+func TestDoctorAgentNamesTheUserFileWithDuplicateHooks(t *testing.T) {
+	t.Run("plugin in the local file, hooks in the user's file", func(t *testing.T) {
+		dir := agentProject(t)
+		plugin := settingsIn(dir)
+		writeSettings(t, plugin, pluginEnabled)
+		user := userSettings(t)
+		writeSettings(t, user, hooksSettings(t))
+
+		checks := claudeCodeChecks(dir)
+		dup := checkNamed(checks, "plugin")
+		if dup == nil || dup.status != "warn" || dup.detail != duplicateDetail(plugin, user) {
+			t.Fatalf("plugin check is %v, want a warn naming %s as the file holding the hooks", dup, user)
+		}
+		for _, event := range []string{"SessionStart", "PreCompact", "Stop"} {
+			if hc := checkNamed(checks, event); hc == nil || hc.status != "ok" {
+				t.Errorf("%s is %v, want the hook line ok", event, hc)
+			}
+		}
+	})
+
+	t.Run("plugin and hooks in the user's file", func(t *testing.T) {
+		dir := agentProject(t)
+		user := userSettings(t)
+		writeSettings(t, user, `{"enabledPlugins": {"cairn@cairn-memory": true}, "hooks": `+hooksJSON(t)+`}`)
+
+		checks := claudeCodeChecks(dir)
+		dup := checkNamed(checks, "plugin")
+		if dup == nil || dup.status != "warn" || dup.detail != duplicateDetail(user, user) {
+			t.Fatalf("plugin check is %v, want a warn naming %s as the file holding the hooks", dup, user)
+		}
+	})
+}
+
+// hooksJSON is the value of the hooks key that enable writes, as JSON text.
+func hooksJSON(t *testing.T) string {
+	t.Helper()
+	raw, err := json.Marshal(freshHooks())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+// TestDoctorAgentPluginInAProjectFile checks the plugin enabled in a project file, with no hooks written anywhere: no
+// duplicate warning, each missing hook is ok and names that file, and the PreCompact line keeps its D15 note (D34).
+func TestDoctorAgentPluginInAProjectFile(t *testing.T) {
+	dir := agentProject(t)
+	shared := sharedSettings(dir)
+	writeSettings(t, shared, pluginEnabled)
+
+	checks := claudeCodeChecks(dir)
+	if dup := checkNamed(checks, "plugin"); dup != nil {
+		t.Errorf("a duplicate warning with no hooks written: %v", dup)
+	}
+	wantStop := "not installed in any settings file read; the cairn plugin is enabled in " + shared + ", which carries it (doctor does not read the plugin's hooks)"
+	for _, event := range []string{"SessionStart", "Stop"} {
+		if c := checkNamed(checks, event); c == nil || c.status != "ok" || c.detail != wantStop {
+			t.Errorf("%s is %v, want ok naming %s", event, c, shared)
+		}
+	}
+	wantPreCompact := "not installed in any settings file read; installed per D15, but Claude Code does not show its output, so this is an operator decision"
+	if c := checkNamed(checks, "PreCompact"); c == nil || c.status != "ok" || c.detail != wantPreCompact {
+		t.Errorf("PreCompact is %v, want ok with the D15 note %q", c, wantPreCompact)
 	}
 }

@@ -1,12 +1,12 @@
 # Connecting agents
 
-_Status as of 2026-11-06: M5 (Plugin) is current. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. #206 is open. Checked against the code at 8b651da. The Claude Code commands were checked against the `claude` CLI, version 2.1.311, and not run end to end._
+_Status as of 2026-11-17: M5 (Plugin) is current. The Claude Code plugin is built on `m5-plugin` and is not on `main` yet; [Install-Plugin](Install-Plugin) covers it. As of 2026-11-06, M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. #206 is open. Checked against the code at 8b651da. The Claude Code commands were checked against the `claude` CLI, version 2.1.311, and not run end to end._
 
 An agent reaches Cairn in one of two ways. Clients that speak MCP connect to `cairn mcp`, which talks to the server. Agents with only a shell use the `cairn` command-line verbs. Each client below says which it uses.
 
 | Client | Status | Reaches Cairn through | Hooks |
 |---|---|---|---|
-| Claude Code | Supported. The plugin is M5 work and is not shipped | `cairn mcp`, registered by hand | Yes, three, installed by `cairn enable` |
+| Claude Code | Supported. The plugin is the recommended route; it is built on `m5-plugin` and not on `main` yet. The route without it is below | `cairn mcp`, from the plugin, or registered by hand | Yes, three: from the plugin, or installed by `cairn enable` |
 | opencode | EXPERIMENTAL. No real run has confirmed it | `cairn mcp`, registered by `cairn enable` | No |
 | pi | EXPERIMENTAL. No real run has confirmed it | `cairn mcp`, registered by `cairn enable` | No |
 | Any agent with a shell | Supported | The CLI verbs, [CLI-Reference](CLI-Reference) | Not applicable |
@@ -20,7 +20,7 @@ An agent reaches Cairn in one of two ways. Clients that speak MCP connect to `ca
 
 ## Claude Code
 
-Claude Code connects in three steps: the hooks, the MCP entry and the check.
+Claude Code connects in three steps: the hooks, the MCP entry and the check. These steps are the route without the plugin. The Claude Code plugin is the recommended route (D34), and [Install-Plugin](Install-Plugin) covers it. Use one route or the other, not both.
 
 ### Step 1: the hooks
 
@@ -38,7 +38,7 @@ The three hooks:
 | Event | Matcher | Command | What it does in Claude Code |
 |---|---|---|---|
 | `SessionStart` | `startup\|resume\|clear\|compact` | `cairn hook session-start` | Prints the active task, its steps and its directives. After `/compact`, the output is added to the agent's context. This is what carries a task across compaction |
-| `PreCompact` | none | `cairn hook pre-compact` | Prints the same block. Claude Code does not add this hook's output to the context, so it does nothing there. It is installed for the design (D15), and the operator decides whether to keep it |
+| `PreCompact` | none | `cairn hook pre-compact` | Prints the same block. The hooks reference says Claude Code uses this output as instructions for the compaction summary. That is not confirmed in a live session (issue #26). It is installed for the design (D15), and the operator decides whether to keep it |
 | `Stop` | none | `cairn hook stop` | Prints a warning when a step of the active task is active with no summary. Otherwise it prints nothing |
 
 A hook never blocks the session. It exits 0 even when it has nothing to say.
@@ -65,13 +65,13 @@ claude mcp get cairn
 cairn doctor --agent claude-code
 ```
 
-This lists the hooks in the Claude Code settings files and runs each hook once against the server, so the output shows what each hook would print. The first read of a project the server has not seen creates the project's row. `doctor` warns when a hook is not installed, and tells you to run `cairn enable --agent claude-code`.
+This lists the hooks in the Claude Code settings files and runs each hook once against the server, so the output shows what each hook would print. The first read of a project the server has not seen creates the project's row. `doctor` warns when a hook is not installed, and tells you to run `cairn enable --agent claude-code`. When the cairn plugin is enabled in one of the Claude Code settings files it reads, a hook that is not installed is ok, since the plugin carries it; `doctor` does not read the plugin's hooks.
 
 Restart Claude Code in the project after you change its MCP entry or its hooks.
 
 ### What is verified about `/compact`
 
-The `SessionStart` hook carries a task across `/compact`. The M4 hand check, section 3, was run on 2026-11-06 with a task started before `/compact` and continued after it. It passed by operator ruling. The hook's output asks the agent to call `task_current` for the brief, and the agent made that call in the run, which the guide's own rule counts against the check. The operator ruled it a pass, and issue #206 asks whether the hook text should change. That is open. A later operator decision can reverse the ruling, and this page will follow it.
+The `SessionStart` hook carries a task across `/compact`. The M4 hand check, section 3, was run on 2026-11-06 with a task started before `/compact` and continued after it. It passed by operator ruling. In that run the hook's output asked the agent to call `task_current` for the brief, and the agent made that call, which the guide's own rule counts against the check. The operator ruled it a pass. On 2026-11-17 the operator decided that the hook text should stop asking for that call (D35, issue #206), because the block already carries the active task, its current step and its next action. That change is built and not released yet, so a binary from before it still asks for the call. The M4 rule itself is unchanged.
 
 Sections 4 and 5 of the guide, for opencode and pi, have not been run.
 
@@ -141,7 +141,7 @@ pi reads `.pi/mcp.json` only after the project is trusted. No real pi run has co
 
 | Agent | Writes | Does not write |
 |---|---|---|
-| `claude-code` | Three hooks in `.claude/settings.local.json` | An MCP entry. Register it with `claude mcp add` (above) |
+| `claude-code` | Three hooks in `.claude/settings.local.json`. From M5, not written when the cairn plugin is enabled in Claude Code settings (D34; that check is built and not released yet) | An MCP entry. Register it with `claude mcp add` (above) |
 | `opencode` (EXPERIMENTAL) | The Cairn server in `opencode.json` under `mcp`, the instruction file `.cairn/instructions.md`, and its listing in `instructions` | The key. The key comes from the environment or `client.env` |
 | `pi` (EXPERIMENTAL) | The Cairn server in `.pi/mcp.json`, and the task-loop block in `AGENTS.md` | The key |
 

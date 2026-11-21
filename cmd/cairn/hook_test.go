@@ -26,8 +26,8 @@ func hookNothing(event string) string {
 }
 
 // TestSessionStartPrintsTheActiveTask checks the block a session start gets: the
-// task, its next action, its current step, the directive count and the line that
-// tells the agent to call task_current. It makes one call, a read.
+// task, its next action, its current step, the directive count and the closing line,
+// which names no tool call (D35). It makes one call, a read.
 func TestSessionStartPrintsTheActiveTask(t *testing.T) {
 	var seen []string
 	local, url := newServer(t, &seen)
@@ -47,11 +47,15 @@ func TestSessionStartPrintsTheActiveTask(t *testing.T) {
 		"Next action: Read the schema first\n",
 		"Current step: 1 of 2, \"Read the schema\" (active).\n",
 		"Directives that apply: 0.\n",
-		"Call task_current for the brief, the steps and recent events.\n",
+		"The block above is the task to continue.\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("session-start lacks %q:\n%s", want, stdout)
 		}
+	}
+	// D35: the block carries the task, so the hook text asks for no tool call.
+	if strings.Contains(stdout, "task_current") {
+		t.Errorf("session-start names task_current, which D35 removes from the hook text:\n%s", stdout)
 	}
 	if len(seen) != 1 || !strings.HasPrefix(seen[0], "/v1/agent/task_current") {
 		t.Errorf("the hook made calls %q, want one task_current read", seen)
@@ -91,7 +95,7 @@ func TestPreCompactPrintsTheBlockBytes(t *testing.T) {
 		"Current step: 1 of 2, \"Read the schema\" (active).\n" +
 		"Directives that apply: 0.\n" +
 		"Agent-scoped directives were not counted: no agent role is set.\n" +
-		"Call task_current for the brief, the steps and recent events.\n"
+		"The block above is the task to continue.\n"
 	if code != 0 || stderr != "" || stdout != want {
 		t.Errorf("exit %d, stderr %q, stdout:\n%q\nwant:\n%q", code, stderr, stdout, want)
 	}
@@ -311,7 +315,7 @@ func TestSessionStartFoldsServerText(t *testing.T) {
 		`Current step: 1 of 2, "Read the schema" (active).`,
 		"Directives that apply: 0.",
 		"Agent-scoped directives were not counted: no agent role is set.",
-		"Call task_current for the brief, the steps and recent events.",
+		"The block above is the task to continue.",
 	}
 	if got := strings.Split(strings.TrimSuffix(stdout, "\n"), "\n"); !slices.Equal(got, want) {
 		t.Errorf("session-start lines:\n%q\nwant:\n%q", got, want)

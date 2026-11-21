@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cairn": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/cairn-launch",
+      "args": ["mcp"]
+    }
+  }
+}

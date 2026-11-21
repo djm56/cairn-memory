@@ -475,6 +475,29 @@ that is not a numbered decision here, and the table says what.
   Changing that would change the CLI's identity model, which is a larger
   decision (issue #220).
 
+**Operator decision, 2026-11-17: D34 to D37.**
+
+- **D34. The plugin and `cairn enable --agent claude-code` are alternatives.**
+  The Claude Code plugin is the recommended route for Claude Code.
+  `cairn enable --agent claude-code` checks whether the cairn plugin is enabled
+  in Claude Code settings. If it is, enable says so and does not add its own
+  hooks. Otherwise it behaves as §4.1 and §5 describe. The check is built and
+  not released yet (issue #193).
+- **D35. The session-start hook no longer asks for `task_current`.** The block
+  already carries the active task, its current step and its next action, so
+  the hook text drops the call. The skill's task loop step 1 becomes: the
+  session-start block carries the active task; call `task_current` only if the
+  block is missing or you need more. The M4 hand-check rule stays as written
+  (issue #206).
+- **D36. The API key lives only in `~/.config/cairn/client.env` or
+  `CAIRN_API_KEY`.** The plugin's `plugin.json` has no `userConfig` `api_key` and
+  no `server`. The server comes from each project's `.cairn.toml`. DESIGN §6.1
+  is amended to match.
+- **D37. `CAIRN_HOME/bin` is dropped.** `cairn-launch` looks for `cairn` on PATH,
+  then in `~/.local/bin`. If it finds neither, it exits non-zero and prints the
+  one-line install command. Epic #20 and issue #23 get decision comments when
+  the M5 pull request is opened.
+
 ## 9. Project management
 
 - **Milestones** are the rows of the milestone table in §3: M1 to M8, and
