@@ -52,7 +52,7 @@ The design and the contract are in the repository. This wiki summarises them, an
 - **M1, Server-mode MCP:** exit check passed (MCP stdio flow test, recorded 2026-11-03).
 - **M2, Server:** exit check passed on 2026-11-02 (live run, #19).
 - **M3, Web UI and dashboard:** exit check passed (web UI exit-check test, recorded 2026-11-03).
-- **M4, Hooks and CLI:** exit check passed by operator ruling (the /compact hand check, recorded 2026-11-06). Sections 4 and 5 of the guide are not run, and #206 (the hook text) is open under M5.
+- **M4, Hooks and CLI:** exit check passed by operator ruling (the /compact hand check, recorded 2026-11-06). Sections 4 and 5 of the guide are not run, and #206 (the hook text) was open under M5 and closed 2026-11-21 with PR #229.
 - **M5, Plugin:** current. The Claude Code plugin is on `main` and is the recommended route for Claude Code. [Connecting-Agents](Connecting-Agents) describes the route without it.
 - **M6 to M8, and Later:** planned. See the [Roadmap](Roadmap).
 

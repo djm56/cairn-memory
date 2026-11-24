@@ -27,7 +27,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Now**
 
-- M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) is open.
+- M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) is closed by the post-merge guide PR from `m5-guide-post-merge`, on merge.
 
 **Next**
 
@@ -50,18 +50,18 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 26 issues open, 12 closed (counted from the issue list). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
+- **Status:** Current. Not passed. 25 issues open, 13 closed (counted from the issue list, with #235 closed by this PR). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
 - **Next action:** The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine.
 
 **Detail**
 
-Open issues, grouped (26):
+Open issues, grouped (25):
 
 - Decisions (0 open): #193 (the plugin and `cairn enable` are alternatives; D34) and #206 (the hook text stops asking for `task_current`; D35) closed with PR #229 on 2026-11-21. The M4 "not run" rule is unchanged.
 - Exit-critical build (1): #20 epic. #21 layout and marketplace, #22 skill text, #23 `cairn-launch`, #24 `claude plugin validate` in CI, #25 install guide and #26 live confirmation of tool names and hook behaviour closed with PR #229 on 2026-11-21.
 - Carry-over code and tests (16): #140 (restore: stray `-wal` and `-shm` files; the refusal is already in `internal/server/restore.go:128-133`), #191 (a `task_get` brief over the 64 KiB cap cannot be narrowed), #192, #194, #195, #196, #201, #212, #213, #215, #216, #217, #218 (MCP reads send no caller name, so agent-scoped directives are dropped), #230 (doctor reports plugin-carried hooks ok without reading `hooks/hooks.json`), #231 (PreCompact wording in `enable.go` and doctor), #232 (skill test checks argument names against each tool's InputSchema; restore `learning_add`'s required fields).
-- Carry-over docs (9): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5), #233 (MCP tool examples name the agent `main`; use a placeholder), #234 (`cairn enable --help` plugin-check rule does not match `wiki/CLI-Reference.md`), #235 (`wiki/Install-Plugin.md`: section 8 scope, `claude mcp get` fallback, relative `cd`, blank line, loop action).
+- Carry-over docs (8): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5), #233 (MCP tool examples name the agent `main`; use a placeholder), #234 (`cairn enable --help` plugin-check rule does not match `wiki/CLI-Reference.md`).
 
 Left before the exit check passes:
 
@@ -213,7 +213,7 @@ Closed 2026-11-06, 33 issues. Exit passed. Evidence: `TestM3ExitCheck` (`interna
 
 **Detail**
 
-Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only (`docs/M4-HAND-CHECK.md` §3). Sections 4 and 5 (OpenCode, pi) are not run; #206 is open under M5. Shell-only close test: `TestExitCheckAgentWithOnlyBashCompletesAndClosesATask` (`internal/conformance/cliservice/exitcheck_test.go:54`). Delivered the pre-compact and stop hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
+Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only (`docs/M4-HAND-CHECK.md` §3). Sections 4 and 5 (OpenCode, pi) are not run; #206 was open under M5 and closed 2026-11-21 with PR #229. Shell-only close test: `TestExitCheckAgentWithOnlyBashCompletesAndClosesATask` (`internal/conformance/cliservice/exitcheck_test.go:54`). Delivered the pre-compact and stop hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
 
 #### Phase 9 and Phase 10 (closed, empty)
 
