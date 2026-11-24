@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-24, from main at d3ff98f, the merge commit of PR #229 (m5-plugin into main, merged 2026-11-21). On that merge PR #229 closed #21 to #26, #193 and #206. Decisions D34 to D37 are on main. Decision comments are posted on #193, #206, #20 and #23.
+Last synced: 2026-11-24, from main at d3ff98f, the merge commit of PR #229 (m5-plugin into main, merged 2026-11-21), with the M5 counts already reflecting #235 closing when `m5-guide-post-merge` merges. On that merge PR #229 closed #21 to #26, #193 and #206. Decisions D34 to D37 are on main. Decision comments are posted on #193, #206, #20 and #23.
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
@@ -50,7 +50,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 25 issues open, 13 closed (counted from the issue list, with #235 closed by this PR). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
+- **Status:** Current. Not passed. 25 issues open, 13 closed (counted from the issue list, with #235 counted as closed, on merge of the post-merge guide PR from `m5-guide-post-merge`). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
 - **Next action:** The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine.
 
