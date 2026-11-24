@@ -167,7 +167,7 @@ cairn enable --agent claude-code --dry-run
 cairn enable --agent claude-code
 ```
 
-It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin does both. It is the recommended route, and it is built on the `m5-plugin` branch, not on `main` yet. [Install-Plugin](Install-Plugin) has its steps. When it is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That check is built and not released yet.
+It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin does both. It is the recommended route, and it is on `main`. [Install-Plugin](Install-Plugin) has its steps. When it is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That check is built and not released yet.
 
 ## Run a local server for development
 

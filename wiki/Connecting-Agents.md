@@ -1,12 +1,12 @@
 # Connecting agents
 
-_Status as of 2026-11-17: M5 (Plugin) is current. The Claude Code plugin is built on `m5-plugin` and is not on `main` yet; [Install-Plugin](Install-Plugin) covers it. As of 2026-11-06, M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. #206 is open. Checked against the code at 8b651da. The Claude Code commands were checked against the `claude` CLI, version 2.1.311, and not run end to end._
+_Status as of 2026-11-24: M5 (Plugin) is current. The Claude Code plugin is merged to `main` (PR #229, 2026-11-21); [Install-Plugin](Install-Plugin) covers it. As of 2026-11-06, M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. #206 closed with PR #229 on 2026-11-21. Checked against the code at 8b651da. The Claude Code commands were checked against the `claude` CLI, version 2.1.311, and not run end to end._
 
 An agent reaches Cairn in one of two ways. Clients that speak MCP connect to `cairn mcp`, which talks to the server. Agents with only a shell use the `cairn` command-line verbs. Each client below says which it uses.
 
 | Client | Status | Reaches Cairn through | Hooks |
 |---|---|---|---|
-| Claude Code | Supported. The plugin is the recommended route; it is built on `m5-plugin` and not on `main` yet. The route without it is below | `cairn mcp`, from the plugin, or registered by hand | Yes, three: from the plugin, or installed by `cairn enable` |
+| Claude Code | Supported. The plugin is the recommended route, and it is on `main`. The route without it is below | `cairn mcp`, from the plugin, or registered by hand | Yes, three: from the plugin, or installed by `cairn enable` |
 | opencode | EXPERIMENTAL. No real run has confirmed it | `cairn mcp`, registered by `cairn enable` | No |
 | pi | EXPERIMENTAL. No real run has confirmed it | `cairn mcp`, registered by `cairn enable` | No |
 | Any agent with a shell | Supported | The CLI verbs, [CLI-Reference](CLI-Reference) | Not applicable |
