@@ -199,10 +199,11 @@ func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
 			useDir(t, dir)
 			legacy := writeFile(t, dir, ".cairn.toml", content)
 
+			newPath := filepath.Join(dir, ".cairnbook.toml")
 			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
 			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") ||
-				!strings.Contains(stderr, "git mv .cairn.toml .cairnbook.toml") || !strings.Contains(stderr, legacy) {
-				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal naming %s", code, stderr, legacy)
+				!strings.Contains(stderr, "git mv "+legacy+" "+newPath) || !strings.Contains(stderr, legacy) {
+				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal naming %s and %s", code, stderr, legacy, newPath)
 			}
 			if stdout != "" {
 				t.Errorf("stdout %q, want nothing", stdout)
@@ -232,6 +233,38 @@ func TestInitRefusesALegacyDirectoryInTheWay(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
 		t.Errorf("a .cairnbook.toml was written beside the directory: %v", err)
+	}
+	assertNoDestructive(t, stderr)
+}
+
+// TestInitDirectoryAtTheNewNameBesideALegacyFileRefusesFirst checks #244: a .cairnbook.toml directory
+// beside a legacy .cairn.toml file is refused as a directory, since the new-name check runs first. The
+// directory and the legacy file are both left as they were, and nothing is written.
+func TestInitDirectoryAtTheNewNameBesideALegacyFileRefusesFirst(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	newPath := filepath.Join(dir, ".cairnbook.toml")
+	if err := os.Mkdir(newPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+	legacyBefore := readBytes(t, legacy)
+
+	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "is a directory, not a project file") || !strings.Contains(stderr, newPath) {
+		t.Errorf("exit %d, stderr %q: want 1 and the directory refusal naming %s", code, stderr, newPath)
+	}
+	if stdout != "" {
+		t.Errorf("stdout %q, want nothing", stdout)
+	}
+	if info, err := os.Stat(newPath); err != nil || !info.IsDir() {
+		t.Errorf("%s is no longer a directory: %v", newPath, err)
+	}
+	if got := dirNames(t, dir); len(got) != 2 {
+		t.Errorf("folder holds %v, want the directory and the legacy file only", got)
+	}
+	if !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+		t.Errorf("the legacy file changed: %q", readBytes(t, legacy))
 	}
 	assertNoDestructive(t, stderr)
 }
@@ -490,6 +523,9 @@ func TestInitHelpGoesToStdout(t *testing.T) {
 		}
 		if !strings.Contains(stdout, "Usage: cairnbook init") || !strings.Contains(stdout, "-project") {
 			t.Errorf("%v: stdout %q does not carry the usage and the flags", args, stdout)
+		}
+		if !strings.Contains(stdout, "holds .cairn.toml") || !strings.Contains(stdout, "says how to rename it") {
+			t.Errorf("%v: stdout %q does not say init refuses the old file and how to rename it", args, stdout)
 		}
 	}
 }

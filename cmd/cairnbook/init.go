@@ -128,7 +128,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cairnbook init: %s is a directory, not a project file: move it aside by hand, then run cairnbook init\n", legacy)
 		return 1
 	case err == nil:
-		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv .cairn.toml .cairnbook.toml` (or mv), then run cairnbook init again\n", legacy)
+		// The paths are the full ones: init may run from a subfolder with CLAUDE_PROJECT_DIR set, so a relative
+		// command would name a file that is not there.
+		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv %s %s` (or mv %s %s), then run cairnbook init again\n", legacy, legacy, path, legacy, path)
 		return 1
 	case !errors.Is(err, fs.ErrNotExist):
 		fmt.Fprintf(stderr, "cairnbook init: look for %s: %v\n", legacy, err)
@@ -161,6 +163,7 @@ func writeInitHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Writes .cairnbook.toml in the project directory: CLAUDE_PROJECT_DIR when it is set, else the working directory.")
 	fmt.Fprintln(w, "It changes nothing that is already there.")
 	fmt.Fprintln(w, "It refuses to run from a working directory outside CLAUDE_PROJECT_DIR, when that is set.")
+	fmt.Fprintln(w, "It refuses when the folder holds .cairn.toml, the old name, and no .cairnbook.toml, and says how to rename it.")
 	fmt.Fprintln(w, "It writes the file whole or not at all where the filesystem has hard links. On one without them it writes the file directly, and a crash can leave it partly written.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()
