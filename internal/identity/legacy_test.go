@@ -108,3 +108,30 @@ func TestServerSourceNamesTheFileRead(t *testing.T) {
 		}
 	})
 }
+
+// TestEmptyNewNamesFallBackToTheOld checks that a new variable set to "" counts as unset, so the old
+// name is read: an empty CAIRNBOOK_PROJECT gives the project from CAIRN_PROJECT, and an empty
+// CAIRNBOOK_SERVER gives the server from CAIRN_SERVER, which ServerSource names.
+func TestEmptyNewNamesFallBackToTheOld(t *testing.T) {
+	t.Run("project", func(t *testing.T) {
+		setEnv(t, EnvProjectDir, "", true)
+		setEnv(t, EnvProject, "", false)
+		t.Setenv("CAIRN_PROJECT", "old-name")
+		p, err := Resolve(t.TempDir())
+		if err != nil || p.Name != "old-name" || p.Source != SourceEnv {
+			t.Fatalf("Resolve = %+v, %v; want old-name from env", p, err)
+		}
+	})
+	t.Run("server", func(t *testing.T) {
+		setEnv(t, EnvServer, "", false)
+		setEnv(t, EnvProjectDir, "", true)
+		t.Setenv("CAIRN_SERVER", "https://old.example")
+		dir := t.TempDir()
+		if got, err := ResolveServer(dir); err != nil || got != "https://old.example" {
+			t.Fatalf("ResolveServer = %q, %v; want the old variable's server", got, err)
+		}
+		if got := ServerSource(dir); got != "CAIRN_SERVER" {
+			t.Errorf("ServerSource = %q, want CAIRN_SERVER", got)
+		}
+	})
+}

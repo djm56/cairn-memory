@@ -51,6 +51,16 @@ func TestRoleFromEnvIsTheVariableWhenItIsValid(t *testing.T) {
 	}
 }
 
+// TestRoleFromEnvReadsTheOldNameWhenTheNewIsEmpty checks that CAIRNBOOK_AGENT set to "" is unset for the
+// role, so the role is read from CAIRN_AGENT, its name before the rename.
+func TestRoleFromEnvReadsTheOldNameWhenTheNewIsEmpty(t *testing.T) {
+	t.Setenv("CAIRNBOOK_AGENT", "")
+	t.Setenv("CAIRN_AGENT", "hicks")
+	if got, refused := roleFromEnv(); got != "hicks" || refused {
+		t.Errorf("roleFromEnv() = (%q, %v), want (hicks, false)", got, refused)
+	}
+}
+
 // TestStatusDropsTheNoteWithARole checks that status keeps the no-role note when there is no role,
 // and leaves it out when there is one, since the count then includes the role's own directives.
 func TestStatusDropsTheNoteWithARole(t *testing.T) {

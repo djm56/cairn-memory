@@ -84,6 +84,32 @@ func TestAgentNameForAWriteNamesBothSources(t *testing.T) {
 	}
 }
 
+// TestEmptyNewAgentVariableFallsBackToTheOld checks that CAIRNBOOK_AGENT set to "" is no name, so a
+// write takes the name from CAIRN_AGENT, and that a refusal of that name names CAIRN_AGENT as the source.
+func TestEmptyNewAgentVariableFallsBackToTheOld(t *testing.T) {
+	t.Setenv(identity.EnvAgent, "")
+	t.Setenv("CAIRN_AGENT", "reviewer")
+	fl := flag.NewFlagSet("cairnbook task start", flag.ContinueOnError)
+	agent := fl.String("agent", "", "")
+	if err := fl.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	if name, ok := agentName(fl, *agent, true, "cairnbook task start", &stderr); !ok || name != "reviewer" {
+		t.Errorf("agentName = %q, %v, stderr %q; want reviewer", name, ok, stderr.String())
+	}
+
+	t.Setenv("CAIRN_AGENT", "reviewer ")
+	stderr.Reset()
+	if _, ok := agentName(fl, *agent, true, "cairnbook task start", &stderr); ok || !strings.Contains(stderr.String(), "CAIRN_AGENT") {
+		t.Errorf("agentName accepted or did not name CAIRN_AGENT: stderr %q", stderr.String())
+	}
+	stderr.Reset()
+	if checkEnvAgent("cairnbook task current", &stderr) || !strings.Contains(stderr.String(), "CAIRN_AGENT") {
+		t.Errorf("checkEnvAgent accepted or did not name CAIRN_AGENT: stderr %q", stderr.String())
+	}
+}
+
 // TestAgentNameIsCheckedBeforeTheCall checks that an agent name the wire form cannot carry is a
 // usage error, exit 2, before the project is opened and before any call. The name is refused from
 // the flag and from the variable, for a write and for a read, with a trailing space and with a

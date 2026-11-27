@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -259,5 +260,55 @@ func TestPiRemovesCairnOnlyWhenItRunsCairnMCP(t *testing.T) {
 				t.Errorf("stdout does not say the cairn entry was left as is:\n%s", stdout)
 			}
 		})
+	}
+}
+
+// TestEnableDryRunReportsARenameAndWritesNothing checks --dry-run over a settings file that holds the old cairn
+// hook: the report names the rename, and the file keeps every byte it had and no other file appears in .claude.
+func TestEnableDryRunReportsARenameAndWritesNothing(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, `{"hooks": {"SessionStart": [{"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": "cairn hook session-start"}]}]}}`)
+	before := readBytes(t, path)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code", "--dry-run")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := outcomes(stdout)["SessionStart"]; got != "renamed from cairn hook session-start" {
+		t.Errorf("SessionStart is %q, want the rename reported", got)
+	}
+	if !strings.Contains(stdout, "dry run: nothing written to "+path) {
+		t.Errorf("stdout does not say nothing was written:\n%s", stdout)
+	}
+	if string(readBytes(t, path)) != string(before) {
+		t.Errorf("the dry run changed the file:\n%s", readBytes(t, path))
+	}
+	if got := listDir(t, filepath.Join(dir, ".claude")); !reflect.DeepEqual(got, []string{settingsName}) {
+		t.Errorf(".claude holds %v, want the settings file only", got)
+	}
+}
+
+// TestEnableRenamesAnOldHookUnderADifferentMatcher pins what enable does with an old cairn hook under a matcher
+// that does not name compact. The hook is renamed in place and keeps its matcher: the first run reports only the
+// rename, without naming the matcher, and a second run reports the matcher as one that does not cover compact.
+func TestEnableRenamesAnOldHookUnderADifferentMatcher(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, `{"hooks": {"SessionStart": [{"matcher": "startup", "hooks": [{"type": "command", "command": "cairn hook session-start"}]}]}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := outcomes(stdout)["SessionStart"]; got != "renamed from cairn hook session-start" {
+		t.Errorf("SessionStart is %q, want the rename reported", got)
+	}
+	got := decodeJSON(t, readBytes(t, path))["hooks"].(map[string]any)["SessionStart"]
+	if want := []any{entryJSON("startup", "cairnbook hook session-start")}; !reflect.DeepEqual(got, want) {
+		t.Errorf("SessionStart is %v, want the renamed entry under its own matcher %v", got, want)
+	}
+	if _, stdout, _ = runCmd(t, "enable", "--agent", "claude-code"); outcomes(stdout)["SessionStart"] != "already present, matcher is startup, not startup|resume|clear|compact" {
+		t.Errorf("second run SessionStart is %q, want the matcher named as not covering compact", outcomes(stdout)["SessionStart"])
 	}
 }

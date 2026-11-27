@@ -298,3 +298,25 @@ func TestHostileAuthorizationHeaders(t *testing.T) {
 		}
 	}
 }
+
+// TestKeyRoleIgnoresTheRoleHeaderUnderEitherName checks that the role of a key-authenticated call comes
+// from the key when the request sends a role header under its new name or its old one from before the
+// rename. An agent key is an agent whichever header says otherwise.
+func TestKeyRoleIgnoresTheRoleHeaderUnderEitherName(t *testing.T) {
+	st := openKeyStore(t)
+	rec := &recorder{}
+	h := keyedHandler(st, rec)
+	agent := addKey(t, st, "ci", auth.ScopeAgent)
+	for _, name := range []string{api.HeaderRole, "X-Cairn-Role"} {
+		rec.callers = nil
+		hdr := bearer(agent)
+		hdr[name] = string(core.RoleOperator)
+		got := serve(h, http.MethodPost, api.Prefix+api.RouteTaskCurrent, "", hdr)
+		if got.Code != http.StatusOK || len(rec.callers) != 1 {
+			t.Fatalf("%s: status %d, %d calls; want 200 and one call: %s", name, got.Code, len(rec.callers), got.Body.String())
+		}
+		if rec.callers[0].Role != core.RoleAgent {
+			t.Errorf("%s: role %s, want agent from the key", name, rec.callers[0].Role)
+		}
+	}
+}

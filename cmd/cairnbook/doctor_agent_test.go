@@ -888,3 +888,16 @@ func TestDoctorAgentPluginInAProjectFile(t *testing.T) {
 		t.Errorf("PreCompact is %v, want ok with the D15 note %q", c, wantPreCompact)
 	}
 }
+
+// TestDoctorAgentWarnsOfThePluginUnderItsOldName checks that a user settings file which enables the plugin as cairn,
+// its name before the rename, is a plugin warning that names that file and says to reinstall the plugin.
+func TestDoctorAgentWarnsOfThePluginUnderItsOldName(t *testing.T) {
+	dir := agentProject(t)
+	user := userSettings(t)
+	writeSettings(t, user, `{"enabledPlugins": {"cairn@cairn-memory": true}}`)
+
+	c := checkNamed(claudeCodeChecks(dir), "plugin")
+	if c == nil || c.status != "warn" || c.detail != legacyPluginNote(user) {
+		t.Errorf("plugin check is %+v, want warn %q", c, legacyPluginNote(user))
+	}
+}
