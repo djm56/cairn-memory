@@ -52,7 +52,7 @@ var errorConstructors = map[string]bool{
 // to stdout, and text passed through a helper that writes it for the caller are not read.
 //
 // An earlier audit read two strings in ../identity and missed the five or six that name
-// `cairn init`. TestErrorAuditCanFail holds the forms the audit reads, so a form that
+// `cairnbook init`. TestErrorAuditCanFail holds the forms the audit reads, so a form that
 // drops out fails there, not here.
 func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 	dirs, err := auditDirs(auditRoot)
@@ -60,7 +60,7 @@ func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The walk must reach the packages that carry the errors, or it has lost the tree.
-	for _, want := range []string{"internal/core", "internal/client", "cmd/cairn"} {
+	for _, want := range []string{"internal/core", "internal/client", "cmd/cairnbook"} {
 		if !containsSuffix(dirs, want) {
 			t.Fatalf("the audit walk did not reach %s: it found %d packages", want, len(dirs))
 		}
@@ -108,7 +108,7 @@ func TestErrorTextNamesOnlySafeFix(t *testing.T) {
 // directory with a non-test Go file is audited, one with only test files is not, and the
 // directories in skipDirs are not entered when they sit directly under the root, so a
 // package added anywhere in the tree is found without a list naming it. A skip-listed name
-// lower in the tree (internal/docs, cmd/cairn/bin) is a package and is audited (6-W5). A
+// lower in the tree (internal/docs, cmd/cairnbook/bin) is a package and is audited (6-W5). A
 // testdata directory is not audited at any depth.
 func TestAuditWalkFindsEveryPackage(t *testing.T) {
 	root := auditTree(t)
@@ -117,7 +117,7 @@ func TestAuditWalkFindsEveryPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "cmd", "cairn", "bin"),
+		filepath.Join(root, "a"), filepath.Join(root, "b", "c"), filepath.Join(root, "cmd", "cairnbook", "bin"),
 		filepath.Join(root, "internal", "docs"), filepath.Join(root, "newpkg"),
 	}
 	sort.Strings(want)
@@ -171,7 +171,7 @@ func auditTree(t *testing.T) string {
 	write("wiki/w.go")
 	write("newpkg/n.go")
 	write("internal/docs/d.go")
-	write("cmd/cairn/bin/b.go")
+	write("cmd/cairnbook/bin/b.go")
 	write("a/testdata/t.go")
 	write("testdata/r.go")
 	return root
@@ -281,7 +281,7 @@ func TestErrorAuditCanFail(t *testing.T) {
 	}{
 		{"a bare core.Invalid, as inside core", pkg + "func f() { Invalid(\"run rm x\") }\n", 1, 1},
 		{"core.Invalid, as outside core (W2)", pkg + "func f() { core.Invalid(\"run rm x\") }\n", 1, 1},
-		{"core.Invalid with a format and a safe fix", pkg + "func f() { core.Invalid(\"no server: run `cairn init`, %s\", \"x\") }\n", 2, 0},
+		{"core.Invalid with a format and a safe fix", pkg + "func f() { core.Invalid(\"no server: run `cairnbook init`, %s\", \"x\") }\n", 2, 0},
 		{"core.Refused with --force", pkg + "func f() { core.Refused(\"use --force\") }\n", 1, 1},
 		{"core.NotFound with reset", pkg + "func f() { core.NotFound(\"reset the id\") }\n", 1, 1},
 		{"core.OperatorOnly with a safe fix", pkg + "func f() { core.OperatorOnly(\"ask the operator\") }\n", 1, 0},
@@ -293,7 +293,7 @@ func TestErrorAuditCanFail(t *testing.T) {
 		{"words that end in a banned fragment", pkg + "func f() { core.Invalid(\"confirm: the form\") }\n", 1, 0},
 		{"a constant passed by name (the shape of checkReviewData)", pkg + "const shape = \"run rm x\"\nfunc f() { Invalid(shape) }\n", 1, 1},
 		{"a constant passed by name, with a format", pkg + "const shape = \"run rm x\"\nfunc f() { Invalid(\"%s: fix it\", shape) }\n", 2, 1},
-		{"a constant with a safe text", pkg + "const shape = \"run cairn init\"\nfunc f() { Invalid(shape) }\n", 1, 0},
+		{"a constant with a safe text", pkg + "const shape = \"run cairnbook init\"\nfunc f() { Invalid(shape) }\n", 1, 0},
 		{"an upper-case reset", pkg + "func f() { core.Invalid(\"RESET the id\") }\n", 1, 1},
 		{"an upper-case --FORCE", pkg + "func f() { core.Refused(\"use --FORCE\") }\n", 1, 1},
 		{"a write to ErrOrStderr()", pkg + "import \"fmt\"\nfunc f(c C) { fmt.Fprintln(c.ErrOrStderr(), \"use --force\") }\n", 1, 1},

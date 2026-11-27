@@ -15,14 +15,14 @@ import (
 func TestASymlinkIsJudgedByItsTarget(t *testing.T) {
 	key := newKey(t)
 	home := keyEnv(t, "")
-	dir := filepath.Join(home, ".config", "cairn")
+	dir := filepath.Join(home, ".config", "cairnbook")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "client.env")
 
 	open := filepath.Join(home, "open.env")
-	if err := os.WriteFile(open, []byte("CAIRN_API_KEY="+key+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(open, []byte("CAIRNBOOK_API_KEY="+key+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(open, 0o644); err != nil {
@@ -40,7 +40,7 @@ func TestASymlinkIsJudgedByItsTarget(t *testing.T) {
 	}
 
 	owner := filepath.Join(home, "owner.env")
-	if err := os.WriteFile(owner, []byte("CAIRN_API_KEY="+key+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(owner, []byte("CAIRNBOOK_API_KEY="+key+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(owner, 0o600); err != nil {
@@ -59,11 +59,11 @@ func TestASymlinkIsJudgedByItsTarget(t *testing.T) {
 }
 
 // TestAnExportLineIsAccepted checks that a client.env line that begins with "export " is read as
-// the CAIRN_API_KEY line it is, as a shell would read it, and not skipped.
+// the CAIRNBOOK_API_KEY line it is, as a shell would read it, and not skipped.
 func TestAnExportLineIsAccepted(t *testing.T) {
 	key := newKey(t)
 	home := keyEnv(t, "")
-	writeKeyFile(t, home, 0o600, "export CAIRN_API_KEY="+key+"\n")
+	writeKeyFile(t, home, 0o600, "export CAIRNBOOK_API_KEY="+key+"\n")
 	k, err := client.LoadKey()
 	if err != nil || k.Value != key {
 		t.Errorf("an export line: LoadKey = %v, %v; want the key", k, err)
@@ -75,9 +75,9 @@ func TestAnExportLineIsAccepted(t *testing.T) {
 // and loopback addresses are not sent over a network.
 func TestSendsKeyInClear(t *testing.T) {
 	cases := map[string]bool{
-		"http://cairn.example.invalid:8788":     true,
+		"http://cairnbook.example.invalid:8788": true,
 		"http://192.168.1.5:8788":               true,
-		"https://cairn.example.invalid":         false,
+		"https://cairnbook.example.invalid":     false,
 		"http://127.0.0.1:8788":                 false,
 		"http://localhost:8788":                 false,
 		"http://LOCALHOST:8788":                 false,

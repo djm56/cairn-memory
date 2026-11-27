@@ -27,7 +27,7 @@ func TestMCPToolsPageMatchesRegisteredTools(t *testing.T) {
 		registered = append(registered, tool.Name)
 	}
 
-	onPage, err := docscheck.Names(mcpToolsPage, "cairn-mcp-tools")
+	onPage, err := docscheck.Names(mcpToolsPage, "cairnbook-mcp-tools")
 	if err != nil {
 		t.Fatalf("read the tool table: %v", err)
 	}

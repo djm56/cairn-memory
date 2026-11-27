@@ -59,14 +59,31 @@ const (
 // The headers that carry the caller (CONTRACT §1.1). None is required by the
 // wire form; a call with no project is invalid, whatever the headers say.
 const (
-	HeaderProject = "X-Cairn-Project"
-	HeaderAgent   = "X-Cairn-Agent"
-	HeaderSession = "X-Cairn-Session"
-	HeaderClient  = "X-Cairn-Client"
+	HeaderProject = "X-Cairnbook-Project"
+	HeaderAgent   = "X-Cairnbook-Agent"
+	HeaderSession = "X-Cairnbook-Session"
+	HeaderClient  = "X-Cairnbook-Client"
 	// HeaderRole is "operator" for an operator call. Any other value, or none,
 	// is an agent.
-	HeaderRole = "X-Cairn-Role"
+	HeaderRole = "X-Cairnbook-Role"
 )
+
+// legacyHeaderPrefix is the prefix of the caller headers before the rename to Cairnbook.
+// A server reads a header under its old name only when the request has none under the new
+// one, so a client built before the rename keeps working against a newer server.
+const legacyHeaderPrefix = "X-Cairn-"
+
+// callerHeader returns the value of the caller header name, or of its old X-Cairn- form when
+// the request does not carry name at all.
+func callerHeader(r *http.Request, name string) string {
+	if _, ok := r.Header[http.CanonicalHeaderKey(name)]; ok {
+		return r.Header.Get(name)
+	}
+	if rest, ok := strings.CutPrefix(name, "X-Cairnbook-"); ok {
+		return r.Header.Get(legacyHeaderPrefix + rest)
+	}
+	return ""
+}
 
 // MaxBodyBytes caps a request body. A larger body is refused with 413.
 const MaxBodyBytes = 1 << 20
@@ -244,7 +261,7 @@ type CallerFunc func(r *http.Request) (core.Caller, error)
 // caller. A nil hook discards the cause.
 type FailureHook func(r *http.Request, err error)
 
-// UnauthenticatedHeaderCaller returns the caller that the request's Cairn
+// UnauthenticatedHeaderCaller returns the caller that the request's Cairnbook
 // headers name, and trusts the role header as it is sent. No key checks it, so
 // it is for in-process tests only. Non-test code may not name it: the reach
 // guard TestNoNonTestUseOfUnauthenticatedHeaderCaller fails on any use outside
@@ -252,7 +269,7 @@ type FailureHook func(r *http.Request, err error)
 // is an agent. It never returns an error.
 func UnauthenticatedHeaderCaller(r *http.Request) (core.Caller, error) {
 	role := core.RoleAgent
-	switch r.Header.Get(HeaderRole) {
+	switch callerHeader(r, HeaderRole) {
 	case string(core.RoleOperator):
 		role = core.RoleOperator
 	case string(core.RoleViewer):
@@ -261,10 +278,10 @@ func UnauthenticatedHeaderCaller(r *http.Request) (core.Caller, error) {
 		role = core.RoleViewer
 	}
 	return core.Caller{
-		Project: r.Header.Get(HeaderProject),
-		Agent:   r.Header.Get(HeaderAgent),
-		Session: r.Header.Get(HeaderSession),
-		Client:  r.Header.Get(HeaderClient),
+		Project: callerHeader(r, HeaderProject),
+		Agent:   callerHeader(r, HeaderAgent),
+		Session: callerHeader(r, HeaderSession),
+		Client:  callerHeader(r, HeaderClient),
 		Role:    role,
 	}, nil
 }

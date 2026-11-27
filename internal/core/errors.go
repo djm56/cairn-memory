@@ -74,4 +74,4 @@ func OperatorOnly(format string, args ...any) *Error {
 
 // ErrNoProject is returned for every agent call whose caller has no project.
 // The message names the fix; there is no default project (DESIGN.md §2.1).
-var ErrNoProject = Invalid("no project: run `cairn init` in the project, or set CAIRN_PROJECT")
+var ErrNoProject = Invalid("no project: run `cairnbook init` in the project, or set CAIRNBOOK_PROJECT")

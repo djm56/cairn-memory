@@ -21,9 +21,9 @@ The labels are defined in [labels.json](https://github.com/djm56/cairn-memory/bl
 | `m1` to `m8`, `later` | The milestone the work belongs to ([PLAN §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)). |
 | `area:core` | Rules and types: `internal/core` and `internal/identity`. |
 | `area:store` | SQLite store, migrations and typed queries: `internal/store`. |
-| `area:mcp` | MCP adapter and `cairn mcp`: `internal/mcp`. |
+| `area:mcp` | MCP adapter and `cairnbook mcp`: `internal/mcp`. |
 | `area:plugin` | Claude Code plugin and marketplace. |
-| `area:server` | HTTP server and API keys: `cairn serve`. |
+| `area:server` | HTTP server and API keys: `cairnbook serve`. |
 | `area:ui` | Web UI pages embedded in the binary. |
 | `area:migration` | Import from bishop-memory. |
 | `area:review` | Triage and grading loop. |

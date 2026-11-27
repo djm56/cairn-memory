@@ -1,0 +1,55 @@
+# Cairnbook server. Install as /etc/systemd/system/cairnbook.service.
+# See docs/DEPLOY.md. This file holds no secrets: API keys live in the database, and
+# clients send them. It listens on loopback, so a reverse proxy must front it (setup b).
+# For setup (a), TLS on a non-loopback address, see DEPLOY.md, "Setup (a)": the service
+# user, the state directory and the first key come before this unit is started.
+
+[Unit]
+Description=Cairnbook memory server
+Documentation=https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# A dedicated system user. Create it first: see DEPLOY.md, "Users and the state directory".
+User=cairnbook
+Group=cairnbook
+ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr 127.0.0.1:8788
+Restart=on-failure
+RestartSec=5
+
+# The state directory: /var/lib/cairnbook, owner-only. The database and its -wal and -shm live here.
+StateDirectory=cairnbook
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/cairnbook
+UMask=0077
+
+# Hardening. Chosen by reading what the server does: no privilege gain, no write outside
+# the state directory, no kernel or device access, no extra address families. The unit
+# was first started under systemd in the M2 live run, on 2026-11-02 (DEPLOY.md, "The
+# systemd unit"). Check it on your own host: systemd-analyze verify, then systemctl status.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+# StateDirectory= already makes /var/lib/cairnbook writable under ProtectSystem=strict. This
+# line repeats it on purpose, so the unit still works if StateDirectory= is ever removed.
+ReadWritePaths=/var/lib/cairnbook
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

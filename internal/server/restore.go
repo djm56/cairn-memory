@@ -40,7 +40,7 @@ var (
 	probeRaw = rawInUse
 )
 
-// RestoreOptions is what cairn restore starts with. DB is the database to replace and Backup
+// RestoreOptions is what cairnbook restore starts with. DB is the database to replace and Backup
 // the copy to restore from. Terminal says stdin is a terminal: the command checks it, and a
 // test sets it. Input is where the confirmation is typed. Out gets the prompt and the report,
 // and Now is the clock for the pre-restore name; nil means the real one.
@@ -84,7 +84,7 @@ type move struct {
 //     migrates it to this build's schema.
 //
 // Every error after the first move names the pre-restore path and the step that puts the
-// database back (see recoveryStep). The messages carry no "cairn restore:" prefix; the command
+// database back (see recoveryStep). The messages carry no "cairnbook restore:" prefix; the command
 // adds it.
 func Restore(ctx context.Context, o RestoreOptions) error {
 	if o.Out == nil {
@@ -97,7 +97,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		return err
 	}
 	if o.Backup == "" {
-		return errors.New("needs a backup file: cairn restore --db <file> <backup>")
+		return errors.New("needs a backup file: cairnbook restore --db <file> <backup>")
 	}
 	// 1. Checked first, so a restore that cannot be confirmed does nothing else.
 	if !o.Terminal {
@@ -123,7 +123,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		return fmt.Errorf("the database %s: %w; nothing was changed", o.DB, derr)
 	}
 	if exists && os.SameFile(di, bi) {
-		return fmt.Errorf("the backup %s is the database itself: restore from a copy made by cairn backup", o.Backup)
+		return fmt.Errorf("the backup %s is the database itself: restore from a copy made by cairnbook backup", o.Backup)
 	}
 	// With no database at the path, a -wal or -shm beside it belongs to a database that is
 	// not there. SQLite replays a -wal it finds beside the file it opens, so the restore refuses
@@ -173,7 +173,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 			held, perr := probeRaw(o.DB)
 			switch {
 			case held:
-				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+				return fmt.Errorf("the database %s is in use: stop cairnbook serve, or whatever holds it, then try again; nothing was changed", o.DB)
 			case perr == nil:
 				rawProbed = true
 			}
@@ -183,11 +183,11 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 			lock, err = acquireExclusive(ctx, o.DB)
 			switch {
 			case errors.Is(err, store.ErrInUse):
-				return fmt.Errorf("the database %s is in use: stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+				return fmt.Errorf("the database %s is in use: stop cairnbook serve, or whatever holds it, then try again; nothing was changed", o.DB)
 			case errors.Is(err, store.ErrNotDatabase):
 				// The file read as a database a moment ago and does not now: it changed under the
 				// check, or it is damaged in a way the lock finds and the check did not.
-				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairn serve if it runs, check the file as the user that owns it, the service user for a service (the sqlite3 command-line tool may need installing) with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
+				return fmt.Errorf("the database %s could be read, then could not be locked as a database; it may have changed while it was checked; nothing was moved or deleted. Stop cairnbook serve if it runs, check the file as the user that owns it, the service user for a service (the sqlite3 command-line tool may need installing) with: sqlite3 %s 'PRAGMA integrity_check'; then run restore again", o.DB, shellQuote(o.DB))
 			case err != nil:
 				return err
 			}
@@ -205,10 +205,10 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 			if rawProbed {
 				// The probe cannot see an idle connection in rollback-journal mode, which holds no lock,
 				// so the operator is still told to stop the server.
-				fmt.Fprintf(o.Out, "A read-only probe found no lock on %s. The probe cannot see every holder. Stop cairn serve before you type the path if it runs against this file.\n", o.DB)
+				fmt.Fprintf(o.Out, "A read-only probe found no lock on %s. The probe cannot see every holder. Stop cairnbook serve before you type the path if it runs against this file.\n", o.DB)
 			} else {
 				// The probe could not tell, so a server holding the file is not seen.
-				fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairn serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
+				fmt.Fprintf(o.Out, "The lock could not be checked for %s, because it is not a readable SQLite database. Stop cairnbook serve before you type the path: nothing here can tell whether it is running on this file.\n", o.DB)
 			}
 		}
 	} else {
@@ -238,7 +238,7 @@ func Restore(ctx context.Context, o RestoreOptions) error {
 		held, perr := probeRaw(o.DB)
 		switch {
 		case held:
-			return fmt.Errorf("the database %s is in use: a holder started on it after the check before the prompt. Stop cairn serve, or whatever holds it, then try again; nothing was changed", o.DB)
+			return fmt.Errorf("the database %s is in use: a holder started on it after the check before the prompt. Stop cairnbook serve, or whatever holds it, then try again; nothing was changed", o.DB)
 		case perr != nil && rawProbed:
 			return fmt.Errorf("the lock on %s could not be checked again before the move: %w; nothing was changed", o.DB, perr)
 		}
@@ -385,12 +385,12 @@ func recoveryStep(db, pre string, moves []move) string {
 	if !mainMoved {
 		what = "no database was there before the restore; the files moved aside are kept at " + strings.Join(kept, " and ")
 	}
-	return fmt.Sprintf("%s. To put them back: stop cairn serve, move any file now at %s aside, then run: %s (see README, If a restore fails)",
+	return fmt.Sprintf("%s. To put them back: stop cairnbook serve, move any file now at %s aside, then run: %s (see README, If a restore fails)",
 		what, db, strings.Join(cmds, " && "))
 }
 
 // stageBackup copies the backup at src to a new file in the directory of db, with dbFileMode
-// (os.CreateTemp makes it 0600), then checks the copy as Restore needs: it opens as a Cairn
+// (os.CreateTemp makes it 0600), then checks the copy as Restore needs: it opens as a Cairnbook
 // database, passes the integrity check, and its schema is not newer than this build. It returns
 // the copy's name and the schema version. On a refusal the copy and any -wal or -shm beside it
 // are removed, after the copy is closed.
@@ -423,7 +423,7 @@ func stageBackup(ctx context.Context, db, src string) (string, int, error) {
 	return name, v, nil
 }
 
-// verifyStaged opens the copy at name as a Cairn database, checks it, and returns its schema
+// verifyStaged opens the copy at name as a Cairnbook database, checks it, and returns its schema
 // version. The copy is closed before it returns, so the caller may remove it at once; a close
 // that fails is an error.
 func verifyStaged(ctx context.Context, name, src string) (v int, err error) {
@@ -532,7 +532,7 @@ func unchanged(locked bool) string {
 // it.
 func checkFailure(db string, err error) error {
 	if _, serr := os.Lstat(db + "-journal"); serr == nil {
-		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairn serve, then open the database once as the user that owns it (for the service, sudo -u cairn; the sqlite3 command-line tool may need installing) with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",
+		return fmt.Errorf("%w; nothing was moved or deleted. A journal file %s sits beside the database, and a read-only check cannot roll it back. Stop cairnbook serve, then open the database once as the user that owns it (for the service, sudo -u cairnbook; the sqlite3 command-line tool may need installing) with sqlite3 %s 'SELECT 1' so SQLite rolls the journal back, then run restore again",
 			err, db+"-journal", shellQuote(db))
 	}
 	return fmt.Errorf("%w; nothing was moved or deleted", err)

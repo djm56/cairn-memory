@@ -24,7 +24,7 @@ import (
 // race is closed by the design (no check precedes the open), not by this test.
 func TestANamedPipeAsTheKeyFileIsRefusedWithoutBlocking(t *testing.T) {
 	home := keyEnv(t, "")
-	dir := filepath.Join(home, ".config", "cairn")
+	dir := filepath.Join(home, ".config", "cairnbook")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,7 @@ import (
 func TestUnknownRouteIsNoRoute(t *testing.T) {
 	srv := httptest.NewServer(api.Handler(newLocal(t), api.UnauthenticatedHeaderCaller, nil))
 	t.Cleanup(srv.Close)
-	base := srv.URL + "/cairn"
+	base := srv.URL + "/cairnbook"
 	c, err := client.New(base, srv.Client())
 	if err != nil {
 		t.Fatal(err)
@@ -35,11 +35,11 @@ func TestUnknownRouteIsNoRoute(t *testing.T) {
 	}
 }
 
-// TestNonCairnNotFoundNamesTheBaseURL checks #121: a 404 whose body is not a cairn answer, such
+// TestNonCairnbookNotFoundNamesTheBaseURL checks #121: a 404 whose body is not a cairnbook answer, such
 // as a reverse proxy's page, names the base URL the client was given and says the body was not a
-// cairn answer, as the no_route message does. The base URL is named for that 404 only: a 500
+// cairnbook answer, as the no_route message does. The base URL is named for that 404 only: a 500
 // with the same kind of body keeps the plain message (see the next test).
-func TestNonCairnNotFoundNamesTheBaseURL(t *testing.T) {
+func TestNonCairnbookNotFoundNamesTheBaseURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusNotFound)
@@ -53,19 +53,19 @@ func TestNonCairnNotFoundNamesTheBaseURL(t *testing.T) {
 	}
 	_, err = c.TaskCurrent(agentCtx())
 	if err == nil {
-		t.Fatal("a 404 from a non-cairn server gave no error")
+		t.Fatal("a 404 from a non-cairnbook server gave no error")
 	}
-	if !strings.Contains(err.Error(), "not a cairn answer") || !strings.Contains(err.Error(), base) {
-		t.Errorf("error %q does not say the body was not a cairn answer, or does not name the base URL %s", err, base)
+	if !strings.Contains(err.Error(), "not a cairnbook answer") || !strings.Contains(err.Error(), base) {
+		t.Errorf("error %q does not say the body was not a cairnbook answer, or does not name the base URL %s", err, base)
 	}
 	if core.KindOf(err) != "" {
-		t.Errorf("a non-cairn 404 read as kind %q, want none", core.KindOf(err))
+		t.Errorf("a non-cairnbook 404 read as kind %q, want none", core.KindOf(err))
 	}
 }
 
-// TestNonCairnServerErrorDoesNotNameTheBaseURL checks that a 500 with a non-cairn body keeps the
+// TestNonCairnbookServerErrorDoesNotNameTheBaseURL checks that a 500 with a non-cairnbook body keeps the
 // plain message that names the route and the status, and not the base-URL message of a 404.
-func TestNonCairnServerErrorDoesNotNameTheBaseURL(t *testing.T) {
+func TestNonCairnbookServerErrorDoesNotNameTheBaseURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte("<html>boom</html>"))
@@ -76,7 +76,7 @@ func TestNonCairnServerErrorDoesNotNameTheBaseURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = c.TaskCurrent(agentCtx())
-	if err == nil || strings.Contains(err.Error(), "not a cairn answer") {
+	if err == nil || strings.Contains(err.Error(), "not a cairnbook answer") {
 		t.Errorf("a 500 gave error %v, want the plain status message", err)
 	}
 }

@@ -118,14 +118,14 @@ func TestTaskStartNeedsAnAgent(t *testing.T) {
 	if code != 2 || out != "" || svc.calls != 0 {
 		t.Errorf("exit %d, stdout %q, calls %d; want a usage error and no call", code, out, svc.calls)
 	}
-	for _, want := range []string{"cairn task start: no agent name", "--agent", identity.EnvAgent} {
+	for _, want := range []string{"cairnbook task start: no agent name", "--agent", identity.EnvAgent} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr %q lacks %q", errOut, want)
 		}
 	}
 }
 
-// TestTaskStartAgentFromTheVariable checks that CAIRN_AGENT names the agent when --agent is left out.
+// TestTaskStartAgentFromTheVariable checks that CAIRNBOOK_AGENT names the agent when --agent is left out.
 func TestTaskStartAgentFromTheVariable(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "hicks")
 	svc := &fakeWrites{start: startedResult()}
@@ -143,7 +143,7 @@ func TestTaskStartRefusedByTheServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("another task is active in this project")}
 	code, out, errOut := runWrite(t, Task, svc, "", "start", "--agent", "hicks", "--title", "t", "--goal", "g")
-	if code != 5 || out != "" || errOut != "cairn task start: another task is active in this project\n" {
+	if code != 5 || out != "" || errOut != "cairnbook task start: another task is active in this project\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused), nothing on stdout and the refusal", code, out, errOut)
 	}
 }
@@ -253,7 +253,7 @@ func TestTaskCloseRefusedByServer(t *testing.T) {
 	refusal.Missing = []string{core.MissingSummary, core.MissingLessons, core.MissingMistakes}
 	svc := &fakeWrites{err: refusal}
 	code, out, errOut := runWrite(t, Task, svc, "", "close", "task-20261030-01", "--outcome", "done", "--agent", "hicks")
-	if code != 5 || out != "" || errOut != "cairn task close: close policy not met: summary, lessons, mistakes\n" {
+	if code != 5 || out != "" || errOut != "cairnbook task close: close policy not met: summary, lessons, mistakes\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused), nothing on stdout and the refusal", code, out, errOut)
 	}
 }
@@ -396,7 +396,7 @@ func TestTaskUpdateRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("another task is active in this project")}
 	code, out, errOut := runWrite(t, Task, svc, "", "update", "task-20261030-01", "--status", "active", "--agent", "hicks")
-	if code != 5 || out != "" || errOut != "cairn task update: another task is active in this project\n" {
+	if code != 5 || out != "" || errOut != "cairnbook task update: another task is active in this project\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused) and the refusal", code, out, errOut)
 	}
 }

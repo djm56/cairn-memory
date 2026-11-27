@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — set up GitHub project management for Cairn: labels,
+# bootstrap.sh — set up GitHub project management for Cairnbook: labels,
 # milestones, roadmap issues and the Projects v2 board.
 #
 # Usage:
@@ -166,7 +166,7 @@ OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 
 # Scratch space for request bodies and intermediate JSON. Removed on exit.
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairn-bootstrap.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairnbook-bootstrap.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 if [ "$APPLY" = 1 ]; then
@@ -474,11 +474,11 @@ sync_children() {
       continue
     fi
 
-    # Test hook, inert unless CAIRN_TEST_CUT_SHIFT is set (only the tests set
+    # Test hook, inert unless CAIRNBOOK_TEST_CUT_SHIFT is set (only the tests set
     # it): moves both cut points by that many bytes so the guards can be shown
     # to refuse a wrong cut.
-    pend=$((pend + ${CAIRN_TEST_CUT_SHIFT:-0}))
-    estart=$((estart + ${CAIRN_TEST_CUT_SHIFT:-0}))
+    pend=$((pend + ${CAIRNBOOK_TEST_CUT_SHIFT:-0}))
+    estart=$((estart + ${CAIRNBOOK_TEST_CUT_SHIFT:-0}))
 
     # Range check before any head/tail uses the offsets.
     size="$(wc -c < "$cur" | tr -d ' ')"

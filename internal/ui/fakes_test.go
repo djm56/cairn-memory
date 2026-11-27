@@ -186,7 +186,7 @@ type harness struct {
 
 // host is the host name of every request: the Host header and the Origin of a same-origin
 // form, with the scheme the harness is configured for.
-const host = "cairn.test"
+const host = "cairnbook.test"
 
 // newHarness builds a UI. secure sets the Secure flag (TLS or behind a proxy); hsts sets
 // the HSTS flag. The clock starts at 9:00 UTC on 2026-11-03.
@@ -271,9 +271,9 @@ func (hr *harness) signIn(key string, presented *http.Cookie) *http.Cookie {
 // cookieName is the session cookie's name for this harness.
 func (hr *harness) cookieName() string {
 	if hr.cfg.Secure {
-		return "__Secure-cairn_ui"
+		return "__Secure-cairnbook_ui"
 	}
-	return "cairn_ui"
+	return "cairnbook_ui"
 }
 
 // csrfFor returns the CSRF value of the session cookie c, as a rendered form carries it.

@@ -1,13 +1,13 @@
 # M2 live run: checklist
 
 This is the live run that closes M2's exit check (issue #19). A Claude Code session on a
-second machine starts, steps and closes a small task through `cairn mcp`, against a
-`cairn serve` on the server. It takes about 20 minutes. The operator runs it and pastes
+second machine starts, steps and closes a small task through `cairnbook mcp`, against a
+`cairnbook serve` on the server. It takes about 20 minutes. The operator runs it and pastes
 the output back. Nothing here needs the author to be present.
 
 Two machines are involved:
 
-- **Server:** the machine that runs `cairn serve`. Setup is in [DEPLOY.md](DEPLOY.md).
+- **Server:** the machine that runs `cairnbook serve`. Setup is in [DEPLOY.md](DEPLOY.md).
 - **Client:** the machine with Claude Code and a project. It is the second machine.
 
 Keep one test project for the run. Its name below is `m2-live-run`.
@@ -19,8 +19,8 @@ made **before** the server starts, for every variant below: a server on a non-lo
 address refuses to start with no active key, and `key add` needs the state directory
 to exist first (it creates the database file, not its directory).
 
-- [ ] **1.1 Build or install `cairn`.** From a checkout: `make build`, which writes
-  `bin/cairn`. Install it: `install -m 0755 bin/cairn /usr/local/bin/cairn`.
+- [ ] **1.1 Build or install `cairnbook`.** From a checkout: `make build`, which writes
+  `bin/cairnbook`. Install it: `install -m 0755 bin/cairnbook /usr/local/bin/cairnbook`.
 - [ ] **1.2 Prepare the host and make an agent key.** This is the key Claude Code will
   use. Choose how the server will run, then do the matching block.
 
@@ -28,9 +28,9 @@ to exist first (it creates the database file, not its directory).
   state directory, then make the key as that user:
 
   ```bash
-  useradd --system --no-create-home --home-dir /var/lib/cairn --shell /usr/sbin/nologin cairn
-  install -d -m 0700 -o cairn -g cairn /var/lib/cairn
-  sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name m2-live-run --scope agent
+  useradd --system --no-create-home --home-dir /var/lib/cairnbook --shell /usr/sbin/nologin cairnbook
+  install -d -m 0700 -o cairnbook -g cairnbook /var/lib/cairnbook
+  sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name m2-live-run --scope agent
   ```
 
   If the user already exists, `useradd` says so and you can go on.
@@ -39,7 +39,7 @@ to exist first (it creates the database file, not its directory).
   current directory exists, so no directory step is needed:
 
   ```bash
-  cairn key add --db ./m2-live-run.db --name m2-live-run --scope agent
+  cairnbook key add --db ./m2-live-run.db --name m2-live-run --scope agent
   ```
 
   The key is printed once, on stdout. Copy it now. It is the first key on this server, so
@@ -62,7 +62,7 @@ to exist first (it creates the database file, not its directory).
   - *In a terminal for this run:* keep this terminal for the server, and capture its log:
 
     ```bash
-    cairn serve --db ./m2-live-run.db 2>&1 | tee serve.log
+    cairnbook serve --db ./m2-live-run.db 2>&1 | tee serve.log
     ```
 
     This listens on loopback, so it needs the tunnel route to be reached from the
@@ -74,15 +74,15 @@ to exist first (it creates the database file, not its directory).
   Run them and keep the output:
 
   ```bash
-  systemd-analyze verify /etc/systemd/system/cairn.service
-  systemctl status cairn
-  systemd-analyze security cairn
+  systemd-analyze verify /etc/systemd/system/cairnbook.service
+  systemctl status cairnbook
+  systemd-analyze security cairnbook
   ```
 
   `verify` prints nothing when it finds no fault. `status` should show `active
   (running)`; paste its first lines. `security` prints a table and a final overall
   exposure line; paste the whole output. If the unit does not start, paste `status` and
-  `journalctl -u cairn -n 30 --no-pager` (as root), and stop: that is a finding, not
+  `journalctl -u cairnbook -n 30 --no-pager` (as root), and stop: that is a finding, not
   something to work round.
 - [ ] **1.4 Check the server answers.** `curl -sS <server-url>/healthz` should print a
   fixed body. For setup (a) use `https://` and the port. For setup (b), check the proxy
@@ -98,9 +98,9 @@ to exist first (it creates the database file, not its directory).
 
 Do this on the second machine, in the project's directory.
 
-- [ ] **2.1 Install `cairn` on the client.** The client needs: Claude Code, a test
+- [ ] **2.1 Install `cairnbook` on the client.** The client needs: Claude Code, a test
   project directory, `curl` for the health check, a network route to the server (or
-  `ssh` for the tunnel route), and a `cairn` binary built for the client's operating
+  `ssh` for the tunnel route), and a `cairnbook` binary built for the client's operating
   system and CPU. A binary built on Linux does not run on macOS. Two ways to get one:
 
   *Build on the build machine, for the client.* From the checkout, with Go 1.26 or later
@@ -108,23 +108,23 @@ Do this on the second machine, in the project's directory.
   `arm64` (Apple silicon) or `x86_64` (Intel, which is `amd64` here):
 
   ```bash
-  GOOS=darwin GOARCH=arm64 go build -o cairn ./cmd/cairn   # Apple silicon
-  GOOS=darwin GOARCH=amd64 go build -o cairn ./cmd/cairn   # Intel Mac
-  GOOS=linux  GOARCH=amd64 go build -o cairn ./cmd/cairn   # Linux client, x86_64
+  GOOS=darwin GOARCH=arm64 go build -o cairnbook ./cmd/cairnbook   # Apple silicon
+  GOOS=darwin GOARCH=amd64 go build -o cairnbook ./cmd/cairnbook   # Intel Mac
+  GOOS=linux  GOARCH=amd64 go build -o cairnbook ./cmd/cairnbook   # Linux client, x86_64
   ```
 
-  Copy the file to the client, for example `scp cairn client:`. A binary built this way
+  Copy the file to the client, for example `scp cairnbook client:`. A binary built this way
   reports its version as `dev`.
 
   *Or build on the client,* from a checkout there, which needs Go 1.26 or later and
-  `make`: `make build`, which writes `bin/cairn`.
+  `make`: `make build`, which writes `bin/cairnbook`.
 
   Then put it on the client's `PATH`. `~/.local/bin` does not exist on a stock macOS, so
   make it first:
 
   ```bash
   mkdir -p ~/.local/bin
-  install -m 0755 cairn ~/.local/bin/cairn      # or bin/cairn, if you ran make build
+  install -m 0755 cairnbook ~/.local/bin/cairnbook      # or bin/cairnbook, if you ran make build
   ```
 
   Add it to `PATH` if it is not there. For zsh (the macOS default), then open a new
@@ -136,31 +136,31 @@ Do this on the second machine, in the project's directory.
   ```
 
   For bash, use `~/.bashrc` on Linux, or `~/.bash_profile` on macOS, in place of
-  `~/.zshrc`. Check it: `cairn version`.
+  `~/.zshrc`. Check it: `cairnbook version`.
 - [ ] **2.2 Write the key file, owner-only.** The key goes into
-  `~/.config/cairn/client.env`, mode 0600. This form works in bash and zsh, and keeps the
+  `~/.config/cairnbook/client.env`, mode 0600. This form works in bash and zsh, and keeps the
   key out of your shell history:
 
   ```bash
-  mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
-  [ -e ~/.config/cairn/client.env ] && chmod 600 ~/.config/cairn/client.env
+  mkdir -p -m 700 ~/.config/cairnbook && chmod 700 ~/.config/cairnbook
+  [ -e ~/.config/cairnbook/client.env ] && chmod 600 ~/.config/cairnbook/client.env
   printf 'API key: ' >&2; read -rs K; echo >&2
-  (umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
+  (umask 077 && printf 'CAIRNBOOK_API_KEY=%s\n' "$K" > ~/.config/cairnbook/client.env); unset K
   ```
 
-  Paste the key at the prompt. Check the mode: `ls -l ~/.config/cairn/client.env` must
-  begin `-rw-------`. A file that any other user can read is refused, and `cairn` says
+  Paste the key at the prompt. Check the mode: `ls -l ~/.config/cairnbook/client.env` must
+  begin `-rw-------`. A file that any other user can read is refused, and `cairnbook` says
   `chmod 600`.
-- [ ] **2.3 Write `.cairn.toml` in the project root.** It holds the project name and the
+- [ ] **2.3 Write `.cairnbook.toml` in the project root.** It holds the project name and the
   server URL, and no key. Write it by hand, or run
-  `cairn init --project m2-live-run --server <server-url>` from the project directory.
+  `cairnbook init --project m2-live-run --server <server-url>` from the project directory.
 
   ```toml
   project = "m2-live-run"
-  server = "https://cairn.example.net"
+  server = "https://cairnbook.example.net"
   ```
 
-  Use `https://` and the server's name for setup (a) and for setup (b). `cairn doctor`
+  Use `https://` and the server's name for setup (a) and for setup (b). `cairnbook doctor`
   warns when a key would go over plain `http://` to a host that is not loopback.
 
   **For a server with no public DNS name, use the tunnel.** Open it on the client and
@@ -171,36 +171,36 @@ Do this on the second machine, in the project's directory.
   ```
 
   Then set `server = "http://127.0.0.1:8788"`. The client sees a loopback address, so
-  `cairn doctor` does not warn, and the SSH tunnel carries the traffic encrypted.
-  `cairn` trusts only the operating system's certificate roots and has no flag to skip
+  `cairnbook doctor` does not warn, and the SSH tunnel carries the traffic encrypted.
+  `cairnbook` trusts only the operating system's certificate roots and has no flag to skip
   a check; DEPLOY.md, "A server with no public DNS name", also covers a private CA.
-- [ ] **2.4 Write `.mcp.json` by hand, in the project root.** It registers `cairn mcp`.
+- [ ] **2.4 Write `.mcp.json` by hand, in the project root.** It registers `cairnbook mcp`.
   Use the absolute path of the binary, since Claude Code may not have your `PATH`.
   This is the documented route.
 
   ```json
   {
     "mcpServers": {
-      "cairn": {
-        "command": "/Users/you/.local/bin/cairn",
+      "cairnbook": {
+        "command": "/Users/you/.local/bin/cairnbook",
         "args": ["mcp"]
       }
     }
   }
   ```
 
-  On Linux the path is, for example, `/home/you/.local/bin/cairn`. Use what
-  `command -v cairn` prints.
+  On Linux the path is, for example, `/home/you/.local/bin/cairnbook`. Use what
+  `command -v cairnbook` prints.
 
   *User scope, as an alternative.* Run
-  `claude mcp add --scope user cairn -- <absolute path> mcp`. It registers `cairn` for
+  `claude mcp add --scope user cairnbook -- <absolute path> mcp`. It registers `cairnbook` for
   every project on this machine, and skips the approval prompt in
   4.1, so 4.1's approval check does not apply to it. Use one route or the other, not
   both. Its cleanup is in part 6.
 
-## Part 3: `cairn doctor` passes
+## Part 3: `cairnbook doctor` passes
 
-- [ ] **3.1 Run it from the project directory:** `cairn doctor`.
+- [ ] **3.1 Run it from the project directory:** `cairnbook doctor`.
 
   It checks the binary, the project file, the server, the key and the connection. It
   changes nothing. Every check should say `ok`. A `warn` is printed with its reason; a
@@ -208,13 +208,13 @@ Do this on the second machine, in the project's directory.
 
 ## Part 4: the Claude Code session
 
-- [ ] **4.1 Open Claude Code in the project.** Approve the project's `cairn` MCP server
+- [ ] **4.1 Open Claude Code in the project.** Approve the project's `cairnbook` MCP server
   when Claude Code asks. (Not for the user-scope route in 2.4, which asks for no
-  approval.) Then run `/mcp` and check that `cairn` is connected.
+  approval.) Then run `/mcp` and check that `cairnbook` is connected.
 - [ ] **4.2 Ask for a small task, through the MCP tools only.** Paste this into the
   session:
 
-  > Using the cairn MCP tools, not the shell: start a task titled "M2 live run" with a
+  > Using the cairnbook MCP tools, not the shell: start a task titled "M2 live run" with a
   > one-line goal, using `task_start` with `agent` set to `claude-code`. Then set two
   > steps with `step_plan`: "write a line", and "read it back". Start and finish each step
   > with `step_update`, and record a short `event_log` entry for each. Finish both steps
@@ -226,7 +226,7 @@ Do this on the second machine, in the project's directory.
 
 ## Part 5: export and report
 
-- [ ] **5.1 Export the task:** `cairn export task <task-id>`. It prints the task as
+- [ ] **5.1 Export the task:** `cairnbook export task <task-id>`. It prints the task as
   Markdown, with its steps and events. It should show the title, the two steps and the
   close.
 - [ ] **5.2 Run the check script** from the project directory, with the task id:
@@ -235,22 +235,22 @@ Do this on the second machine, in the project's directory.
   scripts/m2-live-run-check.sh <task-id>
   ```
 
-  It runs `cairn doctor` and `cairn export task`, and prints both in one block. It never
-  prints the key, and it creates and changes nothing. If `cairn` is not on your `PATH`,
-  run it as `CAIRN=/full/path/to/cairn scripts/m2-live-run-check.sh <task-id>`.
+  It runs `cairnbook doctor` and `cairnbook export task`, and prints both in one block. It never
+  prints the key, and it creates and changes nothing. If `cairnbook` is not on your `PATH`,
+  run it as `CAIRNBOOK=/full/path/to/cairnbook scripts/m2-live-run-check.sh <task-id>`.
 - [ ] **5.3 On the server, list the keys.** Use the block that matches the run from 1.2
   and 1.3. The list shows names, scopes and times. It never shows a key.
 
   *For the unit:*
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
+  sudo -u cairnbook /usr/local/bin/cairnbook key list --db /var/lib/cairnbook/cairnbook.db
   ```
 
   *For a server run in a terminal:*
 
   ```bash
-  cairn key list --db ./m2-live-run.db
+  cairnbook key list --db ./m2-live-run.db
   ```
 - [ ] **5.4 Pick the serve log lines.** Take the server's log lines for the run, and keep
   only the lines that have `msg=listening`, and any with `level=ERROR`. Redact the host
@@ -261,7 +261,7 @@ Do this on the second machine, in the project's directory.
     group. Run it as root or with `sudo`:
 
     ```bash
-    sudo journalctl -u cairn --no-pager | grep -E 'msg=listening|level=ERROR'
+    sudo journalctl -u cairnbook --no-pager | grep -E 'msg=listening|level=ERROR'
     ```
 
   - *For a server run in a terminal:* it has no journal entry. Its log is the
@@ -277,17 +277,17 @@ Do this on the second machine, in the project's directory.
 
 Paste these, in this order, in one message:
 
-1. The output of `cairn doctor` (from 3.1, or the block from 5.2).
-2. The output of `cairn export task <task-id>` (from 5.1, or the block from 5.2).
+1. The output of `cairnbook doctor` (from 3.1, or the block from 5.2).
+2. The output of `cairnbook export task <task-id>` (from 5.1, or the block from 5.2).
 3. The serve log lines from 5.4, redacted.
-4. The output of `cairn key list` from 5.3.
+4. The output of `cairnbook key list` from 5.3.
 5. For a unit only: the output of the three checks from 1.3 (`systemd-analyze verify`,
-   `systemctl status cairn`, `systemd-analyze security cairn`).
+   `systemctl status cairnbook`, `systemd-analyze security cairnbook`).
 
 Do not paste the key itself, or the contents of `client.env`. The key should appear in
-none of them; if it does, say so and leave that line out. The output of `cairn key add`
+none of them; if it does, say so and leave that line out. The output of `cairnbook key add`
 (1.2) prints the key, so leave it out of the paste. In everything you paste, replace any
-`cairn_...` value with `<redacted>`. If a key is pasted anywhere, revoke it and make a
+`cairnbook_...` value with `<redacted>`. If a key is pasted anywhere, revoke it and make a
 new one.
 
 ## Part 6: clean up
@@ -302,17 +302,17 @@ new one.
   *For the unit:*
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name m2-live-run
+  sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/cairnbook.db --name m2-live-run
   ```
 
   *For a server run in a terminal:*
 
   ```bash
-  cairn key revoke --db ./m2-live-run.db --name m2-live-run
+  cairnbook key revoke --db ./m2-live-run.db --name m2-live-run
   ```
 - [ ] **6.2 Remove the client's key file** if the machine is not kept for further runs:
-  `rm ~/.config/cairn/client.env`. Remove `.mcp.json` from the test project, or, for the
-  user-scope route in 2.4, run `claude mcp remove cairn --scope user`.
+  `rm ~/.config/cairnbook/client.env`. Remove `.mcp.json` from the test project, or, for the
+  user-scope route in 2.4, run `claude mcp remove cairnbook --scope user`.
 - [ ] **6.3 Stop a terminal server** if you started one for this run. Stop the unit only
   if it was started for this run.
 

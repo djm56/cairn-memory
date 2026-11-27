@@ -46,14 +46,14 @@ var serverSide = map[string]string{
 	"internal/store": "owns the database; it is the one place a store is opened",
 	"internal/core":  "the in-process Service over a store; it imports internal/store",
 	"internal/api":   "HTTP handlers only; no listener is started here (D19)",
-	// cairn serve (D20) is the one place the server opens the store and listens. The
-	// command in cmd/cairn is guarded and only parses its flags, then calls server.Run.
-	"internal/server": "cairn serve (D20): opens the server's store and starts the listener; the command in cmd/cairn calls it",
+	// cairnbook serve (D20) is the one place the server opens the store and listens. The
+	// command in cmd/cairnbook is guarded and only parses its flags, then calls server.Run.
+	"internal/server": "cairnbook serve (D20): opens the server's store and starts the listener; the command in cmd/cairnbook calls it",
 }
 
 // requiredGuarded are packages that must stay in the guard. Losing one of them to an
 // exemption, or to a rename, fails the test and names it.
-var requiredGuarded = []string{"cmd/cairn", "internal/mcp", "internal/client", "internal/identity"}
+var requiredGuarded = []string{"cmd/cairnbook", "internal/mcp", "internal/client", "internal/identity"}
 
 // guardedDirs derives the packages the guard checks: every directory under the module
 // with a non-test Go file, except the serverSide ones. It fails when a serverSide name
@@ -120,7 +120,7 @@ func contains(list []string, s string) bool {
 var bannedImports = map[string]string{
 	storePath:    "opens a database",
 	httptestPath: "starts an in-process HTTP listener",
-	serverPath:   "opens the server's database and starts its listener: only cairn serve, key, backup and restore may import it",
+	serverPath:   "opens the server's database and starts its listener: only cairnbook serve, key, backup and restore may import it",
 }
 
 // serverImportAllowed are the only guarded files that may import internal/server, each with
@@ -128,10 +128,10 @@ var bannedImports = map[string]string{
 // listed here that no longer imports the package, or a file that imports it and is not
 // listed, fails TestServerImportIsOnlyInTheNamedFiles.
 var serverImportAllowed = map[string]string{
-	"cmd/cairn/serve.go":   "cairn serve: parses the flags and calls server.Run, which opens the store and listens",
-	"cmd/cairn/key.go":     "cairn key: parses the flags and calls server.AddKey, ListKeys and RevokeKey, which open the store",
-	"cmd/cairn/backup.go":  "cairn backup: parses the flags and calls server.Backup, which opens the store to copy it",
-	"cmd/cairn/restore.go": "cairn restore: parses the flags and calls server.Restore, which opens the store to check, lock and migrate it",
+	"cmd/cairnbook/serve.go":   "cairnbook serve: parses the flags and calls server.Run, which opens the store and listens",
+	"cmd/cairnbook/key.go":     "cairnbook key: parses the flags and calls server.AddKey, ListKeys and RevokeKey, which open the store",
+	"cmd/cairnbook/backup.go":  "cairnbook backup: parses the flags and calls server.Backup, which opens the store to copy it",
+	"cmd/cairnbook/restore.go": "cairnbook restore: parses the flags and calls server.Restore, which opens the store to check, lock and migrate it",
 }
 
 // listenerPkgs are the standard packages whose functions and types start or configure

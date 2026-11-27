@@ -102,7 +102,7 @@ func dirNames(t *testing.T, dir string) []string {
 // is out of WAL mode, so the main file alone reads as the whole state.
 func TestConsolidateFoldsTheWALAndLeavesTheMainFileWhole(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	st, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -126,8 +126,8 @@ func TestConsolidateFoldsTheWALAndLeavesTheMainFileWhole(t *testing.T) {
 
 	// The -wal is removed by the switch to DELETE. The -shm the stash left is not, so it stays
 	// beside the database; the restore moves it with the database and reports it.
-	if got := dirNames(t, filepath.Dir(path)); !slices.Equal(got, []string{"cairn.db", "cairn.db-shm"}) {
-		t.Errorf("after Consolidate and Release the directory holds %v, want [cairn.db cairn.db-shm]", got)
+	if got := dirNames(t, filepath.Dir(path)); !slices.Equal(got, []string{"cairnbook.db", "cairnbook.db-shm"}) {
+		t.Errorf("after Consolidate and Release the directory holds %v, want [cairnbook.db cairnbook.db-shm]", got)
 	}
 	if got := rawNames(t, path); !slices.Contains(got, "wal-only") {
 		t.Errorf("the main file holds %v after Consolidate: the -wal row is not in it", got)
@@ -141,7 +141,7 @@ func TestConsolidateFoldsTheWALAndLeavesTheMainFileWhole(t *testing.T) {
 func TestCheckReadableLeavesTheWALOfAFileItCannotRead(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "cairn.db")
+	path := filepath.Join(dir, "cairnbook.db")
 	st, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +173,7 @@ func TestCheckReadableLeavesTheWALOfAFileItCannotRead(t *testing.T) {
 // and that the check does not take its -wal: the row in the -wal is still there after it.
 func TestCheckReadableAcceptsADatabaseAndKeepsItsWAL(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	st, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func TestCheckReadableAcceptsADatabaseAndKeepsItsWAL(t *testing.T) {
 // after another against an open store, which is what a busy server does.
 func TestAcquireExclusiveRefusesAWriterRunning(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	st, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +250,7 @@ func TestAcquireExclusiveRefusesAWriterRunning(t *testing.T) {
 	}
 }
 
-// TestOpenExistingLeavesARefusedFileAsItWas checks that a file with no Cairn schema is refused
+// TestOpenExistingLeavesARefusedFileAsItWas checks that a file with no Cairnbook schema is refused
 // without being switched to WAL. Its header bytes that say the journal mode are the same afterwards,
 // and no -wal is created beside it.
 func TestOpenExistingLeavesARefusedFileAsItWas(t *testing.T) {

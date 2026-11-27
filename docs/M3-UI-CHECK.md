@@ -11,14 +11,14 @@ an hour. The operator runs it and pastes the results back.
 
 Two machines are involved:
 
-- **Server:** Ubuntu 24.04. `cairn serve` runs as the systemd unit `cairn` on
-  `127.0.0.1:8788`, with the database at `/var/lib/cairn/cairn.db`. Apache sits in
+- **Server:** Ubuntu 24.04. `cairnbook serve` runs as the systemd unit `cairnbook` on
+  `127.0.0.1:8788`, with the database at `/var/lib/cairnbook/cairnbook.db`. Apache sits in
   front, as in [DEPLOY.md](DEPLOY.md), with TLS from certbot. The guide assumes the
   server runs with `--behind-proxy`. The shipped unit does not pass that flag, so step
   3.3 checks for it and adds it when it is missing.
-- **Client:** a Mac with Claude Code and `cairn mcp`, as set up in M2.
+- **Client:** a Mac with Claude Code and `cairnbook mcp`, as set up in M2.
 
-The server's name is `cairn.example.net` in this guide, as in DEPLOY.md. Use your own
+The server's name is `cairnbook.example.net` in this guide, as in DEPLOY.md. Use your own
 name in each command, and never paste it back.
 
 Keys used in this run:
@@ -50,7 +50,7 @@ at the failing step, record what you saw, and paste it back as step 13 describes
 ## 2. Stop and back up (mandatory)
 
 The upgrade in step 3 applies migrations `0006_web_ui.sql` and `0007_web_ui_reads.sql`
-to the live database when `cairn serve` starts. Migrations are one-way: the old binary
+to the live database when `cairnbook serve` starts. Migrations are one-way: the old binary
 cannot read the new schema. The backup in this step is **the rollback point**. Step 12
 cannot run without it. The server is stopped before the copy is taken, so nothing writes
 between the copy and the upgrade. Do not start step 3 until 2.5 has shown the file.
@@ -59,28 +59,28 @@ between the copy and the upgrade. Do not start step 3 until 2.5 has shown the fi
   owned by the service user, as [DEPLOY.md, "Backup"](DEPLOY.md#backup) sets it:
 
   ```bash
-  sudo install -d -m 0700 -o cairn -g cairn /var/backups/cairn
+  sudo install -d -m 0700 -o cairnbook -g cairnbook /var/backups/cairnbook
   ```
 
 - [x] **2.2 Stop the server.** It stays stopped until step 3.2 starts it.
 
   ```bash
-  sudo systemctl stop cairn
+  sudo systemctl stop cairnbook
   ```
 
-- [x] **2.3 Back up the database while the server is stopped.** `cairn backup` makes a
+- [x] **2.3 Back up the database while the server is stopped.** `cairnbook backup` makes a
   consistent copy, and refuses to overwrite a file. It opens the database file without
   migrating it, so it works on a stopped server. The command is the one DEPLOY.md gives:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/pre-m3-ui-$(date -u +%Y%m%dT%H%M%SZ).db"
+  sudo -u cairnbook /usr/local/bin/cairnbook backup --db /var/lib/cairnbook/cairnbook.db "/var/backups/cairnbook/pre-m3-ui-$(date -u +%Y%m%dT%H%M%SZ).db"
   ```
 
-- [x] **2.4 Confirm the file exists.** It must be non-empty, owned by `cairn`, and
+- [x] **2.4 Confirm the file exists.** It must be non-empty, owned by `cairnbook`, and
   mode `-rw-------`:
 
   ```bash
-  sudo ls -l /var/backups/cairn/
+  sudo ls -l /var/backups/cairnbook/
   ```
 
 - [x] **2.5 This file is the rollback point.** Write its name down; step 12 names it.
@@ -89,12 +89,12 @@ between the copy and the upgrade. Do not start step 3 until 2.5 has shown the fi
 ## 3. Upgrade
 
 Two routes give the binary, and both build for the server's CPU. Both end with an
-`install` into `/usr/local/bin/cairn`, as [DEPLOY.md, "Install the binary"](DEPLOY.md#install-the-binary)
+`install` into `/usr/local/bin/cairnbook`, as [DEPLOY.md, "Install the binary"](DEPLOY.md#install-the-binary)
 and [its Upgrade section](DEPLOY.md#upgrade) give it. The Makefile's `build` target
 stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 
 - **Route A, build on the server.** Needs Go 1.26 and a checkout of `main` on the
-  server. From the checkout: `make build`, which writes `bin/cairn`.
+  server. From the checkout: `make build`, which writes `bin/cairnbook`.
 - **Route B, build on the Mac for the server's CPU.** Needs Go 1.26 and a checkout of
   `main` on the Mac. On the server, `uname -m` prints `x86_64` (use `amd64`, the
   default) or `aarch64` (use `arm64`). On the Mac, from the checkout:
@@ -104,76 +104,76 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   make push SERVER=<user>@<server> LINUX_ARCH=arm64   # aarch64 server
   ```
 
-  `make push` runs `make build-linux`, which writes `bin/cairn-linux` with the version
-  stamp. It copies that file to `~/cairn-linux` on the server and runs its `version`
+  `make push` runs `make build-linux`, which writes `bin/cairnbook-linux` with the version
+  stamp. It copies that file to `~/cairnbook-linux` on the server and runs its `version`
   there. It installs nothing. When SSH listens on another port, add `SSH_PORT=<port>`.
   To build without copying, run `make build-linux`, and
-  copy `bin/cairn-linux` yourself.
+  copy `bin/cairnbook-linux` yourself.
 
-  Then install it there in 3.2, from `~/cairn-linux`.
+  Then install it there in 3.2, from `~/cairnbook-linux`.
 
 - [x] **3.1 Keep the old binary, on the server and off it.** DEPLOY.md keeps one copy,
-  `cairn.prev`. Look at what is there first, without copying anything yet:
+  `cairnbook.prev`. Look at what is there first, without copying anything yet:
 
   ```bash
-  ls -l /usr/local/bin/cairn /usr/local/bin/cairn.prev
+  ls -l /usr/local/bin/cairnbook /usr/local/bin/cairnbook.prev
   ```
 
-  - If `cairn.prev` does not exist, copy the current binary to it:
+  - If `cairnbook.prev` does not exist, copy the current binary to it:
 
     ```bash
-    sudo cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev
+    sudo cp -p /usr/local/bin/cairnbook /usr/local/bin/cairnbook.prev
     ```
 
-  - If `cairn.prev` exists, keep it and do not write over it. It may be the rollback
+  - If `cairnbook.prev` exists, keep it and do not write over it. It may be the rollback
     binary from an earlier upgrade. Copy the current binary to a new name instead:
 
     ```bash
-    sudo cp -p /usr/local/bin/cairn /usr/local/bin/cairn.pre-m3-ui
+    sudo cp -p /usr/local/bin/cairnbook /usr/local/bin/cairnbook.pre-m3-ui
     ```
 
-    Step 12 then names this file as well as `cairn.prev`.
+    Step 12 then names this file as well as `cairnbook.prev`.
 
-  Also copy the current `/usr/local/bin/cairn` to the Mac, with `scp`. Step 12 needs
+  Also copy the current `/usr/local/bin/cairnbook` to the Mac, with `scp`. Step 12 needs
   it if the server's copy is lost.
 
 - [x] **3.2 Install the new binary, and start.** The server is still stopped from 2.2.
   Use the file from route A or B:
 
   ```bash
-  sudo install -m 0755 bin/cairn /usr/local/bin/cairn
-  sudo systemctl start cairn
+  sudo install -m 0755 bin/cairnbook /usr/local/bin/cairnbook
+  sudo systemctl start cairnbook
   ```
 
-  Route B: replace `bin/cairn` with the path where you put the copy, such as
-  `~/cairn-linux`.
+  Route B: replace `bin/cairnbook` with the path where you put the copy, such as
+  `~/cairnbook-linux`.
 
 - [x] **3.3 Check that the unit runs with `--behind-proxy`.** The shipped unit does not
-  pass it: [`docs/deploy/cairn.service:18`](deploy/cairn.service) ends its `ExecStart`
+  pass it: [`docs/deploy/cairnbook.service:18`](deploy/cairnbook.service) ends its `ExecStart`
   line at `--addr 127.0.0.1:8788`. Read the line systemd actually runs:
 
   ```bash
-  sudo systemctl cat cairn | grep ExecStart
+  sudo systemctl cat cairnbook | grep ExecStart
   ```
 
   - If the last `ExecStart=` line ends with `--behind-proxy`, go on to 3.4.
   - If it does not, add a drop-in now, before any browser step. Run
-    `sudo systemctl edit cairn`. Put these lines in the editor and save. The blank
+    `sudo systemctl edit cairnbook`. Put these lines in the editor and save. The blank
     `ExecStart=` clears the shipped line, and the next line is the whole command with
     the flag:
 
     ```ini
     [Service]
     ExecStart=
-    ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788 --behind-proxy
+    ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr 127.0.0.1:8788 --behind-proxy
     ```
 
     Then reload the unit and restart the server, and read the line again:
 
     ```bash
     sudo systemctl daemon-reload
-    sudo systemctl restart cairn
-    sudo systemctl cat cairn | grep ExecStart
+    sudo systemctl restart cairnbook
+    sudo systemctl cat cairnbook | grep ExecStart
     ```
 
     `systemctl cat` lists the drop-in after the shipped unit, so the last `ExecStart=`
@@ -183,16 +183,16 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   `https://` in each form's `Origin`. Without the flag the server checks forms against
   `http://`. Every form is then refused, sign-in included, and the cookie is not Secure.
   With the flag, the server expects `https://` and sets the cookie as
-  `__Secure-cairn_ui`. Do not open the UI until 3.4 passes.
+  `__Secure-cairnbook_ui`. Do not open the UI until 3.4 passes.
 
 - [x] **3.4 Check the journal and the service.** Expect a `msg=listening` line, with
   `behind_proxy=true` and `tls=false`, and no `level=ERROR`. If the listening line shows
   `behind_proxy=false`, the drop-in did not take: go back to 3.3.
 
   ```bash
-  sudo systemctl is-active cairn
-  sudo systemctl status cairn --no-pager
-  sudo journalctl -u cairn -n 30 --no-pager
+  sudo systemctl is-active cairnbook
+  sudo systemctl status cairnbook --no-pager
+  sudo journalctl -u cairnbook -n 30 --no-pager
   ```
 
   `is-active` must print `active`, and `status` must show `active (running)`. If the
@@ -205,10 +205,10 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 - [x] **3.5 Check the version.**
 
   ```bash
-  /usr/local/bin/cairn version
+  /usr/local/bin/cairnbook version
   ```
 
-  It prints `cairn <version>`. A route-A build shows the `git describe` value; a build
+  It prints `cairnbook <version>`. A route-A build shows the `git describe` value; a build
   made without the `-ldflags` stamp shows `dev`.
 
 ## 4. Keys
@@ -217,7 +217,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   Mac's `<agent-key>`, are listed and not revoked:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
+  sudo -u cairnbook /usr/local/bin/cairnbook key list --db /var/lib/cairnbook/cairnbook.db
   ```
 
   The list shows names, scopes and times. It never shows a key. If `<operator-key>` is
@@ -227,7 +227,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
   The key prints once, on stdout:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name <viewer-key> --scope viewer
+  sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name <viewer-key> --scope viewer
   ```
 
   Save the printed key in the password manager now.
@@ -238,7 +238,7 @@ stamps the version (`Makefile`, `build:`); route B makes the same stamp by hand.
 
 ## 5. Sign in as operator
 
-- [x] **5.1 Open the UI.** In a browser, open `https://cairn.example.net/ui/`. Without a
+- [x] **5.1 Open the UI.** In a browser, open `https://cairnbook.example.net/ui/`. Without a
   session you are sent to `/ui/signin`. The page has the heading "Sign in", a field
   labelled "API key", and a "Sign in" button.
 - [x] **5.2 Sign in.** Paste the `<operator-key>` key into the field and press "Sign in".
@@ -288,15 +288,15 @@ tabs. In Firefox, they are the Network and Storage tabs.
 
   | Attribute | Expected | Yes or no |
   |-----------|----------|-----------|
-  | Name | `__Secure-cairn_ui` | |
+  | Name | `__Secure-cairnbook_ui` | |
   | HttpOnly | yes | |
   | Secure | yes | |
   | SameSite | Strict | |
   | Path | `/ui` | |
 
-  If the name is `cairn_ui`, with no `__Secure-` prefix, the server is not running with
+  If the name is `cairnbook_ui`, with no `__Secure-` prefix, the server is not running with
   `--behind-proxy`. The drop-in in step 3.3 is missing or did not take. Go back to 3.3,
-  and check the last `ExecStart=` line with `sudo systemctl cat cairn`. When the flag
+  and check the last `ExecStart=` line with `sudo systemctl cat cairnbook`. When the flag
   is in place, sign out and sign in again: the old cookie has the old name. Record the
   first result in step 13.
 
@@ -314,23 +314,23 @@ which the first agent write creates.
 
   ```bash
   mkdir -p m3-ui-check && cd m3-ui-check
-  cairn init --project m3-ui-check --server https://cairn.example.net
+  cairnbook init --project m3-ui-check --server https://cairnbook.example.net
   ```
 
   Write `.mcp.json` in this directory, as M2-LIVE-RUN.md 2.4 does, with the absolute
-  path that `command -v cairn` prints. The Mac's `~/.config/cairn/client.env` must hold
+  path that `command -v cairnbook` prints. The Mac's `~/.config/cairnbook/client.env` must hold
   the `<agent-key>` key. If it holds another key, put the `<agent-key>` key in its
   place, as M2-LIVE-RUN.md 2.2 does. Never print the file's contents.
 
-  If `cairn hook session-start` in 7.4 reports an unknown event, the Mac's binary
+  If `cairnbook hook session-start` in 7.4 reports an unknown event, the Mac's binary
   predates M4. Rebuild it as M2-LIVE-RUN.md 2.1 says.
 
-- [x] **7.2 Open Claude Code in `m3-ui-check`.** Approve the `cairn` server if asked,
-  then run `/mcp` and check that `cairn` is connected.
+- [x] **7.2 Open Claude Code in `m3-ui-check`.** Approve the `cairnbook` server if asked,
+  then run `/mcp` and check that `cairnbook` is connected.
 
 - [x] **7.3 Start a task and record a proposed learning.** Paste this into the session:
 
-  > Using the cairn MCP tools, not the shell: start a task titled "M3 UI check two" with a
+  > Using the cairnbook MCP tools, not the shell: start a task titled "M3 UI check two" with a
   > one-line goal, using `task_start` with `agent` set to `claude-code`. Leave the task
   > open. Then record one proposed learning with `learning_add`: agent `claude-code`,
   > kind `finding`, title "M3 UI check two: a proposed learning", body "A test learning for
@@ -343,20 +343,20 @@ which the first agent write creates.
   the project directory:
 
   ```bash
-  cairn hook session-start
+  cairnbook hook session-start
   ```
 
-  Expect the line `Cairn task: "M3 UI check" ...` and the line `Directives that apply: 0.`
+  Expect the line `Cairnbook task: "M3 UI check" ...` and the line `Directives that apply: 0.`
   Record the count. The hook prints a count, not the directive text.
 
-  Read the output with care. The line `Cairn: no task is active in <project>.` means
+  Read the output with care. The line `Cairnbook: no task is active in <project>.` means
   no task is active: the task from 7.3 is not open, so go back to 7.3. Empty stdout is
   a different case. If stdout is empty and stderr has a line starting
-  `cairn hook session-start: no context added:`, the hook could not read the project.
+  `cairnbook hook session-start: no context added:`, the hook could not read the project.
   Fix that first, and do not read it as "no task".
 
 - [x] **7.5 See the learning in the browser.** Open
-  `https://cairn.example.net/ui/p/m3-ui-check/learnings`, or use the "Learnings" link
+  `https://cairnbook.example.net/ui/p/m3-ui-check/learnings`, or use the "Learnings" link
   and the project link in the top bar. The default filter shows `proposed` learnings,
   so "M3 UI check: a proposed learning" should appear in the list.
 
@@ -384,11 +384,11 @@ which the first agent write creates.
 - [x] **7.8 Check the directive in a new session.** Quit Claude Code and open it again in
   `m3-ui-check`.
 
-  - From the shell, run `cairn hook session-start` again. Expect `Directives that apply: 1.`
-    The count went from 0 to 1. If it prints `Cairn: no task is active`, the task from
+  - From the shell, run `cairnbook hook session-start` again. Expect `Directives that apply: 1.`
+    The count went from 0 to 1. If it prints `Cairnbook: no task is active`, the task from
     7.3 is not open. Stop and record that; do not start a new task to move the count.
     Empty stdout with a `no context added:` line on stderr is a read failure, as in 7.4.
-  - In Claude Code, paste: "Call `task_current` with the cairn MCP tool and show me the
+  - In Claude Code, paste: "Call `task_current` with the cairnbook MCP tool and show me the
     directives it returns." Expect `M3 UI check directive` in the result.
 
   The hook counts only; `task_current` gives the text. This is the same check
@@ -448,7 +448,7 @@ which the first agent write creates.
   `<temp-agent-key>`:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name <temp-agent-key> --scope agent
+  sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name <temp-agent-key> --scope agent
   ```
 
   Save the printed key in the password manager, then paste it here. It prints once.
@@ -479,7 +479,7 @@ in step 13.
 - [ ] **11.2 Revoke `<viewer-key>`,** unless the operator wants to keep it:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name <viewer-key>
+  sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/cairnbook.db --name <viewer-key>
   ```
 
   A revoked key stops working at its next call. Its name is not reused.
@@ -487,7 +487,7 @@ in step 13.
 - [x] **11.3 Revoke the temporary agent key,** only if step 9.2 made one:
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name <temp-agent-key>
+  sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/cairnbook.db --name <temp-agent-key>
   ```
 
 - [x] **11.4 Leave the test learning.** It stays as history, with the status `applied`.
@@ -510,16 +510,16 @@ order.
 - [ ] **12.1 Stop the service.**
 
   ```bash
-  sudo systemctl stop cairn
+  sudo systemctl stop cairnbook
   ```
 
 - [x] **12.2 Put back the previous binary.** Use the copy that holds the build which ran
-  before this upgrade. That is `cairn.prev`, or `cairn.pre-m3-ui` if step 3.1 made that
+  before this upgrade. That is `cairnbook.prev`, or `cairnbook.pre-m3-ui` if step 3.1 made that
   copy. If neither is on the server, use the copy kept on the Mac in step 3.1. The
-  example uses `cairn.prev`:
+  example uses `cairnbook.prev`:
 
   ```bash
-  sudo install -m 0755 /usr/local/bin/cairn.prev /usr/local/bin/cairn
+  sudo install -m 0755 /usr/local/bin/cairnbook.prev /usr/local/bin/cairnbook
   ```
 
   **The drop-in from step 3.3 stays in place.** A binary rollback does not remove it,
@@ -528,15 +528,15 @@ order.
   prints the flags and opens no database:
 
   ```bash
-  /usr/local/bin/cairn.prev serve --help | grep behind-proxy
+  /usr/local/bin/cairnbook.prev serve --help | grep behind-proxy
   ```
 
-  The line should print. Source: [`cmd/cairn/serve.go:32`](../cmd/cairn/serve.go); the
+  The line should print. Source: [`cmd/cairnbook/serve.go:32`](../cmd/cairnbook/serve.go); the
   flag came in with commit `419a7ba`, which is in the M2 close `b3d7467`.
 
-  To remove the drop-in, run `sudo systemctl revert cairn`, then
-  `sudo systemctl daemon-reload` and `sudo systemctl restart cairn`. The revert removes
-  every drop-in for `cairn`, not only this one, so run `sudo systemctl cat cairn` first
+  To remove the drop-in, run `sudo systemctl revert cairnbook`, then
+  `sudo systemctl daemon-reload` and `sudo systemctl restart cairnbook`. The revert removes
+  every drop-in for `cairnbook`, not only this one, so run `sudo systemctl cat cairnbook` first
   and note any other drop-in. Use it only when the server no longer sits behind a TLS
   proxy on this host, for example after a move to the SSH tunnel or to setup (a). On
   plain HTTP the flag makes the server expect `https://`, and every form is then refused.
@@ -545,19 +545,19 @@ order.
   restore asks you to type the database path to confirm.
 
   ```bash
-  sudo -u cairn /usr/local/bin/cairn restore --db /var/lib/cairn/cairn.db /var/backups/cairn/<the step 2 file name>
+  sudo -u cairnbook /usr/local/bin/cairnbook restore --db /var/lib/cairnbook/cairnbook.db /var/backups/cairnbook/<the step 2 file name>
   ```
 
   Restore never deletes anything. It moves the current database aside to
-  `/var/lib/cairn/cairn.db.pre-restore-<UTC time>`. Anything written since the upgrade
+  `/var/lib/cairnbook/cairnbook.db.pre-restore-<UTC time>`. Anything written since the upgrade
   started is in that moved-aside file, not in the restored database. Keep it until the
   restored server checks out, then delete it by hand, as DEPLOY.md says.
 
 - [x] **12.4 Start the service, and check the journal.**
 
   ```bash
-  sudo systemctl start cairn
-  sudo journalctl -u cairn -n 20 --no-pager
+  sudo systemctl start cairnbook
+  sudo journalctl -u cairnbook -n 20 --no-pager
   ```
 
   The listening line shows `behind_proxy=true` if the drop-in is still in place.
@@ -567,7 +567,7 @@ order.
 Paste these, in this order, in one message:
 
 1. The `msg=listening` line from 3.4, and any line with `level=ERROR`.
-2. The output of `cairn version` (3.5).
+2. The output of `cairnbook version` (3.5).
 3. The two yes-or-no tables from 6.1 and 6.2.
 4. Whether the `ExecStart` line already had `--behind-proxy` at 3.3, and if the drop-in
    was added, that the listening line then showed `behind_proxy=true`.
@@ -581,8 +581,8 @@ Paste these, in this order, in one message:
 8. From step 8: whether any page had a form, and the status of the refusal in 8.4.
 9. From step 9: the status and message of the refusal in 9.3, and whether a temporary
    agent key was used.
-10. If 6.2 did not show `__Secure-cairn_ui`, after the drop-in: the `ExecStart` line from
-    `sudo systemctl cat cairn`.
+10. If 6.2 did not show `__Secure-cairnbook_ui`, after the drop-in: the `ExecStart` line from
+    `sudo systemctl cat cairnbook`.
 
 Never paste:
 

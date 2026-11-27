@@ -31,7 +31,7 @@ func warningJSON(msg string) string {
 func TestStepWarningNamesAnActiveStepWithNoSummary(t *testing.T) {
 	task := activeTask()
 	cur := &core.TaskCurrent{Task: &task, Steps: twoSteps()}
-	want := warningJSON(`Cairn warning: step 1 of 2, "Write test", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.`)
+	want := warningJSON(`Cairnbook warning: step 1 of 2, "Write test", is active with no summary. Record a summary with cairnbook step update or the step_update tool when it is done.`)
 	if got := stepWarningOf(cur); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
@@ -87,7 +87,7 @@ func TestStepWarningCountsSeveralActiveSteps(t *testing.T) {
 		{Number: 2, Title: "Implement", Status: core.StepActive},
 		{Number: 3, Title: "Document", Status: core.StepActive, Summary: "Done."},
 	}
-	want := warningJSON(`Cairn warning: 2 steps are active with no summary; the first is step 1 of 3, "Write test". Record a summary with cairn step update or the step_update tool when each is done.`)
+	want := warningJSON(`Cairnbook warning: 2 steps are active with no summary; the first is step 1 of 3, "Write test". Record a summary with cairnbook step update or the step_update tool when each is done.`)
 	if got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps}); got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)
 	}
@@ -99,7 +99,7 @@ func TestStepWarningCountsSeveralActiveSteps(t *testing.T) {
 func TestStepWarningFoldsTheTitle(t *testing.T) {
 	task := activeTask()
 	steps := []core.Step{{Number: 1, Title: "Write" + string(rune(0x0a)) + "test" + string(rune(0x1b)) + "[31m now", Status: core.StepActive}}
-	want := warningJSON(`Cairn warning: step 1 of 1, "Write test now", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.`)
+	want := warningJSON(`Cairnbook warning: step 1 of 1, "Write test now", is active with no summary. Record a summary with cairnbook step update or the step_update tool when it is done.`)
 	got := stepWarningOf(&core.TaskCurrent{Task: &task, Steps: steps})
 	if got != want {
 		t.Errorf("warning = %q\nwant %q", got, want)

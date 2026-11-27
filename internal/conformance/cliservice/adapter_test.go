@@ -1,8 +1,8 @@
-// Package cliservice runs the conformance suite through the cairn binary (issue #88). It is test code
+// Package cliservice runs the conformance suite through the cairnbook binary (issue #88). It is test code
 // only: the adapter exists to show that an agent reaching core through the CLI sees the behaviour the
 // suite checks.
 //
-// The agent calls of core.Service run `cairn ... --json` as child processes against an in-process
+// The agent calls of core.Service run `cairnbook ... --json` as child processes against an in-process
 // loopback server (api.Handler over a real core). The operator and web calls have no CLI verb, so the
 // adapter does not run them: they are the HTTP client's, which the embedded *client.Client supplies, and
 // they reach the same server. Those calls are:
@@ -22,7 +22,7 @@
 //     back into core's error, and checks that the exit code is the one the table gives that kind. A usage
 //     error exits 2 with no object. The adapter reads it as core's KindInvalid only when its message names
 //     a flag the call set; see usageNamesFlag.
-//   - The CLI calls as an agent. It names itself cairn-cli, and it sends no session. The adapter does not
+//   - The CLI calls as an agent. It names itself cairnbook-cli, and it sends no session. The adapter does not
 //     carry the caller's Client or Session, and it refuses a caller whose role is not agent, since
 //     running that call as an agent would change its meaning.
 //   - Some request shapes have no flag: an empty step reference, since an absent --after, --step or --step
@@ -32,7 +32,7 @@
 //
 // Three of the deferred cases are permanent properties of a CLI, not gaps to close, and they stay deferred for
 // as long as the CLI is a CLI: identity/client_name_refused and identity/session_name_refused, since the CLI
-// names itself cairn-cli and sends no session, and identity/viewer_first_read_is_not_found, since the CLI calls
+// names itself cairnbook-cli and sends no session, and identity/viewer_first_read_is_not_found, since the CLI calls
 // only as an agent and carries no viewer role. The other deferrals are gaps or documented choices, and each
 // names its own in the deferral list.
 package cliservice
@@ -58,27 +58,27 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// cairnBin is the path of the cairn binary that TestMain builds once for the package run.
-var cairnBin string
+// cairnbookBin is the path of the cairnbook binary that TestMain builds once for the package run.
+var cairnbookBin string
 
 // testKey is the API key the CLI sends. The in-process server names the caller from the headers and
 // does not check the key, so any value serves. It has no spaces or control characters.
 const testKey = "conformance-key"
 
-// TestMain builds the cairn binary into a temporary directory, once for the whole package run, and
+// TestMain builds the cairnbook binary into a temporary directory, once for the whole package run, and
 // removes the directory when the run ends. The child processes all run that one binary.
 func TestMain(m *testing.M) {
 	code := func() int {
-		dir, err := os.MkdirTemp("", "cairn-cli-*")
+		dir, err := os.MkdirTemp("", "cairnbook-cli-*")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cliservice: make a temporary directory: %v\n", err)
 			return 1
 		}
 		defer os.RemoveAll(dir)
-		cairnBin = filepath.Join(dir, "cairn")
-		out, err := exec.Command(goTool(), "build", "-o", cairnBin, "../../../cmd/cairn").CombinedOutput()
+		cairnbookBin = filepath.Join(dir, "cairnbook")
+		out, err := exec.Command(goTool(), "build", "-o", cairnbookBin, "../../../cmd/cairnbook").CombinedOutput()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cliservice: go build cmd/cairn: %v\n%s", err, out)
+			fmt.Fprintf(os.Stderr, "cliservice: go build cmd/cairnbook: %v\n%s", err, out)
 			return 1
 		}
 		return m.Run()
@@ -94,18 +94,18 @@ func goTool() string {
 	return filepath.Join(runtime.GOROOT(), "bin", "go")
 }
 
-// Service is a core.Service whose agent calls run the cairn binary. The embedded client supplies the
+// Service is a core.Service whose agent calls run the cairnbook binary. The embedded client supplies the
 // operator and web calls over HTTP, against the same server; see the package comment for the list.
 type Service struct {
 	*client.Client
 	url string // the in-process server the binary calls
-	dir string // the working directory of each child: it holds no .cairn.toml, so no file is found
+	dir string // the working directory of each child: it holds no .cairnbook.toml, so no file is found
 }
 
 var _ core.Service = (*Service)(nil)
 
 // New returns a Service over svc. It serves svc on a loopback server for the life of the test, and
-// every agent call runs the cairn binary against that server.
+// every agent call runs the cairnbook binary against that server.
 func New(t *testing.T, svc core.Service) *Service {
 	t.Helper()
 	srv := httptest.NewServer(api.Handler(svc, api.UnauthenticatedHeaderCaller, nil))
@@ -120,7 +120,7 @@ func New(t *testing.T, svc core.Service) *Service {
 	return &Service{Client: hc, url: srv.URL, dir: t.TempDir()}
 }
 
-// argv collects the arguments of one cairn call. A value the CLI cannot carry sets err, and the call
+// argv collects the arguments of one cairnbook call. A value the CLI cannot carry sets err, and the call
 // is not made: a request is never sent in a different form.
 type argv struct {
 	args []string
@@ -176,19 +176,19 @@ func call[R any](s *Service, ctx context.Context, a *argv, stdin []byte) (*R, er
 	if c.Role != "" && c.Role != core.RoleAgent {
 		return nil, fmt.Errorf("cliservice: the CLI calls as an agent and cannot carry role %q", c.Role)
 	}
-	// The CLI names itself cairn-cli and sends no session, so the caller's Client and Session are not
+	// The CLI names itself cairnbook-cli and sends no session, so the caller's Client and Session are not
 	// carried. A case that checks them fails, and is listed as a gap.
-	env := []string{"HOME=" + s.dir, "CAIRN_SERVER=" + s.url, "CAIRN_API_KEY=" + testKey}
+	env := []string{"HOME=" + s.dir, "CAIRNBOOK_SERVER=" + s.url, "CAIRNBOOK_API_KEY=" + testKey}
 	if c.Project != "" {
-		env = append(env, "CAIRN_PROJECT="+c.Project)
+		env = append(env, "CAIRNBOOK_PROJECT="+c.Project)
 	}
-	// The caller's agent goes in CAIRN_AGENT as well as in --agent where a verb takes one. Every verb checks
+	// The caller's agent goes in CAIRNBOOK_AGENT as well as in --agent where a verb takes one. Every verb checks
 	// the variable, reads included, so a malformed agent is refused on a read as core refuses it. A recall
 	// with no --agent takes the variable as its role, as core takes the caller's agent.
 	if c.Agent != "" {
-		env = append(env, "CAIRN_AGENT="+c.Agent)
+		env = append(env, "CAIRNBOOK_AGENT="+c.Agent)
 	}
-	cmd := exec.Command(cairnBin, a.args...)
+	cmd := exec.Command(cairnbookBin, a.args...)
 	cmd.Dir = s.dir
 	cmd.Env = env
 	if stdin != nil {
@@ -200,7 +200,7 @@ func call[R any](s *Service, ctx context.Context, a *argv, stdin []byte) (*R, er
 	if err != nil {
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) {
-			return nil, fmt.Errorf("cliservice: run cairn: %w", err)
+			return nil, fmt.Errorf("cliservice: run cairnbook: %w", err)
 		}
 		return nil, failure(exit.ExitCode(), a.args, stdout.Bytes(), stderr.String())
 	}
@@ -282,14 +282,14 @@ type closeInput struct {
 	Deliverables []core.TaskFile         `json:"deliverables"`
 }
 
-// TaskCurrent runs `cairn task current`, with --agent when the caller has one.
+// TaskCurrent runs `cairnbook task current`, with --agent when the caller has one.
 func (s *Service) TaskCurrent(ctx context.Context) (*core.TaskCurrent, error) {
 	a := newArgv("task", "current")
 	a.agent(ctx)
 	return call[core.TaskCurrent](s, ctx, a, nil)
 }
 
-// TaskStart runs `cairn task start` with the brief as flags and the structured fields on standard input.
+// TaskStart runs `cairnbook task start` with the brief as flags and the structured fields on standard input.
 func (s *Service) TaskStart(ctx context.Context, req core.TaskStartRequest) (*core.TaskStartResult, error) {
 	a := newArgv("task", "start")
 	a.agent(ctx)
@@ -315,7 +315,7 @@ func (s *Service) TaskStart(ctx context.Context, req core.TaskStartRequest) (*co
 	return call[core.TaskStartResult](s, ctx, a, body)
 }
 
-// TaskGet runs `cairn task get`. A step is named by number, with --step, or by id, with --step-id. A
+// TaskGet runs `cairnbook task get`. A step is named by number, with --step, or by id, with --step-id. A
 // reference that gives both is sent as both, so the CLI refuses it as a usage error that names the flags.
 // An empty reference has no flag, since an absent --step means the task, so it is refused.
 func (s *Service) TaskGet(ctx context.Context, req core.TaskGetRequest) (*core.TaskDetail, error) {
@@ -343,7 +343,7 @@ func (s *Service) TaskGet(ctx context.Context, req core.TaskGetRequest) (*core.T
 	return call[core.TaskDetail](s, ctx, a, nil)
 }
 
-// TaskList runs `cairn task list`.
+// TaskList runs `cairnbook task list`.
 func (s *Service) TaskList(ctx context.Context, req core.TaskListRequest) (*core.TaskList, error) {
 	a := newArgv("task", "list")
 	for _, st := range req.Status {
@@ -358,7 +358,7 @@ func (s *Service) TaskList(ctx context.Context, req core.TaskListRequest) (*core
 	return call[core.TaskList](s, ctx, a, nil)
 }
 
-// TaskUpdate runs `cairn task update`. A field the request leaves nil is not passed, so the CLI keeps
+// TaskUpdate runs `cairnbook task update`. A field the request leaves nil is not passed, so the CLI keeps
 // it. The criteria and key files are sent on standard input, where a nil list is absent and an empty
 // one replaces the list with none.
 func (s *Service) TaskUpdate(ctx context.Context, req core.TaskUpdateRequest) (*core.Task, error) {
@@ -412,7 +412,7 @@ func nonNil[T any](s []T) []T {
 	return s
 }
 
-// TaskClose runs `cairn task close`, with the lists on standard input.
+// TaskClose runs `cairnbook task close`, with the lists on standard input.
 func (s *Service) TaskClose(ctx context.Context, req core.TaskCloseRequest) (*core.Task, error) {
 	a := newArgv("task", "close", req.ID)
 	a.agent(ctx)
@@ -429,7 +429,7 @@ func (s *Service) TaskClose(ctx context.Context, req core.TaskCloseRequest) (*co
 	return call[core.Task](s, ctx, a, body)
 }
 
-// StepPlan runs `cairn step plan` with the new steps on standard input. The CLI refuses a plan with no
+// StepPlan runs `cairnbook step plan` with the new steps on standard input. The CLI refuses a plan with no
 // steps list, so a nil list reaches it as null and is refused there.
 func (s *Service) StepPlan(ctx context.Context, req core.StepPlanRequest) (*core.StepList, error) {
 	a := newArgv("step", "plan", req.TaskID)
@@ -444,7 +444,7 @@ func (s *Service) StepPlan(ctx context.Context, req core.StepPlanRequest) (*core
 	return call[core.StepList](s, ctx, a, body)
 }
 
-// StepAdd runs `cairn step add`. --after takes a step number and --after-id a step id; a reference with both
+// StepAdd runs `cairnbook step add`. --after takes a step number and --after-id a step id; a reference with both
 // is sent as both, so the CLI refuses it as a usage error that names the flags. An empty reference has no
 // flag, since an absent --after means the step goes last, so it is refused. Number 0 is "first", as the CLI reads it.
 func (s *Service) StepAdd(ctx context.Context, req core.StepAddRequest) (*core.Step, error) {
@@ -468,7 +468,7 @@ func (s *Service) StepAdd(ctx context.Context, req core.StepAddRequest) (*core.S
 	return call[core.Step](s, ctx, a, nil)
 }
 
-// StepUpdate runs `cairn step update`. The step is the number as the second positional, or the id as
+// StepUpdate runs `cairnbook step update`. The step is the number as the second positional, or the id as
 // --step-id. A reference that gives both, or neither, is passed as given, so the CLI refuses it as a
 // usage error, as core refuses it as invalid.
 func (s *Service) StepUpdate(ctx context.Context, req core.StepUpdateRequest) (*core.Step, error) {
@@ -490,7 +490,7 @@ func (s *Service) StepUpdate(ctx context.Context, req core.StepUpdateRequest) (*
 	return call[core.Step](s, ctx, a, nil)
 }
 
-// EventLog runs `cairn event log`. The step is by number or by id; a reference with neither is refused,
+// EventLog runs `cairnbook event log`. The step is by number or by id; a reference with neither is refused,
 // since the CLI would read it as an event on the task.
 func (s *Service) EventLog(ctx context.Context, req core.EventLogRequest) (*core.Event, error) {
 	a := newArgv("event", "log", req.TaskID)
@@ -514,7 +514,7 @@ func (s *Service) EventLog(ctx context.Context, req core.EventLogRequest) (*core
 	return call[core.Event](s, ctx, a, nil)
 }
 
-// LearningAdd runs `cairn learning add`.
+// LearningAdd runs `cairnbook learning add`.
 func (s *Service) LearningAdd(ctx context.Context, req core.LearningAddRequest) (*core.Learning, error) {
 	a := newArgv("learning", "add")
 	a.agent(ctx)
@@ -536,7 +536,7 @@ func (s *Service) LearningAdd(ctx context.Context, req core.LearningAddRequest) 
 	return call[core.Learning](s, ctx, a, nil)
 }
 
-// LearningList runs `cairn learning list`. The CLI lists one project at a time, so a request for all
+// LearningList runs `cairnbook learning list`. The CLI lists one project at a time, so a request for all
 // projects is refused.
 func (s *Service) LearningList(ctx context.Context, req core.LearningListRequest) (*core.LearningList, error) {
 	if req.AllProjects {
@@ -561,7 +561,7 @@ func (s *Service) LearningList(ctx context.Context, req core.LearningListRequest
 	return call[core.LearningList](s, ctx, a, nil)
 }
 
-// DirectiveList runs `cairn directive list`, with --agent when the request names a role.
+// DirectiveList runs `cairnbook directive list`, with --agent when the request names a role.
 func (s *Service) DirectiveList(ctx context.Context, req core.DirectiveListRequest) (*core.DirectiveList, error) {
 	a := newArgv("directive", "list")
 	if req.Agent != "" {
@@ -570,7 +570,7 @@ func (s *Service) DirectiveList(ctx context.Context, req core.DirectiveListReque
 	return call[core.DirectiveList](s, ctx, a, nil)
 }
 
-// Recall runs `cairn recall`. The agent is the one the request names, as the CLI reads it.
+// Recall runs `cairnbook recall`. The agent is the one the request names, as the CLI reads it.
 func (s *Service) Recall(ctx context.Context, req core.RecallRequest) (*core.RecallResult, error) {
 	a := newArgv("recall")
 	a.text("goal", req.Goal)
@@ -583,7 +583,7 @@ func (s *Service) Recall(ctx context.Context, req core.RecallRequest) (*core.Rec
 	return call[core.RecallResult](s, ctx, a, nil)
 }
 
-// Search runs `cairn search`.
+// Search runs `cairnbook search`.
 func (s *Service) Search(ctx context.Context, req core.SearchRequest) (*core.SearchResult, error) {
 	a := newArgv("search")
 	a.text("query", req.Query)

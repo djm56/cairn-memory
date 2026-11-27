@@ -1,4 +1,4 @@
-// Package server is cairn serve: the one part of Cairn that opens the database for
+// Package server is cairnbook serve: the one part of Cairnbook that opens the database for
 // the API and listens on the network (docs/DESIGN.md §5.3, §8; decision D20). Run
 // starts it. The bind rules are plain functions, so each is tested in a table with
 // no socket. The reach guard (internal/core/reach_guard_test.go) holds the CLI, the
@@ -16,7 +16,7 @@ import (
 
 // NoKeysLine is printed when a loopback server starts with no active key. Every call
 // is refused with 401 until a key exists, so the operator is told at the start.
-const NoKeysLine = "cairn serve: no active API key: every call will be refused with 401 until a key exists"
+const NoKeysLine = "cairnbook serve: no active API key: every call will be refused with 401 until a key exists"
 
 // Loopback reports whether every address in ips is a loopback address: 127.0.0.0/8
 // or ::1, and the IPv4-mapped form of either. An empty list is not loopback. A host
@@ -81,5 +81,5 @@ func CleartextLine(loopback, tls, behindProxy bool) string {
 	if loopback || tls || !behindProxy {
 		return ""
 	}
-	return "cairn serve: warning: this server serves plain HTTP on a non-loopback address, with no TLS of its own: the proxy in front must terminate TLS, and the port must be reachable only from that proxy"
+	return "cairnbook serve: warning: this server serves plain HTTP on a non-loopback address, with no TLS of its own: the proxy in front must terminate TLS, and the port must be reachable only from that proxy"
 }

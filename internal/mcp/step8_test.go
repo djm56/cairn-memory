@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/djm56/cairn-memory/internal/core"
-	cairnmcp "github.com/djm56/cairn-memory/internal/mcp"
+	cairnbookmcp "github.com/djm56/cairn-memory/internal/mcp"
 )
 
 // panicking is a Service whose TaskCurrent panics. Every other call is unimplemented.
@@ -37,7 +37,7 @@ func TestAnswersKeepMarkupCharacters(t *testing.T) {
 // The SDK does not recover it, as far as its non-test source shows.
 func TestPanicInAToolIsAnInternalError(t *testing.T) {
 	var diag bytes.Buffer
-	restore := cairnmcp.SetDiagnosticsForTest(&diag)
+	restore := cairnbookmcp.SetDiagnosticsForTest(&diag)
 	defer restore()
 	cs := connect(t, panicking{}, acme)
 	text, isErr := call(t, cs, "task_current", nil)
@@ -74,11 +74,11 @@ func TestMissingAgentNamesTheArgument(t *testing.T) {
 // The shared core.ErrNoProject is copied, not changed.
 func TestUnresolvedProjectSaysToRestart(t *testing.T) {
 	svc, _ := newService(t)
-	cs := connect(t, svc, cairnmcp.Project{Err: core.ErrNoProject})
+	cs := connect(t, svc, cairnbookmcp.Project{Err: core.ErrNoProject})
 	text, isErr := call(t, cs, "task_current", nil)
 	got := errorOf(t, text, isErr)
-	if got.Kind != "invalid" || !strings.Contains(got.Message, "cairn init") || !strings.Contains(got.Message, "restart this session") {
-		t.Errorf("no project: %+v, want invalid naming cairn init and the restart", got)
+	if got.Kind != "invalid" || !strings.Contains(got.Message, "cairnbook init") || !strings.Contains(got.Message, "restart this session") {
+		t.Errorf("no project: %+v, want invalid naming cairnbook init and the restart", got)
 	}
 	if strings.Contains(core.ErrNoProject.Error(), "restart") {
 		t.Errorf("core.ErrNoProject was changed: %q", core.ErrNoProject.Error())

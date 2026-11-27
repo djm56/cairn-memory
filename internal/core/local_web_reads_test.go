@@ -368,7 +368,7 @@ func TestLearningListAllProjectsForReaders(t *testing.T) {
 		t.Errorf("operator all_projects read created the project row for its named project: %v", err)
 	}
 
-	// ErrNoProject is an invalid error: its message names cairn init.
+	// ErrNoProject is an invalid error: its message names cairnbook init.
 	_, err := s.LearningList(context.Background(), core.LearningListRequest{AllProjects: true})
 	wantKindLocal(t, err, core.KindInvalid, "all_projects read with no caller")
 	_, err = s.LearningList(core.WithCaller(context.Background(), core.Caller{Role: core.RoleAgent, Agent: "main"}),

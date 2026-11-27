@@ -13,9 +13,9 @@ import (
 // and keeps the rest of it.
 func TestDisplayURLRemovesCredentials(t *testing.T) {
 	cases := map[string]string{
-		"https://keeper:secret@cairn.lan:8788": "https://cairn.lan:8788",
-		"https://keeper@cairn.lan":             "https://cairn.lan",
-		"http://127.0.0.1:8788/":               "http://127.0.0.1:8788/",
+		"https://keeper:secret@cairnbook.lan:8788": "https://cairnbook.lan:8788",
+		"https://keeper@cairnbook.lan":             "https://cairnbook.lan",
+		"http://127.0.0.1:8788/":                   "http://127.0.0.1:8788/",
 	}
 	for in, want := range cases {
 		if got := DisplayURL(in); got != want {
@@ -31,7 +31,7 @@ func TestDisplayURLRemovesCredentials(t *testing.T) {
 // can reach a message: a base that is refused when the client is built, and a call that
 // fails in transport. Neither error may carry the user name or the password.
 func TestCredentialsNeverReachAnError(t *testing.T) {
-	if _, err := New("ftp://keeper:secret@cairn.lan", nil); err == nil || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "keeper") {
+	if _, err := New("ftp://keeper:secret@cairnbook.lan", nil); err == nil || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "keeper") {
 		t.Errorf("New refused the base with %v, want an error with no credentials", err)
 	}
 

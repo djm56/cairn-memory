@@ -19,7 +19,7 @@ func TestMigration0005ReviewByBackfill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadMigrations: %v", err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairnbook.db")+"?"+dsnOptions)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}

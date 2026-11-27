@@ -1,4 +1,4 @@
-# Cairn progress
+# Cairnbook progress
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
@@ -12,21 +12,22 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 | Milestone | Status | Exit check | One line |
 |---|---|---|---|
-| Phase 0 Skeleton | Done | Passed | Go module, `cairn version`, Makefile, CI |
+| Phase 0 Skeleton | Done | Passed | Go module, `cairnbook version`, Makefile, CI |
 | Phase 1 Contract | Done | Passed | Service interface, CONTRACT.md, conformance suite |
 | Phase 2 Core and local store | Done | Passed | SQLite store, migrations, core rules, identity |
-| M1 Server-mode MCP | Done | Passed | `cairn mcp` over the client and API |
-| M2 Server | Done | Passed 2026-11-02 | `cairn serve`, key scopes, backup and restore |
+| M1 Server-mode MCP | Done | Passed | `cairnbook mcp` over the client and API |
+| M2 Server | Done | Passed 2026-11-02 | `cairnbook serve`, key scopes, backup and restore |
 | M3 Web UI + dashboard | Done | Passed | Web pages, sign-in, viewer mode, dashboard |
 | M4 Hooks + CLI | Done | Passed by operator ruling 2026-11-06 | Claude Code hooks, CLI verbs with `--json` |
 | M5 Plugin | Current | Not passed | Plugin tree, skill text, CI validate and install guide (#25) merged to main 2026-11-21 (PR #229); live check (#26) done 2026-11-17 for the tool names and session start, not for the marketplace install or PreCompact; the exit check (install guide section 7a) not yet run |
-| M6 Import | Planned | Not passed | `cairn import bishop-memory`; no code yet |
+| M6 Import | Planned | Not passed | `cairnbook import bishop-memory`; no code yet |
 | M7 Pilot | Planned | Not passed | Two weeks of real use; operator decisions first |
 | M8 Roll-out | Planned | Not passed | Every project moves; bishop-memory goes read-only |
 | Later | Later | Opens after M8 | Review loop, per-harness plugins, public releases |
 
 **Now**
 
+- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Done on branch claude/rename-cairnbook-8ef722, not merged. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
 - M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) is closed by the post-merge guide PR from `m5-guide-post-merge`, on merge.
 
 **Next**
@@ -49,8 +50,8 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 ### M5 Plugin (current)
 
-- **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, a skill, `/cairn:init` and `/cairn:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 26 issues open, 13 closed (counted from the issue list, with #235 counted as closed, on merge of the post-merge guide PR from `m5-guide-post-merge`). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairn-launch`, `hooks/hooks.json`, `skills/cairn/SKILL.md`, `/cairn:init`, `/cairn:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
+- **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairnbook-launch`, `hooks/hooks.json`, a skill, `/cairnbook:init` and `/cairnbook:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
+- **Status:** Current. Not passed. 26 issues open, 13 closed (counted from the issue list, with #235 counted as closed, on merge of the post-merge guide PR from `m5-guide-post-merge`). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairnbook-launch`, `hooks/hooks.json`, `skills/cairnbook/SKILL.md`, `/cairnbook:init`, `/cairnbook:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
 - **Next action:** The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine.
 
@@ -58,24 +59,24 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 Open issues, grouped (26):
 
-- Decisions (0 open): #193 (the plugin and `cairn enable` are alternatives; D34) and #206 (the hook text stops asking for `task_current`; D35) closed with PR #229 on 2026-11-21. The M4 "not run" rule is unchanged.
-- Exit-critical build (1): #20 epic. #21 layout and marketplace, #22 skill text, #23 `cairn-launch`, #24 `claude plugin validate` in CI, #25 install guide and #26 live confirmation of tool names and hook behaviour closed with PR #229 on 2026-11-21.
+- Decisions (0 open): #193 (the plugin and `cairnbook enable` are alternatives; D34) and #206 (the hook text stops asking for `task_current`; D35) closed with PR #229 on 2026-11-21. The M4 "not run" rule is unchanged.
+- Exit-critical build (1): #20 epic. #21 layout and marketplace, #22 skill text, #23 `cairnbook-launch`, #24 `claude plugin validate` in CI, #25 install guide and #26 live confirmation of tool names and hook behaviour closed with PR #229 on 2026-11-21.
 - Carry-over code and tests (16): #140 (restore: stray `-wal` and `-shm` files; the refusal is already in `internal/server/restore.go:128-133`), #191 (a `task_get` brief over the 64 KiB cap cannot be narrowed), #192, #194, #195, #196, #201, #212, #213, #215, #216, #217, #218 (MCP reads send no caller name, so agent-scoped directives are dropped), #230 (doctor reports plugin-carried hooks ok without reading `hooks/hooks.json`), #231 (PreCompact wording in `enable.go` and doctor), #232 (skill test checks argument names against each tool's InputSchema; restore `learning_add`'s required fields).
-- Carry-over docs (9): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairn init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5), #233 (MCP tool examples name the agent `main`; use a placeholder), #234 (`cairn enable --help` plugin-check rule does not match `wiki/CLI-Reference.md`), #239 (plugin guide section 8 removal wording).
+- Carry-over docs (9): #116 (init docs), #169 (M3 hand-test guide), #197 (CLI help for exit codes), #200 (`cairnbook init` help text), #224 Doc drift sweep 2026-11-11 (the drift tracking issue), #225 Quick docs polish (review suggestions S1–S5), #233 (MCP tool examples name the agent `main`; use a placeholder), #234 (`cairnbook enable --help` plugin-check rule does not match `wiki/CLI-Reference.md`), #239 (plugin guide section 8 removal wording).
 
 Left before the exit check passes:
 
 1. The skill text (#22) is on main, and a test checks it against the tools the server registers. The CI validate job (#24) is on main too. The install guide (#25) is `wiki/Install-Plugin.md`; its tool names are confirmed by the live check (#26, 2026-11-17). The DESIGN §6.1 tree is on main.
-2. `/cairn:init` and `/cairn:status` are on main, under #21 and #23. No issue names them on its own. Both issues are closed.
+2. `/cairnbook:init` and `/cairnbook:status` are on main, under #21 and #23. No issue names them on its own. Both issues are closed.
 3. Decided 2026-11-17: #193 (D34) and #206 (D35). Both are on main, and both closed with PR #229 on 2026-11-21. The skill text for D35 is in the skill (#22).
-4. Live check of #26, done 2026-11-17 on the m5-plugin branch, before the merge, with Claude Code 2.1.311 and the plugin loaded by `--plugin-dir`. Confirmed: the server `plugin:cairn:cairn` and its tool names, the commands, the session-start block with and without a task, a task recorded through the plugin's tools, the rule that a step is started before it is finished, and the second server that a user-scope `cairn` entry adds. Not confirmed: the marketplace install, the PreCompact hook's effect, the launcher's exit 127 display, and what `/mcp` prints. `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` were not isolated: the probe ran in the project folder, so it cannot tell which one resolved the project.
-5. Decided 2026-11-17 (D36): the API key lives only in `~/.config/cairn/client.env` or `CAIRN_API_KEY`, and the plugin has no `userConfig`. Recorded on main since PR #229 merged on 2026-11-21.
+4. Live check of #26, done 2026-11-17 on the m5-plugin branch, before the merge, with Claude Code 2.1.311 and the plugin loaded by `--plugin-dir`. Confirmed: the server `plugin:cairnbook:cairnbook` and its tool names, the commands, the session-start block with and without a task, a task recorded through the plugin's tools, the rule that a step is started before it is finished, and the second server that a user-scope `cairnbook` entry adds. Not confirmed: the marketplace install, the PreCompact hook's effect, the launcher's exit 127 display, and what `/mcp` prints. `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR` were not isolated: the probe ran in the project folder, so it cannot tell which one resolved the project.
+5. Decided 2026-11-17 (D36): the API key lives only in `~/.config/cairnbook/client.env` or `CAIRNBOOK_API_KEY`, and the plugin has no `userConfig`. Recorded on main since PR #229 merged on 2026-11-21.
 6. Decided 2026-11-17 (D37): `CAIRN_HOME/bin` is dropped. The launcher searches PATH, then `~/.local/bin`. `.github/roadmap.json` is corrected on main. The GitHub text of epic #20 and of issue #23 no longer names `CAIRN_HOME/bin`, and decision comments are posted on both.
 7. No release archives exist, so a clean-machine install means a source build with Go 1.26. The exit check does not say whether that counts. No issue covers the exit run itself.
 
 ### M6 Import (planned)
 
-- **Goal:** `cairn import bishop-memory --db <copy> [--dry-run]` reads the SQLite database, never Markdown, follows the mapping in PLAN §5.1, is idempotent, and prints a counts report.
+- **Goal:** `cairnbook import bishop-memory --db <copy> [--dry-run]` reads the SQLite database, never Markdown, follows the mapping in PLAN §5.1, is idempotent, and prints a counts report.
 - **Status:** Planned. Not started. 3 issues open, 0 closed. The binary has no `import` verb (wiki/CLI-Reference.md:34 lists it as planned).
 - **Exit check:** "Dry run on a copy maps every mission, step, event, finding, directive, criterion, lesson, mistake and deliverable, or names each skip; counts match; history visible on the dashboard." (PLAN §3)
 - **Next action:** Settle the grades conflict (below) with the operator. Then file issues for the command, its idempotence and its dry run.
@@ -92,9 +93,9 @@ Left before the exit check passes:
 
 ### M7 Pilot (planned)
 
-- **Goal:** One pilot project, two developers and one operator, with a daily review of findings and a weekly look at the dashboard with a project manager.
+- **Goal:** One pilot project, two developers and one operator, with a daily review of findings and a weekly look at the dashboard with a teammate.
 - **Status:** Planned. Not started. 4 issues open, 0 closed. Most of what is left is operator decisions and calendar time.
-- **Exit check:** "Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone." (PLAN §3)
+- **Exit check:** "Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a teammate can answer 'what is running' from the dashboard alone." (PLAN §3)
 - **Next action:** The operator chooses the pilot project and the two developers (#91), and a second operator (#92).
 
 **Detail**
@@ -109,14 +110,14 @@ Left before the exit check passes:
 
 ### M8 Roll-out (planned)
 
-- **Goal:** `.cairn.toml` in every active project, keys issued per role, harnesses move between tasks, and bishop-memory set read-only, then archived.
+- **Goal:** `.cairnbook.toml` in every active project, keys issued per role, harnesses move between tasks, and bishop-memory set read-only, then archived.
 - **Status:** Planned. Not started. 3 issues open, 0 closed.
 - **Exit check:** "No harness writes to bishop-memory; backups verified by a restore to a scratch server." (PLAN §3)
 - **Next action:** File an issue for the scratch-server restore drill and write its procedure.
 
 **Detail**
 
-Open issues (3): #95 `.cairn.toml` in every active project, #96 keys per role and a monthly `cairn key list` review, #97 bishop-memory set read-only, then archived, with nightly jobs off.
+Open issues (3): #95 `.cairnbook.toml` in every active project, #96 keys per role and a monthly `cairnbook key list` review, #97 bishop-memory set read-only, then archived, with nightly jobs off.
 
 Left before the exit check passes:
 
@@ -127,12 +128,12 @@ Left before the exit check passes:
 - **Goal:** Scheduled review loop, per-harness plugins, public releases, Postgres store, documentation ingestion (PLAN §3).
 - **Status:** Later. 22 issues open, 0 closed. Not scheduled.
 - **Exit check:** "Opened only after M8." (PLAN §3)
-- **Next action:** None until M8 closes. The operator decides #98 (rename, D18) and #99 (internal name).
+- **Next action:** None until M8 closes. #98 and #99 are answered by D38 (2026-11-27): the operator renames the repository, then closes them.
 
 **Detail**
 
 - Epics (3): #30 scheduled review loop, #31 per-harness plugins, #32 public releases.
-- Decisions (2): #98 rename to `cairn` (D18), #99 internal name.
+- Decisions (2): #98 rename the repository and module to `cairnbook` (D38), #99 one name (answered by D38).
 - Hygiene (15): #33, #34, #35, #36, #37, #38, #41, #43, #64, #100, #126, #135, #214, #221, #223. Several are misfiled; see Known doc drift.
 - Plugin follow-ups (2): #236 (CI plugin job: try `npm install --global --ignore-scripts` for Claude Code), #237 (plugin icon: `claude plugin validate` reports ICON_MISSING).
 
@@ -140,14 +141,14 @@ Left before the exit check passes:
 
 #### Phase 0 Skeleton
 
-- **Goal:** The Go module, `cairn version`, the Makefile and CI.
+- **Goal:** The Go module, `cairnbook version`, the Makefile and CI.
 - **Status:** Closed 2026-10-30, 1 issue. Exit passed.
-- **Exit check:** "`make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`." (PLAN §3)
+- **Exit check:** "`make test` passes in CI on an empty suite; `bin/cairnbook version` prints a version from `git describe`." (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**
 
-Closed 2026-10-30, 1 issue. Exit passed. Delivered the Go module, `cairn version`, the Makefile and CI.
+Closed 2026-10-30, 1 issue. Exit passed. Delivered the Go module, `cairnbook version`, the Makefile and CI.
 
 #### Phase 1 Contract
 
@@ -173,31 +174,31 @@ Closed 2026-10-30, 12 issues. Exit passed. Evidence: `TestConformance` in `inter
 
 #### M1 Server-mode MCP
 
-- **Goal:** `cairn mcp` over the client and the API, with init, status, doctor and export task.
+- **Goal:** `cairnbook mcp` over the client and the API, with init, status, doctor and export task.
 - **Status:** Closed 2026-11-03, 15 issues. Exit passed.
-- **Exit check:** "An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live Claude Code run against `cairn serve` on another machine is M2's exit check (#19)." (PLAN §3)
+- **Exit check:** "An MCP stdio test drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairnbook export task` prints the result. The live Claude Code run against `cairnbook serve` on another machine is M2's exit check (#19)." (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**
 
-Closed 2026-11-03, 15 issues. Exit passed. Evidence: the stdio flow test `TestExitCheckMCPFlowThenExport` (`cmd/cairn/export_test.go:312`). Delivered `cairn mcp` over the client and API, and init, status, doctor and export task.
+Closed 2026-11-03, 15 issues. Exit passed. Evidence: the stdio flow test `TestExitCheckMCPFlowThenExport` (`cmd/cairnbook/export_test.go:312`). Delivered `cairnbook mcp` over the client and API, and init, status, doctor and export task.
 
 #### M2 Server
 
-- **Goal:** `cairn serve`, key scopes, backup and restore.
+- **Goal:** `cairnbook serve`, key scopes, backup and restore.
 - **Status:** Closed 2026-11-02, 11 issues. Exit passed.
-- **Exit check:** "Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it" (PLAN §3)
+- **Exit check:** "Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairnbook serve` on another machine (#19), and `cairnbook export task` prints it" (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**
 
-Closed 2026-11-02, 11 issues. Exit passed. Evidence: live run #19 (`docs/M2-LIVE-RUN.md`), and `TestConformanceOverRealListener` (`internal/server/exit_test.go:314`), which runs the suite over HTTP. Delivered `cairn serve`, key scopes, backup and restore, the directive cap and `review_by`.
+Closed 2026-11-02, 11 issues. Exit passed. Evidence: live run #19 (`docs/M2-LIVE-RUN.md`), and `TestConformanceOverRealListener` (`internal/server/exit_test.go:314`), which runs the suite over HTTP. Delivered `cairnbook serve`, key scopes, backup and restore, the directive cap and `review_by`.
 
 #### M3 Web UI + dashboard
 
 - **Goal:** Web pages, sign-in, viewer mode and the dashboard.
 - **Status:** Closed 2026-11-06, 33 issues. Exit passed.
-- **Exit check:** "A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action" (PLAN §3)
+- **Exit check:** "The operator sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action" (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**
@@ -206,14 +207,14 @@ Closed 2026-11-06, 33 issues. Exit passed. Evidence: `TestM3ExitCheck` (`interna
 
 #### M4 Hooks + CLI
 
-- **Goal:** Claude Code hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
+- **Goal:** Claude Code hooks, `cairnbook enable`, `cairnbook doctor --agent`, and the CLI verbs with `--json`.
 - **Status:** Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only.
 - **Exit check:** "On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI" (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**
 
-Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only (`docs/M4-HAND-CHECK.md` §3). Sections 4 and 5 (OpenCode, pi) are not run; #206 was open under M5 and closed 2026-11-21 with PR #229. Shell-only close test: `TestExitCheckAgentWithOnlyBashCompletesAndClosesATask` (`internal/conformance/cliservice/exitcheck_test.go:54`). Delivered the pre-compact and stop hooks, `cairn enable`, `cairn doctor --agent`, and the CLI verbs with `--json`.
+Closed 2026-11-06, 22 issues. Exit passed by operator ruling, for the `/compact` check only (`docs/M4-HAND-CHECK.md` §3). Sections 4 and 5 (OpenCode, pi) are not run; #206 was open under M5 and closed 2026-11-21 with PR #229. Shell-only close test: `TestExitCheckAgentWithOnlyBashCompletesAndClosesATask` (`internal/conformance/cliservice/exitcheck_test.go:54`). Delivered the pre-compact and stop hooks, `cairnbook enable`, `cairnbook doctor --agent`, and the CLI verbs with `--json`.
 
 #### Phase 9 and Phase 10 (closed, empty)
 
@@ -233,7 +234,7 @@ This is a snapshot; re-run the gates for current state.
 - Build, vet and test pass across the 16 Go packages (`go build`, `go vet`, `go test ./...`).
 - Conformance: 106 of 106 against `core.Local`. Through the CLI, 98 PASS and 8 deferred (D30, D31, D33).
 - `scripts/check-docs.sh`, `make fmt-check`, `make scan-invisible` and `make scan-local-paths` pass.
-- The repo ships no release binaries and no launchd unit. A Mac runs `cairn serve` by hand, from a binary built from source (wiki/Install-Local.md:48). Release builds are a Later item (`.github/workflows/ci.yml:4`).
+- The repo ships no release binaries and no launchd unit. A Mac runs `cairnbook serve` by hand, from a binary built from source (wiki/Install-Local.md:48). Release builds are a Later item (`.github/workflows/ci.yml:4`).
 
 ## Where each fact lives
 

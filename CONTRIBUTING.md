@@ -1,6 +1,6 @@
-# Contributing to Cairn
+# Contributing to Cairnbook
 
-What Cairn is: [docs/DESIGN.md](docs/DESIGN.md). What is built next and how
+What Cairnbook is: [docs/DESIGN.md](docs/DESIGN.md). What is built next and how
 each milestone is checked: [docs/PLAN.md](docs/PLAN.md).
 
 ## Build and check
@@ -8,8 +8,8 @@ each milestone is checked: [docs/PLAN.md](docs/PLAN.md).
 Go 1.26 or later. No C toolchain: SQLite is `modernc.org/sqlite`.
 
 ```bash
-make build       # bin/cairn, version from git describe
-make build-linux # bin/cairn-linux for a Linux server (LINUX_ARCH=amd64|arm64)
+make build       # bin/cairnbook, version from git describe
+make build-linux # bin/cairnbook-linux for a Linux server (LINUX_ARCH=amd64|arm64)
 make test        # go test -race ./...
 make vet         # go vet ./...
 make fmt         # gofmt -w .
@@ -74,7 +74,7 @@ From what went well and badly in bishop-memory (PLAN.md §6):
   Gremlins (`make mutation`), a Bishop default awaiting the operator's
   ratification.
 - **No silent defaults for identity.** A missing project is an error that
-  says how to fix it (`cairn init`).
+  says how to fix it (`cairnbook init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.
 
 ### Plan v1 rules
@@ -87,7 +87,7 @@ Ten rules from Plan v1 (2026-10-30), added to the rules above.
 2. **No destructive advice in error text.** A refusal names only a safe fix. The
    error-text audit in `internal/core` (`TestErrorTextNamesOnlySafeFix`) fails on
    `--force`, `rm` or `reset` in an error string, and runs in `make test`. A check
-   that fails on any `init` other than `cairn init` is not yet written.
+   that fails on any `init` other than `cairnbook init` is not yet written.
 3. **One source of truth.** Exports are exports; nothing reads an export back
    except `import` on an explicit command.
 4. **Hooks remind, tools record.** Every task-loop step the skill asks for has a
@@ -98,7 +98,7 @@ Ten rules from Plan v1 (2026-10-30), added to the rules above.
 6. **The loop stays cheap.** No scheduled agents in v1; a human decides findings
    daily and the "waiting on you" count stays under 15.
 7. **No silent identity.** Missing `project` or `server` is an error that names
-   `cairn init`.
+   `cairnbook init`.
 8. **Small tool surface.** 13 tools plus the read tools `recall` and `search`
    (15 names), descriptions under 200 characters, every non-obvious affordance
    shown by example in the skill text.
@@ -128,13 +128,13 @@ the reason. Adopted decisions are listed in PLAN.md §8.
   or Later), and the two values match. `scripts/check-docs.sh` checks that they
   agree. When the marker and the status lines change is set out in
   [PLAN §9](docs/PLAN.md#9-project-management).
-- **Docs drift tests.** `internal/mcp/docs_drift_test.go` and `cmd/cairn/docs_drift_test.go`
+- **Docs drift tests.** `internal/mcp/docs_drift_test.go` and `cmd/cairnbook/docs_drift_test.go`
   run under `make test`. They fail when the tool names in [wiki/MCP-Tools.md](wiki/MCP-Tools.md)
   differ from the names the server registers, or the verb names in
   [wiki/CLI-Reference.md](wiki/CLI-Reference.md) differ from the binary's dispatch table. They
   compare names only, not descriptions, parameters or prose, so a wrong sentence on either page
-  passes them. The tests read the table between each page's markers (`<!-- cairn-mcp-tools:begin -->`
-  and `:end`, `<!-- cairn-cli-verbs:begin -->` and `:end`), so keep the markers, and keep the first
+  passes them. The tests read the table between each page's markers (`<!-- cairnbook-mcp-tools:begin -->`
+  and `:end`, `<!-- cairnbook-cli-verbs:begin -->` and `:end`), so keep the markers, and keep the first
   column as one name in backticks. A rename on either side fails them.
 - **Operator smoke check.** [scripts/smoke-check.sh](scripts/smoke-check.sh) is a read-only check
   of an install, run by an operator against a binary and, with `--server`, a server. It is not a CI

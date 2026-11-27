@@ -12,11 +12,11 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/djm56/cairn-memory/internal/core"
-	cairnmcp "github.com/djm56/cairn-memory/internal/mcp"
+	cairnbookmcp "github.com/djm56/cairn-memory/internal/mcp"
 )
 
-// skillFile is the cairn skill of the plugin, relative to this package.
-const skillFile = pluginDir + "/skills/cairn/SKILL.md"
+// skillFile is the cairnbook skill of the plugin, relative to this package.
+const skillFile = pluginDir + "/skills/cairnbook/SKILL.md"
 
 // skillArguments are the argument, field and refusal names the skill writes in backticks or in its examples, which are not
 // tool names. Every other lowercase name the skill cites must be a registered MCP tool. A name added to the skill that is
@@ -58,7 +58,7 @@ func frontValue(front, key string) string {
 	return ""
 }
 
-// TestSkillFrontmatter checks the frontmatter the skills docs require: the file opens with the --- line, the name is cairn
+// TestSkillFrontmatter checks the frontmatter the skills docs require: the file opens with the --- line, the name is cairnbook
 // (the directory name), the description is present, is one line, is within the 1,536 characters the skill listing keeps,
 // and has no angle brackets, which the docs say show escaped. The skill is under 500 lines, as the docs advise.
 func TestSkillFrontmatter(t *testing.T) {
@@ -67,8 +67,8 @@ func TestSkillFrontmatter(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s has no frontmatter between --- lines", skillFile)
 	}
-	if name := frontValue(front, "name"); name != "cairn" {
-		t.Errorf("name is %q, want cairn", name)
+	if name := frontValue(front, "name"); name != "cairnbook" {
+		t.Errorf("name is %q, want cairnbook", name)
 	}
 	desc := frontValue(front, "description")
 	switch {
@@ -117,14 +117,14 @@ func skillNames(body string) []string {
 	return names
 }
 
-// registeredTools returns the names of the tools the cairn MCP server lists, read over the protocol with an in-memory
+// registeredTools returns the names of the tools the cairnbook MCP server lists, read over the protocol with an in-memory
 // transport, as the MCP-Tools drift test reads them (internal/mcp/docs_drift_test.go).
 func registeredTools(t *testing.T) []string {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	serverT, clientT := mcpsdk.NewInMemoryTransports()
-	srv := cairnmcp.New(core.Unimplemented{}, cairnmcp.Project{Name: "acme-api"}, "test")
+	srv := cairnbookmcp.New(core.Unimplemented{}, cairnbookmcp.Project{Name: "acme-api"}, "test")
 	go func() { _ = srv.Run(ctx, serverT) }()
 
 	mc := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "plugincheck", Version: "0"}, nil)

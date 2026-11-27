@@ -22,7 +22,7 @@ import (
 // newLocal returns a Service over a new database, for a test server to wrap.
 func newLocal(t *testing.T) *core.Local {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -140,12 +140,12 @@ func TestInternalFailureIsAPlainError(t *testing.T) {
 }
 
 // TestCallWithNoCallerIsInvalid checks that a context with no caller sends no
-// Cairn headers, and so the server finds no project. The message names the fix.
+// Cairnbook headers, and so the server finds no project. The message names the fix.
 func TestCallWithNoCallerIsInvalid(t *testing.T) {
 	c := loopback(t, newLocal(t))
 	_, err := c.TaskCurrent(context.Background())
-	if core.KindOf(err) != core.KindInvalid || !strings.Contains(err.Error(), "cairn init") {
-		t.Errorf("TaskCurrent with no caller = %v, want invalid and a message that names cairn init", err)
+	if core.KindOf(err) != core.KindInvalid || !strings.Contains(err.Error(), "cairnbook init") {
+		t.Errorf("TaskCurrent with no caller = %v, want invalid and a message that names cairnbook init", err)
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// Event is the sub-command `cairn event`: the journal of a task, for a person or an agent with
+// Event is the sub-command `cairnbook event`: the journal of a task, for a person or an agent with
 // only a shell (issue #87). Its verb is log, a write through event_log (CONTRACT §4). Each verb
 // takes --json, which writes the result as one line of JSON, the object the MCP tool returns.
 //
@@ -18,24 +18,24 @@ import (
 // error.
 func Event(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn event: name what to do: cairn event log")
+		fmt.Fprintln(stderr, "cairnbook event: name what to do: cairnbook event log")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
 	if verb == "log" {
 		return eventLog(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn event: unknown verb %q: use cairn event log\n", verb)
+	fmt.Fprintf(stderr, "cairnbook event: unknown verb %q: use cairnbook event log\n", verb)
 	return 2
 }
 
-// eventLog is `cairn event log <task-id> --kind k --text t [--step n | --step-id n] [--data d]
+// eventLog is `cairnbook event log <task-id> --kind k --text t [--step n | --step-id n] [--data d]
 // [--agent a] [--json]`: one journal entry on a task (CONTRACT §4, event_log). The step is named by
 // its number, or by its id, and not both (CONTRACT §1.4). An agent may log note,
 // blocked, unblocked, handoff, decision, review and custom. A review needs --data, a JSON object
 // with verdict, critical and warnings. The server refuses the other kinds, which it writes itself.
 func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn event log"
+	const verb = "cairnbook event log"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	kind := fl.String("kind", "", "note, blocked, unblocked, handoff, decision, review or custom")
@@ -48,7 +48,7 @@ func eventLog(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 		return code
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, verb+": name one task id: cairn event log <task-id> --kind note --text t")
+		fmt.Fprintln(stderr, verb+": name one task id: cairnbook event log <task-id> --kind note --text t")
 		return 2
 	}
 	if given(fl, "step") && *step < 1 {

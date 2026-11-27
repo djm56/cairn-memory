@@ -20,25 +20,25 @@ func TestUsageNamesFlagCountsOnlyTheValuesTheCallSet(t *testing.T) {
 	}{
 		{"a value the call set is named",
 			[]string{"step", "add", "task-1", "--after-id", "0", "--json"},
-			"cairn step add: --after-id must be a step id, 1 or more; leave it out to add the step last", true},
+			"cairnbook step add: --after-id must be a step id, 1 or more; leave it out to add the step last", true},
 		{"two forms of one position are named",
 			[]string{"task", "get", "task-1", "--step", "1", "--step-id", "4", "--json"},
-			"cairn task get: give the step by --step or by --step-id, not both", true},
+			"cairnbook task get: give the step by --step or by --step-id, not both", true},
 		{"a refused caller name from the variable",
 			[]string{"task", "get", "task-1", "--json"},
-			"cairn task get: the name from CAIRN_AGENT is refused: the agent name \"ma\\nin\" has a control character", true},
+			"cairnbook task get: the name from CAIRNBOOK_AGENT is refused: the agent name \"ma\\nin\" has a control character", true},
 		{"no caller name at all",
 			[]string{"task", "start", "--title", "t", "--json"},
-			"cairn task start: no agent name: give --agent <name>, or set CAIRN_AGENT to one", true},
+			"cairnbook task start: no agent name: give --agent <name>, or set CAIRNBOOK_AGENT to one", true},
 		{"the flag package refused the call's own arguments",
 			[]string{"task", "get", "task-1", "--bogus", "--json"},
-			"cairn task get: flag provided but not defined: -bogus; run cairn task get -h for the flags", false},
+			"cairnbook task get: flag provided but not defined: -bogus; run cairnbook task get -h for the flags", false},
 		{"a flag the call did not set is named",
 			[]string{"step", "add", "task-1", "--after", "1", "--json"},
-			"cairn step add: --step must be a step number, 1 or more", false},
+			"cairnbook step add: --step must be a step number, 1 or more", false},
 		{"a positional argument is refused",
 			[]string{"step", "update", "task-1", "0", "--action", "start", "--json"},
-			"cairn step update: the step is a number, 1 or more, as the steps list shows it: got \"0\"", false},
+			"cairnbook step update: the step is a number, 1 or more, as the steps list shows it: got \"0\"", false},
 	}
 	for _, c := range cases {
 		if got := usageNamesFlag(c.argv, c.stderr); got != c.want {
@@ -52,12 +52,12 @@ func TestUsageNamesFlagCountsOnlyTheValuesTheCallSet(t *testing.T) {
 // that expects a kind cannot pass on it.
 func TestUsageErrorIsInvalidOnlyWhenItNamesAValue(t *testing.T) {
 	argv := []string{"step", "add", "task-1", "--after-id", "0", "--json"}
-	named := failure(2, argv, nil, "cairn step add: --after-id must be a step id, 1 or more\n")
+	named := failure(2, argv, nil, "cairnbook step add: --after-id must be a step id, 1 or more\n")
 	var ce *core.Error
 	if !errors.As(named, &ce) || ce.Kind != core.KindInvalid {
 		t.Errorf("a usage error naming the value gave %v, want core's KindInvalid", named)
 	}
-	unnamed := failure(2, argv, nil, "cairn step update: the step is a number, 1 or more\n")
+	unnamed := failure(2, argv, nil, "cairnbook step update: the step is a number, 1 or more\n")
 	if errors.As(unnamed, &ce) {
 		t.Errorf("a usage error naming no value gave the kind %q, want no kind", ce.Kind)
 	}

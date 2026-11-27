@@ -9,8 +9,8 @@ This page lists the checks you can run yourself, what each one proves, what it c
 | Check | Where you run it | What it changes | Use it |
 |---|---|---|---|
 | `scripts/smoke-check.sh` | The repository, from any folder | Moves a key's last-used time, at most once a minute | After an install or an upgrade, and before you hand a client its key |
-| `cairn doctor` | A project folder | Moves a key's last-used time, when a key is found | When a client misbehaves, and after you set one up |
-| `cairn doctor --agent claude-code` | A project folder | Creates the project's row on the server, the first time a project is read | After `cairn enable --agent claude-code` |
+| `cairnbook doctor` | A project folder | Moves a key's last-used time, when a key is found | When a client misbehaves, and after you set one up |
+| `cairnbook doctor --agent claude-code` | A project folder | Creates the project's row on the server, the first time a project is read | After `cairnbook enable --agent claude-code` |
 | `scripts/check-docs.sh` | The repository | Nothing | Before a pull request |
 | `make test`, `make vet`, `make fmt-check` | The repository | Nothing (`make fmt` rewrites files) | Before a pull request |
 | The CI workflows | GitHub | Nothing, except the wiki publish on `main` | On every pull request and push |
@@ -25,15 +25,15 @@ scripts/smoke-check.sh [--bin PATH] [--server URL]
 
 | Option | Meaning |
 |---|---|
-| `--bin PATH` | The `cairn` binary to check. Without it, the script uses `cairn` from the PATH |
-| `--server URL` | The server's base URL, `http://` or `https://`. It turns on the server checks, and sets `CAIRN_SERVER` for `doctor` and `cairn mcp` |
+| `--bin PATH` | The `cairnbook` binary to check. Without it, the script uses `cairnbook` from the PATH |
+| `--server URL` | The server's base URL, `http://` or `https://`. It turns on the server checks, and sets `CAIRNBOOK_SERVER` for `doctor` and `cairnbook mcp` |
 | `--help` | Prints the usage |
 
-The key is read from the environment variable `CAIRN_API_KEY`, and only from there. The script refuses `--key`, in either form, and never prints the key. Pass it like this, so it stays out of your shell history:
+The key is read from the environment variable `CAIRNBOOK_API_KEY`, and only from there. The script refuses `--key`, in either form, and never prints the key. Pass it like this, so it stays out of your shell history:
 
 ```bash
-CAIRN_API_KEY="$(sed -n 's/^CAIRN_API_KEY=//p' ~/.config/cairn/client.env)" \
-  scripts/smoke-check.sh --server https://cairn.lan:8788
+CAIRNBOOK_API_KEY="$(sed -n 's/^CAIRNBOOK_API_KEY=//p' ~/.config/cairnbook/client.env)" \
+  scripts/smoke-check.sh --server https://cairnbook.lan:8788
 ```
 
 Run it from inside the project folder. `doctor` needs one, and the output of a run outside a project is different (see the notes below).
@@ -43,12 +43,12 @@ Run it from inside the project folder. `doctor` needs one, and the output of a r
 | Check | Runs when | PASS when | FAIL when | SKIP when |
 |---|---|---|---|---|
 | `binary` | Always | The binary is found | No binary at the path given | Never |
-| `version` | The binary is found | It prints `cairn <version>` | It prints something else | No binary |
-| `doctor` | The binary lists a `doctor` verb | `cairn doctor` exits 0 | It exits 1, and the failing lines are shown | No binary, or no `doctor` verb |
+| `version` | The binary is found | It prints `cairnbook <version>` | It prints something else | No binary |
+| `doctor` | The binary lists a `doctor` verb | `cairnbook doctor` exits 0 | It exits 1, and the failing lines are shown | No binary, or no `doctor` verb |
 | `healthz` | `--server` is given | `GET /healthz` answers 200 with `{"status":"ok"}` | Another answer | No `--server` |
 | `refused` | `--server` is given | `POST /v1/agent/task_current` with no key answers 401 `unauthenticated` | Any other answer, or no answer | No `--server` |
-| `key` | `--server` is given and `CAIRN_API_KEY` is set | The same call with the key answers 400 with kind `invalid`. The call names no project, so the server refuses it before it reads anything. That answer shows the key was accepted | 401 or 403, or another answer. A value that is not a Cairn key is refused before it is sent | `CAIRN_API_KEY` is not set |
-| `mcp` | `--server` is given and `CAIRN_API_KEY` is set | `cairn mcp` answers `initialize` and `tools/list`, with the `cairn` server name and a tools list | `cairn mcp` does not answer as expected | `CAIRN_API_KEY` is not set, since `cairn mcp` will not start without a key |
+| `key` | `--server` is given and `CAIRNBOOK_API_KEY` is set | The same call with the key answers 400 with kind `invalid`. The call names no project, so the server refuses it before it reads anything. That answer shows the key was accepted | 401 or 403, or another answer. A value that is not a Cairnbook key is refused before it is sent | `CAIRNBOOK_API_KEY` is not set |
+| `mcp` | `--server` is given and `CAIRNBOOK_API_KEY` is set | `cairnbook mcp` answers `initialize` and `tools/list`, with the `cairnbook` server name and a tools list | `cairnbook mcp` does not answer as expected | `CAIRNBOOK_API_KEY` is not set, since `cairnbook mcp` will not start without a key |
 
 The summary line reads `smoke-check: N passed, N failed, N skipped`.
 
@@ -59,13 +59,13 @@ The summary line reads `smoke-check: N passed, N failed, N skipped`.
 **You should see**, for a healthy install, seven `PASS` lines and the summary:
 
 ```text
-PASS  binary   found at /Users/you/.local/bin/cairn
-PASS  version  cairn 8b651da
+PASS  binary   found at /Users/you/.local/bin/cairnbook
+PASS  version  cairnbook 8b651da
 PASS  doctor   exit 0: no check failed
 PASS  healthz  GET /healthz answered 200 with status ok
 PASS  refused  POST /v1/agent/task_current with no key answered 401 unauthenticated
 PASS  key      the key was accepted: the call named no project, so the server refused it before any read (400, kind invalid)
-PASS  mcp      cairn mcp answered initialize and tools/list
+PASS  mcp      cairnbook mcp answered initialize and tools/list
 smoke-check: 7 passed, 0 failed, 0 skipped
 ```
 
@@ -73,35 +73,35 @@ Without `--server`, the four server lines are `SKIP`, and the summary counts the
 
 ### Notes that matter
 
-- **The key comes from `CAIRN_API_KEY` for the script's own checks.** The `key` and `mcp` checks read that variable only. `cairn doctor` and `cairn mcp` also read `~/.config/cairn/client.env` when `CAIRN_API_KEY` is not set. So a run without the variable can show `doctor` as `PASS`, because doctor found the key in the file, and `key` and `mcp` as `SKIP`, because the script did not look there.
-- **`doctor` needs a project.** It finds one from `CAIRN_PROJECT`, or the nearest `.cairn.toml`, searched upward from `CLAUDE_PROJECT_DIR` when it is set and from the working directory otherwise. Run outside a project, its `project` line fails, and so the `doctor` line is `FAIL`, even when the binary, the server and the key are sound. The detail names the failing line. A broken `.cairn.toml` fails the same way.
-- **`doctor` without `--server` goes to the server its configuration names.** With `--server`, the script sets `CAIRN_SERVER`, so `doctor` checks the server you named. Without it, `doctor`'s reach call goes to the server from `CAIRN_SERVER` or the `server` line of `.cairn.toml`, and the key is sent there. Give `--server` to make the run check one server.
+- **The key comes from `CAIRNBOOK_API_KEY` for the script's own checks.** The `key` and `mcp` checks read that variable only. `cairnbook doctor` and `cairnbook mcp` also read `~/.config/cairnbook/client.env` when `CAIRNBOOK_API_KEY` is not set. So a run without the variable can show `doctor` as `PASS`, because doctor found the key in the file, and `key` and `mcp` as `SKIP`, because the script did not look there.
+- **`doctor` needs a project.** It finds one from `CAIRNBOOK_PROJECT`, or the nearest `.cairnbook.toml`, searched upward from `CLAUDE_PROJECT_DIR` when it is set and from the working directory otherwise. Run outside a project, its `project` line fails, and so the `doctor` line is `FAIL`, even when the binary, the server and the key are sound. The detail names the failing line. A broken `.cairnbook.toml` fails the same way.
+- **`doctor` without `--server` goes to the server its configuration names.** With `--server`, the script sets `CAIRNBOOK_SERVER`, so `doctor` checks the server you named. Without it, `doctor`'s reach call goes to the server from `CAIRNBOOK_SERVER` or the `server` line of `.cairnbook.toml`, and the key is sent there. Give `--server` to make the run check one server.
 - **Without a key, `doctor` fails.** A run with no key anywhere shows `doctor` as `FAIL` (key missing), while the `refused` check still passes. The `doctor` line then names the key, not the server.
 
 ### Known gaps
 
 These are recorded for the next change to the script. They are not hidden here.
 
-- The `key` and `mcp` `SKIP` lines say `CAIRN_API_KEY` is not set. That is wrong when `~/.config/cairn/client.env` holds a key, which `doctor` and `cairn mcp` then use. The skip is still correct for the script's own check.
+- The `key` and `mcp` `SKIP` lines say `CAIRNBOOK_API_KEY` is not set. That is wrong when `~/.config/cairnbook/client.env` holds a key, which `doctor` and `cairnbook mcp` then use. The skip is still correct for the script's own check.
 - A `doctor` `FAIL` can be for the project, the key or the server. Its detail names every failing line, but the help and the header speak of the project alone.
 - The `mcp` check waits a fixed one second for the replies, so a slow host can fail it.
 
-## `cairn doctor`
+## `cairnbook doctor`
 
 Checks the binary, the project file, the server and the connection. It changes no project data.
 
 ```bash
-cairn doctor
-cairn doctor --agent claude-code
-cairn doctor --agent opencode
-cairn doctor --agent pi
+cairnbook doctor
+cairnbook doctor --agent claude-code
+cairnbook doctor --agent opencode
+cairnbook doctor --agent pi
 ```
 
 Without `--agent`, it prints the lines in [Install-Local](Install-Local#6-check-it): `binary`, `project`, `server`, `key` and `reach`. A `skip` line, such as `reach` with no server, is not a failure.
 
 With `--agent`, it also checks a client:
 
-- `claude-code` lists the Cairn hooks in the Claude Code settings files, and runs each hook once against the server. It warns when a hook is missing, and tells you to run `cairn enable --agent claude-code`.
+- `claude-code` lists the Cairnbook hooks in the Claude Code settings files, and runs each hook once against the server. It warns when a hook is missing, and tells you to run `cairnbook enable --agent claude-code`.
 - `opencode` and `pi` report whether the registration and the instructions `enable` writes are in place. Both are EXPERIMENTAL.
 
 Exit 0 when no line fails, 1 when one does.
@@ -137,14 +137,14 @@ Two Go tests check that the wiki's tables list what the code really has:
 | Test | Package | Checks |
 |---|---|---|
 | `TestMCPToolsPageMatchesRegisteredTools` | `internal/mcp` | The tool names in the marked table of [MCP-Tools](MCP-Tools) are the 15 names the server registers |
-| `TestCLIReferencePageMatchesDispatchTable` | `cmd/cairn` | The verb names in the marked table of [CLI-Reference](CLI-Reference) are the names in the binary's dispatch table |
+| `TestCLIReferencePageMatchesDispatchTable` | `cmd/cairnbook` | The verb names in the marked table of [CLI-Reference](CLI-Reference) are the names in the binary's dispatch table |
 
 A tool or a verb added, renamed or removed on one side fails the test until the other side agrees. The package `internal/docscheck` reads the markers. A table row whose first column is not one name in backticks is also a failure.
 
 Run them with:
 
 ```bash
-go test ./internal/mcp ./cmd/cairn
+go test ./internal/mcp ./cmd/cairnbook
 ```
 
 The smoke check's own tests run the script against a stub binary and a stub server, in `internal/smokecheck`. `make test` runs all of these, with the race detector.
@@ -169,7 +169,7 @@ Three workflows run in `.github/workflows/`:
 
 | Workflow | Runs on | Does |
 |---|---|---|
-| `ci.yml`, named `CI` | Every push to `main`, and every pull request | One job, `build, vet, fmt, test`, on Ubuntu with the Go version from `go.mod`: `make build` and `bin/cairn version`, `make vet`, `make fmt-check`, `make test` (with `-race`), `make cross`, `make scan-invisible` and `make scan-local-paths`. The job's name is the required check on `main` |
+| `ci.yml`, named `CI` | Every push to `main`, and every pull request | One job, `build, vet, fmt, test`, on Ubuntu with the Go version from `go.mod`: `make build` and `bin/cairnbook version`, `make vet`, `make fmt-check`, `make test` (with `-race`), `make cross`, `make scan-invisible` and `make scan-local-paths`. The job's name is the required check on `main` |
 | `docs.yml`, named `Docs` | Pull requests: opened, updated, reopened, labelled and unlabelled | `scripts/check-docs.sh` with the base commit and the labels, and shellcheck over every `scripts/**/*.sh` at warning severity |
 | `wiki.yml`, named `Wiki` | Pushes to `main` that touch `wiki/**`, and a manual run | `scripts/github/publish-wiki.sh --apply`, in one publish at a time. It runs only on `main` |
 

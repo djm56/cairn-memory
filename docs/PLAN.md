@@ -1,4 +1,4 @@
-# Cairn Memory — Build Plan
+# Cairnbook — Build Plan
 
 <!-- cairn-milestone: M5 -->
 
@@ -9,11 +9,11 @@ their exit checks passed. Plan v1 replaces phases 3 to 10 with the milestones in
 [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 The rule for this line is in §9.**
 
-What Cairn is and how it works is in [DESIGN.md](DESIGN.md).
+What Cairnbook is and how it works is in [DESIGN.md](DESIGN.md).
 
 ## 1. Where this comes from
 
-Cairn replaces [bishop-memory](https://github.com/djm56/bishop-memory) (a local
+Cairnbook replaces [bishop-memory](https://github.com/djm56/bishop-memory) (a local
 bishop-memory checkout). bishop-memory works, and it holds the
 operator's history: missions, findings, directives and grades. It was built
 around one harness, Bishop, and around one idea: the harness writes Markdown
@@ -38,7 +38,7 @@ this plan.
 
 From bishop-memory, by size (non-test lines at `4c170b6`):
 
-| bishop-memory | Lines | In Cairn |
+| bishop-memory | Lines | In Cairnbook |
 |---|---|---|
 | `internal/importer` (Markdown → rows) | 1,863 | **Dropped.** Agents write through tools |
 | `internal/debrief`, `criteria`, `review` (heading and verdict parsers) | 1,016 | **Dropped.** The same data arrives as tool fields; the parsers' test cases become validation cases |
@@ -81,13 +81,13 @@ is under the heading Milestone table, below Phase 2.
 
 ### Phase 0 — Skeleton
 
-**Work.** Go module `github.com/djm56/cairn-memory`, Go 1.25. `cmd/cairn` with
-the sub-command frame and `cairn version`. Makefile (`build`, `test`, `vet`,
+**Work.** Go module `github.com/djm56/cairn-memory`, Go 1.25. `cmd/cairnbook` with
+the sub-command frame and `cairnbook version`. Makefile (`build`, `test`, `vet`,
 `fmt`, `run`). CI on pull requests: `go vet`, `go test -race`, `gofmt` check.
 MIT licence (as bishop-memory). `CONTRIBUTING.md` with the rules in §6.
 `.gitignore` for `bin/`, `dist/`, `*.db`.
 
-**Exit.** `make test` passes in CI on an empty suite; `bin/cairn version`
+**Exit.** `make test` passes in CI on an empty suite; `bin/cairnbook version`
 prints a version from `git describe`.
 
 ### Phase 1 — Contract
@@ -120,8 +120,8 @@ WAL mode, busy timeout, FTS5 index and its triggers. Typed query functions
 for every table. `internal/core`: the `Service` implementation over the
 store, holding every rule: status transitions, the close policy, step
 positions, task-id allocation in one transaction, operator-only changes.
-`internal/identity`: project resolution from `CAIRN_PROJECT` and
-`.cairn.toml` (DESIGN.md §2.1).
+`internal/identity`: project resolution from `CAIRNBOOK_PROJECT` and
+`.cairnbook.toml` (DESIGN.md §2.1).
 
 Guided by bishop-memory, for reference: `internal/store/sqlite.go` and
 `migrate.go`, the FTS setup from `db/schema.sql`, and the allocator's daily
@@ -140,14 +140,14 @@ the only thing that moves the status line (§9).
 
 | Milestone | Was | Work | Exit check |
 | --- | --- | --- | --- |
-| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairn mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, `cairn hook session-start`; compact, paged output; MCP stdio test. `internal/api` lands here as handlers only, with no network listener in the shipped binary and no `cairn serve`; `internal/client` is tested against an in-process `httptest` server (D19). The directive cap and `review_by` land in M2 | An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live Claude Code run against `cairn serve` on another machine is M2's exit check (#19) |
-| M2 Server | Phase 5 | `cairn serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or proxy, loopback default, body caps beyond the 1 MiB handler cap that M1 already applies, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairn key add/list/revoke`; `cairn backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it |
-| M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
-| M4 Hooks + CLI | New | `cairn hook pre-compact` and `stop`; `cairn enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairn doctor --agent`; `cairn export project`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
-| M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairn:init`, `/cairn:status`, `cairn-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
-| M6 Import | Phase 7 | `cairn import bishop-memory --db --dry-run`; mapping per PLAN.md §5.1 minus the reviews table (verdicts become `review` events); idempotent; counts report | Dry run on a copy maps every mission, step, event, finding, directive, criterion, lesson, mistake and deliverable, or names each skip; counts match; history visible on the dashboard |
-| M7 Pilot | New | One pilot project, two developers, one operator; daily review of findings; weekly look at the dashboard with a project manager | Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone |
-| M8 Roll-out | Cut-over (§5.3) | `.cairn.toml` in every active project; operator keys to leads, viewer keys to project managers; harnesses move between tasks; bishop-memory read-only, then archived | No harness writes to bishop-memory; backups verified by a restore to a scratch server |
+| M1 Server-mode MCP | Phase 3 | `internal/mcp` over `internal/client`; `cairnbook mcp` refuses to start without a server; 13 tools plus recall and search (Scope of v1); `cairnbook init` writes `project` and `server`; `cairnbook status`, `doctor`, `export task`, `cairnbook hook session-start`; compact, paged output; MCP stdio test. `internal/api` lands here as handlers only, with no network listener in the shipped binary and no `cairnbook serve`; `internal/client` is tested against an in-process `httptest` server (D19). The directive cap and `review_by` land in M2 | An MCP stdio test drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairnbook export task` prints the result. The live Claude Code run against `cairnbook serve` on another machine is M2's exit check (#19) |
+| M2 Server | Phase 5 | `cairnbook serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or proxy, loopback default, body caps beyond the 1 MiB handler cap that M1 already applies, `/healthz`; keys with `agent`, `operator`, `viewer` scopes; `cairnbook key add/list/revoke`; `cairnbook backup` to a path; systemd unit in `docs/`; directive cap (12 per call, ranked) and `review_by` (D16) | Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairnbook serve` on another machine (#19), and `cairnbook export task` prints it |
+| M3 Web UI + dashboard | Phase 6 | Tasks, Learnings (accept, reject, supersede with note), Directives (ratify, scope, `review_by`, retire), Projects (close policy, parallel tasks); Dashboard: running now, waiting on you, quality (30 days), improving (by month), active directive count and oldest age | The operator sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action |
+| M4 Hooks + CLI | New | `cairnbook hook pre-compact` and `stop`; `cairnbook enable --agent claude-code` (OpenCode and Pi files embedded but marked experimental); `cairnbook doctor --agent`; `cairnbook export project`; `internal/cli`: `task`, `step`, `event`, `learning`, `directive`, `recall`, `search`, `prime` with `--json`; conformance suite runs through the CLI | On Claude Code a task started before `/compact` continues correctly after it with no user prompt; an agent with only bash completes and closes a task through the CLI |
+| M5 Plugin | Phase 4 | `plugins/claude-code/`, skill text with the task loop and the hook reminders, `/cairnbook:init`, `/cairnbook:status`, `cairnbook-launch`, local marketplace, `claude plugin validate` in CI, internal install guide with confirmed tool names | A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file |
+| M6 Import | Phase 7 | `cairnbook import bishop-memory --db --dry-run`; mapping per PLAN.md §5.1 minus the reviews table (verdicts become `review` events); idempotent; counts report | Dry run on a copy maps every mission, step, event, finding, directive, criterion, lesson, mistake and deliverable, or names each skip; counts match; history visible on the dashboard |
+| M7 Pilot | New | One pilot project, two developers, one operator; daily review of findings; weekly look at the dashboard with a teammate | Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a teammate can answer 'what is running' from the dashboard alone |
+| M8 Roll-out | Cut-over (§5.3) | `.cairnbook.toml` in every active project; operator keys to the people who rule on findings, viewer keys to the people who only read; harnesses move between tasks; bishop-memory read-only, then archived | No harness writes to bishop-memory; backups verified by a restore to a scratch server |
 | Later | Phases 8–10, Postgres | Scheduled review loop; per-harness plugins; public releases; Postgres store; documentation ingestion | Opened only after M8 |
 
 ### Scope of v1
@@ -164,8 +164,8 @@ needs.
 | HTTP API, API keys with `agent` / `operator` / `viewer` scopes, TLS, body caps, `/healthz` | OKF export | Bishop crew pack (bishop-harness repo) |
 | Web UI: Tasks, Learnings, Directives, Projects, Dashboard | Multi-organisation, SSO, hosting | |
 | MCP adapter (server mode) and CLI with `--json` | | |
-| Hooks: session-start, pre-compact, stop; `cairn enable --agent` | | |
-| `cairn init`, `status`, `doctor`, `key`, `backup`, `export task`, `export project` | | |
+| Hooks: session-start, pre-compact, stop; `cairnbook enable --agent` | | |
+| `cairnbook init`, `status`, `doctor`, `key`, `backup`, `export task`, `export project` | | |
 | Import from bishop-memory | | |
 
 Tool surface after the cuts: `task_current`, `task_start`, `task_get`,
@@ -183,20 +183,20 @@ v1 keep each of these cheap.
 - **Postgres store.** All SQL stays in `internal/store`; `Search(query, filters)`
   is one store function; migrations are numbered SQL per backend; timestamps
   stay ISO text. A `store/postgres` package then passes the same conformance
-  suite, and `cairn serve --db postgres://…` is the only user-visible change.
+  suite, and `cairnbook serve --db postgres://…` is the only user-visible change.
 - **Vectors and graph.** Both sit behind `Search` and `recall`; the agent tools
   do not change. pgvector for embeddings; recursive queries or a graph extension
   for links between tasks, learnings and directives.
-- **Documentation ingestion.** A `documents` table and a `cairn ingest` command.
+- **Documentation ingestion.** A `documents` table and a `cairnbook ingest` command.
   Documents are read-only knowledge, kept separate from agent-written learnings
   so the trust boundary stays clear.
 - **Scheduled review loop (Later).** Classify, process and grade as
   recommendations only, once the daily human review is routine and the
   dashboard shows the backlog is stable.
 
-## 4. What Bishop needs from Cairn
+## 4. What Bishop needs from Cairnbook
 
-Bishop's crew pack is bishop-harness's work, not this repository's. Cairn
+Bishop's crew pack is bishop-harness's work, not this repository's. Cairnbook
 must provide, by M5:
 
 - every operation Bishop's lifecycle uses: brief, plan, steps with
@@ -210,15 +210,15 @@ must provide, by M5:
 What bishop-harness then does, for the record: drop its `state/`,
 `missions/`, `findings/` and `reference/` folders, the state-continuity and
 completion-gate hooks, the reconciler wrapper and the connect script; rewrite
-its lifecycle doctrine in terms of Cairn's tools; become a plugin that
-depends on `cairn`; keep `workspace/` for scratch and QA evidence, and keep
+its lifecycle doctrine in terms of Cairnbook's tools; become a plugin that
+depends on `cairnbook`; keep `workspace/` for scratch and QA evidence, and keep
 `qa-guard.sh` as a plugin hook scoped to Ripley.
 
 ## 5. Migration from bishop-memory
 
 ### 5.1 Mapping
 
-| bishop-memory | Cairn |
+| bishop-memory | Cairnbook |
 |---|---|
 | `harnesses.name`, `missions.harness` | `projects.name`, `tasks.project` |
 | `missions` | `tasks`: id kept as it is; status `not-started`→`open`, `in-progress`→`active`, `blocked`→`blocked`, `complete`+`done`→`done`, `complete`+`failed`→`failed` |
@@ -241,7 +241,7 @@ depends on `cairn`; keep `workspace/` for scratch and QA evidence, and keep
 
 ### 5.2 Coexistence
 
-bishop-memory and the live harnesses keep running unchanged while Cairn is
+bishop-memory and the live harnesses keep running unchanged while Cairnbook is
 built. Nothing in this plan writes to bishop-memory's database or to any
 harness. The import reads a copy.
 
@@ -249,8 +249,8 @@ harness. The import reads a copy.
 
 The cut-over is milestone M8 (Roll-out). Before it:
 
-1. A new test project uses Cairn from M2, once `cairn serve` runs (D19).
-2. After M6, the history is imported into a Cairn server, and the import is
+1. A new test project uses Cairnbook from M2, once `cairnbook serve` runs (D19).
+2. After M6, the history is imported into a Cairnbook server, and the import is
    repeated (it is idempotent) until cut-over.
 
 In M8:
@@ -264,8 +264,8 @@ In M8:
 5. bishop-memory is archived when no harness writes to it.
 
 Rollback at any step: the harness goes back to its bishop-memory
-configuration. Tasks recorded in Cairn in the meantime can be exported as
-Markdown with `cairn export`.
+configuration. Tasks recorded in Cairnbook in the meantime can be exported as
+Markdown with `cairnbook export`.
 
 ## 6. Engineering rules
 
@@ -275,7 +275,7 @@ From what went well and badly in bishop-memory:
   file is a rule that a second path will miss. The conformance suite is the
   gate.
 - **No SQL in handlers.** bishop-memory's handlers carry inline SQL, and its
-  typed store was left as a placeholder. Cairn starts with the store typed.
+  typed store was left as a placeholder. Cairnbook starts with the store typed.
 - **Every tool result is read by a model.** Keep it small, paged and
   readable. Test the size of `task_current` on a large task.
 - **Tests before code for each tool**, through the conformance suite.
@@ -316,12 +316,12 @@ v1's decisions table, D19 from issue #71, D20 from issue #78 and D21 from issue
 2026-11-03 (D24 from issue #82, D25 from issue #143), and D26 from Bishop under
 the operator's veto, the same day.
 
-- **D1. Vocabulary: "task".** Bishop says mission; Cairn says task, which
+- **D1. Vocabulary: "task".** Bishop says mission; Cairnbook says task, which
   every harness understands. Bishop's doctrine can keep its word.
   *Recommended.*
-- **D2. Local mode with no daemon.** `cairn mcp` opens a local SQLite file
+- **D2. Local mode with no daemon.** `cairnbook mcp` opens a local SQLite file
   when no server is configured. The alternative is always running
-  `cairn serve`. *Recommended: local mode, because it makes the first install
+  `cairnbook serve`. *Recommended: local mode, because it makes the first install
   one step.* **Superseded by D11** (Plan v1, 2026-10-30); kept as the record.
 - **D3. One `learnings` table** for findings, patterns and agent notes, with
   a `kind`. The alternative is three tables, as in bishop-memory.
@@ -331,9 +331,9 @@ the operator's veto, the same day.
   keep their own form. *Recommended.*
 - **D5. Step positions, not step numbers.** Display numbers are computed.
   *Recommended.*
-- **D6. One binary `cairn`** with sub-commands, rather than separate server
+- **D6. One binary `cairnbook`** with sub-commands, rather than separate server
   and adapter binaries. *Recommended.*
-- **D7. The project file is `.cairn.toml`** at the project root.
+- **D7. The project file is `.cairnbook.toml`** at the project root.
   *Recommended.*
 - **D8. The review loop waits for phase 8.** Version 1 has no scheduled
   agents. *Recommended.* **Superseded by D17** (Plan v1, 2026-10-30); kept as
@@ -351,8 +351,8 @@ that is not a numbered decision here, and the table says what.
 
 **Adopted 2026-10-30 by the operator (Plan v1): D11–D18.**
 
-- **D11. Central server only.** `cairn mcp` and the CLI require a `server` in
-  `.cairn.toml` or `CAIRN_SERVER`; no local database path for clients.
+- **D11. Central server only.** `cairnbook mcp` and the CLI require a `server` in
+  `.cairnbook.toml` or `CAIRNBOOK_SERVER`; no local database path for clients.
   *Replaces D2 (local mode). Why: one place to look and back up; one backend to
   test; the first users are a team, not one developer.*
 - **D12. SQLite stays, behind `Service` and `store`.** Postgres is a second
@@ -360,22 +360,22 @@ that is not a numbered decision here, and the table says what.
   Why: already built and passing; vectors and graph are not v1.*
 - **D13. Three key scopes:** `agent` (tools), `operator` (decisions,
   ratification), `viewer` (read-only UI and dashboard). *Replaces DESIGN.md §8's
-  two agent and operator scopes plus admin. Why: leads and project managers
-  need to look without being able to change anything.*
+  two agent and operator scopes plus admin. Why: some people need to look
+  without being able to change anything.*
 - **D14. Two agent surfaces.** MCP for Claude Code; a CLI over the same HTTP API
   for every other harness. *Replaces: nothing. Why: no per-harness plugin work
   in v1; bash is enough.*
 - **D15. Hooks on `session-start`, `pre-compact` and `stop`,** installed by
-  `cairn enable --agent`. *Replaces DESIGN.md §4.1, session-start only. Why: a
+  `cairnbook enable --agent`. *Replaces DESIGN.md §4.1, session-start only. Why: a
   task loop must survive compaction.*
 - **D16. Directives returned per call are capped at 12,** ranked agent >
   project > global, then newest. Each has a `review_by` date, 90 days by
   default. *Replaces: nothing. Why: instruction-following degrades as rules pile
   up; a cap forces retirement.*
-- **D17. No scheduled review agents in v1.** The review loop moves to Later; a
-  lead reviews proposed findings daily from the UI. *Replaces D8 (already
+- **D17. No scheduled review agents in v1.** The review loop moves to Later; the
+  operator reviews proposed findings daily from the UI. *Replaces D8 (already
   deferred). Why: token cost and oversight; the UI is the loop.*
-- **D18. Repo, binary and plugin are named `cairn`.** The category line is
+- **D18. Repo, binary and plugin are named `cairn`.** Superseded by D38. The category line is
   "operating record for coding agents". *Replaces "cairn-memory". Why: "memory"
   invites the wrong comparison and hides task state and directives.*
 
@@ -384,17 +384,17 @@ that is not a numbered decision here, and the table says what.
 - **D19. M1 builds no network listener in the shipped binary.** `internal/api` lands in M1 as
   handlers only (decode, call `core`, encode). `internal/client` is tested
   against an in-process `httptest` server, bound to loopback for the life of
-  the test; the shipped binary has no listener. `cairn serve` (the listener, TLS,
-  keys and scopes) is M2, and the live Claude Code run against `cairn serve` on
+  the test; the shipped binary has no listener. `cairnbook serve` (the listener, TLS,
+  keys and scopes) is M2, and the live Claude Code run against `cairnbook serve` on
   another machine moves to M2's exit check (#19). M1's exit check is an MCP
   stdio test over that in-process server. *Replaces the M1 exit check against
-  a live `cairn serve`, which M2 builds (§10). Why: a server reachable from
+  a live `cairnbook serve`, which M2 builds (§10). Why: a server reachable from
   another machine with no keys or TLS must never exist, even briefly, so the
   shipped M1 binary has no listener.*
 
 **Adopted 2026-10-31 by the operator (issue #78): D20.**
 
-- **D20. TLS is optional in `cairn serve`.** `cairn serve` takes optional
+- **D20. TLS is optional in `cairnbook serve`.** `cairnbook serve` takes optional
   `--tls-cert` and `--tls-key`. It binds loopback by default. It refuses a
   non-loopback bind without TLS unless `--behind-proxy` is given, so a proxy
   that terminates TLS is a choice the operator makes, not a default. [DEPLOY.md](DEPLOY.md)
@@ -413,7 +413,7 @@ that is not a numbered decision here, and the table says what.
 
 **Operator decision, 2026-11-03 (issue #72): D22.**
 
-- **D22. `cairn export project` is placed in M4 Hooks + CLI.** Operator decision,
+- **D22. `cairnbook export project` is placed in M4 Hooks + CLI.** Operator decision,
   2026-11-03 (issue #72).
 
 **Operator decision, 2026-11-03: D23.**
@@ -460,7 +460,7 @@ that is not a numbered decision here, and the table says what.
   (`step/empty_ref_is_invalid`, `event/step_refs_must_name_a_step` and
   `task_get/bad_paging_refused`) stay deferred through the CLI for good. They
   pass against the local service and over HTTP (issue #198).
-- **D31. `cairn learning list` lists one project.** The CLI does not offer
+- **D31. `cairnbook learning list` lists one project.** The CLI does not offer
   `all_projects`; operators read across projects in the web UI or over MCP. The
   cases `learning/operator_decides` and `web/learning_all_projects_for_readers`
   stay deferred through the CLI for good (issue #199).
@@ -477,9 +477,9 @@ that is not a numbered decision here, and the table says what.
 
 **Operator decision, 2026-11-17: D34 to D37.**
 
-- **D34. The plugin and `cairn enable --agent claude-code` are alternatives.**
+- **D34. The plugin and `cairnbook enable --agent claude-code` are alternatives.**
   The Claude Code plugin is the recommended route for Claude Code.
-  `cairn enable --agent claude-code` checks whether the cairn plugin is enabled
+  `cairnbook enable --agent claude-code` checks whether the cairnbook plugin is enabled
   in Claude Code settings. If it is, enable says so and does not add its own
   hooks. Otherwise it behaves as §4.1 and §5 describe. The check is built and
   not released yet (issue #193).
@@ -489,14 +489,30 @@ that is not a numbered decision here, and the table says what.
   session-start block carries the active task; call `task_current` only if the
   block is missing or you need more. The M4 hand-check rule stays as written
   (issue #206).
-- **D36. The API key lives only in `~/.config/cairn/client.env` or
-  `CAIRN_API_KEY`.** The plugin's `plugin.json` has no `userConfig` `api_key` and
-  no `server`. The server comes from each project's `.cairn.toml`. DESIGN §6.1
+- **D36. The API key lives only in `~/.config/cairnbook/client.env` or
+  `CAIRNBOOK_API_KEY`.** The plugin's `plugin.json` has no `userConfig` `api_key` and
+  no `server`. The server comes from each project's `.cairnbook.toml`. DESIGN §6.1
   is amended to match.
-- **D37. `CAIRN_HOME/bin` is dropped.** `cairn-launch` looks for `cairn` on PATH,
+- **D37. `CAIRN_HOME/bin` is dropped.** `cairnbook-launch` looks for `cairnbook` on PATH,
   then in `~/.local/bin`. If it finds neither, it exits non-zero and prints the
   one-line install command. Epic #20 and issue #23 get decision comments when
   the M5 pull request is opened.
+
+**Operator decision, 2026-11-27: D38.**
+
+- **D38. The tool is named Cairnbook.** The binary, the MCP server, the Claude
+  Code plugin and its marketplace are `cairnbook`; the environment variables are
+  `CAIRNBOOK_*`; the project file is `.cairnbook.toml`; the key file is
+  `~/.config/cairnbook/client.env`; the caller headers are `X-Cairnbook-*`. The
+  old names are still read when the new ones are missing, so an install made
+  before the rename keeps working (wiki Upgrade). The repository and the Go
+  module keep `cairn-memory` until the operator renames the repository to
+  `cairnbook`. The `cairn-roadmap` and `cairn-milestone` markers keep their
+  names, since the bootstrap script finds issues and milestones by them, and so
+  does the Cairn Memory Roadmap board until the operator renames it. The
+  picture stays: a cairn is stones stacked on stones, so what came before
+  supports what comes after. *Replaces the names in D18, and answers #98 and
+  #99. Why: another project already uses the name cairn-memory.*
 
 ## 9. Project management
 
@@ -544,17 +560,20 @@ that is not a numbered decision here, and the table says what.
 - [ ] Pilot project and the two developers (M7).
 - [ ] A second operator besides the first, so that daily review does not
   depend on one person.
-- [x] Does the proxy in front of the server terminate TLS, or does `cairn serve`
-  carry certificates? **Answered 2026-10-31 (D20, #78):** both. `cairn serve`
+- [x] Does the proxy in front of the server terminate TLS, or does `cairnbook serve`
+  carry certificates? **Answered 2026-10-31 (D20, #78):** both. `cairnbook serve`
   carries optional certificates, and refuses a non-loopback bind without TLS
   unless `--behind-proxy` is given.
 - [x] Do viewers see proposed learnings, or only ratified directives?
   **Answered 2026-11-03 (D24, #82):** viewers see every page, proposed learnings
   included, read-only.
-- [ ] Keep "Cairn" as the only name, or give the tool a separate internal name?
-- [ ] Rename to `cairn` now (one PR, before M1) or after M8?
-- [x] M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move
+- [x] Keep one name, or give the tool a separate internal name? **Answered
+  2026-11-27 (D38):** one name, Cairnbook.
+- [x] Rename now (one PR, before M1) or after M8? **Answered 2026-11-27 (D38):**
+  the tool is renamed to Cairnbook before the M7 pilot. The repository and the
+  Go module follow when the operator renames the repository.
+- [x] M1's exit check runs against `cairnbook serve`, which M2 builds. Does M1 move
   `internal/client` and a serve skeleton into M1, or does it test against an
   in-process test server? **Answered 2026-10-30 (D19, #71):** M1 tests against
-  an in-process `httptest` server. M1 adds no listener to the shipped binary and no `cairn serve`. The
-  live run against `cairn serve` on another machine moves to M2's exit check (#19).
+  an in-process `httptest` server. M1 adds no listener to the shipped binary and no `cairnbook serve`. The
+  live run against `cairnbook serve` on another machine moves to M2's exit check (#19).

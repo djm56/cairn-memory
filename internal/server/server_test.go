@@ -57,7 +57,7 @@ func testLogger(w io.Writer) *slog.Logger {
 // openStore opens a new database in the test's directory.
 func openStore(t *testing.T) *store.Store {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -142,9 +142,9 @@ func send(t *testing.T, c *http.Client, method, url, body string, headers map[st
 // callHeaders returns the headers of an agent call from acme-api, with key as the bearer.
 func callHeaders(key string) map[string]string {
 	return map[string]string{
-		"X-Cairn-Project": "acme-api",
-		"X-Cairn-Agent":   "main",
-		"Authorization":   "Bearer " + key,
+		"X-Cairnbook-Project": "acme-api",
+		"X-Cairnbook-Agent":   "main",
+		"Authorization":       "Bearer " + key,
 	}
 }
 
@@ -201,7 +201,7 @@ func TestNoKeyIs401WithTheBearerChallenge(t *testing.T) {
 	st := openStore(t)
 	base := startServer(t, Handler(st, testLogger(io.Discard)), nil)
 	resp, body := send(t, client(nil), http.MethodPost, base+"/v1/agent/task_current", "",
-		map[string]string{"X-Cairn-Project": "acme-api"})
+		map[string]string{"X-Cairnbook-Project": "acme-api"})
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("no key: status %d, want 401: %s", resp.StatusCode, body)
 	}
@@ -310,8 +310,8 @@ func TestTouchFailureIsLoggedAndDoesNotRefuse(t *testing.T) {
 	h := handler(touchFails{}, NewSessionStore(st), core.NewLocal(st), testLogger(&logs), Transport{})
 	base := startServer(t, h, nil)
 	resp, body := send(t, client(nil), http.MethodPost, base+"/v1/agent/task_current", "",
-		map[string]string{"X-Cairn-Project": "acme-api", "X-Cairn-Agent": "main",
-			"Authorization": "Bearer cairn_" + strings.Repeat("A", 43)})
+		map[string]string{"X-Cairnbook-Project": "acme-api", "X-Cairnbook-Agent": "main",
+			"Authorization": "Bearer cairnbook_" + strings.Repeat("A", 43)})
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("call with a failed touch: status %d, want 200: %s", resp.StatusCode, body)
 	}
@@ -332,7 +332,7 @@ func TestRedactRemovesKeysAndBearerCredentials(t *testing.T) {
 	if strings.Contains(out, key) || strings.Contains(out, "Bearer "+key) {
 		t.Errorf("redact left a key or a bearer credential: %q", out)
 	}
-	if !strings.Contains(out, "cairn_<redacted>") || !strings.Contains(out, "Bearer <redacted>") {
+	if !strings.Contains(out, "cairnbook_<redacted>") || !strings.Contains(out, "Bearer <redacted>") {
 		t.Errorf("redact did not mark what it removed: %q", out)
 	}
 }
@@ -377,7 +377,7 @@ func selfSigned(t *testing.T, dir string) (certFile, keyFile string, certPEM []b
 	}
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "cairn serve test"},
+		Subject:      pkix.Name{CommonName: "cairnbook serve test"},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(time.Hour),
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
@@ -523,7 +523,7 @@ func TestRunPrintsTheNoKeyLineOnLoopback(t *testing.T) {
 	var out syncBuffer
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	err := Run(ctx, Options{Addr: "127.0.0.1:0", DB: filepath.Join(t.TempDir(), "cairn.db"), Log: &out})
+	err := Run(ctx, Options{Addr: "127.0.0.1:0", DB: filepath.Join(t.TempDir(), "cairnbook.db"), Log: &out})
 	if err != nil {
 		t.Fatalf("Run on loopback with no key: %v", err)
 	}
@@ -547,7 +547,7 @@ func TestRunListensAtTheCheckedAddress(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		done <- Run(ctx, Options{Addr: "localhost:0", DB: filepath.Join(t.TempDir(), "cairn.db"), Log: &logs})
+		done <- Run(ctx, Options{Addr: "localhost:0", DB: filepath.Join(t.TempDir(), "cairnbook.db"), Log: &logs})
 	}()
 
 	// The test waits for the listening line, not for a deadline: the bind rule, the store and
@@ -604,7 +604,7 @@ func TestRunListensAtTheCheckedAddress(t *testing.T) {
 func TestRunRefusesBeforeItListens(t *testing.T) {
 	dir := t.TempDir()
 	certFile, keyFile, _ := selfSigned(t, dir)
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	cases := []struct {
 		what string
 		o    Options

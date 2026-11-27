@@ -16,13 +16,13 @@ type startInput struct {
 	Steps    []core.StepInput `json:"steps"`
 }
 
-// taskStart is `cairn task start --title t --goal g [--context c] [--constraints k] [--priority p]
+// taskStart is `cairnbook task start --title t --goal g [--context c] [--constraints k] [--priority p]
 // [--queue] [--json-input] [--agent a] [--json]`: a new task, with its brief and its plan (CONTRACT
 // §2, task_start). The server refuses a blank title or goal, and a second active task unless the
 // project allows parallel tasks. The structured fields come from standard input as one JSON object
 // when --json-input is given.
 func taskStart(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn task start"
+	const verb = "cairnbook task start"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	title := fl.String("title", "", "the task's short name; - reads standard input")
@@ -92,12 +92,12 @@ type closeInput struct {
 	Deliverables []core.TaskFile         `json:"deliverables"`
 }
 
-// taskClose is `cairn task close <id> --outcome done|failed --summary s [--no-lessons-reason r]
+// taskClose is `cairnbook task close <id> --outcome done|failed --summary s [--no-lessons-reason r]
 // [--json-input] [--agent a] [--json]`: the task closed with its outcome (CONTRACT §2, task_close).
 // A refused close changes nothing, and the refusal names what is missing. The structured fields
 // come from standard input as one JSON object when --json-input is given.
 func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn task close"
+	const verb = "cairnbook task close"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	outcome := fl.String("outcome", "", "done or failed")
@@ -109,7 +109,7 @@ func taskClose(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wr
 		return code
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, verb+": name one task id: cairn task close <id> --outcome done --summary s")
+		fmt.Fprintln(stderr, verb+": name one task id: cairnbook task close <id> --outcome done --summary s")
 		return 2
 	}
 	name, ok := agentName(fl, *agent, true, verb, stderr)
@@ -155,13 +155,13 @@ type updateInput struct {
 	KeyFiles *[]core.TaskFile `json:"key_files"`
 }
 
-// taskUpdate is `cairn task update <id> [--status s] [--reason r] [--priority p] [--owner o]
+// taskUpdate is `cairnbook task update <id> [--status s] [--reason r] [--priority p] [--owner o]
 // [--next-action n] [--blockers b] [--title t] [--goal g] [--context c] [--constraints k]
 // [--json-input] [--agent a] [--json]`: the fields given change, and no others (CONTRACT §2,
 // task_update). The brief fields change only before any step starts, and the server refuses them
 // after. A move to blocked or abandoned needs --reason.
 func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn task update"
+	const verb = "cairnbook task update"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	status := fl.String("status", "", "active, blocked or abandoned; a status the task already has is refused")
@@ -180,7 +180,7 @@ func taskUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.W
 		return code
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, verb+": name one task id: cairn task update <id> --status active")
+		fmt.Fprintln(stderr, verb+": name one task id: cairnbook task update <id> --status active")
 		return 2
 	}
 	name, ok := agentName(fl, *agent, true, verb, stderr)

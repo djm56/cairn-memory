@@ -19,7 +19,7 @@ import (
 )
 
 // Session is what a command runs with: the service it calls and the caller's context,
-// which carries the project and the client name. cmd/cairn builds it from the project and
+// which carries the project and the client name. cmd/cairnbook builds it from the project and
 // the server it resolves for the working directory.
 type Session struct {
 	Svc core.Service
@@ -33,11 +33,11 @@ type Session struct {
 // pass the usage check, so a usage error needs no project and no server.
 type Opener func() (Session, error)
 
-// Task is the sub-command `cairn task`: the reads of a task, for a person or an agent with
+// Task is the sub-command `cairnbook task`: the reads of a task, for a person or an agent with
 // only a shell (issue #87). The reads are current, get and list; start is the first write,
 // and update and close follow. Each takes --json, which writes the result as one line of
 // JSON: the object the MCP tool of the same name returns, with the same field names
-// (CONTRACT §2). A write takes its agent from --agent, or from CAIRN_AGENT.
+// (CONTRACT §2). A write takes its agent from --agent, or from CAIRNBOOK_AGENT.
 //
 // The text form is a summary for a person. It prints each section the call read, folds every
 // text to one line, and leaves out what --json keeps: the task's opened, started, closed and
@@ -50,7 +50,7 @@ type Opener func() (Session, error)
 // line, in the words reason gives it; with --json it is one JSON object on stdout instead.
 func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn task: name what to do: cairn task current|get|list|start|update|close")
+		fmt.Fprintln(stderr, "cairnbook task: name what to do: cairnbook task current|get|list|start|update|close")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -68,31 +68,31 @@ func Task(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 	case "update":
 		return taskUpdate(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn task: unknown verb %q: use cairn task current|get|list|start|update|close\n", verb)
+	fmt.Fprintf(stderr, "cairnbook task: unknown verb %q: use cairnbook task current|get|list|start|update|close\n", verb)
 	return 2
 }
 
-// taskCurrent is `cairn task current [--agent name] [--json]`: the active task, its
+// taskCurrent is `cairnbook task current [--agent name] [--json]`: the active task, its
 // current step and the directives that apply. With no active task it says so and exits 0,
 // since that is an answer, not a failure.
 func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
-	fl, asJSON := newFlags("cairn task current")
+	fl, asJSON := newFlags("cairnbook task current")
 	agent := fl.String("agent", "", "the calling agent's role, such as main or reviewer; names its agent-scoped directives; left out, "+identity.EnvAgent+" is used")
 	pos, code, done := parse(fl, args, stdout, stderr)
 	if done {
 		return code
 	}
 	if len(pos) > 0 {
-		fmt.Fprintf(stderr, "cairn task current: takes no task id, got %q\n", pos)
+		fmt.Fprintf(stderr, "cairnbook task current: takes no task id, got %q\n", pos)
 		return 2
 	}
-	name, ok := agentName(fl, *agent, false, "cairn task current", stderr)
+	name, ok := agentName(fl, *agent, false, "cairnbook task current", stderr)
 	if !ok {
 		return 2
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stdout, stderr, "cairn task current", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task current", *asJSON, err)
 	}
 	ctx := s.Ctx
 	if name != "" {
@@ -100,21 +100,21 @@ func taskCurrent(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	cur, err := s.Svc.TaskCurrent(ctx)
 	if err != nil {
-		return fail(stdout, stderr, "cairn task current", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task current", *asJSON, err)
 	}
 	if *asJSON {
-		return writeJSON(stdout, stderr, "cairn task current", cur)
+		return writeJSON(stdout, stderr, "cairnbook task current", cur)
 	}
 	writeCurrent(stdout, cur)
 	return 0
 }
 
-// taskGet is `cairn task get <id> [--section s] [--limit n] [--cursor c] [--step n | --step-id id] [--json]`:
+// taskGet is `cairnbook task get <id> [--section s] [--limit n] [--cursor c] [--step n | --step-id id] [--json]`:
 // one task. Without --section every part is read; --limit and --cursor page the events, as the server counts
 // them (CONTRACT §2). The events of one step are named by its number, with --step, or by its id, with
 // --step-id, and not both (CONTRACT §1.4).
 func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
-	fl, asJSON := newFlags("cairn task get")
+	fl, asJSON := newFlags("cairnbook task get")
 	section := fl.String("section", "", "one part of the task: brief, steps, events or close; empty for all")
 	limit := fl.Int("limit", 0, "events only: the page size: 20 by default, 100 at most; leave it out for the default")
 	cursor := fl.String("cursor", "", "events only: the next value from the last page")
@@ -124,28 +124,28 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	if done {
 		return code
 	}
-	if limitUsage(fl, "cairn task get", *limit, stderr) {
+	if limitUsage(fl, "cairnbook task get", *limit, stderr) {
 		return 2
 	}
 	if given(fl, "step") && *step < 1 {
-		fmt.Fprintln(stderr, "cairn task get: --step must be a step number, 1 or more; leave it out for every step")
+		fmt.Fprintln(stderr, "cairnbook task get: --step must be a step number, 1 or more; leave it out for every step")
 		return 2
 	}
 	if given(fl, "step-id") && *stepID < 1 {
-		fmt.Fprintln(stderr, "cairn task get: --step-id must be a step id, 1 or more; leave it out for every step")
+		fmt.Fprintln(stderr, "cairnbook task get: --step-id must be a step id, 1 or more; leave it out for every step")
 		return 2
 	}
 	if given(fl, "step") && given(fl, "step-id") {
-		fmt.Fprintln(stderr, "cairn task get: give the step by --step or by --step-id, not both")
+		fmt.Fprintln(stderr, "cairnbook task get: give the step by --step or by --step-id, not both")
 		return 2
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, "cairn task get: name one task id: cairn task get <id>")
+		fmt.Fprintln(stderr, "cairnbook task get: name one task id: cairnbook task get <id>")
 		return 2
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stdout, stderr, "cairn task get", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task get", *asJSON, err)
 	}
 	req := core.TaskGetRequest{ID: pos[0], Section: core.TaskSection(*section), Limit: *limit, Cursor: *cursor}
 	if given(fl, "step") {
@@ -158,19 +158,19 @@ func taskGet(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	d, err := s.Svc.TaskGet(s.Ctx, req)
 	if err != nil {
-		return fail(stdout, stderr, "cairn task get", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task get", *asJSON, err)
 	}
 	if *asJSON {
-		return writeJSON(stdout, stderr, "cairn task get", d)
+		return writeJSON(stdout, stderr, "cairnbook task get", d)
 	}
 	writeDetail(stdout, d)
 	return 0
 }
 
-// taskList is `cairn task list [--status s]... [--limit n] [--cursor c] [--json]`: the
+// taskList is `cairnbook task list [--status s]... [--limit n] [--cursor c] [--json]`: the
 // project's tasks, most recently updated first. --status may be given more than once.
 func taskList(open Opener, args []string, stdout, stderr io.Writer) int {
-	fl, asJSON := newFlags("cairn task list")
+	fl, asJSON := newFlags("cairnbook task list")
 	var statuses statusFlag
 	fl.Var(&statuses, "status", "a status to list: open, active, blocked, done, failed or abandoned; repeat for more; leave it out to list all")
 	limit := fl.Int("limit", 0, "the page size: 20 by default, 100 at most; leave it out for the default")
@@ -179,23 +179,23 @@ func taskList(open Opener, args []string, stdout, stderr io.Writer) int {
 	if done {
 		return code
 	}
-	if limitUsage(fl, "cairn task list", *limit, stderr) {
+	if limitUsage(fl, "cairnbook task list", *limit, stderr) {
 		return 2
 	}
 	if len(pos) > 0 {
-		fmt.Fprintf(stderr, "cairn task list: takes no task id, got %q\n", pos)
+		fmt.Fprintf(stderr, "cairnbook task list: takes no task id, got %q\n", pos)
 		return 2
 	}
 	s, err := open()
 	if err != nil {
-		return fail(stdout, stderr, "cairn task list", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task list", *asJSON, err)
 	}
 	list, err := s.Svc.TaskList(s.Ctx, core.TaskListRequest{Status: statuses, Limit: *limit, Cursor: *cursor})
 	if err != nil {
-		return fail(stdout, stderr, "cairn task list", *asJSON, err)
+		return fail(stdout, stderr, "cairnbook task list", *asJSON, err)
 	}
 	if *asJSON {
-		return writeJSON(stdout, stderr, "cairn task list", list)
+		return writeJSON(stdout, stderr, "cairnbook task list", list)
 	}
 	writeList(stdout, list)
 	return 0
@@ -216,7 +216,7 @@ func newFlags(name string) (*flag.FlagSet, *bool) {
 // are sorted here, into flags with their values and positionals, and the flags are parsed once.
 // done is true when the command should stop now: the flags were asked for with -h (code 0, their
 // list on stdout) or one was wrong (code 2, with the cause on stderr). Every verb reads its flags here, so
-// the check every verb makes of CAIRN_AGENT (checkEnvAgent) is made here too, reads included: a name the
+// the check every verb makes of CAIRNBOOK_AGENT (checkEnvAgent) is made here too, reads included: a name the
 // wire form refuses is a usage error, before the project is opened.
 func parse(fl *flag.FlagSet, args []string, stdout, stderr io.Writer) (pos []string, code int, done bool) {
 	var flagArgs []string

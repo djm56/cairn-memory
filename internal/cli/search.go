@@ -7,7 +7,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// Search is `cairn search`: a full-text search of the rows a project keeps, for a person or an agent
+// Search is `cairnbook search`: a full-text search of the rows a project keeps, for a person or an agent
 // with only a shell (issue #87). It is the search call of CONTRACT §6 and takes no verb. --query is the
 // text to find, as plain words that no operator reads as syntax, and --query - reads it from standard
 // input. --kind narrows the search to one kind and may be given more than once; left out, every kind
@@ -27,7 +27,7 @@ import (
 // Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call failed
 // (ExitCodeFor), 2 for a usage error.
 func Search(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn search"
+	const verb = "cairnbook search"
 	fl, asJSON := newFlags(verb)
 	query := fl.String("query", "", "the text to find: plain words, which no operator reads as syntax; - reads standard input")
 	kinds := listFlag[core.HitKind]{name: "kind"}
@@ -47,12 +47,12 @@ func Search(open Opener, args []string, stdin io.Reader, stdout, stderr io.Write
 		return 2
 	}
 	if !given(fl, "query") {
-		fmt.Fprintf(stderr, "%s: --query is required: cairn search --query \"plain words\"\n", verb)
+		fmt.Fprintf(stderr, "%s: --query is required: cairnbook search --query \"plain words\"\n", verb)
 		return 2
 	}
 	for _, k := range kinds.vals {
 		if !validSearchKind(k) {
-			fmt.Fprintf(stderr, "%s: --kind must be task, event, learning, directive, note, lesson or mistake, not %q: cairn search --query text --kind lesson\n", verb, k)
+			fmt.Fprintf(stderr, "%s: --kind must be task, event, learning, directive, note, lesson or mistake, not %q: cairnbook search --query text --kind lesson\n", verb, k)
 			return 2
 		}
 	}

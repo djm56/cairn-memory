@@ -14,9 +14,9 @@ import (
 
 // KeyCaller returns the CallerFunc of a server that checks API keys (DESIGN.md
 // §5.4, §8). The key in the Authorization header gives the role, by its scope:
-// agent, operator or viewer. X-Cairn-Role is not read here, so a client cannot
+// agent, operator or viewer. X-Cairnbook-Role is not read here, so a client cannot
 // claim a role the key does not carry (issue #110). The project, agent, session
-// and client still come from the X-Cairn-* headers, as they do for every caller.
+// and client still come from the X-Cairnbook-* headers, as they do for every caller.
 //
 // A missing, malformed, unknown or revoked key is a core.Error of kind
 // KindUnauthenticated, answered 401. A failure of the lookup is returned as it
@@ -35,10 +35,10 @@ func KeyCaller(res *auth.Resolver) CallerFunc {
 			return core.Caller{}, err
 		}
 		return core.Caller{
-			Project: r.Header.Get(HeaderProject),
-			Agent:   r.Header.Get(HeaderAgent),
-			Session: r.Header.Get(HeaderSession),
-			Client:  r.Header.Get(HeaderClient),
+			Project: callerHeader(r, HeaderProject),
+			Agent:   callerHeader(r, HeaderAgent),
+			Session: callerHeader(r, HeaderSession),
+			Client:  callerHeader(r, HeaderClient),
 			Role:    role,
 		}, nil
 	}

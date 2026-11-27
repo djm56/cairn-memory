@@ -1,4 +1,4 @@
-// Package mcp is the MCP tool surface of Cairn (DESIGN.md §4): 13 tools plus the
+// Package mcp is the MCP tool surface of Cairnbook (DESIGN.md §4): 13 tools plus the
 // read tools recall and search, each one call of a core.Service. The package
 // holds no rules. It maps each tool's arguments to one request type, and each
 // result or error back, as CONTRACT §1 asks of the adapter. The Service it is
@@ -37,7 +37,7 @@ import (
 )
 
 // Name is the name the server gives itself to MCP clients.
-const Name = "cairn"
+const Name = "cairnbook"
 
 // diagnostics receives what the adapter tells the operator and not the model: the
 // stack of a panic in a tool. It is stderr, since stdout carries
@@ -54,14 +54,14 @@ type Project struct {
 	Err error
 }
 
-// Server is an MCP server with the Cairn tools registered. Build one with New,
+// Server is an MCP server with the Cairnbook tools registered. Build one with New,
 // then run it on a transport.
 type Server struct {
 	srv     *mcp.Server
 	project Project
 }
 
-// New returns the Cairn MCP server over svc, in project. version is the version
+// New returns the Cairnbook MCP server over svc, in project. version is the version
 // the server reports to clients. Every tool is registered before New returns.
 func New(svc core.Service, project Project, version string) *Server {
 	s := &Server{
@@ -104,7 +104,7 @@ func addTool[In any](s *Server, name, description string, write bool, fn func(ct
 			if p := recover(); p != nil {
 				// The model gets the cause. The stack goes to diagnostics, for the
 				// operator, since the model cannot act on it.
-				fmt.Fprintf(diagnostics, "cairn mcp: the %s tool panicked: %v\n%s", name, p, debug.Stack())
+				fmt.Fprintf(diagnostics, "cairnbook mcp: the %s tool panicked: %v\n%s", name, p, debug.Stack())
 				res, err = failure(fmt.Errorf("the tool failed: %v", p)), nil
 			}
 		}()

@@ -17,7 +17,7 @@ import (
 // check runs before the database is opened, as add's does.
 func TestRevokeKeyRefusesAKeyPastedAsAName(t *testing.T) {
 	ctx := context.Background()
-	db := filepath.Join(t.TempDir(), "cairn.db")
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(ctx, db, "ci", auth.ScopeAgent); err != nil {
 		t.Fatalf("AddKey ci: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestRevokeKeyRefusesAKeyPastedAsAName(t *testing.T) {
 	}
 
 	err = RevokeKey(ctx, db, pasted)
-	if err == nil || !strings.Contains(err.Error(), "must not begin with cairn_") {
+	if err == nil || !strings.Contains(err.Error(), "must not begin with cairnbook_") {
 		t.Fatalf("RevokeKey with a key as the name = %v, want the name rule", err)
 	}
 	if strings.Contains(err.Error(), pasted) {
@@ -47,7 +47,7 @@ func TestRevokeKeyRefusesAKeyPastedAsAName(t *testing.T) {
 // TestRevokeKeyRefusesABadNameBeforeTheLookup checks that a name the rule refuses is refused as a
 // name, not as a missing key, whatever the database holds: the lookup never runs.
 func TestRevokeKeyRefusesABadNameBeforeTheLookup(t *testing.T) {
-	db := filepath.Join(t.TempDir(), "cairn.db")
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(context.Background(), db, "ci", auth.ScopeAgent); err != nil {
 		t.Fatalf("AddKey: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestRevokeKeyRefusesABadNameBeforeTheLookup(t *testing.T) {
 func TestDanglingLinkAtTheDatabaseIsRefused(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "elsewhere.db")
-	link := filepath.Join(dir, "cairn.db")
+	link := filepath.Join(dir, "cairnbook.db")
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatalf("symlink: %v", err)
 	}

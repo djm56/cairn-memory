@@ -73,7 +73,7 @@ func errorBody(t *testing.T, rec *httptest.ResponseRecorder) *core.Error {
 // openLocal returns a Service over a new database, for the calls that need one.
 func openLocal(t *testing.T) *core.Local {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestMissingTaskIsNotFound(t *testing.T) {
 	}
 }
 
-// TestHeadersCarryTheCaller checks that the Cairn headers become the caller of
+// TestHeadersCarryTheCaller checks that the Cairnbook headers become the caller of
 // the call, and that a call with no role header is an agent.
 func TestHeadersCarryTheCaller(t *testing.T) {
 	f := &fake{}
@@ -307,8 +307,8 @@ func TestMissingProjectNamesInit(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", rec.Code)
 	}
-	if got := errorBody(t, rec); got.Kind != core.KindInvalid || !strings.Contains(got.Message, "cairn init") {
-		t.Errorf("body = %+v, want invalid and a message that names cairn init", got)
+	if got := errorBody(t, rec); got.Kind != core.KindInvalid || !strings.Contains(got.Message, "cairnbook init") {
+		t.Errorf("body = %+v, want invalid and a message that names cairnbook init", got)
 	}
 }
 

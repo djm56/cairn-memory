@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-docs.sh — documentation checks for Cairn (CONTRIBUTING.md).
+# check-docs.sh — documentation checks for Cairnbook (CONTRIBUTING.md).
 #
 # Milestone markers: README.md and docs/PLAN.md must each carry exactly one
 # <!-- cairn-milestone: M --> marker, M the current milestone (M1 to M8, or

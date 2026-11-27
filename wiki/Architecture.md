@@ -8,13 +8,13 @@ This page summarises [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main
 
 ## One binary
 
-`cairn` is the only binary. It serves as the MCP server, the HTTP server with the web UI, the hook helper and the admin tool. It is written in Go, uses SQLite with full-text search, and needs no C toolchain.
+`cairnbook` is the only binary. It serves as the MCP server, the HTTP server with the web UI, the hook helper and the admin tool. It is written in Go, uses SQLite with full-text search, and needs no C toolchain.
 
 _Design: [DESIGN.md §1.1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#11-principles)._
 
 ## One server
 
-Clients open no database. `cairn mcp` and the CLI send each call over HTTP to `cairn serve`, with an API key. One server suits a home server, a team, or several machines (decision D11). `cairn mcp` refuses to start without a `server` in `.cairn.toml` or `CAIRN_SERVER` (M1).
+Clients open no database. `cairnbook mcp` and the CLI send each call over HTTP to `cairnbook serve`, with an API key. One server suits a home server, a team, or several machines (decision D11). `cairnbook mcp` refuses to start without a `server` in `.cairnbook.toml` or `CAIRNBOOK_SERVER` (M1).
 
 The local database path that decision D2 designed was cut before it was built.
 
@@ -22,17 +22,17 @@ _Design: [DESIGN.md §5.3](https://github.com/djm56/cairn-memory/blob/main/docs/
 
 ## Layers
 
-An MCP client talks to `cairn mcp` over stdio. The adapter calls the `Service` interface through `internal/client`, which sends each call over HTTP to `cairn serve`. `cairn serve` calls core, and core writes to the store. The packages:
+An MCP client talks to `cairnbook mcp` over stdio. The adapter calls the `Service` interface through `internal/client`, which sends each call over HTTP to `cairnbook serve`. `cairnbook serve` calls core, and core writes to the store. The packages:
 
 - `internal/core`: the `Service` interface and every rule, including the close policy, status moves and operator-only changes.
 - `internal/store`: SQLite access, migrations and full-text search. It is the only package with SQL.
 - `internal/api`: HTTP handlers. They decode the request, call core and encode the result.
-- `internal/client`: a `Service` over HTTP, the way every client reaches `cairn serve`.
+- `internal/client`: a `Service` over HTTP, the way every client reaches `cairnbook serve`.
 - `internal/mcp`: the MCP tools. Each one calls `Service` through `internal/client`.
 - `internal/identity`: finds the project, agent and session for a call.
 - `internal/auth`: API keys and scopes in server mode.
 - `internal/ui`: the web pages, embedded in the binary.
-- `cmd/cairn`: the one binary and its sub-commands.
+- `cmd/cairnbook`: the one binary and its sub-commands.
 
 `internal/conformance` holds the test suite that checks any `Service`. It is covered below.
 
@@ -60,13 +60,13 @@ _Design: [DESIGN.md §5.1](https://github.com/djm56/cairn-memory/blob/main/docs/
 
 ## Clients
 
-Claude Code comes first, as a plugin in M5. Other clients use the CLI over the same HTTP API, built in M4. Any MCP client can run `cairn mcp` over stdio, against a server. Bishop will become a crew pack in its own repository.
+Claude Code comes first, as a plugin in M5. Other clients use the CLI over the same HTTP API, built in M4. Any MCP client can run `cairnbook mcp` over stdio, against a server. Bishop will become a crew pack in its own repository.
 
 _Design: [DESIGN.md §6](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#6-clients)._
 
 ## Security
 
-Clients open no database and listen on nothing. `cairn serve` binds to loopback by default. It refuses any other address unless the address has TLS files or sits behind a proxy (`--behind-proxy`), and unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes. The setup is in [Install-Server](Install-Server), and the rules for keys are in [Operations](Operations).
+Clients open no database and listen on nothing. `cairnbook serve` binds to loopback by default. It refuses any other address unless the address has TLS files or sits behind a proxy (`--behind-proxy`), and unless at least one API key exists. Keys are stored hashed. An agent key cannot reach operator routes. The setup is in [Install-Server](Install-Server), and the rules for keys are in [Operations](Operations).
 
 _Design: [DESIGN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#8-security)._
 

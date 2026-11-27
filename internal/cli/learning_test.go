@@ -136,7 +136,7 @@ func TestLearningAddRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeLearning{err: core.NotFound("task task-20261105-99 not found")}
 	code, out, errOut, _ := learningRun(svc, strings.NewReader(""),
 		"add", "--kind", "finding", "--title", "t", "--body", "b", "--task-id", "task-20261105-99", "--agent", "hicks")
-	if code != 4 || out != "" || errOut != "cairn learning add: task task-20261105-99 not found\n" {
+	if code != 4 || out != "" || errOut != "cairnbook learning add: task task-20261105-99 not found\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 4 (not_found) with the refusal on stderr", code, out, errOut)
 	}
 }
@@ -294,7 +294,7 @@ func TestLearningListEmptyJSON(t *testing.T) {
 func TestLearningListRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeLearning{err: core.Invalid("the limit is over the page size")}
 	code, out, errOut, _ := learningRun(svc, strings.NewReader(""), "list")
-	if code != 3 || out != "" || errOut != "cairn learning list: the limit is over the page size\n" {
+	if code != 3 || out != "" || errOut != "cairnbook learning list: the limit is over the page size\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 3 (invalid) with the refusal on stderr", code, out, errOut)
 	}
 }
@@ -330,7 +330,7 @@ func TestLearningListUsageErrors(t *testing.T) {
 // that names the verbs.
 func TestLearningVerbsNeedAVerb(t *testing.T) {
 	svc := &fakeLearning{}
-	if code, _, errOut, opened := learningRun(svc, strings.NewReader("")); code != 2 || !strings.Contains(errOut, "cairn learning add|list") || opened != 0 {
+	if code, _, errOut, opened := learningRun(svc, strings.NewReader("")); code != 2 || !strings.Contains(errOut, "cairnbook learning add|list") || opened != 0 {
 		t.Errorf("no verb: exit %d, stderr %q; want a usage error naming add|list", code, errOut)
 	}
 	if code, _, errOut, opened := learningRun(svc, strings.NewReader(""), "remove"); code != 2 || !strings.Contains(errOut, `unknown verb "remove"`) || opened != 0 {

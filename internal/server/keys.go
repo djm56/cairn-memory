@@ -12,7 +12,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// KeyInfo is one API key as cairn key list prints it. It carries no hash and no
+// KeyInfo is one API key as cairnbook key list prints it. It carries no hash and no
 // plaintext: the hash is only for the lookup on a call, and the plaintext exists only
 // in the output of AddKey (DESIGN §8).
 type KeyInfo struct {
@@ -79,7 +79,7 @@ func AddKey(ctx context.Context, db, name string, scope auth.Scope) (string, err
 // lookup, so the two cannot disagree about what a name is.
 func checkKeyName(name string) error {
 	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) {
-		return errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairn_")
+		return errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairnbook_")
 	}
 	return nil
 }

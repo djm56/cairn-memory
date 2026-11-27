@@ -15,7 +15,7 @@ import (
 var startFreshText = []string{
 	"To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own",
 	"mkdir -p -- /path/to/folder && mv -- ",
-	"Then start cairn serve again. Nothing is deleted.",
+	"Then start cairnbook serve again. Nothing is deleted.",
 }
 
 // TestRefusalsTellTheOperatorHowToStartFresh pins the text in both refusals over pre-restore
@@ -23,7 +23,7 @@ var startFreshText = []string{
 // names every file it found, quoted, in the mv command.
 func TestRefusalsTellTheOperatorHowToStartFresh(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "cairn.db")
+	path := filepath.Join(dir, "cairnbook.db")
 	oldMain := path + ".pre-restore-20261030T090000Z"
 	newMain := path + ".pre-restore-20261031T101112Z"
 	for _, name := range []string{oldMain, newMain} {
@@ -48,7 +48,7 @@ func TestRefusalsTellTheOperatorHowToStartFresh(t *testing.T) {
 
 	// Only strays: the same text, and the mv goes to a folder, never to the database path.
 	strayDir := t.TempDir()
-	strayPath := filepath.Join(strayDir, "cairn.db")
+	strayPath := filepath.Join(strayDir, "cairnbook.db")
 	stray := strayPath + ".pre-restore-20261031T101112Z-wal"
 	if err := os.WriteFile(stray, []byte("kept"), 0o600); err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestRefusalsTellTheOperatorHowToStartFresh(t *testing.T) {
 // folder error, which wraps fs.ErrNotExist and does not talk of an interrupted restore. The key
 // command goes through openDatabase, which is where the operator sees it.
 func TestRefusalForAMissingFolderIsNotAnInterruptedRestore(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "no-such-folder", "cairn.db")
+	path := filepath.Join(t.TempDir(), "no-such-folder", "cairnbook.db")
 	err := refuseNewOverRestore(path)
 	if err == nil || !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("refuseNewOverRestore in a missing folder: err = %v, want the plain not-exist error", err)
@@ -90,7 +90,7 @@ func TestRefusalForAMissingFolderIsNotAnInterruptedRestore(t *testing.T) {
 // is not named as the database to recover.
 func TestRefusalNamesTheNewestOfTwoStamps(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "cairn.db")
+	path := filepath.Join(dir, "cairnbook.db")
 	oldMain := path + ".pre-restore-20261030T090000Z"
 	newMain := path + ".pre-restore-20261031T101112Z"
 	for _, name := range []string{oldMain, oldMain + "-shm", newMain} {
@@ -129,7 +129,7 @@ func TestRefusalNamesTheNewestOfTwoStamps(t *testing.T) {
 // stamp that has a main file, never the -wal, and its mv command puts a main file at the path.
 func TestRefusalSkipsAStraysOnlyNewestStamp(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "cairn.db")
+	path := filepath.Join(dir, "cairnbook.db")
 	oldMain := path + ".pre-restore-20261030T090000Z"
 	newStray := path + ".pre-restore-20261031T101112Z"
 	for _, name := range []string{oldMain, newStray + "-wal", newStray + "-shm"} {
@@ -160,7 +160,7 @@ func TestRefusalSkipsAStraysOnlyNewestStamp(t *testing.T) {
 // stamp beside the path, the refusal still stops the server but prints no mv command.
 func TestRefusalOffersNoMvWhenOnlyStraysRemain(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "cairn.db")
+	path := filepath.Join(dir, "cairnbook.db")
 	stray := path + ".pre-restore-20261031T101112Z-wal"
 	if err := os.WriteFile(stray, []byte("kept"), 0o600); err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-# Cairn Memory — Contract
+# Cairnbook — Contract
 
 **Status as of 2026-11-07.** Items 1–11 of §9 are operator-approved (2026-10-28,
 phase 1 exit). Item 12 is deferred by the operator. Item 39 is adopted as D32
@@ -39,7 +39,7 @@ Every call runs as a **caller**: project, agent, optional session and
 client, and a role. The adapter sets it; request types do not carry it.
 
 - **Project.** Required for every agent call, reads included. Absent →
-  `invalid`, with a message that names `cairn init`. A name is lowercase
+  `invalid`, with a message that names `cairnbook init`. A name is lowercase
   letters and digits in hyphen-separated groups, at most 64 characters
   (`acme-api`). A project row is created on its first call. Each write call
   moves the project's `last_seen_at` on to the server's time. A read does not,
@@ -61,7 +61,7 @@ client, and a role. The adapter sets it; request types do not carry it.
   request: `viewer` reads and does not write (§1.2, `read_only`). Operator calls
   (§8) refuse any other role.
   *M1 exception, replaced (2026-10-30; replaced 2026-10-31):* M1's
-  `api.UnauthenticatedHeaderCaller` took the role from the `X-Cairn-Role` header,
+  `api.UnauthenticatedHeaderCaller` took the role from the `X-Cairnbook-Role` header,
   safe only while no listener existed (D19). The key-scope resolver
   (`api.KeyCaller`) replaces it for every served call. The reach guard keeps the
   header caller out of non-test code (DESIGN §5.4).
@@ -256,7 +256,7 @@ A refused close changes nothing. Supply the missing items and call again.
 steps are still `pending`. Only an `active` step blocks it, whatever the outcome (`active_steps`, from
 `closeMissing` in `internal/core/local_close.go`, under the `require_no_active_steps`
 switch). A close over pending steps is recorded as such: the steps keep their
-`pending` status, and the close event reads `Closed as done` or `Closed as failed`. `cairn export task` prints
+`pending` status, and the close event reads `Closed as done` or `Closed as failed`. `cairnbook export task` prints
 every step with its status, so the open plan items show in the export.
 
 ## 3. Step tools
@@ -751,7 +751,7 @@ only a core test checks it. An item with no check of its own is marked
     (DESIGN §5.4). *Bishop default, pending operator approval.* (api and client
     tests only)
 43. **The key names the role (2026-10-31).** The role comes from the API key's
-    scope, and `X-Cairn-Role` is not read (DESIGN §5.4, issue #110). A key that
+    scope, and `X-Cairnbook-Role` is not read (DESIGN §5.4, issue #110). A key that
     is missing, malformed, unknown or revoked is `401`, kind `unauthenticated`,
     and the answer does not echo the header (§1.2). *Bishop default, pending
     operator approval.* (api test only)

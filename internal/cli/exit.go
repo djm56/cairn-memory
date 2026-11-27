@@ -51,7 +51,7 @@ func ExitCodeFor(k core.Kind) int {
 	return ExitFailure
 }
 
-// ExitCodeHelp is the table of exit codes that cairn --help prints. It is the package comment's table in
+// ExitCodeHelp is the table of exit codes that cairnbook --help prints. It is the package comment's table in
 // words, so the help and the code cannot drift apart while the codes are written in one place each.
 const ExitCodeHelp = `Exit codes for task, step, event, learning, directive, recall, search and prime:
   0  success

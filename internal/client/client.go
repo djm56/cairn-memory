@@ -1,4 +1,4 @@
-// Package client is a core.Service that sends each call to a Cairn server over
+// Package client is a core.Service that sends each call to a Cairnbook server over
 // HTTP, in the wire form of internal/api (DESIGN.md §5.4). It holds no rules.
 // The server applies them, and an error comes back as the core.Error the
 // server returned, with the same kind, message and missing list.
@@ -65,7 +65,7 @@ func NewWithKey(base, key string, hc *http.Client) (*Client, error) {
 		return nil, fmt.Errorf("client: base %s is not an http or https URL with a host", DisplayURL(base))
 	}
 	if strings.ContainsFunc(key, func(r rune) bool { return r <= ' ' || r > '~' }) {
-		return nil, errors.New("client: the API key holds a character a request header cannot carry: check CAIRN_API_KEY or the client.env file for a space or a line break")
+		return nil, errors.New("client: the API key holds a character a request header cannot carry: check CAIRNBOOK_API_KEY or the client.env file for a space or a line break")
 	}
 	return &Client{base: strings.TrimRight(base, "/"), key: key, hc: keyedClient(hc)}, nil
 }
@@ -256,7 +256,7 @@ func (c *Client) Dashboard(ctx context.Context) (*core.Dashboard, error) {
 }
 
 // post sends one call: req as the JSON body of route, with the caller that ctx
-// carries in the Cairn headers. It returns the result the server answers with,
+// carries in the Cairnbook headers. It returns the result the server answers with,
 // or the error the call failed with.
 func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res, error) {
 	body, err := json.Marshal(req)
@@ -302,7 +302,7 @@ func post[Res any](ctx context.Context, c *Client, route string, req any) (*Res,
 	return &out, nil
 }
 
-// setCaller writes the caller that ctx carries into h, as the Cairn headers. A
+// setCaller writes the caller that ctx carries into h, as the Cairnbook headers. A
 // field the caller leaves empty is not sent, so the server sees it as absent. A
 // context with no caller sends no headers, and the server then finds no project.
 // A name the headers cannot carry unchanged is refused here, with core's message
@@ -348,19 +348,19 @@ func (e *ServerError) Unwrap() error { return e.Err }
 // answer names the base URL the client was given, since a mis-set base is the
 // usual cause. So does a 404 whose body is not the wire form, such as a reverse
 // proxy's page, which is the same fault. The 404 message says the body was not a
-// cairn answer. Anything else, such as an internal failure, is a plain error that
+// cairnbook answer. Anything else, such as an internal failure, is a plain error that
 // names the route and the status, and is not a core.Error. A redirect is refused
 // with its own message, and its Location is not printed.
 func failure(base, route string, resp *http.Response) error {
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		// The redirect is not followed, and its Location is not printed: it may carry what the
-		// server should not show. A Cairn server does not redirect a call.
+		// server should not show. A Cairnbook server does not redirect a call.
 		return fmt.Errorf("client: %s: the server answered HTTP %d with a redirect, which a call does not follow: check the server URL", route, resp.StatusCode)
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
 		// The server answers 401 for a key that is missing, malformed, unknown or revoked, and
 		// says nothing finer, so the message says only that. It names no key.
-		return fmt.Errorf("client: %s: the server refused the API key: check CAIRN_API_KEY or the client.env file", route)
+		return fmt.Errorf("client: %s: the server refused the API key: check CAIRNBOOK_API_KEY or the client.env file", route)
 	}
 	var body api.ErrorBody
 	if err := json.NewDecoder(io.LimitReader(resp.Body, api.MaxBodyBytes)).Decode(&body); err == nil && body.Error != nil {
@@ -376,8 +376,8 @@ func failure(base, route string, resp *http.Response) error {
 	if resp.StatusCode == http.StatusNotFound {
 		// A 404 that is not the wire form is usually another server's page, such as a reverse
 		// proxy's, so the base URL is the likely fault (#121). It names the base URL the client
-		// was given, as the no_route answer does, and says the body was not a cairn answer.
-		return fmt.Errorf("client: %s: the server answered HTTP 404 with a body that is not a cairn answer: check the server base URL, which the client was given as %s", route, DisplayURL(base))
+		// was given, as the no_route answer does, and says the body was not a cairnbook answer.
+		return fmt.Errorf("client: %s: the server answered HTTP 404 with a body that is not a cairnbook answer: check the server base URL, which the client was given as %s", route, DisplayURL(base))
 	}
 	return fmt.Errorf("client: %s: the server answered HTTP %d", route, resp.StatusCode)
 }

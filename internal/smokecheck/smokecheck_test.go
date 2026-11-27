@@ -1,5 +1,5 @@
 // Package smokecheck tests scripts/smoke-check.sh. The script is run by bash against a stub
-// cairn binary and a stub server on the loopback address, so the tests need no network and no
+// cairnbook binary and a stub server on the loopback address, so the tests need no network and no
 // install. The stub server records every call it gets, so a test can show the script calls only
 // the read endpoints it names.
 package smokecheck
@@ -22,20 +22,20 @@ import (
 // scriptPath is the script under test, relative to this package.
 const scriptPath = "../../scripts/smoke-check.sh"
 
-// testKey is the key the stub server accepts. Its shape is a Cairn key's, so the script
+// testKey is the key the stub server accepts. Its shape is a Cairnbook key's, so the script
 // sends it. It is never expected in the script's output.
-const testKey = "cairn_test_key_0123456789"
+const testKey = "cairnbook_test_key_0123456789"
 
-// stubBinary stands in for cairn. It prints a version, lists doctor in help, runs doctor with
-// exit 0, and answers cairn mcp with the initialize and tools/list replies.
+// stubBinary stands in for cairnbook. It prints a version, lists doctor in help, runs doctor with
+// exit 0, and answers cairnbook mcp with the initialize and tools/list replies.
 const stubBinary = `#!/usr/bin/env bash
 case "$1" in
-  version) echo "cairn test" ;;
+  version) echo "cairnbook test" ;;
   help) printf 'Commands:\n  doctor     Check the project file\n' ;;
-  doctor) echo "binary   ok    cairn test"; exit 0 ;;
+  doctor) echo "binary   ok    cairnbook test"; exit 0 ;;
   mcp)
     cat > /dev/null
-    echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","serverInfo":{"name":"cairn","version":"test"}}}'
+    echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","serverInfo":{"name":"cairnbook","version":"test"}}}'
     echo '{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}'
     ;;
   *) echo "unexpected: $*" >&2; exit 2 ;;
@@ -48,7 +48,7 @@ var readEndpoints = map[string]bool{
 	"POST /v1/agent/task_current": true,
 }
 
-// stubServer is a Cairn server stand-in. It answers the health probe, refuses a call with no
+// stubServer is a Cairnbook server stand-in. It answers the health probe, refuses a call with no
 // key, accepts testKey with the answer of a call that names no project, and refuses any other
 // key. It records each call as "METHOD path".
 type stubServer struct {
@@ -103,7 +103,7 @@ func setup(t *testing.T) (binPath string, stub *stubServer, srv *httptest.Server
 	if _, err := exec.LookPath("curl"); err != nil {
 		t.Skip("curl is not on PATH, so the server checks cannot run")
 	}
-	binPath = filepath.Join(t.TempDir(), "cairn")
+	binPath = filepath.Join(t.TempDir(), "cairnbook")
 	if err := os.WriteFile(binPath, []byte(stubBinary), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func setup(t *testing.T) (binPath string, stub *stubServer, srv *httptest.Server
 
 // runScript runs the script with args and env, and returns its output and exit code. env holds
 // KEY=value pairs; PATH and HOME are set for the run, and no other variable from the test process
-// reaches the script, so CAIRN_API_KEY and CAIRN_SERVER are only what a test sets.
+// reaches the script, so CAIRNBOOK_API_KEY and CAIRNBOOK_SERVER are only what a test sets.
 func runScript(t *testing.T, env []string, args ...string) (string, int) {
 	t.Helper()
 	bash, err := exec.LookPath("bash")
@@ -145,7 +145,7 @@ func hasStatus(out, status, check string) bool {
 // the key is never printed, and the server saw only the two read endpoints.
 func TestSmokeCheckPassesAgainstAGoodInstall(t *testing.T) {
 	bin, stub, srv := setup(t)
-	out, code := runScript(t, []string{"CAIRN_API_KEY=" + testKey}, "--bin", bin, "--server", srv.URL)
+	out, code := runScript(t, []string{"CAIRNBOOK_API_KEY=" + testKey}, "--bin", bin, "--server", srv.URL)
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0\n%s", code, out)
 	}
@@ -181,7 +181,7 @@ func TestSmokeCheckFailsWhenTheServerIsDown(t *testing.T) {
 	bin, _, srv := setup(t)
 	url := srv.URL
 	srv.Close()
-	out, code := runScript(t, []string{"CAIRN_API_KEY=" + testKey}, "--bin", bin, "--server", url)
+	out, code := runScript(t, []string{"CAIRNBOOK_API_KEY=" + testKey}, "--bin", bin, "--server", url)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1\n%s", code, out)
 	}
@@ -222,8 +222,8 @@ func TestSmokeCheckSkipsTheKeyChecksWithoutAKey(t *testing.T) {
 // check and names no key in the output.
 func TestSmokeCheckFailsAKeyTheServerRefuses(t *testing.T) {
 	bin, _, srv := setup(t)
-	const wrong = "cairn_wrong_key_0123456789"
-	out, code := runScript(t, []string{"CAIRN_API_KEY=" + wrong}, "--bin", bin, "--server", srv.URL)
+	const wrong = "cairnbook_wrong_key_0123456789"
+	out, code := runScript(t, []string{"CAIRNBOOK_API_KEY=" + wrong}, "--bin", bin, "--server", srv.URL)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1\n%s", code, out)
 	}
@@ -239,7 +239,7 @@ func TestSmokeCheckFailsAKeyTheServerRefuses(t *testing.T) {
 // and that the server checks still run.
 func TestSmokeCheckFailsWhenTheBinaryIsMissing(t *testing.T) {
 	_, _, srv := setup(t)
-	out, code := runScript(t, []string{"CAIRN_API_KEY=" + testKey}, "--bin", filepath.Join(t.TempDir(), "no-such-cairn"), "--server", srv.URL)
+	out, code := runScript(t, []string{"CAIRNBOOK_API_KEY=" + testKey}, "--bin", filepath.Join(t.TempDir(), "no-such-cairnbook"), "--server", srv.URL)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1\n%s", code, out)
 	}
@@ -283,7 +283,7 @@ func TestSmokeCheckHelpNamesTheReadsAndTheKey(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0\n%s", code, out)
 	}
-	for _, want := range []string{"CAIRN_API_KEY", "/healthz", "/v1/agent/task_current", "--server URL"} {
+	for _, want := range []string{"CAIRNBOOK_API_KEY", "/healthz", "/v1/agent/task_current", "--server URL"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--help does not mention %q\n%s", want, out)
 		}
@@ -298,7 +298,7 @@ func TestSmokeCheckHelpSaysWhereDoctorAndTheKeyComeFrom(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0\n%s", code, out)
 	}
-	for _, want := range []string{"doctor needs a project directory", ".cairn.toml", "doctor exits 1", "~/.config/cairn/client.env", "400"} {
+	for _, want := range []string{"doctor needs a project directory", ".cairnbook.toml", "doctor exits 1", "~/.config/cairnbook/client.env", "400"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--help does not mention %q\n%s", want, out)
 		}
@@ -371,7 +371,7 @@ func TestSmokeCheckKeyNeedsA400(t *testing.T) {
 		fmt.Fprint(w, `{"error":{"kind":"unauthenticated","message":"the request needs a valid API key"}}`)
 	}))
 	t.Cleanup(srv.Close)
-	out, code := runScript(t, []string{"CAIRN_API_KEY=" + testKey}, "--bin", bin, "--server", srv.URL)
+	out, code := runScript(t, []string{"CAIRNBOOK_API_KEY=" + testKey}, "--bin", bin, "--server", srv.URL)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1\n%s", code, out)
 	}
@@ -383,14 +383,14 @@ func TestSmokeCheckKeyNeedsA400(t *testing.T) {
 	}
 }
 
-// doctorFailStub is a cairn binary whose doctor fails its project check, as it does when run outside
+// doctorFailStub is a cairnbook binary whose doctor fails its project check, as it does when run outside
 // a project directory. Its reach and key lines are absent, so the only failing line is the project one.
 const doctorFailStub = `#!/usr/bin/env bash
 case "$1" in
-  version) echo "cairn test" ;;
+  version) echo "cairnbook test" ;;
   help) printf 'Commands:\n  doctor     Check the project file\n' ;;
   doctor)
-    printf 'binary   ok    cairn test\nproject  fail  no .cairn.toml found above the working directory\n'
+    printf 'binary   ok    cairnbook test\nproject  fail  no .cairnbook.toml found above the working directory\n'
     exit 1
     ;;
   *) echo "unexpected: $*" >&2; exit 2 ;;
@@ -400,12 +400,12 @@ esac
 // TestSmokeCheckDoctorFailOutsideAProjectIsFail checks W3, the choice made: a doctor that fails its
 // project check outside a project directory makes the script's doctor line FAIL, with the failing
 // project line in the detail. It is not SKIP, because the script cannot tell a missing project from a
-// broken .cairn.toml, and a SKIP would hide the second.
+// broken .cairnbook.toml, and a SKIP would hide the second.
 func TestSmokeCheckDoctorFailOutsideAProjectIsFail(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash is not on PATH, so the smoke check cannot run")
 	}
-	bin := filepath.Join(t.TempDir(), "cairn")
+	bin := filepath.Join(t.TempDir(), "cairnbook")
 	if err := os.WriteFile(bin, []byte(doctorFailStub), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +419,7 @@ func TestSmokeCheckDoctorFailOutsideAProjectIsFail(t *testing.T) {
 	if hasStatus(out, "SKIP", "doctor") {
 		t.Errorf("doctor was SKIPped; a project FAIL must stay FAIL\n%s", out)
 	}
-	if !strings.Contains(out, "no .cairn.toml found above the working directory") {
+	if !strings.Contains(out, "no .cairnbook.toml found above the working directory") {
 		t.Errorf("the doctor FAIL does not name the failing project line\n%s", out)
 	}
 }

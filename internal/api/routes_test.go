@@ -74,7 +74,7 @@ func TestEveryMarkedRouteIsMounted(t *testing.T) {
 	h := Handler(core.Unimplemented{}, KeyCaller(auth.NewResolver(staticLookup{}, nil)), nil)
 	for route := range routeAccess {
 		req := httptest.NewRequest(http.MethodPost, Prefix+route, strings.NewReader(""))
-		req.Header.Set("Authorization", "Bearer "+"cairn_"+strings.Repeat("A", 43))
+		req.Header.Set("Authorization", "Bearer "+"cairnbook_"+strings.Repeat("A", 43))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		if rec.Code == http.StatusNotFound {

@@ -23,7 +23,7 @@ const (
 
 // csrfLabel is the fixed message the CSRF value is the HMAC of. It is a label, not a
 // secret: it keeps this value apart from any other HMAC of the same token.
-const csrfLabel = "cairn-ui-csrf"
+const csrfLabel = "cairnbook-ui-csrf"
 
 // logCap is the longest a header value is written to the log. A Host or Origin is
 // attacker-controlled text, so it is quoted and cut short before it is logged.

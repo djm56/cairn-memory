@@ -70,9 +70,9 @@ func TestUISignInAndSessionOverARealListener(t *testing.T) {
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/ui/" {
 		t.Fatalf("sign-in: status %d location %q, want 303 to /ui/", resp.StatusCode, resp.Header.Get("Location"))
 	}
-	cookie := uiCookie(resp, "cairn_ui")
+	cookie := uiCookie(resp, "cairnbook_ui")
 	if cookie == nil {
-		t.Fatalf("sign-in set no cairn_ui cookie: %v", resp.Header["Set-Cookie"])
+		t.Fatalf("sign-in set no cairnbook_ui cookie: %v", resp.Header["Set-Cookie"])
 	}
 
 	dash := get(t, c, base+"/ui/", cookie)
@@ -127,7 +127,7 @@ func TestUIKeysStayOutOfTheLogAndTheAnswers(t *testing.T) {
 	st := openStore(t)
 	op := addKey(t, st, "ops", auth.ScopeOperator)
 	agent := addKey(t, st, "claude", auth.ScopeAgent)
-	unknown := "cairn_" + strings.Repeat("E", 43)
+	unknown := "cairnbook_" + strings.Repeat("E", 43)
 	var logs syncBuffer
 	base := startServer(t, Handler(st, testLogger(&logs)), nil)
 	c := noRedirect()
@@ -166,9 +166,9 @@ func TestUICookieNameAndSecureFlagFollowTheTransport(t *testing.T) {
 		secure bool
 		scheme string
 	}{
-		{"plain loopback", Transport{Loopback: true}, "cairn_ui", false, "http"},
-		{"behind a proxy", Transport{BehindProxy: true}, "__Secure-cairn_ui", true, "https"},
-		{"TLS on loopback", Transport{TLS: true, Loopback: true}, "__Secure-cairn_ui", true, "https"},
+		{"plain loopback", Transport{Loopback: true}, "cairnbook_ui", false, "http"},
+		{"behind a proxy", Transport{BehindProxy: true}, "__Secure-cairnbook_ui", true, "https"},
+		{"TLS on loopback", Transport{TLS: true, Loopback: true}, "__Secure-cairnbook_ui", true, "https"},
 	}
 	for _, c := range cases {
 		st := openStore(t)
@@ -302,7 +302,7 @@ func TestRevokedKeyEndsItsUISessionOnTheRunningServer(t *testing.T) {
 	base := startServer(t, Handler(st, testLogger(io.Discard)), nil)
 	c := noRedirect()
 	resp, _ := postForm(t, c, base+"/ui/signin", url.Values{"key": {key}}, map[string]string{"Origin": base})
-	cookie := uiCookie(resp, "cairn_ui")
+	cookie := uiCookie(resp, "cairnbook_ui")
 	if cookie == nil {
 		t.Fatal("no session cookie")
 	}

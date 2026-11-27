@@ -218,7 +218,7 @@ func TestSignInTrimsWhiteSpaceAndRefusesTheRest(t *testing.T) {
 	if rec.status() != http.StatusSeeOther {
 		t.Errorf("a padded key: status %d, want 303", rec.status())
 	}
-	for _, bad := range []string{"not-a-key", "cairn_" + strings.Repeat("B", 43)} {
+	for _, bad := range []string{"not-a-key", "cairnbook_" + strings.Repeat("B", 43)} {
 		rec := hr.do(http.MethodPost, "/ui/signin", "key="+bad, nil, hr.signInHeaders())
 		if rec.status() != http.StatusUnauthorized || !strings.Contains(rec.body.String(), "The key was not accepted.") {
 			t.Errorf("bad key %q: status %d, body %q", bad, rec.status(), rec.body.String())
@@ -236,7 +236,7 @@ func TestKeyNeverAppearsInAnyAnswerOrLog(t *testing.T) {
 	var answers []*recorder
 	answers = append(answers, hr.do(http.MethodPost, "/ui/signin", "key="+hr.opKey, nil, hr.signInHeaders()))
 	answers = append(answers, hr.do(http.MethodPost, "/ui/signin", "key="+hr.agentKey, nil, hr.signInHeaders()))
-	answers = append(answers, hr.do(http.MethodPost, "/ui/signin", "key=cairn_"+strings.Repeat("C", 43), nil, hr.signInHeaders()))
+	answers = append(answers, hr.do(http.MethodPost, "/ui/signin", "key=cairnbook_"+strings.Repeat("C", 43), nil, hr.signInHeaders()))
 	cookie := hr.signIn(hr.viewKey, nil)
 	answers = append(answers, hr.do(http.MethodGet, "/ui/", "", cookie, nil))
 	answers = append(answers, hr.do(http.MethodGet, "/ui/signin", "", nil, nil))
@@ -276,7 +276,7 @@ func TestSignInPageIsAPasswordFieldNamedKey(t *testing.T) {
 func TestCookieFlagsWithoutSecure(t *testing.T) {
 	hr := newHarness(t, false, false)
 	rec := hr.do(http.MethodPost, "/ui/signin", "key="+hr.opKey, nil, hr.signInHeaders())
-	c := cookieNamed(t, rec, "cairn_ui")
+	c := cookieNamed(t, rec, "cairnbook_ui")
 	checkCookie(t, c, false)
 }
 
@@ -285,7 +285,7 @@ func TestCookieFlagsWithoutSecure(t *testing.T) {
 func TestCookieFlagsWithSecure(t *testing.T) {
 	hr := newHarness(t, true, false)
 	rec := hr.do(http.MethodPost, "/ui/signin", "key="+hr.opKey, nil, hr.signInHeaders())
-	c := cookieNamed(t, rec, "__Secure-cairn_ui")
+	c := cookieNamed(t, rec, "__Secure-cairnbook_ui")
 	checkCookie(t, c, true)
 }
 
@@ -330,7 +330,7 @@ func TestSignedInBrowserIsSentToTheDashboard(t *testing.T) {
 	if rec.status() != http.StatusSeeOther || rec.Header().Get("Location") != "/ui/" {
 		t.Errorf("sign-in page for a signed-in browser: status %d, location %q", rec.status(), rec.Header().Get("Location"))
 	}
-	refused := hr.do(http.MethodPost, "/ui/signin", "key=cairn_"+strings.Repeat("D", 43), cookie, hr.signInHeaders())
+	refused := hr.do(http.MethodPost, "/ui/signin", "key=cairnbook_"+strings.Repeat("D", 43), cookie, hr.signInHeaders())
 	if refused.status() != http.StatusUnauthorized {
 		t.Fatalf("refused sign-in status %d", refused.status())
 	}
@@ -366,13 +366,13 @@ func TestSignOutEndsTheSessionAndClearsTheCookie(t *testing.T) {
 	if rec.status() != http.StatusSeeOther || rec.Header().Get("Location") != "/ui/signin" {
 		t.Errorf("sign-out: status %d, location %q", rec.status(), rec.Header().Get("Location"))
 	}
-	cleared := cookieNamed(t, rec, "__Secure-cairn_ui")
+	cleared := cookieNamed(t, rec, "__Secure-cairnbook_ui")
 	if cleared.Value != "" {
 		t.Errorf("the cleared cookie carries value %q, want none", cleared.Value)
 	}
 	// Go reads "Max-Age=0" back as a negative MaxAge, so the header text is checked here.
 	setCookie := rec.Header().Get("Set-Cookie")
-	for _, want := range []string{"__Secure-cairn_ui=", "Max-Age=0", "Path=/ui", "HttpOnly", "SameSite=Strict", "Secure"} {
+	for _, want := range []string{"__Secure-cairnbook_ui=", "Max-Age=0", "Path=/ui", "HttpOnly", "SameSite=Strict", "Secure"} {
 		if !strings.Contains(setCookie, want) {
 			t.Errorf("the clearing Set-Cookie %q lacks %s", setCookie, want)
 		}
@@ -647,7 +647,7 @@ func TestCSRFMustMatchTheSession(t *testing.T) {
 	hr := newHarness(t, false, false)
 	mine := hr.signIn(hr.opKey, nil)
 	theirs := hr.signIn(hr.viewKey, nil)
-	otherLabel := encodeHMAC(mine.Value, "cairn-ui-other")
+	otherLabel := encodeHMAC(mine.Value, "cairnbook-ui-other")
 	cases := []struct{ label, body string }{
 		{"no field", ""},
 		{"empty field", "csrf="},

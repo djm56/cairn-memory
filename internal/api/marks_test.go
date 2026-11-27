@@ -116,13 +116,13 @@ func handlerFor(scope auth.Scope) http.Handler {
 }
 
 // callRoute sends a POST of route with body to h, with a well-formed key and the
-// Cairn headers of an agent call, and returns the answer.
+// Cairnbook headers of an agent call, and returns the answer.
 func callRoute(h http.Handler, route, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, Prefix+route, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(HeaderProject, "acme-api")
 	req.Header.Set(HeaderAgent, "main")
-	req.Header.Set("Authorization", "Bearer cairn_"+strings.Repeat("A", 43))
+	req.Header.Set("Authorization", "Bearer cairnbook_"+strings.Repeat("A", 43))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec

@@ -140,7 +140,7 @@ func rawSQL(t *testing.T, path string, stmts ...string) {
 func TestRestoreRefusesANonTerminal(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	opts, _ := restoreRun(target, backup, target+"\n", false)
@@ -155,10 +155,10 @@ func TestRestoreRefusesANonTerminal(t *testing.T) {
 func TestRestoreRefusesAWrongTypedPath(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
-	for _, typed := range []string{"", "cairn.db\n", target + " \n", filepath.Join(dir, "other.db") + "\n", "\n"} {
+	for _, typed := range []string{"", "cairnbook.db\n", target + " \n", filepath.Join(dir, "other.db") + "\n", "\n"} {
 		opts, _ := restoreRun(target, backup, typed, true)
 		if err := Restore(context.Background(), opts); err == nil {
 			t.Fatalf("Restore with the typed answer %q: want a refusal", typed)
@@ -177,7 +177,7 @@ func TestRestoreRefusesAWrongTypedPath(t *testing.T) {
 func TestRestoreRefusesWhileTheDatabaseIsLocked(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	held, err := store.Open(target)
@@ -222,7 +222,7 @@ func TestRestoreRefusesACorruptBackup(t *testing.T) {
 		}
 	}
 
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	opts, _ := restoreRun(target, corrupt, target+"\n", true)
 	err = Restore(context.Background(), opts)
@@ -275,7 +275,7 @@ func TestRestoreRefusesANewerSchemaBackup(t *testing.T) {
 	}
 	rawSQL(t, future, `INSERT INTO schema_migrations (version, name, applied_at) VALUES (99, 'from_a_newer_build', '2030-01-01T00:00:00Z')`)
 
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	opts, _ := restoreRun(target, future, target+"\n", true)
 	err = Restore(context.Background(), opts)
@@ -289,7 +289,7 @@ func TestRestoreRefusesANewerSchemaBackup(t *testing.T) {
 // it would replace, which would move the copy away with it.
 func TestRestoreRefusesABackupThatIsTheDatabase(t *testing.T) {
 	dir := t.TempDir()
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	opts, _ := restoreRun(target, target, target+"\n", true)
 	if err := Restore(context.Background(), opts); err == nil || !strings.Contains(err.Error(), "is the database itself") {
@@ -303,7 +303,7 @@ func TestRestoreRefusesABackupThatIsTheDatabase(t *testing.T) {
 func TestRestoreRefusesATakenPreRestoreName(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	if err := os.WriteFile(preRestoreName(target), []byte("kept"), 0o600); err != nil {
 		t.Fatal(err)
@@ -324,7 +324,7 @@ func TestRestoreRefusesATakenPreRestoreName(t *testing.T) {
 func TestRestoreReplacesAndKeepsTheOldFiles(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	// The database as a server that stopped leaves it: "gamma" is in its -wal, not its main file.
 	leaveWAL(t, target, "gamma")

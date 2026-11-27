@@ -131,7 +131,7 @@ func TestDirectiveListEmptyJSON(t *testing.T) {
 }
 
 // TestDirectiveListAgentFlag checks the request of directive list. --agent narrows the list to the
-// role it names. With the flag left out, the request names no role, even when CAIRN_AGENT is set, so
+// role it names. With the flag left out, the request names no role, even when CAIRNBOOK_AGENT is set, so
 // the list is every role, as the contract has it.
 func TestDirectiveListAgentFlag(t *testing.T) {
 	svc := &fakeDirectives{list: sampleDirectives()}
@@ -149,7 +149,7 @@ func TestDirectiveListAgentFlag(t *testing.T) {
 func TestDirectiveListRefusedThroughTheFake(t *testing.T) {
 	svc := &fakeDirectives{err: core.Refused("the directives could not be read")}
 	code, out, errOut, _ := directiveRun(svc, "list")
-	if code != 5 || out != "" || errOut != "cairn directive list: the directives could not be read\n" {
+	if code != 5 || out != "" || errOut != "cairnbook directive list: the directives could not be read\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }
@@ -182,7 +182,7 @@ func TestDirectiveListUsageErrors(t *testing.T) {
 // names the verb.
 func TestDirectiveNeedsAVerb(t *testing.T) {
 	svc := &fakeDirectives{}
-	if code, _, errOut, opened := directiveRun(svc); code != 2 || !strings.Contains(errOut, "cairn directive list") || opened != 0 {
+	if code, _, errOut, opened := directiveRun(svc); code != 2 || !strings.Contains(errOut, "cairnbook directive list") || opened != 0 {
 		t.Errorf("no verb: exit %d, stderr %q; want a usage error naming list", code, errOut)
 	}
 	if code, _, errOut, opened := directiveRun(svc, "add"); code != 2 || !strings.Contains(errOut, `unknown verb "add"`) || opened != 0 {

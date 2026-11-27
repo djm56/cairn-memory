@@ -50,7 +50,7 @@ func (l *Local) now() time.Time {
 
 // callerFor returns the caller in ctx for an agent call. Every agent call needs
 // a project (CONTRACT §1.1), reads included, and every write also needs an
-// agent. A missing project is the error that names `cairn init`.
+// agent. A missing project is the error that names `cairnbook init`.
 func callerFor(ctx context.Context, write bool) (Caller, error) {
 	c, ok := CallerFrom(ctx)
 	if !ok || c.Project == "" {

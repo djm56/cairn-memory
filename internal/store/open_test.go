@@ -52,7 +52,7 @@ func TestEveryConnectionHasOptions(t *testing.T) {
 // migration. The write lock taken by each migration transaction is what stops two
 // processes applying the same version twice.
 func TestOpenConcurrentSameFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	const n = 8
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -118,7 +118,7 @@ func TestApplyOneCases(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairnbook.db")+"?"+dsnOptions)
 			if err != nil {
 				t.Fatalf("sql.Open: %v", err)
 			}

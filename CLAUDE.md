@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Cairn is a memory for coding agents: task state, learnings, directives and
-recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
+Cairnbook is a memory for coding agents: task state, learnings, directives and
+recall, behind MCP tools, in one Go binary (`cairnbook`) over SQLite.
 
 ## Read first
 
@@ -56,7 +56,7 @@ recall, behind MCP tools, in one Go binary (`cairn`) over SQLite.
 ## Commands
 
 ```bash
-make build && bin/cairn version
+make build && bin/cairnbook version
 make test        # go test -race ./...
 make vet
 make fmt-check   # CI fails on unformatted files
@@ -64,11 +64,11 @@ make fmt-check   # CI fails on unformatted files
 
 ## Reference implementation
 
-Cairn replaces bishop-memory, which is checked out locally; ask the operator for the path.
+Cairnbook replaces bishop-memory, which is checked out locally; ask the operator for the path.
 PLAN.md §1.1 and each phase's "Guided by" line name the files to read for
-reference. Read them there. Write Cairn's code fresh: copy nothing from that
+reference. Read them there. Write Cairnbook's code fresh: copy nothing from that
 checkout, and never write to it or to its database. Bishop and
-mission words are not used in Cairn: it says task, project and agent.
+mission words are not used in Cairnbook: it says task, project and agent.
 
 ## Conventions
 

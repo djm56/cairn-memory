@@ -44,7 +44,7 @@ func TestStepUpdateByIDRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.NotFound("step 412 is not in task task-20261030-01")}
 	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "--step-id", "412", "--action", "start", "--agent", "hicks")
-	if code != 4 || out != "" || errOut != "cairn step update: step 412 is not in task task-20261030-01\n" {
+	if code != 4 || out != "" || errOut != "cairnbook step update: step 412 is not in task task-20261030-01\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 4 (not_found) and the one-line refusal", code, out, errOut)
 	}
 }
@@ -130,7 +130,7 @@ func TestStepAddRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("the task is done: no step can be added")}
 	code, out, errOut := runWrite(t, Step, svc, "", "add", "task-20261030-01", "--title", "Review", "--agent", "hicks")
-	if code != 5 || out != "" || errOut != "cairn step add: the task is done: no step can be added\n" {
+	if code != 5 || out != "" || errOut != "cairnbook step add: the task is done: no step can be added\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused) and the refusal", code, out, errOut)
 	}
 }
@@ -212,7 +212,7 @@ func TestStepUpdateRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("start needs an active task")}
 	code, out, errOut := runWrite(t, Step, svc, "", "update", "task-20261030-01", "1", "--action", "start", "--agent", "hicks")
-	if code != 5 || out != "" || errOut != "cairn step update: start needs an active task\n" {
+	if code != 5 || out != "" || errOut != "cairnbook step update: start needs an active task\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused) and the refusal", code, out, errOut)
 	}
 }
@@ -293,7 +293,7 @@ func TestStepPlanRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Refused("step 2 has a review: skip it first")}
 	code, out, errOut := runWrite(t, Step, svc, `{"steps": []}`, "plan", "task-20261030-01", "--json-input", "--agent", "hicks")
-	if code != 5 || out != "" || errOut != "cairn step plan: step 2 has a review: skip it first\n" {
+	if code != 5 || out != "" || errOut != "cairnbook step plan: step 2 has a review: skip it first\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 5 (refused) and the refusal", code, out, errOut)
 	}
 }
@@ -329,7 +329,7 @@ func TestStepPlanUsageErrors(t *testing.T) {
 // have.
 func TestStepVerbs(t *testing.T) {
 	svc := &fakeWrites{}
-	if code, _, errOut := runWrite(t, Step, svc, ""); code != 2 || !strings.Contains(errOut, "cairn step add|update") {
+	if code, _, errOut := runWrite(t, Step, svc, ""); code != 2 || !strings.Contains(errOut, "cairnbook step add|update") {
 		t.Errorf("no verb: exit %d, stderr %q", code, errOut)
 	}
 	if code, _, errOut := runWrite(t, Step, svc, "", "frobnicate"); code != 2 || !strings.Contains(errOut, `unknown verb "frobnicate"`) {

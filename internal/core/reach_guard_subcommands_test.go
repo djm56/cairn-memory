@@ -10,32 +10,32 @@ import (
 )
 
 // The subcommand rule. The guard's import and selector rules see a
-// call only through its package. cmd/cairn is one package, so a function in mcp.go that
+// call only through its package. cmd/cairnbook is one package, so a function in mcp.go that
 // calls runServe, which starts the listener, names no import and no listener selector,
 // and nothing above it reports the call. This rule closes that route: the names the two
 // subcommand files declare may be named only by the dispatch table in main.go, and by
 // those two files. The rule is a denylist of one package's names, so the guard's own
-// file set is what it reads (nonTestGoFiles), and a file added to cmd/cairn is checked
+// file set is what it reads (nonTestGoFiles), and a file added to cmd/cairnbook is checked
 // from its first commit.
 //
 // The dispatch identifiers of main.go are guarded too. run and
 // commands are how main.go reaches the two files: a call to run with a subcommand's
 // name starts that subcommand, and names no guarded identifier. main.go may name them
-// anywhere in the file. No other non-test file in cmd/cairn may.
+// anywhere in the file. No other non-test file in cmd/cairnbook may.
 
-// subcommandFiles are the files of cmd/cairn whose top-level names are reachable only
+// subcommandFiles are the files of cmd/cairnbook whose top-level names are reachable only
 // from the dispatch table. serve.go starts the listener through server.Run, and key.go
 // makes and revokes keys in the server's database.
 var subcommandFiles = map[string]bool{
-	"cmd/cairn/serve.go":   true,
-	"cmd/cairn/key.go":     true,
-	"cmd/cairn/backup.go":  true,
-	"cmd/cairn/restore.go": true,
+	"cmd/cairnbook/serve.go":   true,
+	"cmd/cairnbook/key.go":     true,
+	"cmd/cairnbook/backup.go":  true,
+	"cmd/cairnbook/restore.go": true,
 }
 
 // dispatchFile is the one file that names the subcommand functions outside the two files:
 // the table that maps each sub-command name to its run function.
-const dispatchFile = "cmd/cairn/main.go"
+const dispatchFile = "cmd/cairnbook/main.go"
 
 // dispatchNames are the identifiers main.go declares that route to a subcommand: the
 // dispatch function, the table, and the table's entry type. The rule guards them as it
@@ -101,10 +101,10 @@ func dispatchFaults(fset *token.FileSet, f *ast.File, names map[string]bool, all
 }
 
 // TestSubcommandsAreReachedOnlyFromDispatch is the rule over the package. The names the two
-// subcommand files declare must not appear in any other non-test file of cmd/cairn, except
+// subcommand files declare must not appear in any other non-test file of cmd/cairnbook, except
 // the dispatch table. Test files are outside the guard, as they are for every rule here.
 func TestSubcommandsAreReachedOnlyFromDispatch(t *testing.T) {
-	dir := filepath.Join(repoRoot, "cmd", "cairn")
+	dir := filepath.Join(repoRoot, "cmd", "cairnbook")
 	names := map[string]bool{}
 	for _, file := range nonTestGoFiles(t, dir) {
 		if subcommandFiles[moduleRel(file)] {
@@ -145,13 +145,13 @@ func TestSubcommandRuleCanFail(t *testing.T) {
 		allowed bool
 		faults  int
 	}{
-		{"cairn mcp calling runServe, in another file", "package main\nfunc serveMCP() { runServe(nil, nil, nil) }\n", false, 1},
+		{"cairnbook mcp calling runServe, in another file", "package main\nfunc serveMCP() { runServe(nil, nil, nil) }\n", false, 1},
 		{"a key helper called from another file", "package main\nfunc f() { keyFlags(\"add\", nil, nil, nil, nil) }\n", false, 1},
 		{"a subcommand function used as a value", "package main\nvar h = runServe\n", false, 1},
-		{"cairn mcp calling run with serve, in another file", "package main\nfunc serveMCP() { run([]string{\"serve\"}, nil, nil) }\n", false, 1},
+		{"cairnbook mcp calling run with serve, in another file", "package main\nfunc serveMCP() { run([]string{\"serve\"}, nil, nil) }\n", false, 1},
 		{"a field of the same name, which is no reference", "package main\nfunc f(x T) { x.runServe() }\n", false, 0},
-		{"cairn mcp calling runBackup, in another file", "package main\nfunc serveMCP() { runBackup(nil, nil, nil) }\n", false, 1},
-		{"cairn mcp calling runRestore, in another file", "package main\nvar h = runRestore\n", false, 1},
+		{"cairnbook mcp calling runBackup, in another file", "package main\nfunc serveMCP() { runBackup(nil, nil, nil) }\n", false, 1},
+		{"cairnbook mcp calling runRestore, in another file", "package main\nvar h = runRestore\n", false, 1},
 		{"the dispatch table in main.go", "package main\nvar h = runServe\n", true, 0},
 	}
 	for _, c := range cases {
