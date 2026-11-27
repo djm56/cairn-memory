@@ -9,7 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"time"
+
 	"github.com/djm56/cairn-memory/internal/auth"
+	"github.com/djm56/cairn-memory/internal/store"
 )
 
 // TestRevokeKeyRefusesAKeyPastedAsAName checks that a key given where a name belongs is refused
@@ -27,7 +30,7 @@ func TestRevokeKeyRefusesAKeyPastedAsAName(t *testing.T) {
 	}
 
 	err = RevokeKey(ctx, db, pasted)
-	if err == nil || !strings.Contains(err.Error(), "must not begin with cairnbook_") {
+	if err == nil || !strings.Contains(err.Error(), "looks like an API key") {
 		t.Fatalf("RevokeKey with a key as the name = %v, want the name rule", err)
 	}
 	if strings.Contains(err.Error(), pasted) {
@@ -104,5 +107,97 @@ func TestCheckKeyNameRefusesAKeyOfEitherPrefix(t *testing.T) {
 	}
 	if err := checkKeyName("ci-cairn"); err != nil {
 		t.Errorf("checkKeyName(ci-cairn) = %v, want no error", err)
+	}
+}
+
+// insertKeyNamed writes an active key named name straight through the store, for the names
+// AddKey refuses. The database must be a path; it is created when absent.
+func insertKeyNamed(t *testing.T, db, name string) {
+	t.Helper()
+	ctx := context.Background()
+	key, err := auth.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := openDatabase(db, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	err = st.WithTx(ctx, func(q store.Querier) error {
+		_, err := store.AddAPIKey(ctx, q, store.APIKeyNew{
+			Name: name, Hash: auth.HashKey(key), Scope: string(auth.ScopeAgent), CreatedAt: time.Now().UTC(),
+		})
+		return err
+	})
+	if err != nil {
+		t.Fatalf("insert key %s: %v", name, err)
+	}
+}
+
+// TestRevokeKeyAcceptsANameThatOnlyBeginsWithAPrefix checks that a key whose name begins with
+// either prefix, which AddKey refuses but an unreleased renamed build may have stored, can be
+// revoked by that name. Only a name shaped like a whole key is refused on revoke.
+func TestRevokeKeyAcceptsANameThatOnlyBeginsWithAPrefix(t *testing.T) {
+	ctx := context.Background()
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	names := []string{"cairn_x", "cairnbook_x"}
+	for _, name := range names {
+		insertKeyNamed(t, db, name)
+	}
+	for _, name := range names {
+		if err := RevokeKey(ctx, db, name); err != nil {
+			t.Errorf("RevokeKey %s: %v; want it revoked", name, err)
+		}
+	}
+	keys, err := ListKeys(ctx, db)
+	if err != nil {
+		t.Fatalf("ListKeys: %v", err)
+	}
+	for _, k := range keys {
+		if k.RevokedAt == nil {
+			t.Errorf("key %s is not revoked after RevokeKey", k.Name)
+		}
+	}
+}
+
+// TestRevokeKeyRefusesAFullKeyOfEitherPrefix checks that a name shaped like a whole key, under
+// either prefix, is refused on revoke with the shape message, and that the refusal does not print
+// the name. The names are built here, not issued, so the test holds whatever the store contains.
+func TestRevokeKeyRefusesAFullKeyOfEitherPrefix(t *testing.T) {
+	ctx := context.Background()
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	if _, err := AddKey(ctx, db, "ci", auth.ScopeAgent); err != nil {
+		t.Fatalf("AddKey ci: %v", err)
+	}
+	for _, prefix := range []string{auth.KeyPrefix, auth.LegacyKeyPrefix} {
+		name := prefix + strings.Repeat("B", 43)
+		err := RevokeKey(ctx, db, name)
+		if err == nil || !strings.Contains(err.Error(), "looks like an API key") {
+			t.Errorf("RevokeKey with a %s-shaped name = %v, want the shape refusal", prefix, err)
+		}
+		if err != nil && strings.Contains(err.Error(), name) {
+			t.Errorf("the refusal prints the name: %v", err)
+		}
+	}
+}
+
+// TestRevokeKeyStillRefusesAMalformedName checks that a name failing keyNamePattern is refused by
+// the name rule on revoke, before the lookup, and that the rule given is the revoke rule, which
+// names no prefix.
+func TestRevokeKeyStillRefusesAMalformedName(t *testing.T) {
+	ctx := context.Background()
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	if _, err := AddKey(ctx, db, "ci", auth.ScopeAgent); err != nil {
+		t.Fatalf("AddKey ci: %v", err)
+	}
+	for _, name := range []string{"has a space", "-cairn", strings.Repeat("a", 65)} {
+		err := RevokeKey(ctx, db, name)
+		if err == nil || !strings.Contains(err.Error(), "must be 1 to 64 letters") {
+			t.Errorf("RevokeKey with a malformed name = %v, want the name rule", err)
+		}
+		if strings.Contains(err.Error(), "cairnbook_") || strings.Contains(err.Error(), "cairn_") {
+			t.Errorf("the revoke refusal names a prefix: %v", err)
+		}
 	}
 }

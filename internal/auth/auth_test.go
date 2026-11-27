@@ -285,3 +285,31 @@ func TestResolveAcceptsKeysByTheirPrefix(t *testing.T) {
 		t.Errorf("a malformed legacy key was stamped %d times", f.touches)
 	}
 }
+
+// TestIsKeyShaped checks the shape test that revoke uses to refuse a whole key given as a name: a
+// key issued under either prefix is shaped, and a name that only begins with a prefix is not.
+func TestIsKeyShaped(t *testing.T) {
+	fresh, err := NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		what string
+		s    string
+		want bool
+	}{
+		{"a key issued now", fresh, true},
+		{"a legacy key", legacyKey, true},
+		{"a short cairn_ name", "cairn_x", false},
+		{"a short cairnbook_ name", "cairnbook_x", false},
+		{"a prefix and 42 characters", LegacyKeyPrefix + strings.Repeat("B", 42), false},
+		{"a prefix and a standard-alphabet character", LegacyKeyPrefix + strings.Repeat("B", 42) + "+", false},
+		{"43 characters and no prefix", strings.Repeat("B", 43), false},
+		{"an empty string", "", false},
+	}
+	for _, c := range cases {
+		if got := IsKeyShaped(c.s); got != c.want {
+			t.Errorf("%s: IsKeyShaped = %v, want %v", c.what, got, c.want)
+		}
+	}
+}

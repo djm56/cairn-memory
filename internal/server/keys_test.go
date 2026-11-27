@@ -75,6 +75,8 @@ func TestAddKeyRefusesABadNameAndScope(t *testing.T) {
 		{"a name that starts with a hyphen", "-ci", auth.ScopeAgent},
 		{"a name of 65 characters", strings.Repeat("a", 65), auth.ScopeAgent},
 		{"a key pasted as the name", pasted, auth.ScopeAgent},
+		{"a name that begins with cairn_", "cairn_x", auth.ScopeAgent},
+		{"a name that begins with cairnbook_", "cairnbook_x", auth.ScopeAgent},
 		{"a scope that is not one of three", "ci", auth.Scope("admin")},
 	}
 	for _, c := range cases {

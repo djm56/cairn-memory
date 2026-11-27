@@ -132,7 +132,7 @@ func TestKeyRevokeDoesNotPrintAPastedKey(t *testing.T) {
 	}
 	key := strings.TrimSpace(out)
 	code, out, errs = runCmd(t, "key", "revoke", "--db", db, "--name", key)
-	if code != 1 || !strings.Contains(errs, "must not begin with cairnbook_") {
+	if code != 1 || !strings.Contains(errs, "looks like an API key") {
 		t.Errorf("revoke with a key as the name: exit %d, stderr %q; want 1 and the name rule", code, errs)
 	}
 	if strings.Contains(out, key) || strings.Contains(errs, key) {

@@ -1468,8 +1468,9 @@ status; they only recommend.
   hash or the key. `cairnbook key revoke` ends a key at its next call, since the server
   reads the key table on every call. A revoked key keeps its name, so a name is
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
-  and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` checks the name the same
-  way, before it looks anything up, so a key pasted as a name is refused and is
+  and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` refuses a name that
+  fails the pattern, or a name shaped like a whole key under either prefix, before it looks
+  anything up, so a key pasted as a name is refused and is
   not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.
 
