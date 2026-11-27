@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-24, from main at d3ff98f, the merge commit of PR #229 (m5-plugin into main, merged 2026-11-21), with the M5 counts already reflecting #235 closing when `m5-guide-post-merge` merges. On that merge PR #229 closed #21 to #26, #193 and #206. Decisions D34 to D37 are on main. Decision comments are posted on #193, #206, #20 and #23.
+Last synced: 2026-11-27, from main at ea86c13, the merge commit of PR #241 (rename-cairnbook-fixes into main, merged 2026-11-27). Since the previous sync, PR #238 (m5-guide-post-merge, merged 2026-11-27) closed #235, PR #240 (rename-cairnbook, merged 2026-11-27) landed the rename, and PR #241 added the old-key fallback and the rename doc corrections. Decisions D34 to D38 are on main. Decision comments are posted on #193, #206, #20 and #23. This file is updated on branch rename-followups for PR #246, which is open.
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
