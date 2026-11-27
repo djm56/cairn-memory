@@ -131,7 +131,7 @@ func ratifyValues(csrf string, over url.Values) url.Values {
 	return v
 }
 
-// TestM3ExitCheck is M3's exit check (PLAN, M3 row): a lead sees a proposed finding, accepts it,
+// TestM3ExitCheck is M3's exit check (PLAN, M3 row): the operator sees a proposed finding, accepts it,
 // ratifies a directive from it, and the next session's task_current returns that directive. A
 // viewer key sees every page, and gets 403 read_only on every action.
 func TestM3ExitCheck(t *testing.T) {
@@ -145,14 +145,14 @@ func TestM3ExitCheck(t *testing.T) {
 	// 1. An agent key records a proposed learning through the agent route.
 	id := addLearning(t, base, agent, "Exit finding")
 
-	// 2. The lead signs in and sees the proposed learning.
+	// 2. The operator signs in and sees the proposed learning.
 	lead := signInCookie(t, base, addKey(t, st, "lead", auth.ScopeOperator))
 	resp, body := readPage(t, c, base+"/ui/learnings", lead)
 	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "Exit finding") {
 		t.Fatalf("the learnings page does not show the proposed learning: status %d", resp.StatusCode)
 	}
 
-	// 3. The lead accepts it, with a note, using the csrf value of the page.
+	// 3. The operator accepts it, with a note, using the csrf value of the page.
 	csrf := csrfOf(t, body)
 	resp, _ = formAs(t, base, "/ui/learnings/"+idText(id)+"/decide", lead, url.Values{
 		"csrf": {csrf}, "status": {"accepted"}, "note": {"Accepted in the exit check"},
@@ -166,7 +166,7 @@ func TestM3ExitCheck(t *testing.T) {
 		t.Fatalf("the learning is %s after the decision, want accepted", got)
 	}
 
-	// 4. The lead opens the ratify form from the learning, then posts it.
+	// 4. The operator opens the ratify form from the learning, then posts it.
 	_, form := readPage(t, c, base+"/ui/directives/new?from_learning="+idText(id), lead)
 	if !strings.Contains(form, `name="from_learning" value="`+idText(id)+`"`) {
 		t.Fatal("the ratify form does not carry from_learning")

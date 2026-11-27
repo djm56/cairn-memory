@@ -93,9 +93,9 @@ Left before the exit check passes:
 
 ### M7 Pilot (planned)
 
-- **Goal:** One pilot project, two developers and one operator, with a daily review of findings and a weekly look at the dashboard with a project manager.
+- **Goal:** One pilot project, two developers and one operator, with a daily review of findings and a weekly look at the dashboard with a teammate.
 - **Status:** Planned. Not started. 4 issues open, 0 closed. Most of what is left is operator decisions and calendar time.
-- **Exit check:** "Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone." (PLAN §3)
+- **Exit check:** "Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a teammate can answer 'what is running' from the dashboard alone." (PLAN §3)
 - **Next action:** The operator chooses the pilot project and the two developers (#91), and a second operator (#92).
 
 **Detail**
@@ -198,7 +198,7 @@ Closed 2026-11-02, 11 issues. Exit passed. Evidence: live run #19 (`docs/M2-LIVE
 
 - **Goal:** Web pages, sign-in, viewer mode and the dashboard.
 - **Status:** Closed 2026-11-06, 33 issues. Exit passed.
-- **Exit check:** "A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action" (PLAN §3)
+- **Exit check:** "The operator sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action" (PLAN §3)
 - **Next action:** None, closed.
 
 **Detail**

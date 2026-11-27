@@ -28,7 +28,7 @@
     {
       "key": "M3",
       "title": "M3 Web UI + dashboard",
-      "description": "Exit: A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: The operator sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M4",
@@ -48,7 +48,7 @@
     {
       "key": "M7",
       "title": "M7 Pilot",
-      "description": "Exit: Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a project manager can answer 'what is running' from the dashboard alone.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: Two weeks of real tasks; every finding decided within 48 hours; five directives ratified; a teammate can answer 'what is running' from the dashboard alone.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M8",
@@ -451,7 +451,7 @@
       "title": "M3 Web UI + dashboard",
       "milestone": "M3 Web UI + dashboard",
       "labels": ["type:epic", "m3", "area:ui"],
-      "body": "**Status.** Done. The web UI exit-check test (TestM3ExitCheck) passes in CI and was recorded as passed on 2026-11-03: a lead signs in, sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Work.** Pages embedded in the binary, served by `cairnbook serve`: **Tasks**: a list across projects; one task's page with its brief, steps, journal, reviews and close record. **Learnings**: proposed findings with accept, reject and supersede, each with a note. **Directives**: ratify, scope, `review_by`, retire. **Projects**: settings, including the close policy and parallel tasks. **Dashboard**: running now, waiting on you, quality (30 days), improving (by month), and the active directive count and oldest age.\n\n**Exit check.** A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Guided by.** bishop-memory, for reference: the mission HUD (Tasks page) and the triage review page (Learnings page).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m3-dashboard,m3-directive-page,m3-viewer-mode,m3-viewer-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p6-epic -->"
+      "body": "**Status.** Done. The web UI exit-check test (TestM3ExitCheck) passes in CI and was recorded as passed on 2026-11-03: the operator signs in, sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Work.** Pages embedded in the binary, served by `cairnbook serve`: **Tasks**: a list across projects; one task's page with its brief, steps, journal, reviews and close record. **Learnings**: proposed findings with accept, reject and supersede, each with a note. **Directives**: ratify, scope, `review_by`, retire. **Projects**: settings, including the close policy and parallel tasks. **Dashboard**: running now, waiting on you, quality (30 days), improving (by month), and the active directive count and oldest age.\n\n**Exit check.** The operator sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Guided by.** bishop-memory, for reference: the mission HUD (Tasks page) and the triage review page (Learnings page).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m3-dashboard,m3-directive-page,m3-viewer-mode,m3-viewer-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p6-epic -->"
     },
     {
       "key": "m3-dashboard",
@@ -611,7 +611,7 @@
       "title": "Daily findings review slot in the calendar; weekly dashboard look with a PM",
       "milestone": "M7 Pilot",
       "labels": ["type:task", "m7", "area:docs"],
-      "body": "**Work.** A daily findings review slot in the calendar, and a weekly look at the dashboard with a project manager.\n\n**Exit.** Part of M7's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M7](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m7-review-slot -->"
+      "body": "**Work.** A daily findings review slot in the calendar, and a weekly look at the dashboard with a teammate.\n\n**Exit.** Part of M7's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M7](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m7-review-slot -->"
     },
     {
       "key": "m7-retro",

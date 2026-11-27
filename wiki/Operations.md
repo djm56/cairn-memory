@@ -39,7 +39,7 @@ sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/ca
 ### Common key tasks
 
 - **A new client.** Make an agent key with the client's name, and store the key on the client.
-- **A new reader, such as a project manager.** Make a viewer key. It can sign in to the web UI and read every page, and it cannot change anything.
+- **A new reader, such as a teammate.** Make a viewer key. It can sign in to the web UI and read every page, and it cannot change anything.
 - **A rotation.** Make the new key first, switch the client to it, check that the client works, and only then revoke the old one.
 - **A lost or leaked key.** Revoke it. It stops at its next call. Make a replacement for the client.
 - **Do not revoke the last key of a server that listens beyond loopback.** The server refuses to start with no active key, and `Restart=on-failure` keeps retrying. Make a replacement first.
