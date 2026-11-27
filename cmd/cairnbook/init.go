@@ -56,6 +56,10 @@ var writeContent = func(w io.Writer, content []byte) error {
 //
 // Exit codes: 0 for a written or unchanged file, 1 for a refusal of the file, 2 for
 // a usage error. `--help` prints to stdout and exits 0.
+//
+// A .cairn.toml in the directory, with no .cairnbook.toml beside it, is refused with the
+// rename to make (#244), whatever it holds, and nothing is written. Once both names are there,
+// the new file is compared as usual and the old one is left alone.
 func runInit(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairnbook init", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
@@ -111,6 +115,23 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return compareExisting(path, *project, *server, stdout, stderr)
 	case !errors.Is(err, fs.ErrNotExist):
 		fmt.Fprintf(stderr, "cairnbook init: look for %s: %v\n", path, err)
+		return 1
+	}
+
+	// The old name with no new one beside it. A new file here would win over the old one, and
+	// any settings it holds that differ would be silently overridden (#244), so init refuses and
+	// writes nothing. The rename is the person's to make, since it moves a committed file.
+	legacy := filepath.Join(dir, identity.LegacyFileName)
+	legacyInfo, err := os.Stat(legacy)
+	switch {
+	case err == nil && legacyInfo.IsDir():
+		fmt.Fprintf(stderr, "cairnbook init: %s is a directory, not a project file: move it aside by hand, then run cairnbook init\n", legacy)
+		return 1
+	case err == nil:
+		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv .cairn.toml .cairnbook.toml` (or mv), then run cairnbook init again\n", legacy)
+		return 1
+	case !errors.Is(err, fs.ErrNotExist):
+		fmt.Fprintf(stderr, "cairnbook init: look for %s: %v\n", legacy, err)
 		return 1
 	}
 

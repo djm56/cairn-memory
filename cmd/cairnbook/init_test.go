@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"io/fs"
@@ -182,6 +183,132 @@ func TestInitRefusesABelowAFileAbove(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
 		t.Errorf("a file was written below the project file: %v", err)
 	}
+}
+
+// TestInitRefusesALegacyFileWithNoNewOne checks #244: a folder that holds only the old .cairn.toml
+// is refused whatever values the old file holds. The message names the rename, and nothing is
+// written or changed, so the new file cannot win over the old one with other settings.
+func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
+	cases := map[string]string{
+		"same values":  "project = \"acme-api\"\nserver = \"" + initServer + "\"\n",
+		"other values": "project = \"old-api\"\nserver = \"https://old.example:8788\"\n",
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			legacy := writeFile(t, dir, ".cairn.toml", content)
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") ||
+				!strings.Contains(stderr, "git mv .cairn.toml .cairnbook.toml") || !strings.Contains(stderr, legacy) {
+				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal naming %s", code, stderr, legacy)
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the old file: %v", err)
+			}
+			if string(readBytes(t, legacy)) != content {
+				t.Errorf("the old file changed: %q", readBytes(t, legacy))
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestInitRefusesALegacyDirectoryInTheWay checks #244: a .cairn.toml directory is refused as a
+// .cairnbook.toml directory is, and nothing is written beside it.
+func TestInitRefusesALegacyDirectoryInTheWay(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	if err := os.Mkdir(filepath.Join(dir, ".cairn.toml"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "is a directory, not a project file") {
+		t.Errorf("exit %d, stderr %q: want 1 and the directory refusal", code, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+		t.Errorf("a .cairnbook.toml was written beside the directory: %v", err)
+	}
+	assertNoDestructive(t, stderr)
+}
+
+// TestInitWithBothFilesKeepsTheExistingBehaviour checks #244: when the folder holds the old file and
+// .cairnbook.toml, init compares the new file as it does on its own, and leaves the old file as it is.
+func TestInitWithBothFilesKeepsTheExistingBehaviour(t *testing.T) {
+	t.Run("same values", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		newFile := writeFile(t, dir, ".cairnbook.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\n")
+		newBefore, legacyBefore := readBytes(t, newFile), readBytes(t, legacy)
+
+		code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+		if code != 0 || !strings.Contains(stdout, "nothing changed") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 0 and nothing changed", code, stdout, stderr)
+		}
+		if !bytes.Equal(readBytes(t, newFile), newBefore) || !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+			t.Errorf("a file changed")
+		}
+	})
+	t.Run("other values", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		newFile := writeFile(t, dir, ".cairnbook.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\n")
+		newBefore, legacyBefore := readBytes(t, newFile), readBytes(t, legacy)
+
+		code, _, stderr := runCmd(t, initArgs("other", initServer)...)
+		if code != 1 || !strings.Contains(stderr, "already sets project") {
+			t.Errorf("exit %d, stderr %q: want 1 and the refusal of other values", code, stderr)
+		}
+		if !bytes.Equal(readBytes(t, newFile), newBefore) || !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+			t.Errorf("a file changed")
+		}
+	})
+}
+
+// TestInitBelowALegacyFileAboveKeepsTheExistingBehaviour checks #244: a folder below a project file
+// under the old name is compared with it as fileAbove has always done. The same values change
+// nothing, and other values are refused as shadowing the project.
+func TestInitBelowALegacyFileAboveKeepsTheExistingBehaviour(t *testing.T) {
+	t.Run("same values", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		sub := filepath.Join(root, "service")
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		useDir(t, sub)
+
+		code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+		if code != 0 || !strings.Contains(stdout, "nothing changed") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 0 and nothing changed", code, stdout, stderr)
+		}
+		if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
+			t.Errorf("a file was written below the old project file: %v", err)
+		}
+	})
+	t.Run("other values", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		sub := filepath.Join(root, "service")
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		useDir(t, sub)
+
+		code, _, stderr := runCmd(t, initArgs("other", initServer)...)
+		if code != 1 || !strings.Contains(stderr, "would shadow it") {
+			t.Errorf("exit %d, stderr %q: want 1 and the shadowing refusal", code, stderr)
+		}
+		if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
+			t.Errorf("a file was written below the old project file: %v", err)
+		}
+	})
 }
 
 // TestInitRejectsBadArguments checks the usage errors, which exit 2 and write
