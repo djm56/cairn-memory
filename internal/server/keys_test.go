@@ -159,8 +159,11 @@ func TestRevokeKeyTwiceIsNotFound(t *testing.T) {
 	}
 	for _, name := range []string{"ci", "nobody"} {
 		err := RevokeKey(ctx, path, name)
-		if err == nil || !strings.Contains(err.Error(), "no active API key named "+name) {
-			t.Errorf("revoke %s again: err = %v, want no active key named %s", name, err, name)
+		if err == nil || !strings.Contains(err.Error(), "no active API key has that name") {
+			t.Errorf("revoke %s again: err = %v, want no active key with that name", name, err)
+		}
+		if err != nil && strings.Contains(err.Error(), name) {
+			t.Errorf("revoke %s again: the not-found error repeats the name: %v", name, err)
 		}
 	}
 }

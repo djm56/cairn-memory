@@ -193,11 +193,87 @@ func TestRevokeKeyStillRefusesAMalformedName(t *testing.T) {
 	}
 	for _, name := range []string{"has a space", "-cairn", strings.Repeat("a", 65)} {
 		err := RevokeKey(ctx, db, name)
-		if err == nil || !strings.Contains(err.Error(), "must be 1 to 64 letters") {
+		if err == nil {
+			t.Errorf("RevokeKey with malformed name %q = nil, want the name rule", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), "must be 1 to 64 letters") {
 			t.Errorf("RevokeKey with a malformed name = %v, want the name rule", err)
 		}
 		if strings.Contains(err.Error(), "cairnbook_") || strings.Contains(err.Error(), "cairn_") {
 			t.Errorf("the revoke refusal names a prefix: %v", err)
 		}
+	}
+}
+
+// echoesRun reports whether msg holds a run of minRun consecutive characters of input. A longer
+// run in msg implies a minRun-long run from its start in input, so checking the windows of
+// length minRun is enough.
+func echoesRun(msg, input string, minRun int) bool {
+	for i := 0; i+minRun <= len(input); i++ {
+		if strings.Contains(msg, input[i:i+minRun]) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestRevokeKeyNotFoundNeverEchoesTheName checks that a key-shaped name which the shape test does
+// not refuse, one character too long, one too short, or with no prefix, reaches the lookup, and
+// that the not-found error holds no run of it longer than the prefix. The prefix alone is allowed
+// to appear, since the refusal text names the command, not the prefix; the body and its first ten
+// characters must not.
+func TestRevokeKeyNotFoundNeverEchoesTheName(t *testing.T) {
+	ctx := context.Background()
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	if _, err := AddKey(ctx, db, "ci", auth.ScopeAgent); err != nil {
+		t.Fatalf("AddKey ci: %v", err)
+	}
+	key, err := auth.NewKey()
+	if err != nil {
+		t.Fatalf("NewKey: %v", err)
+	}
+	body := strings.TrimPrefix(key, auth.KeyPrefix)
+	type echoCase struct{ what, name string }
+	var cases []echoCase
+	for _, prefix := range []string{auth.KeyPrefix, auth.LegacyKeyPrefix} {
+		for _, extra := range []string{".", "-", "_", "x"} {
+			cases = append(cases, echoCase{"a " + prefix + " key with a trailing " + extra, prefix + body + extra})
+		}
+		cases = append(cases, echoCase{"a " + prefix + " key one character short", prefix + body[:len(body)-1]})
+	}
+	cases = append(cases, echoCase{"a 43-character body with no prefix", body})
+
+	minRun := len(auth.KeyPrefix) + 1
+	for _, c := range cases {
+		err := RevokeKey(ctx, db, c.name)
+		if err == nil || !strings.Contains(err.Error(), "no active API key has that name") {
+			t.Errorf("RevokeKey with %s = %v, want the not-found error", c.what, err)
+			continue
+		}
+		msg := err.Error()
+		if strings.Contains(msg, c.name) || echoesRun(msg, c.name, minRun) {
+			t.Errorf("the not-found error for %s echoes the name: %v", c.what, err)
+		}
+		if strings.Contains(msg, body) || strings.Contains(msg, body[:10]) {
+			t.Errorf("the not-found error for %s echoes the key body: %v", c.what, err)
+		}
+	}
+}
+
+// TestRevokeKeyNotFoundDoesNotEchoAnOrdinaryName checks that the not-found error for a name with
+// no key does not repeat that name, and still says that no key has it.
+func TestRevokeKeyNotFoundDoesNotEchoAnOrdinaryName(t *testing.T) {
+	ctx := context.Background()
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	if _, err := AddKey(ctx, db, "ci", auth.ScopeAgent); err != nil {
+		t.Fatalf("AddKey ci: %v", err)
+	}
+	err := RevokeKey(ctx, db, "nobody")
+	if err == nil || !strings.Contains(err.Error(), "no active API key has that name") {
+		t.Fatalf("RevokeKey nobody = %v, want the not-found error", err)
+	}
+	if strings.Contains(err.Error(), "nobody") {
+		t.Errorf("the not-found error repeats the name: %v", err)
 	}
 }

@@ -134,10 +134,11 @@ func ListKeys(ctx context.Context, db string) ([]KeyInfo, error) {
 // RevokeKey revokes the active key named name in the database at db. The first
 // revocation stands; a second one, or a name with no key, is an error that says so. The
 // database must exist. A running server reads the key table on every call, so the key
-// stops working at once. The name is checked as AddKey checks it, before the database is
-// opened, so a name that is not a key name, or a whole key pasted into it, is refused with
-// the rule and is never echoed. A name that only begins with a key prefix is looked up like any
-// other name, so a key stored under one can be revoked.
+// stops working at once. checkRevokeName runs before the database is opened: a name that
+// fails the name rule, or one shaped like a whole key, is refused. A name that only begins
+// with a key prefix is looked up like any other name, so a key stored under one can be
+// revoked. No error RevokeKey returns repeats the name it was given, since a name that
+// reached the lookup may be a key with a character added or dropped.
 func RevokeKey(ctx context.Context, db, name string) error {
 	if err := checkRevokeName(name); err != nil {
 		return err
@@ -151,7 +152,7 @@ func RevokeKey(ctx context.Context, db, name string) error {
 		return store.RevokeAPIKey(ctx, q, name, time.Now().UTC())
 	})
 	if errors.Is(err, store.ErrNotFound) {
-		return fmt.Errorf("no active API key named %s: it was never made, or it is already revoked", name)
+		return errors.New("no active API key has that name: it was never made, or it is already revoked; see cairnbook key list")
 	}
 	if err != nil {
 		return fmt.Errorf("revoke the key: %w", err)

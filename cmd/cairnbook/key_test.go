@@ -135,8 +135,11 @@ func TestKeyRevokeTwiceAndAnUnknownNameExitOne(t *testing.T) {
 	}
 	for _, name := range []string{"ci", "nobody"} {
 		code, _, errs := runCmd(t, "key", "revoke", "--db", db, "--name", name)
-		if code != 1 || !strings.Contains(errs, "no active API key named "+name) {
+		if code != 1 || !strings.Contains(errs, "no active API key has that name") {
 			t.Errorf("revoke %s again: exit %d, stderr %q; want 1 and the not-found message", name, code, errs)
+		}
+		if strings.Contains(errs, name) {
+			t.Errorf("revoke %s again: stderr repeats the name: %q", name, errs)
 		}
 	}
 }
