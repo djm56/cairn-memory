@@ -106,7 +106,7 @@ func TestPiRemovesTheOldEntry(t *testing.T) {
 // registered, which is the only change then.
 func TestPiRemovesTheOldEntryBesideANewOne(t *testing.T) {
 	dir := enableProject(t)
-	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn"}, "cairnbook": {"command": "cairnbook", "args": ["mcp"], "exposure": "direct"}}}`)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "cairn", "args": ["mcp"], "exposure": "direct"}, "cairnbook": {"command": "cairnbook", "args": ["mcp"], "exposure": "direct"}}}`)
 	if code, _, stderr := runCmd(t, "enable", "--agent", "pi"); code != 0 || stderr != "" {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
@@ -152,5 +152,110 @@ func TestEnableRemovesTheOldHookBesideTheNewOne(t *testing.T) {
 	}
 	if _, stdout, _ = runCmd(t, "enable", "--agent", "claude-code"); !reflect.DeepEqual(outcomes(stdout), allPresent) {
 		t.Errorf("second run outcomes %v, want every hook already present", outcomes(stdout))
+	}
+}
+
+// legacyCase is one entry under the name cairn, as the config holds it, and whether enable removes it.
+type legacyCase struct {
+	what    string
+	entry   string
+	removed bool
+}
+
+// jsonValue decodes one JSON value the way decodeJSON decodes a file, so a value read back from a
+// config can be compared with the literal it was written from.
+func jsonValue(t *testing.T, literal string) any {
+	t.Helper()
+	return decodeJSON(t, []byte(`{"v": `+literal+`}`))["v"]
+}
+
+// TestOpenCodeRemovesCairnOnlyWhenItRunsCairnMCP checks the rule for OpenCode: enable removes an entry
+// named cairn only when its command is cairn, or a path whose base name is cairn, followed by exactly
+// "mcp". Any other entry under that name is left as it is, and the report says so. Each case has its
+// own project, since the fixed clock makes backup names collide within one.
+func TestOpenCodeRemovesCairnOnlyWhenItRunsCairnMCP(t *testing.T) {
+	cases := []legacyCase{
+		{"the old entry by name", `{"type": "local", "command": ["cairn", "mcp"]}`, true},
+		{"the old entry by absolute path, with other keys", `{"type": "local", "command": ["/opt/tools/bin/cairn", "mcp"], "timeout": 5000, "env": {"A": "1"}}`, true},
+		{"a user server that runs node", `{"type": "local", "command": ["node", "cairn.js"]}`, false},
+		{"a server that runs cairn with another argument", `{"type": "local", "command": ["cairn", "serve"]}`, false},
+		{"a server that runs cairn with no argument", `{"type": "local", "command": ["cairn"]}`, false},
+		{"a server that runs cairn with an extra argument", `{"type": "local", "command": ["cairn", "mcp", "--verbose"]}`, false},
+		{"a command given as a string", `{"type": "local", "command": "cairn mcp"}`, false},
+		{"a command that is not a list of strings", `{"type": "local", "command": [1, "mcp"]}`, false},
+		{"an entry that is not an object", `"cairn mcp"`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.what, func(t *testing.T) {
+			dir := enableProject(t)
+			writeFile(t, dir, openCodeFile, `{"mcp": {"cairn": `+c.entry+`}}`)
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode")
+			if code != 0 || stderr != "" {
+				t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+			}
+			mcp, _ := decodeJSON(t, readBytes(t, ocConfig(dir)))["mcp"].(map[string]any)
+			if _, has := mcp["cairnbook"]; !has {
+				t.Errorf("mcp is %v, want cairnbook registered", mcp)
+			}
+			got, has := mcp["cairn"]
+			if has == c.removed {
+				t.Errorf("cairn present = %v, want removed = %v: mcp is %v", has, c.removed, mcp)
+			}
+			if !c.removed && has && !reflect.DeepEqual(got, jsonValue(t, c.entry)) {
+				t.Errorf("the entry left as is changed: %v, want %s", got, c.entry)
+			}
+			if c.removed && !strings.Contains(stdout, "the old cairn entry was removed") {
+				t.Errorf("stdout does not say the old entry was removed:\n%s", stdout)
+			}
+			if !c.removed && !strings.Contains(stdout, "a server named cairn that does not run cairn mcp was left as is") {
+				t.Errorf("stdout does not say the cairn entry was left as is:\n%s", stdout)
+			}
+		})
+	}
+}
+
+// TestPiRemovesCairnOnlyWhenItRunsCairnMCP checks the rule for pi: enable removes an entry named cairn
+// only when its command is cairn, or a path whose base name is cairn, and its args are exactly ["mcp"].
+// Any other entry under that name is left as it is, and the report says so. Each case has its own
+// project, since the fixed clock makes backup names collide within one.
+func TestPiRemovesCairnOnlyWhenItRunsCairnMCP(t *testing.T) {
+	cases := []legacyCase{
+		{"the old entry by name", `{"command": "cairn", "args": ["mcp"], "exposure": "direct"}`, true},
+		{"the old entry by absolute path", `{"command": "/opt/tools/bin/cairn", "args": ["mcp"]}`, true},
+		{"a user server named cairn that runs cairn-tools", `{"command": "cairn-tools", "args": ["mcp"]}`, false},
+		{"a user server that runs node", `{"command": "node", "args": ["cairn.js"]}`, false},
+		{"a server that runs cairn with another argument", `{"command": "cairn", "args": ["serve"]}`, false},
+		{"a server that runs cairn with an extra argument", `{"command": "cairn", "args": ["mcp", "--verbose"]}`, false},
+		{"a server that runs cairn with no args", `{"command": "cairn"}`, false},
+		{"a command given as a list", `{"command": ["cairn", "mcp"]}`, false},
+		{"args given as a string", `{"command": "cairn", "args": "mcp"}`, false},
+		{"an entry that is not an object", `"cairn mcp"`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.what, func(t *testing.T) {
+			dir := enableProject(t)
+			writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": `+c.entry+`}}`)
+			code, stdout, stderr := runCmd(t, "enable", "--agent", "pi")
+			if code != 0 || stderr != "" {
+				t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+			}
+			servers, _ := decodeJSON(t, readBytes(t, piConfigFile(dir)))["mcpServers"].(map[string]any)
+			if _, has := servers["cairnbook"]; !has {
+				t.Errorf("mcpServers is %v, want cairnbook registered", servers)
+			}
+			got, has := servers["cairn"]
+			if has == c.removed {
+				t.Errorf("cairn present = %v, want removed = %v: mcpServers is %v", has, c.removed, servers)
+			}
+			if !c.removed && has && !reflect.DeepEqual(got, jsonValue(t, c.entry)) {
+				t.Errorf("the entry left as is changed: %v, want %s", got, c.entry)
+			}
+			if c.removed && !strings.Contains(stdout, "the old cairn entry was removed") {
+				t.Errorf("stdout does not say the old entry was removed:\n%s", stdout)
+			}
+			if !c.removed && !strings.Contains(stdout, "a server named cairn that does not run cairn mcp was left as is") {
+				t.Errorf("stdout does not say the cairn entry was left as is:\n%s", stdout)
+			}
+		})
 	}
 }
