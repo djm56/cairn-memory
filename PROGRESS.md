@@ -27,7 +27,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Now**
 
-- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Done on branch `rename-cairnbook` (origin/rename-cairnbook), not merged. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
+- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27). The old-key fallback (`cairn_` keys) and the doc corrections that followed the review are on branch `rename-cairnbook-fixes`, not yet merged. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
 - M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) is closed by the post-merge guide PR from `m5-guide-post-merge`, on merge.
 
 **Next**
