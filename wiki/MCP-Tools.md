@@ -2,10 +2,10 @@
 
 _Status as of 2026-11-06: M5 (Plugin) is current. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 8b651da: the tool names and the parameter lists come from `internal/mcp/tools.go`, and the results from `internal/core`._
 
-The fifteen tools that `cairn mcp` serves to an agent. Eight write and seven read. The table below lists them, one line each. Each tool has its own section after the table, with its parameters, its result, its limits and an example call. [Connecting-Agents](Connecting-Agents) shows how to register `cairn mcp` with a client.
+The fifteen tools that `cairnbook mcp` serves to an agent. Eight write and seven read. The table below lists them, one line each. Each tool has its own section after the table, with its parameters, its result, its limits and an example call. [Connecting-Agents](Connecting-Agents) shows how to register `cairnbook mcp` with a client.
 
 <!-- The table between the markers is read by internal/mcp/docs_drift_test.go. Keep the markers, and keep the first column as one tool name in backticks. -->
-<!-- cairn-mcp-tools:begin -->
+<!-- cairnbook-mcp-tools:begin -->
 | Tool | Description |
 |------|-------------|
 | `task_current` | The active task, steps, events, and the directives for this project and your agent (agent arg). Ranked, at most 12; expired and omitted count the rest. |
@@ -23,15 +23,15 @@ The fifteen tools that `cairn mcp` serves to an agent. Eight write and seven rea
 | `directive_list` | Directives for this project, ranked agent, project, global; at most 12. expired: past review_by, left out. omitted: beyond the 12. agent: one role, or empty for every role. |
 | `recall` | For a goal: directives, lessons, mistakes and similar tasks, from all projects. Directives: this project and your agent (agent arg), ranked, at most 12; expired, omitted count the rest. |
 | `search` | Full-text search over tasks, events, learnings, directives, lessons and mistakes. Plain words only. Paged. |
-<!-- cairn-mcp-tools:end -->
+<!-- cairnbook-mcp-tools:end -->
 
 ## How a client reaches the tools
 
-- **Transport.** `cairn mcp` runs as a child process of the MCP client and speaks MCP over its standard input and output. It opens no socket and no database. It takes no arguments: `cairn mcp --help` is refused with exit 2.
-- **The server.** Each tool call is one HTTP `POST` from `cairn mcp` to the server, at `/v1/agent/<tool>`, with the JSON arguments as the body. A client never calls that path itself. The server URL comes from `CAIRN_SERVER`, else the `server` line of `.cairn.toml`. The server must be an `http://` or `https://` address with a host, and no query or fragment. The client does not follow redirects.
-- **The key.** Every call sends `Authorization: Bearer <key>`. The key comes from `CAIRN_API_KEY`, else from `~/.config/cairn/client.env`. The file must not be readable by other users.
-- **Start-up refusals.** `cairn mcp` will not start with no server (`invalid: no server: ...`) or with no key (`invalid: no API key: ...`). Both exit 1. With no project it starts, and every call is refused with the reason.
-- **The project.** The project is read once, when the session starts, from `CAIRN_PROJECT` or the nearest `.cairn.toml`. A fix made later is not seen until the session restarts. The refusal says so.
+- **Transport.** `cairnbook mcp` runs as a child process of the MCP client and speaks MCP over its standard input and output. It opens no socket and no database. It takes no arguments: `cairnbook mcp --help` is refused with exit 2.
+- **The server.** Each tool call is one HTTP `POST` from `cairnbook mcp` to the server, at `/v1/agent/<tool>`, with the JSON arguments as the body. A client never calls that path itself. The server URL comes from `CAIRNBOOK_SERVER`, else the `server` line of `.cairnbook.toml`. The server must be an `http://` or `https://` address with a host, and no query or fragment. The client does not follow redirects.
+- **The key.** Every call sends `Authorization: Bearer <key>`. The key comes from `CAIRNBOOK_API_KEY`, else from `~/.config/cairnbook/client.env`. The file must not be readable by other users.
+- **Start-up refusals.** `cairnbook mcp` will not start with no server (`invalid: no server: ...`) or with no key (`invalid: no API key: ...`). Both exit 1. With no project it starts, and every call is refused with the reason.
+- **The project.** The project is read once, when the session starts, from `CAIRNBOOK_PROJECT` or the nearest `.cairnbook.toml`. A fix made later is not seen until the session restarts. The refusal says so.
 - **The caller's name.** A write tool needs its `agent` argument, which is the caller's name, such as `main` or `hicks`. A blank `agent` on a write is refused as `invalid`, and the message asks for the name. A read tool takes `agent` only where it is listed below. Over MCP the adapter sends no caller name on a read. So `recall` and `task_current` list no agent-scoped directives unless their `agent` argument is given. Other reads, such as `directive_list`, list every role when `agent` is left out.
 
 ## Who may call which tool
@@ -393,7 +393,7 @@ Propose a finding, a pattern or an agent note. It is stored as `proposed`. The o
   "kind": "finding",
   "title": "The export help does not name the default format",
   "body": "The flag's help text should say which format is used when the flag is left out.",
-  "target": "cmd/cairn/export.go"
+  "target": "cmd/cairnbook/export.go"
 }}
 ```
 

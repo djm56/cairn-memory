@@ -32,9 +32,9 @@
 
   {"name": "area:core", "color": "006b75", "description": "Rules and types: internal/core and internal/identity."},
   {"name": "area:store", "color": "006b75", "description": "SQLite store, migrations and typed queries: internal/store."},
-  {"name": "area:mcp", "color": "006b75", "description": "MCP adapter and cairn mcp: internal/mcp."},
+  {"name": "area:mcp", "color": "006b75", "description": "MCP adapter and cairnbook mcp: internal/mcp."},
   {"name": "area:plugin", "color": "006b75", "description": "Claude Code plugin and marketplace: plugins/ and .claude-plugin/."},
-  {"name": "area:server", "color": "006b75", "description": "HTTP server and API keys: cairn serve."},
+  {"name": "area:server", "color": "006b75", "description": "HTTP server and API keys: cairnbook serve."},
   {"name": "area:ui", "color": "006b75", "description": "Web UI pages embedded in the binary."},
   {"name": "area:migration", "color": "006b75", "description": "Import from bishop-memory."},
   {"name": "area:review", "color": "006b75", "description": "Triage and grading loop."},

@@ -1,5 +1,5 @@
 name: Bug
-description: Something Cairn does wrong.
+description: Something Cairnbook does wrong.
 title: "[bug] "
 labels: ["bug"]
 body:
@@ -15,15 +15,15 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. cairn init
+        1. cairnbook init
         2. ...
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: cairn version
-      description: The output of `cairn version`.
+      label: cairnbook version
+      description: The output of `cairnbook version`.
       placeholder: "v0.x.y-dirty"
     validations:
       required: true
@@ -31,7 +31,7 @@ body:
     id: client
     attributes:
       label: Client
-      description: How the call reached Cairn.
+      description: How the call reached Cairnbook.
       options:
         - Claude Code
         - OpenCode
@@ -43,10 +43,10 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: OS, architecture, and whether you use a server (cairn serve).
+      description: OS, architecture, and whether you use a server (cairnbook serve).
   - type: textarea
     id: logs
     attributes:
       label: Output
-      description: Relevant output. Remove anything private; Cairn databases stay out of issues.
+      description: Relevant output. Remove anything private; Cairnbook databases stay out of issues.
       render: text

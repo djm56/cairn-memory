@@ -2,7 +2,7 @@
 
 _Status as of 2026-11-06: M5 (Plugin) is current. The exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4 (hooks and CLI) passed its /compact hand check by operator ruling, recorded 2026-11-06; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) have not been run, and #206 is open. Phases 0 to 2 are done. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-This page is for people who change the code. If you want to use Cairn, start with [Quick-Start](Quick-Start). For what Cairn is, read [Home](Home) and [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md).
+This page is for people who change the code. If you want to use Cairnbook, start with [Quick-Start](Quick-Start). For what Cairnbook is, read [Home](Home) and [DESIGN.md](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md).
 
 ## What you need
 
@@ -22,8 +22,8 @@ The clone gives you `main`. For a change, branch from `main`, as [How-We-Work](H
 ## Build and check
 
 ```bash
-make build                 # bin/cairn, version from git describe
-bin/cairn version
+make build                 # bin/cairnbook, version from git describe
+bin/cairnbook version
 make test                  # go test -race ./...
 make vet                   # go vet ./...
 make fmt-check             # fails if a file is not gofmt-formatted
@@ -38,14 +38,14 @@ Run the checks before you push. CI runs `build`, `vet`, `fmt-check`, `test`, `cr
 
 ## What the tests cover
 
-- **`cmd/cairn`** tests the command frame (usage, `version`, `help` and unknown commands), each command against an in-process server, the hooks, `enable`, `doctor`, the exports and the CLI verbs. The stdio flow test drives a whole task through `cairn mcp`.
+- **`cmd/cairnbook`** tests the command frame (usage, `version`, `help` and unknown commands), each command against an in-process server, the hooks, `enable`, `doctor`, the exports and the CLI verbs. The stdio flow test drives a whole task through `cairnbook mcp`.
 - **`internal/conformance`** holds the suite that checks any `Service` against the contract. It has **106 cases**. The suite is run against four implementations, and the results are these, measured for this page:
   - `core.Local`, the local service over SQLite (`internal/core`): all 106 pass.
   - The HTTP client (`internal/client`): all 106 pass.
-  - The listener of `cairn serve`, reached over HTTP (`internal/server`): all 106 pass.
+  - The listener of `cairnbook serve`, reached over HTTP (`internal/server`): all 106 pass.
   - The CLI (`internal/conformance/cliservice`): **98 pass and 8 are deferred**. Three of the eight are the empty step reference, which decision D30 keeps out of the CLI. Two are the learning list over all projects, which D31 keeps out of the CLI. The other three are identity fields the CLI does not send: its client name, its session, and a viewer's role, which decision D33 keeps out of the CLI; the reasons are in `internal/conformance/cliservice/suite_test.go`.
 - **`internal/store`** includes the two-process task-id test.
-- **`internal/mcp` and `cmd/cairn`** include the drift tests, which check [MCP-Tools](MCP-Tools) and [CLI-Reference](CLI-Reference) against the code.
+- **`internal/mcp` and `cmd/cairnbook`** include the drift tests, which check [MCP-Tools](MCP-Tools) and [CLI-Reference](CLI-Reference) against the code.
 - **`internal/smokecheck`** runs `scripts/smoke-check.sh` against a stub binary and a stub server.
 
 ## Where the code is
@@ -54,7 +54,7 @@ The packages, and what each one holds, are in [Architecture](Architecture#layers
 
 - `internal/core` holds every rule. `internal/store` is the only package with SQL.
 - `internal/api` holds the HTTP handlers, and `internal/client` is the HTTP client.
-- `internal/mcp` holds the MCP tools, and `cmd/cairn` holds the one binary.
+- `internal/mcp` holds the MCP tools, and `cmd/cairnbook` holds the one binary.
 - `internal/conformance` is the gate for behaviour, and `internal/ui` holds the web pages.
 
 ## Before you open a pull request

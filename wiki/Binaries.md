@@ -2,9 +2,9 @@
 
 _Status as of 2026-11-06: M5 (Plugin) is current. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the Makefile and the code at 8b651da._
 
-There is one binary, `cairn`. It is the MCP server, the server, the hook helper and the command-line tool. This page covers how to build it, what the version string means, which systems it is built for, and where to put it. The Makefile has 12 targets. This page lists all 12.
+There is one binary, `cairnbook`. It is the MCP server, the server, the hook helper and the command-line tool. This page covers how to build it, what the version string means, which systems it is built for, and where to put it. The Makefile has 12 targets. This page lists all 12.
 
-Cairn ships no release archives yet. Until it does, you build from source. The release work is Later in the plan ([PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones)).
+Cairnbook ships no release archives yet. Until it does, you build from source. The release work is Later in the plan ([PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones)).
 
 ## The Makefile targets
 
@@ -12,9 +12,9 @@ Run `make <target>` from the root of the repository. `make` with no target runs 
 
 | Target | What it runs | Output |
 |---|---|---|
-| `build` | `go build` with the version stamped in, for this machine | `bin/cairn` |
-| `build-linux` | The same build for Linux, with `CGO_ENABLED=0`, for `GOARCH` set by `LINUX_ARCH` (`amd64` by default) | `bin/cairn-linux` |
-| `push` | `build-linux`, then `scp` to the home directory of `SERVER`, then runs `version` there. It installs nothing | `bin/cairn-linux`, and `cairn-linux` in the remote home directory |
+| `build` | `go build` with the version stamped in, for this machine | `bin/cairnbook` |
+| `build-linux` | The same build for Linux, with `CGO_ENABLED=0`, for `GOARCH` set by `LINUX_ARCH` (`amd64` by default) | `bin/cairnbook-linux` |
+| `push` | `build-linux`, then `scp` to the home directory of `SERVER`, then runs `version` there. It installs nothing | `bin/cairnbook-linux`, and `cairnbook-linux` in the remote home directory |
 | `test` | `go test -race ./...` | none |
 | `vet` | `go vet ./...` | none |
 | `fmt` | `gofmt -w .`, which rewrites files in place | none |
@@ -41,14 +41,14 @@ The version is set at build time from `git describe --tags --always --dirty`, wi
 
 | Build | Version string | Example |
 |---|---|---|
-| `make build` or `make build-linux` in a git checkout | the nearest tag, else the short commit hash | `cairn 8b651da` |
-| The same, with uncommitted changes in the checkout | the same, plus `-dirty` | `cairn 8b651da-dirty` |
-| A plain `go build ./cmd/cairn`, with no `-ldflags` | the default in the code | `cairn dev` |
-| `make build` outside a git checkout | the fallback | `cairn dev` |
+| `make build` or `make build-linux` in a git checkout | the nearest tag, else the short commit hash | `cairnbook 8b651da` |
+| The same, with uncommitted changes in the checkout | the same, plus `-dirty` | `cairnbook 8b651da-dirty` |
+| A plain `go build ./cmd/cairnbook`, with no `-ldflags` | the default in the code | `cairnbook dev` |
+| `make build` outside a git checkout | the fallback | `cairnbook dev` |
 
 The repository has **no tags yet**, so today every `make build` prints a short commit hash. Once a tag exists, `git describe` reports the tag, the number of commits since it, and the hash, in the form `v1.2.0-3-g8b651da`. That form does not occur until a tag is made.
 
-`cairn version`, `cairn -v` and `cairn --version` print the string. `cairn --help` does not.
+`cairnbook version`, `cairnbook -v` and `cairnbook --version` print the string. `cairnbook --help` does not.
 
 ## Systems
 
@@ -70,25 +70,25 @@ The binary is one file. Put it where your shell and your service manager look fo
 
 | Machine | Suggested path | Why |
 |---|---|---|
-| A developer machine | `~/.local/bin/cairn` | No root needed. The directory must be on your PATH |
-| A developer machine, system-wide | `/usr/local/bin/cairn` | Needs root. On the PATH by default on most systems |
-| A server | `/usr/local/bin/cairn` | The systemd unit runs this path |
+| A developer machine | `~/.local/bin/cairnbook` | No root needed. The directory must be on your PATH |
+| A developer machine, system-wide | `/usr/local/bin/cairnbook` | Needs root. On the PATH by default on most systems |
+| A server | `/usr/local/bin/cairnbook` | The systemd unit runs this path |
 
 The Makefile has no install target. Copy the file with `install`:
 
 ```bash
-install -m 0755 bin/cairn ~/.local/bin/cairn
+install -m 0755 bin/cairnbook ~/.local/bin/cairnbook
 ```
 
 To check that the directory is on your PATH:
 
 ```bash
-command -v cairn
+command -v cairnbook
 ```
 
 **You should see** the full path of the file. If it prints nothing, add the directory to your PATH in your shell profile, and open a new terminal.
 
-`cairn enable` runs `cairn` by name in the hooks it writes, so the directory must be on the PATH that Claude Code uses. `enable` warns when `cairn` is not on the PATH of the shell it runs in.
+`cairnbook enable` runs `cairnbook` by name in the hooks it writes, so the directory must be on the PATH that Claude Code uses. `enable` warns when `cairnbook` is not on the PATH of the shell it runs in.
 
 ## Build a binary without the Makefile
 
@@ -96,7 +96,7 @@ If you need the same binary without `make`, the Makefile's `build` line is:
 
 ```bash
 mkdir -p bin
-go build -ldflags "-X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" -o bin/cairn ./cmd/cairn
+go build -ldflags "-X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" -o bin/cairnbook ./cmd/cairnbook
 ```
 
-and `build-linux` adds `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`) and writes `bin/cairn-linux`. The `make` form is the one CI uses, so prefer it.
+and `build-linux` adds `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`) and writes `bin/cairnbook-linux`. The `make` form is the one CI uses, so prefer it.

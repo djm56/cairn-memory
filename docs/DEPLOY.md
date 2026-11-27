@@ -1,6 +1,6 @@
-# Deploying `cairn serve`
+# Deploying `cairnbook serve`
 
-This is how to run `cairn serve` on a server that other machines reach. It covers
+This is how to run `cairnbook serve` on a server that other machines reach. It covers
 the two TLS setups of [DESIGN.md §5.3](DESIGN.md#53-the-server) (decision D20), the
 systemd unit, keys, backup and restore, and upgrades. The wiki's
 [Install-Server](https://github.com/djm56/cairn-memory/wiki/Install-Server) page
@@ -12,38 +12,38 @@ steps in more detail. The client side is in the wiki's
 [M2-LIVE-RUN.md](M2-LIVE-RUN.md). The wiki is canonical for the procedures.
 
 Every command below runs on the server, as root or with `sudo`, unless it says
-`sudo -u cairn`.
+`sudo -u cairnbook`.
 
 ## Ports
 
-`cairn serve` listens on `127.0.0.1:8788` by default. Loopback needs no TLS. Any other
+`cairnbook serve` listens on `127.0.0.1:8788` by default. Loopback needs no TLS. Any other
 address needs TLS files, or `--behind-proxy` when a proxy in front terminates TLS
 (D20). A non-loopback address with neither is refused at start, and so is one with no
 active API key.
 
 ## Install the binary
 
-Both setups need `cairn` at `/usr/local/bin/cairn` before anything else, because the
-key and the unit both run it. From a checkout, `make build` writes `bin/cairn`:
+Both setups need `cairnbook` at `/usr/local/bin/cairnbook` before anything else, because the
+key and the unit both run it. From a checkout, `make build` writes `bin/cairnbook`:
 
 ```bash
-install -m 0755 bin/cairn /usr/local/bin/cairn
+install -m 0755 bin/cairnbook /usr/local/bin/cairnbook
 ```
 
 To build on another machine instead, such as a Mac, run `make build-linux` there. It
-writes `bin/cairn-linux` for Linux on `amd64`; add `LINUX_ARCH=arm64` when the server's
+writes `bin/cairnbook-linux` for Linux on `amd64`; add `LINUX_ARCH=arm64` when the server's
 `uname -m` prints `aarch64`. `make push SERVER=<user>@<server>` builds it, copies it to
-`~/cairn-linux` on the server, and runs its `version` there; add `SSH_PORT=<port>` when
+`~/cairnbook-linux` on the server, and runs its `version` there; add `SSH_PORT=<port>` when
 SSH is not on port 22. Then install that file in
-place of `bin/cairn`, here and in [Upgrade](#upgrade). Name it by its full path,
-`/home/you/cairn-linux` for the user `you`: in a root shell, such as one opened with `sudo -s`, `~` is
+place of `bin/cairnbook`, here and in [Upgrade](#upgrade). Name it by its full path,
+`/home/you/cairnbook-linux` for the user `you`: in a root shell, such as one opened with `sudo -s`, `~` is
 `/root`, and the file is not there.
 
 ## Choose a setup
 
-- **(a) TLS by files.** `cairn serve` listens on a non-loopback address and reads a
+- **(a) TLS by files.** `cairnbook serve` listens on a non-loopback address and reads a
   certificate and key. Use it when no proxy sits in front.
-- **(b) Behind a reverse proxy.** `cairn serve` stays on loopback, and a proxy such as
+- **(b) Behind a reverse proxy.** `cairnbook serve` stays on loopback, and a proxy such as
   Caddy or nginx terminates TLS and forwards to it. Use it when a proxy is already
   there. The default unit below is set up for (b).
 
@@ -63,13 +63,13 @@ Run these in this order, on a fresh host. Each step needs the ones before it.
 1. **Create the service user.** It owns the database and runs the service:
 
    ```bash
-   useradd --system --no-create-home --home-dir /var/lib/cairn --shell /usr/sbin/nologin cairn
+   useradd --system --no-create-home --home-dir /var/lib/cairnbook --shell /usr/sbin/nologin cairnbook
    ```
 
 2. **Create the state directory**, owner-only, owned by that user:
 
    ```bash
-   install -d -m 0700 -o cairn -g cairn /var/lib/cairn
+   install -d -m 0700 -o cairnbook -g cairnbook /var/lib/cairnbook
    ```
 
 3. **Make the first key**, as the service user. The server needs it to start on a
@@ -77,17 +77,17 @@ Run these in this order, on a fresh host. Each step needs the ones before it.
    copy it now (see [Keys](#keys)):
 
    ```bash
-   sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name ops --scope operator
+   sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name ops --scope operator
    ```
 
 4. **Install the certificate and key**, where the service user can read them and
-   nobody else can. The group `cairn` exists after step 1. Use the files your CA gave
+   nobody else can. The group `cairnbook` exists after step 1. Use the files your CA gave
    you (a Let's Encrypt pair is under `/etc/letsencrypt/live/<name>/`):
 
    ```bash
-   install -d -m 0750 -o root -g cairn /etc/cairn/tls
-   install -m 0640 -o root -g cairn fullchain.pem /etc/cairn/tls/cert.pem
-   install -m 0640 -o root -g cairn privkey.pem /etc/cairn/tls/key.pem
+   install -d -m 0750 -o root -g cairnbook /etc/cairnbook/tls
+   install -m 0640 -o root -g cairnbook fullchain.pem /etc/cairnbook/tls/cert.pem
+   install -m 0640 -o root -g cairnbook privkey.pem /etc/cairnbook/tls/key.pem
    ```
 
 5. **Install the unit, then the setup (a) override.** The unit is in
@@ -96,14 +96,14 @@ Run these in this order, on a fresh host. Each step needs the ones before it.
    reloads systemd when you save:
 
    ```bash
-   install -m 0644 docs/deploy/cairn.service /etc/systemd/system/cairn.service
-   systemctl edit cairn
+   install -m 0644 docs/deploy/cairnbook.service /etc/systemd/system/cairnbook.service
+   systemctl edit cairnbook
    ```
 
    ```ini
    [Service]
    ExecStart=
-   ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 0.0.0.0:8788 --tls-cert /etc/cairn/tls/cert.pem --tls-key /etc/cairn/tls/key.pem
+   ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr 0.0.0.0:8788 --tls-cert /etc/cairnbook/tls/cert.pem --tls-key /etc/cairnbook/tls/key.pem
    ```
 
    Use a specific LAN address in place of `0.0.0.0` if the host has more than one.
@@ -112,8 +112,8 @@ Run these in this order, on a fresh host. Each step needs the ones before it.
 
    ```bash
    systemctl daemon-reload
-   systemctl enable --now cairn
-   systemctl status cairn
+   systemctl enable --now cairnbook
+   systemctl status cairnbook
    ```
 
    The server's log says `tls=true`. Open the port in the firewall to the clients only.
@@ -123,23 +123,23 @@ cannot bind a port below 1024: `:443` fails with "permission denied". Port 8788,
 any port above 1023, is the supported choice. To serve on 443, use setup (b) with a
 proxy.
 
-**Certificate renewal needs a restart.** `cairn serve` reads the certificate and key
+**Certificate renewal needs a restart.** `cairnbook serve` reads the certificate and key
 once, at start. A certificate renewed on disk is not served until the server restarts,
 and clients then fail verification when the old one expires. With Let's Encrypt's
 `certbot`, a deploy hook copies the renewed pair and restarts the service. Put it in
-`/etc/letsencrypt/renewal-hooks/deploy/cairn.sh`, mode 0755. `certbot` runs it only
+`/etc/letsencrypt/renewal-hooks/deploy/cairnbook.sh`, mode 0755. `certbot` runs it only
 after a successful renewal, and sets `RENEWED_LINEAGE`:
 
 ```sh
 #!/bin/sh
 set -eu
-install -m 0640 -o root -g cairn "$RENEWED_LINEAGE/fullchain.pem" /etc/cairn/tls/cert.pem
-install -m 0640 -o root -g cairn "$RENEWED_LINEAGE/privkey.pem" /etc/cairn/tls/key.pem
-systemctl restart cairn
+install -m 0640 -o root -g cairnbook "$RENEWED_LINEAGE/fullchain.pem" /etc/cairnbook/tls/cert.pem
+install -m 0640 -o root -g cairnbook "$RENEWED_LINEAGE/privkey.pem" /etc/cairnbook/tls/key.pem
+systemctl restart cairnbook
 ```
 
 The restart drops calls in flight for a moment; clients retry. With another CA, do the
-same: copy the new files in, then `systemctl restart cairn`.
+same: copy the new files in, then `systemctl restart cairnbook`.
 
 ### Setup (b): behind a reverse proxy
 
@@ -150,30 +150,30 @@ fresh host:
 1. **Create the service user:**
 
    ```bash
-   useradd --system --no-create-home --home-dir /var/lib/cairn --shell /usr/sbin/nologin cairn
+   useradd --system --no-create-home --home-dir /var/lib/cairnbook --shell /usr/sbin/nologin cairnbook
    ```
 
 2. **Create the state directory** before any `key add`, which creates the database
    file and not its directory:
 
    ```bash
-   install -d -m 0700 -o cairn -g cairn /var/lib/cairn
+   install -d -m 0700 -o cairnbook -g cairnbook /var/lib/cairnbook
    ```
 
 3. **Install the unit and start it.** On loopback the server may start with no key; it
    prints `no active API key` and refuses every call with 401 until one exists:
 
    ```bash
-   install -m 0644 docs/deploy/cairn.service /etc/systemd/system/cairn.service
+   install -m 0644 docs/deploy/cairnbook.service /etc/systemd/system/cairnbook.service
    systemctl daemon-reload
-   systemctl enable --now cairn
-   systemctl status cairn
+   systemctl enable --now cairnbook
+   systemctl status cairnbook
    ```
 
 4. **Make the first key**, as the service user (see [Keys](#keys)):
 
    ```bash
-   sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name ops --scope operator
+   sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name ops --scope operator
    ```
 
 5. **Configure the proxy**, as below, and reload it.
@@ -181,35 +181,35 @@ fresh host:
 On this path the web UI needs `--behind-proxy`, and the shipped unit does not pass it.
 Without the flag the UI refuses every form, sign-in included, because its origin check
 expects `http://` while the browser sends the `https://` origin. Add the override below
-with `systemctl edit cairn`, then run `systemctl daemon-reload` and
-`systemctl restart cairn`. The journal's listening line should then show
+with `systemctl edit cairnbook`, then run `systemctl daemon-reload` and
+`systemctl restart cairnbook`. The journal's listening line should then show
 `behind_proxy=true`. The `127.0.0.1` address is the one the shipped unit listens on:
 
 ```ini
 [Service]
 ExecStart=
-ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788 --behind-proxy
+ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr 127.0.0.1:8788 --behind-proxy
 ```
 
-The same override ships as [deploy/cairn-behind-proxy.conf](deploy/cairn-behind-proxy.conf).
+The same override ships as [deploy/cairnbook-behind-proxy.conf](deploy/cairnbook-behind-proxy.conf).
 To install it as a file instead of with `systemctl edit`, run
-`install -D -m 0644 docs/deploy/cairn-behind-proxy.conf /etc/systemd/system/cairn.service.d/cairn-behind-proxy.conf`,
-then run the same `systemctl daemon-reload` and `systemctl restart cairn`. Use the file
+`install -D -m 0644 docs/deploy/cairnbook-behind-proxy.conf /etc/systemd/system/cairnbook.service.d/cairnbook-behind-proxy.conf`,
+then run the same `systemctl daemon-reload` and `systemctl restart cairnbook`. Use the file
 for this setup only. The flag makes the session cookie `Secure` and the expected origin
 `https`, which breaks a plain-HTTP setup such as the SSH tunnel below.
 
 If the proxy is **not on this host**, the server must listen on a non-loopback address
 with `--behind-proxy`, and then it needs a key before it starts. Use this order
 instead: steps 1 and 2; then step 4 (the key); then install the unit and this
-override (`systemctl edit cairn`), run `systemctl daemon-reload`, and then
-`systemctl restart cairn`. Use `restart`, not `start`: `start` does nothing to a unit that
+override (`systemctl edit cairnbook`), run `systemctl daemon-reload`, and then
+`systemctl restart cairnbook`. Use `restart`, not `start`: `start` does nothing to a unit that
 is already running, so the override would not take effect. The `<address>` is the LAN
 address the proxy reaches:
 
 ```ini
 [Service]
 ExecStart=
-ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr <address>:8788 --behind-proxy
+ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr <address>:8788 --behind-proxy
 ```
 
 The server then warns on each start that the port must be reachable only from the
@@ -230,7 +230,7 @@ The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
   A viewer key reads every page and is refused every change, so a viewer can look
   but cannot act.
 - **Behind a proxy the cookie is `Secure`, but only when `--behind-proxy` is given.**
-  The server sets the flag from that option, so the cookie is `__Secure-cairn_ui`, and
+  The server sets the flag from that option, so the cookie is `__Secure-cairnbook_ui`, and
   a browser keeps it only for an https page. The shipped unit does not give the flag, so
   setup (b) adds it: with the same-host override under step 5, or with the override for
   a proxy on another host. Open the UI at the proxy's https
@@ -248,9 +248,9 @@ The web UI at `/ui/` adds these things to check. DESIGN.md §5.5 sets each one.
   nginx's `$host` is the name without its port, so a server on a port other than
   443 would have every form refused. `$http_host` is the header as the client sent
   it, port included.
-- **Cookies are shared across ports on one host name.** The UI's cookie is `cairn_ui`
-  (`__Secure-cairn_ui` over TLS), and browsers do not separate cookies by port. Two
-  `cairn serve` processes on one host name therefore sign each other out. Run one
+- **Cookies are shared across ports on one host name.** The UI's cookie is `cairnbook_ui`
+  (`__Secure-cairnbook_ui` over TLS), and browsers do not separate cookies by port. Two
+  `cairnbook serve` processes on one host name therefore sign each other out. Run one
   server per host name, or accept that.
 - **HSTS comes from the server only when it serves TLS itself on a non-loopback
   address** (setup (a)). Behind a proxy the server sends no `Strict-Transport-Security`.
@@ -265,13 +265,13 @@ the exit-check flow, is in [M3-UI-CHECK.md](M3-UI-CHECK.md).
 Caddy, with TLS handled by Caddy:
 
 ```caddy
-cairn.example.net {
+cairnbook.example.net {
 	reverse_proxy 127.0.0.1:8788
 	request_body {
 		max_size 1048576
 	}
 	log {
-		output file /var/log/caddy/cairn.log
+		output file /var/log/caddy/cairnbook.log
 		format filter {
 			wrap json
 			fields {
@@ -287,12 +287,12 @@ nginx, with a certificate you supply:
 ```nginx
 server {
     listen 443 ssl;
-    server_name cairn.example.net;
-    ssl_certificate     /etc/ssl/cairn/fullchain.pem;
-    ssl_certificate_key /etc/ssl/cairn/privkey.pem;
+    server_name cairnbook.example.net;
+    ssl_certificate     /etc/ssl/cairnbook/fullchain.pem;
+    ssl_certificate_key /etc/ssl/cairnbook/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 1m;                       # 1 MiB
-    access_log /var/log/nginx/cairn.access.log;    # the default format logs no Authorization
+    access_log /var/log/nginx/cairnbook.access.log;    # the default format logs no Authorization
 
     location / {
         proxy_pass http://127.0.0.1:8788;
@@ -304,11 +304,11 @@ server {
 
 Apache, with a certificate from `certbot`. Enable the modules first:
 `a2enmod proxy proxy_http headers ssl`. Start from a plain HTTP site, and let
-`certbot --apache -d cairn.example.net` add the TLS site and the redirect to it:
+`certbot --apache -d cairnbook.example.net` add the TLS site and the redirect to it:
 
 ```apache
 <VirtualHost *:80>
-    ServerName cairn.example.net
+    ServerName cairnbook.example.net
 
     ProxyPreserveHost On
     ProxyRequests Off
@@ -319,18 +319,18 @@ Apache, with a certificate from `certbot`. Enable the modules first:
     LimitRequestBody 1048576
 
     # The combined format logs no Authorization header. Do not add %{Authorization}i.
-    ErrorLog  ${APACHE_LOG_DIR}/cairn-error.log
-    CustomLog ${APACHE_LOG_DIR}/cairn-access.log combined
+    ErrorLog  ${APACHE_LOG_DIR}/cairnbook-error.log
+    CustomLog ${APACHE_LOG_DIR}/cairnbook-access.log combined
 </VirtualHost>
 ```
 
-`certbot` copies these lines into a new `*:443` site. `cairn` needs no restart when the
+`certbot` copies these lines into a new `*:443` site. `cairnbook` needs no restart when the
 certificate renews, because it does not hold the certificate. The live run was on
-Ubuntu 24.04; the Apache version was not recorded. `cairn` ran as the systemd unit on
+Ubuntu 24.04; the Apache version was not recorded. `cairnbook` ran as the systemd unit on
 `127.0.0.1:8788`, behind Apache on the same host, and the site was set up with
 `certbot --apache`. `certbot` reported a certificate and said it had set up automatic
 renewal. That certbot renews the certificate and reloads Apache by itself is how
-certbot works; the run did not observe a renewal. `cairn doctor` on a second machine
+certbot works; the run did not observe a renewal. `cairnbook doctor` on a second machine
 passed every check over `https`.
 
 On the server itself, a `curl` of the public `https://` name timed out, while the second
@@ -353,8 +353,8 @@ settings to work around.
 |---|---|---|
 | Start a non-loopback server with no key | `the address is not loopback, so it needs at least one active API key` | A network-reachable server with no key would have nothing to check calls against (`RequireKeys`). `Restart=on-failure` then loops on it. |
 | Start a non-loopback server with no TLS files and no `--behind-proxy` | `the address is not loopback, so it needs TLS` | Keys would cross the network in the clear (`RequireTransport`). |
-| `key add` before `/var/lib/cairn` exists | an error ending `open <directory>/: no such file or directory` | `key add` creates the database file, not its directory. |
-| `install ... -g cairn` before the user exists | `install: invalid group 'cairn'` | The group is made with the user. |
+| `key add` before `/var/lib/cairnbook` exists | an error ending `open <directory>/: no such file or directory` | `key add` creates the database file, not its directory. |
+| `install ... -g cairnbook` before the user exists | `install: invalid group 'cairnbook'` | The group is made with the user. |
 
 A loopback server may start with no key, which is why setup (b) with a local proxy
 can start first.
@@ -362,7 +362,7 @@ can start first.
 ## A server with no public DNS name
 
 Caddy's automatic TLS needs a public name; a home or office server often has none.
-`cairn` has no flag to skip certificate checks, and no flag for a private CA. It
+`cairnbook` has no flag to skip certificate checks, and no flag for a private CA. It
 trusts the operating system's certificate roots, and nothing else. Two routes work.
 
 **An SSH tunnel.** The server stays on loopback (the default unit, setup (b) steps 1
@@ -374,18 +374,18 @@ client, keep it running while you work:
 ssh -N -o ExitOnForwardFailure=yes -L 8788:127.0.0.1:8788 you@server
 ```
 
-Set `server = "http://127.0.0.1:8788"` in `.cairn.toml`. Plain `http` to a loopback
-address is not warned about by `cairn doctor`: it warns only for a host that is not
+Set `server = "http://127.0.0.1:8788"` in `.cairnbook.toml`. Plain `http` to a loopback
+address is not warned about by `cairnbook doctor`: it warns only for a host that is not
 loopback. The tunnel must be up whenever Claude Code runs. If port 8788 is taken on the
 client, use another local port, such as `-L 18788:127.0.0.1:8788`, and put the same port
-in `.cairn.toml`.
+in `.cairnbook.toml`.
 
 **A private CA the client trusts.** Make a CA, issue the server a certificate whose
 subject alternative name is the name or address clients use, use it in setup (a) or in
 the proxy, and install the CA certificate in each client's operating system trust store.
 On macOS, `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca.pem`.
-On Debian or Ubuntu, copy it to `/usr/local/share/ca-certificates/cairn-ca.crt` and run
-`sudo update-ca-certificates`. Then use `https://` in `.cairn.toml`. A client that does
+On Debian or Ubuntu, copy it to `/usr/local/share/ca-certificates/cairnbook-ca.crt` and run
+`sudo update-ca-certificates`. Then use `https://` in `.cairnbook.toml`. A client that does
 not trust the CA fails the connection, and that is the correct result: do not look for
 a way round it. These commands are given from the platforms' documentation and have not
 been run for this project.
@@ -393,9 +393,9 @@ been run for this project.
 ## The service user and state directory
 
 The service user owns the database and runs the service. The state directory,
-`/var/lib/cairn`, is mode 0700 and owned by that user, so nothing else on the host reads
+`/var/lib/cairnbook`, is mode 0700 and owned by that user, so nothing else on the host reads
 the database. The server creates the database there at mode 0600. The commands are in
-the numbered orders above. The unit's `StateDirectory=cairn` makes the directory too,
+the numbered orders above. The unit's `StateDirectory=cairnbook` makes the directory too,
 but only once the unit starts, which is too late for the first `key add` and too late
 for a non-loopback server that needs that key to start. That is why the directory is
 made by hand first.
@@ -403,32 +403,32 @@ made by hand first.
 ## The systemd unit
 
 The unit is installed in the numbered orders above. It is
-[docs/deploy/cairn.service](deploy/cairn.service):
+[docs/deploy/cairnbook.service](deploy/cairnbook.service):
 
 ```ini
 [Unit]
-Description=Cairn memory server
+Description=Cairnbook memory server
 Documentation=https://github.com/djm56/cairn-memory/blob/main/docs/DEPLOY.md
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=cairn
-Group=cairn
-ExecStart=/usr/local/bin/cairn serve --db /var/lib/cairn/cairn.db --addr 127.0.0.1:8788
+User=cairnbook
+Group=cairnbook
+ExecStart=/usr/local/bin/cairnbook serve --db /var/lib/cairnbook/cairnbook.db --addr 127.0.0.1:8788
 Restart=on-failure
 RestartSec=5
 
-StateDirectory=cairn
+StateDirectory=cairnbook
 StateDirectoryMode=0700
-WorkingDirectory=/var/lib/cairn
+WorkingDirectory=/var/lib/cairnbook
 UMask=0077
 
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/cairn
+ReadWritePaths=/var/lib/cairnbook
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -450,15 +450,15 @@ WantedBy=multi-user.target
 ```
 
 **The unit was started under systemd in the M2 live run.** On 2026-11-02, on Ubuntu 24.04,
-it was installed from `cairn` `c4e9444` and started with `systemctl enable --now cairn`,
+it was installed from `cairnbook` `c4e9444` and started with `systemctl enable --now cairnbook`,
 and `systemctl status` showed `active (running)`. `systemd-analyze verify` printed
 nothing. `systemd-analyze security` gave a score of 3.2 for the unit, which the tool
 marks OK. Run the same three checks on your own host:
 
 ```bash
-systemd-analyze verify /etc/systemd/system/cairn.service
-systemctl status cairn
-systemd-analyze security cairn
+systemd-analyze verify /etc/systemd/system/cairnbook.service
+systemctl status cairnbook
+systemd-analyze security cairnbook
 ```
 
 `ReadWritePaths=` repeats what `StateDirectory=` already grants under
@@ -469,29 +469,29 @@ The unit holds no secrets. Keys are not in it, and clients send them. The state
 directory is the only path the service may write. `Restart=on-failure` restarts a
 crash, and a clean stop stays stopped.
 
-Logs go to the journal: `journalctl -u cairn`, as root or as a member of the
+Logs go to the journal: `journalctl -u cairnbook`, as root or as a member of the
 `systemd-journal` group. The server logs the method, the route path and the cause of
 each internal failure. It never logs a header, a body or a key.
 
-The time on each log line is UTC, as `cairn export` and `cairn key list` print theirs, so
+The time on each log line is UTC, as `cairnbook export` and `cairnbook key list` print theirs, so
 the lines line up with those without a conversion (#137).
 
 The `listening` line's `active_keys` is the count of keys that were active when the server
 started. A key added while the server runs is not in that count, so the line can read
 `active_keys=0` while a key exists. To see the keys as they are now, run
-`cairn key list` (#138).
+`cairnbook key list` (#138).
 
 ## Keys
 
 Keys are made in the server's database, as the service user, so the file stays owned by
-`cairn`. Give `--db` the same path the unit uses. The first key, `ops`, is made in the
+`cairnbook`. Give `--db` the same path the unit uses. The first key, `ops`, is made in the
 numbered order of your setup, before the server starts; a name is never reused, so
 later keys take other names. `key add` needs the state directory to exist already (it
 creates the database file, not the directory):
 
 ```bash
-sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name laptop-claude --scope agent
-sudo -u cairn /usr/local/bin/cairn key list --db /var/lib/cairn/cairn.db
+sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name laptop-claude --scope agent
+sudo -u cairnbook /usr/local/bin/cairnbook key list --db /var/lib/cairnbook/cairnbook.db
 ```
 
 `key add`, `key list` and `key revoke` open the database with the same migrator as
@@ -508,32 +508,32 @@ key, so revoking the only key and then restarting the service leaves it failing,
 `Restart=on-failure` keeps retrying:
 
 ```bash
-sudo -u cairn /usr/local/bin/cairn key add --db /var/lib/cairn/cairn.db --name laptop-claude-2 --scope agent
-sudo -u cairn /usr/local/bin/cairn key revoke --db /var/lib/cairn/cairn.db --name laptop-claude
+sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairnbook.db --name laptop-claude-2 --scope agent
+sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/cairnbook.db --name laptop-claude
 ```
 
-A key looks like `cairn_<your-key>`. Never paste a real key into a file that is
+A key looks like `cairnbook_<your-key>`. Never paste a real key into a file that is
 committed, a ticket, or a chat.
 
 ## Backup
 
-`cairn backup` makes a consistent copy while the server runs. Schedule it with cron, as
+`cairnbook backup` makes a consistent copy while the server runs. Schedule it with cron, as
 the service user. Write the backups to a directory only that user can read:
 
 ```bash
-install -d -m 0700 -o cairn -g cairn /var/backups/cairn
+install -d -m 0700 -o cairnbook -g cairnbook /var/backups/cairnbook
 ```
 
-`/etc/cron.d/cairn-backup`:
+`/etc/cron.d/cairnbook-backup`:
 
 ```cron
-30 2 * * * cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db "/var/backups/cairn/cairn-$(date -u +\%Y\%m\%dT\%H\%M\%SZ).db"
+30 2 * * * cairnbook /usr/local/bin/cairnbook backup --db /var/lib/cairnbook/cairnbook.db "/var/backups/cairnbook/cairnbook-$(date -u +\%Y\%m\%dT\%H\%M\%SZ).db"
 ```
 
 `backup` makes each copy in a directory of its own beside the output, then gives it the
 output's name by a hard link. A link already at that name, even one that points nowhere,
 is refused, and nothing is written through it (#129). Keep the backup directory 0700 and
-owned by `cairn` anyway: the copies are then readable by that user only, and no other user
+owned by `cairnbook` anyway: the copies are then readable by that user only, and no other user
 can rename the directory `backup` is working in. Do not point backups at a shared
 directory such as `/tmp`, where another user could. The output directory must not be
 writable by other users: the copy is written by name while it is made, so a user who
@@ -541,13 +541,13 @@ could write there could redirect it for the length of the copy. If the staging n
 copy, the backup is refused and nothing at that name is removed, so the directory the backup
 made, emptied first, can be left beside the output renamed by whoever swapped it, a symlink
 can stay at the staging name, and the copy may be in the other directory it was redirected
-to, owner-only but a full database copy. The operator may remove an empty `.cairn-backup-*`
+to, owner-only but a full database copy. The operator may remove an empty `.cairnbook-backup-*`
 directory after checking.
 
 Each copy is new and owner-only, and `backup` refuses an existing name, so a run
 never overwrites one. `backup` needs a filesystem that supports hard links, and fails
 with a message saying so on one that does not. A killed backup can leave a hidden
-`.cairn-backup-*` directory beside the output, with a partial copy. Check it, then
+`.cairnbook-backup-*` directory beside the output, with a partial copy. Check it, then
 remove it by hand; `backup` does not remove it on the next run. Nothing deletes old
 copies. Prune them yourself, and keep enough to cover the window you need. Check that
 a copy restores: restore one to a scratch path on another host, not over the live
@@ -555,7 +555,7 @@ database.
 
 ## Restore
 
-`cairn restore` replaces the database. It is confirmed at a terminal, by typing the
+`cairnbook restore` replaces the database. It is confirmed at a terminal, by typing the
 database path, and it never deletes anything: the old database is moved aside.
 
 1. Stop the server. The restore checks a readable database for a running server. For
@@ -565,20 +565,20 @@ database path, and it never deletes anything: the old database is moved aside.
    server yourself first:
 
    ```bash
-   systemctl stop cairn
+   systemctl stop cairnbook
    ```
 
 2. Run the restore from an interactive shell as the service user:
 
    ```bash
-   sudo -u cairn /usr/local/bin/cairn restore --db /var/lib/cairn/cairn.db /var/backups/cairn/cairn-20261031T023000Z.db
+   sudo -u cairnbook /usr/local/bin/cairnbook restore --db /var/lib/cairnbook/cairnbook.db /var/backups/cairnbook/cairnbook-20261031T023000Z.db
    ```
 
 3. Start the server again, and check the log:
 
    ```bash
-   systemctl start cairn
-   journalctl -u cairn -n 20
+   systemctl start cairnbook
+   journalctl -u cairnbook -n 20
    ```
 
 A restore into a path with no database refuses when a `-wal` or `-shm` file is beside that
@@ -586,12 +586,12 @@ path. It names the files and changes nothing: SQLite would replay a `-wal` it fi
 database it opens. Check those files, move them out of the folder yourself, and run the
 restore again.
 
-The old database stays at `/var/lib/cairn/cairn.db.pre-restore-<UTC time>`. Keep it
+The old database stays at `/var/lib/cairnbook/cairnbook.db.pre-restore-<UTC time>`. Keep it
 until the restored server checks out, then delete it yourself.
 
 **If a restore fails.** A restore that stops after its first move says where the
-database before it is, and the commands that put it back. In short: stop `cairn`, move
-any file now at `/var/lib/cairn/cairn.db` aside, then run the `mv` command the error
+database before it is, and the commands that put it back. In short: stop `cairnbook`, move
+any file now at `/var/lib/cairnbook/cairnbook.db` aside, then run the `mv` command the error
 printed. The server also refuses to create an empty database over an interrupted
 restore, and names the file. The full steps are in the README under "If a restore
 fails".
@@ -607,45 +607,45 @@ gives. It stops first, then backs up, and the backup must exist before anything 
 
 ```bash
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-install -d -m 0700 -o cairn -g cairn /var/backups/cairn && \
-systemctl stop cairn && \
-cp -p /usr/local/bin/cairn /usr/local/bin/cairn.prev-$STAMP && \
-sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db && \
-ls -l /var/backups/cairn/pre-upgrade-$STAMP.db && \
-install -m 0755 /home/you/cairn-linux /usr/local/bin/cairn && \
-systemctl start cairn
-/usr/local/bin/cairn version
-journalctl -u cairn -n 20
+install -d -m 0700 -o cairnbook -g cairnbook /var/backups/cairnbook && \
+systemctl stop cairnbook && \
+cp -p /usr/local/bin/cairnbook /usr/local/bin/cairnbook.prev-$STAMP && \
+sudo -u cairnbook /usr/local/bin/cairnbook backup --db /var/lib/cairnbook/cairnbook.db /var/backups/cairnbook/pre-upgrade-$STAMP.db && \
+ls -l /var/backups/cairnbook/pre-upgrade-$STAMP.db && \
+install -m 0755 /home/you/cairnbook-linux /usr/local/bin/cairnbook && \
+systemctl start cairnbook
+/usr/local/bin/cairnbook version
+journalctl -u cairnbook -n 20
 curl -sS https://<host>:8788/healthz
 ```
 
-The lines before `systemctl start cairn` are joined with `&&`. Each runs only when the one
+The lines before `systemctl start cairnbook` are joined with `&&`. Each runs only when the one
 before it succeeded. If one prints an error, stop there. Nothing after it has run, and the
-old binary is still installed. If the server was already stopped, `systemctl start cairn`
+old binary is still installed. If the server was already stopped, `systemctl start cairnbook`
 starts the old build again, on a database that no migration has changed. The new binary is
-`/home/you/cairn-linux` after `make push`, which copies it to the home directory of the SSH
-user. On a server you built on the server, it is `bin/cairn` in the checkout. Use the file
+`/home/you/cairnbook-linux` after `make push`, which copies it to the home directory of the SSH
+user. On a server you built on the server, it is `bin/cairnbook` in the checkout. Use the file
 you copied. The `ls -l` line is the gate: do not install until it lists the backup. Fill in
 `<host>`. The block runs as root, as the wiki's does, so its lines run without `sudo` except
-the `backup` line, which runs as `cairn`. The stamp is set on the first line, so run the
+the `backup` line, which runs as `cairnbook`. The stamp is set on the first line, so run the
 whole upgrade in the same shell.
 
 Migrations run when the server starts, so the first start after an upgrade may change the
-schema. Keep `cairn.prev-<UTC time>` and the pre-upgrade backup until the new server has run
+schema. Keep `cairnbook.prev-<UTC time>` and the pre-upgrade backup until the new server has run
 cleanly.
 
 **Roll back.** Restoring the old binary alone is not enough: the old binary does not
 understand the new schema. Put back the old binary **and** the pre-upgrade backup:
 
 ```bash
-systemctl stop cairn
-install -m 0755 /usr/local/bin/cairn.prev-<UTC time> /usr/local/bin/cairn
-sudo -u cairn /usr/local/bin/cairn restore --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-<UTC time>.db
-systemctl start cairn
+systemctl stop cairnbook
+install -m 0755 /usr/local/bin/cairnbook.prev-<UTC time> /usr/local/bin/cairnbook
+sudo -u cairnbook /usr/local/bin/cairnbook restore --db /var/lib/cairnbook/cairnbook.db /var/backups/cairnbook/pre-upgrade-<UTC time>.db
+systemctl start cairnbook
 ```
 
 `<UTC time>` is the stamp from the upgrade. If you no longer have it,
-`ls /usr/local/bin/cairn.prev-* /var/backups/cairn/pre-upgrade-*` lists the names.
+`ls /usr/local/bin/cairnbook.prev-* /var/backups/cairnbook/pre-upgrade-*` lists the names.
 
 Anything written after the upgrade started is in the database that `restore` moves aside
-(`cairn.db.pre-restore-<UTC time>`), not in the restored one. See [Restore](#restore).
+(`cairnbook.db.pre-restore-<UTC time>`), not in the restored one. See [Restore](#restore).

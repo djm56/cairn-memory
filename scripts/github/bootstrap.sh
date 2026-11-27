@@ -49,7 +49,7 @@
 #                    project lacks it, with its options. An existing field is
 #                    never changed; missing options are reported with manual
 #                    steps.
-#   sync_project     creates the "Cairnbook Memory Roadmap" project when none exists
+#   sync_project     creates the "Cairn Memory Roadmap" project when none exists
 #                    and links it to the repository when it is not linked.
 #   sync_items       adds a roadmap issue to the board when it is not there, and
 #                    sets its Phase or Area only when that value is empty. Phase
@@ -87,7 +87,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LABELS_FILE="$ROOT/.github/labels.json"
 ROADMAP_FILE="$ROOT/.github/roadmap.json"
-PROJECT_TITLE="Cairnbook Memory Roadmap"
+PROJECT_TITLE="Cairn Memory Roadmap"
 
 APPLY=0
 REPO=""

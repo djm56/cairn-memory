@@ -1,4 +1,4 @@
-# Cairn Memory — Design
+# Cairnbook — Design
 
 **Status as of 2026-11-06: M5 (Plugin) is current, and the exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4's exit check passed by operator ruling on 2026-11-06: the /compact hand check, section 3 of `docs/M4-HAND-CHECK.md`, was run and passed. Sections 4 and 5 of that guide (OpenCode and pi) are not run, and #206 is open. Phases 0 to 2 are done, and
 their exit checks passed. Live progress is on the
@@ -9,17 +9,17 @@ The build order is in [PLAN.md](PLAN.md). The decisions in
 PLAN.md §8 were adopted on 2026-10-27; this document marks each place that
 rests on one as *(decision Dn)*.
 
-## 1. What Cairn is
+## 1. What Cairnbook is
 
-Cairn is an operating record for coding agents. An agent records what it is working on,
+Cairnbook is an operating record for coding agents. An agent records what it is working on,
 the steps it takes, what happened, and what it learned. The next agent, in
 the same project or another one, reads that back before it starts.
 
 A cairn is a pile of stones left on a trail for whoever comes next. Each task
-in Cairn leaves markers of the same kind: what worked, what went wrong, and
+in Cairnbook leaves markers of the same kind: what worked, what went wrong, and
 rules that the next agent must follow.
 
-Cairn has four jobs:
+Cairnbook has four jobs:
 
 1. **Task state.** The current task, its plan, its steps, and a journal of
    events. An agent that starts a new session picks up where the last one
@@ -28,7 +28,7 @@ Cairn has four jobs:
    that worked) and notes about agents. An operator accepts or rejects each
    finding. Accepted findings become **directives**: rules that agents read
    before they work.
-3. **Recall.** Before a task starts, Cairn returns the lessons, directives and
+3. **Recall.** Before a task starts, Cairnbook returns the lessons, directives and
    similar past tasks that apply to it.
 4. **Review.** A web page where the operator follows tasks, decides on
    findings and ratifies directives. Optional scheduled agents classify
@@ -36,7 +36,7 @@ Cairn has four jobs:
 
 ### 1.1 Principles
 
-- **Any harness.** Cairn assumes no agent framework. Plain Claude Code is the
+- **Any harness.** Cairnbook assumes no agent framework. Plain Claude Code is the
   first client. Bishop, OpenCode, pi and others are clients of the same kind.
   Nothing in the core names a particular crew, agent or file layout.
 - **The database is the source of truth.** Agents write through tools and
@@ -45,23 +45,23 @@ Cairn has four jobs:
 - **Structured, not parsed.** Lessons, mistakes, acceptance criteria and
   review verdicts are tool fields. Nothing is parsed out of Markdown headings
   afterwards.
-- **One binary.** `cairn` is the server, the MCP adapter, the hook helper and
+- **One binary.** `cairnbook` is the server, the MCP adapter, the hook helper and
   the admin tool.
-- **One server.** Every client calls one `cairn serve` over HTTP, so a single
+- **One server.** Every client calls one `cairnbook serve` over HTTP, so a single
   team or several machines share one place to look and back up *(decision
-  D11)*. `cairn mcp` and the CLI require `server` in `.cairn.toml` or
-  `CAIRN_SERVER`. The local database path that D2 designed (the MCP adapter
+  D11)*. `cairnbook mcp` and the CLI require `server` in `.cairnbook.toml` or
+  `CAIRNBOOK_SERVER`. The local database path that D2 designed (the MCP adapter
   opening a database when no server is set) was cut by D11 before it was built.
   M1 builds the server-only adapter *(decision D2, superseded by D11)*, and the
   `internal/api` handlers, with no network listener in the M1 binary (decision D19).
-  M2 adds `cairn serve`, the binary's one listener (decision D20).
+  M2 adds `cairnbook serve`, the binary's one listener (decision D20).
 - **The operator decides.** Agents propose findings and directives. Only the
   operator accepts them. No tool lets an agent change a finding's status or
   ratify a rule.
 - **Small, compact tool output.** Every tool result is written to be read by
   a model with a limited context. Lists are short by default and paged.
 
-### 1.2 What Cairn is not
+### 1.2 What Cairnbook is not
 
 - Not an agent framework. It does not decide what agents do, only what they
   remember.
@@ -74,7 +74,7 @@ Cairn has four jobs:
 
 | Concept | Meaning |
 |---|---|
-| **Project** | A codebase that uses Cairn. The unit of identity: every task, event and learning belongs to one. Named in the project's `.cairn.toml`. |
+| **Project** | A codebase that uses Cairnbook. The unit of identity: every task, event and learning belongs to one. Named in the project's `.cairnbook.toml`. |
 | **Client** | The program connecting: `claude-code`, `opencode`, `pi`, or another. Recorded on each session, never used as identity. |
 | **Agent** | The name of whoever made a call: `main`, or a sub-agent's name (`reviewer`, `hicks`). Chosen by the client. |
 | **Session** | One run of a client, when the client supplies an id (Claude Code hooks do). Optional. |
@@ -93,45 +93,45 @@ stored actor is `<project>:<agent>`.
 
 The MCP adapter finds the project in this order:
 
-1. `CAIRN_PROJECT` in its environment.
-2. `project = "<name>"` in `.cairn.toml`, found by walking up from
+1. `CAIRNBOOK_PROJECT` in its environment.
+2. `project = "<name>"` in `.cairnbook.toml`, found by walking up from
    `CLAUDE_PROJECT_DIR` (set by Claude Code for MCP servers) or from the
    working directory.
-3. Otherwise every call is refused with an error that names `cairn init`.
+3. Otherwise every call is refused with an error that names `cairnbook init`.
    There is no default project. A silent default writes under the wrong
    name, which is the trap bishop-memory's `claude-code` default fell into.
 
-A `.cairn.toml` that is a directory is refused, not skipped: the walk stops at
+A `.cairnbook.toml` that is a directory is refused, not skipped: the walk stops at
 it and the call is `invalid`. The error names that path, as in
-`<path> is a directory, not a project file`. It does not name `cairn init`,
+`<path> is a directory, not a project file`. It does not name `cairnbook init`,
 because the fix is to move the directory aside, and init would not replace it.
 
-`.cairn.toml` is committed to the project, so everyone who works on it writes
+`.cairnbook.toml` is committed to the project, so everyone who works on it writes
 under the same name. Its full contents:
 
 ```toml
 project = "acme-api"          # required; lowercase letters, digits, hyphens
-server = "https://cairn.lan:8788"   # required from M1 (decision D11); D2's local database was never built
+server = "https://cairnbook.lan:8788"   # required from M1 (decision D11); D2's local database was never built
 ```
 
-The API key never goes in this file. A client takes it from `CAIRN_API_KEY`
+The API key never goes in this file. A client takes it from `CAIRNBOOK_API_KEY`
 when that is set and not blank. Otherwise it takes it from the
-`CAIRN_API_KEY=<key>` line of `~/.config/cairn/client.env`, which is read only
+`CAIRNBOOK_API_KEY=<key>` line of `~/.config/cairnbook/client.env`, which is read only
 when no other user can read or write it (mode 0600 or stricter, else the client
 refuses it and says `chmod 600`). The path is fixed, not taken from
 `XDG_CONFIG_HOME`. The client sends the key as `Authorization: Bearer <key>` on
 every call, and no command prints it. The client does not follow a redirect, so
 the key is never sent to a second address. A `client.env` that is a symbolic
 link is judged by the file it names, and one that is not a regular file is
-refused. A line may begin with `export `. `cairn doctor` warns when a key would
+refused. A line may begin with `export `. `cairnbook doctor` warns when a key would
 go over `http` to a host that is not loopback. The plugin does not set the key (D36).
-Its `plugin.json` has no `userConfig`, so the key comes from `CAIRN_API_KEY` or
+Its `plugin.json` has no `userConfig`, so the key comes from `CAIRNBOOK_API_KEY` or
 `client.env`, as above.
 
-A user name or a password in the server URL stays out of output too: `cairn init`
+A user name or a password in the server URL stays out of output too: `cairnbook init`
 refuses one, and no command prints a URL with them.
 
-`cairn init` writes the file in `CLAUDE_PROJECT_DIR` when Claude Code sets it,
+`cairnbook init` writes the file in `CLAUDE_PROJECT_DIR` when Claude Code sets it,
 else in the working directory. Where `CLAUDE_PROJECT_DIR` is set, it refuses to
 run from a working directory outside it (exit 1): the variable is inherited by
 the shells Claude Code starts, and a `cd` into another project would otherwise
@@ -147,11 +147,11 @@ crash can leave the file partly written. Any other link failure is returned, and
 nothing is written directly. The file is created with mode 0644 before the
 umask.
 
-The server is resolved the same way, from `CAIRN_SERVER` or else the `server`
-key of the nearest `.cairn.toml`, found by the same walk (M1). `CAIRN_SERVER`
+The server is resolved the same way, from `CAIRNBOOK_SERVER` or else the `server`
+key of the nearest `.cairnbook.toml`, found by the same walk (M1). `CAIRNBOOK_SERVER`
 is read first, and an empty value counts as unset. A call with neither is
-refused with an error that names `cairn init`, and there is no default server.
-`cairn mcp` refuses to start without one.
+refused with an error that names `cairnbook init`, and there is no default server.
+`cairnbook mcp` refuses to start without one.
 
 ## 3. Data model
 
@@ -378,7 +378,7 @@ not the shape of a Markdown table.
 
 Each tool's fields, errors and rules are in [CONTRACT.md](CONTRACT.md).
 Tool names are short and unprefixed; the client adds the server prefix
-(Claude Code: `mcp__plugin_cairn_cairn__task_start`). Each write tool takes
+(Claude Code: `mcp__plugin_cairnbook_cairnbook__task_start`). Each write tool takes
 `agent`. Output is compact JSON or short text, designed to be read by a model.
 
 Plan v1 (decisions D11 and D14) sets the agent surface for M1: 13 tools plus
@@ -387,7 +387,7 @@ Until M1, the contract and `internal/core` still carried `event_list`,
 `review_record`, `note_put` and `note_get`, and no MCP tool wrapped them. M1
 removes them, and `event_list` folds into `task_get` (`section: events`). Each
 tool also has a CLI command over the same HTTP API (`internal/cli`, built in M4), which
-is how every harness other than Claude Code reaches Cairn.
+is how every harness other than Claude Code reaches Cairnbook.
 
 In M1, `internal/mcp` registers the fifteen tools of the table below, each one
 call of the service. Each write tool takes `agent`, which is the caller's agent
@@ -419,7 +419,7 @@ status, ratifies or retires a directive, deletes a task, or edits an event.
 
 ### 4.1 Session start
 
-`cairn hook session-start` prints, for a SessionStart hook, a short block of
+`cairnbook hook session-start` prints, for a SessionStart hook, a short block of
 context: the active task (title, next action, current step), the count of
 directives that apply, and one line saying that the block above is the task to
 continue. Decision D35 (2026-11-17) removed the line that asked the agent to call
@@ -433,9 +433,9 @@ nothing on stdout, says why on stderr, and exits 0, so the session starts.
 
 Plan v1 (decision D15) sets three hooks: `session-start`, `pre-compact` and
 `stop`. All three are built. `session-start` came in M1 (issue #16), and
-`pre-compact` and `stop` in M4 (issues #83 and #84). `cairn enable --agent
+`pre-compact` and `stop` in M4 (issues #83 and #84). `cairnbook enable --agent
 claude-code` installs all three in the project's `.claude/settings.local.json`.
-Decision D34 (2026-11-17) changes this. When the cairn plugin is enabled in Claude
+Decision D34 (2026-11-17) changes this. When the cairnbook plugin is enabled in Claude
 Code settings, enable says so and adds none of the three, because the plugin carries
 them. The check is built (issue #193) and not released yet, so a binary from before it
 still adds them as described here.
@@ -464,7 +464,7 @@ https://code.claude.com/docs/en/hooks.md:
   says `systemMessage` is a warning shown to the user. It is not added to
   Claude's context.
 
-`cairn doctor --agent claude-code` warns when the SessionStart matcher does not
+`cairnbook doctor --agent claude-code` warns when the SessionStart matcher does not
 name `compact`, since a matcher without it does not carry a task across
 `/compact`.
 
@@ -473,23 +473,23 @@ name `compact`, since a matcher without it does not carry a task across
 The target after M2: one server, no local backend. D2 designed a local backend,
 and D11 cut it before it was built; §5.3, "The server", says what replaces it.
 M1 builds the server-only adapter and the `internal/api` handlers. In M1 the
-shipped binary had no network listener and no `cairn serve`: `cairn serve` came
+shipped binary had no network listener and no `cairnbook serve`: `cairnbook serve` came
 in M2, and M1's tests ran against an in-process server (D19).
 
 ```
             ┌──────────── project ─────────────┐
             │ client (Claude Code, OpenCode…)  │
-            │ cairn plugin: MCP entry, skill,  │
+            │ cairnbook plugin: MCP entry, skill,  │
             │   hooks                          │
-            │ .cairn.toml                      │
+            │ .cairnbook.toml                      │
             └───────────────┬──────────────────┘
                             │ MCP stdio (the CLI from M4)
                     ┌───────▼────────┐
-                    │   cairn mcp    │
+                    │   cairnbook mcp    │
                     └───────┬────────┘
                             │ HTTP + API key
                     ┌───────▼──────────┐
-                    │   cairn serve    │
+                    │   cairnbook serve    │
                     │ HTTP API, web UI │
                     └───────┬──────────┘
                     ┌───────▼────────────┐
@@ -505,15 +505,15 @@ in M2, and M1's tests ran against an in-process server (D19).
 |---|---|
 | `internal/core` | The `Service` interface and its implementation: every rule (close policy, status transitions, operator-only changes) lives here and nowhere else. |
 | `internal/store` | SQLite access, migrations, FTS. Typed queries; no SQL in handlers. |
-| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The M1 binary had no network listener (D19). The `cairn serve` listener of M2 mounts them (D20). |
-| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairn serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairn serve`. Its form is §5.4. |
-| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairn serve`. It never touches the store. Built in M1. |
+| `internal/api` | HTTP handlers. Thin: decode, call `core`, encode. Built in M1: handlers only, in the form of §5.4. The M1 binary had no network listener (D19). The `cairnbook serve` listener of M2 mounts them (D20). |
+| `internal/client` | A `Service` implemented over HTTP. It is how every client reaches `cairnbook serve`. Built in M1: tested against an in-process `httptest` server (D19); M2 runs it against `cairnbook serve`. Its form is §5.4. |
+| `internal/mcp` | MCP tools. Each tool calls `Service` through `internal/client`, which talks to `cairnbook serve`. It never touches the store. Built in M1. |
 | `internal/cli` | Built in M4 (#87). The CLI sub-commands for tasks, steps, events, learnings, directives, `recall`, `search` and `prime`, all with `--json`. Calls `internal/client`, never the store. |
-| `internal/identity` | Project resolution from `CAIRN_PROJECT` and `.cairn.toml` (§2.1) is built. Agent and session resolution come later. |
+| `internal/identity` | Project resolution from `CAIRNBOOK_PROJECT` and `.cairnbook.toml` (§2.1) is built. Agent and session resolution come later. |
 | `internal/auth` | API keys and scopes (server mode). |
 | `internal/ui` | The web pages, embedded in the binary. |
 | `internal/conformance` | The conformance suite that checks any `Service`. |
-| `cmd/cairn` | One binary with sub-commands. |
+| `cmd/cairnbook` | One binary with sub-commands. |
 
 The `Service` interface is the contract. One test suite, the **conformance
 suite**, runs against the local implementation, the HTTP client, and later
@@ -523,31 +523,31 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairn init` | Writes `.cairn.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
-| `cairn mcp` | The MCP stdio server. Requires `server` or `CAIRN_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
-| `cairn serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
-| `cairn hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are built in M4 (#83, #84). What Claude Code does with each is in §4.1. |
-| `cairn status` | The project, the server in use and the active task, for a terminal. Built in M1. |
-| `cairn export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` prints every task of the project, built in M4 (D22). |
-| `cairn key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
-| `cairn enable --agent <name>` | Built in M4 (#85). For `claude-code`, it adds the three hooks (`session-start`, matched on `startup`, `resume`, `clear` and `compact`; `pre-compact`; `stop`) to the project's `.claude/settings.local.json`, and writes no MCP registration: that comes through the M5 plugin or `claude mcp add`. D34 (2026-11-17) adds that when the cairn plugin is enabled in Claude Code settings, enable says so and adds none of the hooks; that check is built (issue #193) and not released yet. enable names the settings file that enables the plugin, adds no hooks and writes nothing, and exits 0; a settings file that is malformed or unreadable counts as not enabled. For `opencode` and `pi`, which are EXPERIMENTAL, it also writes the MCP registration and the task-loop instructions. Before it writes an existing file, it copies the original to `cairn/backups/<project>` in the user's cache directory (`os.UserCacheDir`, outside the project), as a file of mode 0600 in a directory made 0700. `--dry-run` writes nothing. |
-| `cairn backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
-| `cairn restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
-| `cairn import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
-| `cairn doctor` | Checks the binary, the project file, the server and whether it answers as a Cairn server. Read-only. Built in M1. `--agent` (`claude-code`, `opencode` or `pi`) is built in M4 (#86): for `claude-code` it lists the cairn hooks in the settings files and runs each once against the server, and it warns when the SessionStart matcher does not name `compact`; a hook that no file holds is ok when the cairn plugin is enabled in one of them (D34); for `opencode` and `pi` (EXPERIMENTAL) it reports whether the registration and the instructions are in place. No file is written. |
-| `cairn task` | `current`, `get`, `list`, `start`, `update` and `close` a task, each with `--json`. Built in M4 (#87). |
-| `cairn step` | `add`, `update` and `plan` the steps of a task, each with `--json`. Built in M4 (#87). |
-| `cairn event log` | Logs an event on a task, with `--json`. Built in M4 (#87). |
-| `cairn learning` | `add` proposes a learning and `list` reads the project's learnings, each with `--json`. Built in M4 (#87). |
-| `cairn directive list` | The directives that apply, ranked and capped at 12, with the `expired` and `omitted` counts, with `--json`. Built in M4 (#87). |
-| `cairn recall --goal <text>` | What applies to a goal, as the `recall` tool gives it, with `--json`. Built in M4 (#87). |
-| `cairn search --query <text>` | Full-text search, as the `search` tool gives it, with `--json`. Built in M4 (#87). |
-| `cairn prime` | The session-start view for an agent with only a shell: the session-start block the hook writes, then the active task, with `--json`. Built in M4 (#87). |
+| `cairnbook init` | Writes `.cairnbook.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
+| `cairnbook mcp` | The MCP stdio server. Requires `server` or `CAIRNBOOK_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
+| `cairnbook serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
+| `cairnbook hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are built in M4 (#83, #84). What Claude Code does with each is in §4.1. |
+| `cairnbook status` | The project, the server in use and the active task, for a terminal. Built in M1. |
+| `cairnbook export <task>` | A task as Markdown (`export task [id]`, built in M1). `export project` prints every task of the project, built in M4 (D22). |
+| `cairnbook key add/list/revoke` | API keys for server mode, in the server's database (`--db`). Built in M2 (§8). `add` prints the key once; `list` shows names, scopes and times; `revoke` takes a name. |
+| `cairnbook enable --agent <name>` | Built in M4 (#85). For `claude-code`, it adds the three hooks (`session-start`, matched on `startup`, `resume`, `clear` and `compact`; `pre-compact`; `stop`) to the project's `.claude/settings.local.json`, and writes no MCP registration: that comes through the M5 plugin or `claude mcp add`. D34 (2026-11-17) adds that when the cairnbook plugin is enabled in Claude Code settings, enable says so and adds none of the hooks; that check is built (issue #193) and not released yet. enable names the settings file that enables the plugin, adds no hooks and writes nothing, and exits 0; a settings file that is malformed or unreadable counts as not enabled. For `opencode` and `pi`, which are EXPERIMENTAL, it also writes the MCP registration and the task-loop instructions. Before it writes an existing file, it copies the original to `cairnbook/backups/<project>` in the user's cache directory (`os.UserCacheDir`, outside the project), as a file of mode 0600 in a directory made 0700. `--dry-run` writes nothing. |
+| `cairnbook backup --db <file> <out>` | A consistent copy of the server's database to a new file, mode 0600, while the server runs. Built in M2 (#74). §5.2.1. |
+| `cairnbook restore --db <file> <backup>` | Replaces the database from a backup, behind a typed confirmation at a terminal. The old database is moved aside, never deleted. Built in M2 (#74). §5.2.1. |
+| `cairnbook import bishop-memory` | One-time migration from a bishop-memory database (PLAN.md §5). Planned, M6. |
+| `cairnbook doctor` | Checks the binary, the project file, the server and whether it answers as a Cairnbook server. Read-only. Built in M1. `--agent` (`claude-code`, `opencode` or `pi`) is built in M4 (#86): for `claude-code` it lists the cairnbook hooks in the settings files and runs each once against the server, and it warns when the SessionStart matcher does not name `compact`; a hook that no file holds is ok when the cairnbook plugin is enabled in one of them (D34); for `opencode` and `pi` (EXPERIMENTAL) it reports whether the registration and the instructions are in place. No file is written. |
+| `cairnbook task` | `current`, `get`, `list`, `start`, `update` and `close` a task, each with `--json`. Built in M4 (#87). |
+| `cairnbook step` | `add`, `update` and `plan` the steps of a task, each with `--json`. Built in M4 (#87). |
+| `cairnbook event log` | Logs an event on a task, with `--json`. Built in M4 (#87). |
+| `cairnbook learning` | `add` proposes a learning and `list` reads the project's learnings, each with `--json`. Built in M4 (#87). |
+| `cairnbook directive list` | The directives that apply, ranked and capped at 12, with the `expired` and `omitted` counts, with `--json`. Built in M4 (#87). |
+| `cairnbook recall --goal <text>` | What applies to a goal, as the `recall` tool gives it, with `--json`. Built in M4 (#87). |
+| `cairnbook search --query <text>` | Full-text search, as the `search` tool gives it, with `--json`. Built in M4 (#87). |
+| `cairnbook prime` | The session-start view for an agent with only a shell: the session-start block the hook writes, then the active task, with `--json`. Built in M4 (#87). |
 
 #### 5.2.1 Backup and restore (M2, #74)
 
-`cairn backup` and `cairn restore` open the server's database, so the logic is in
-`internal/server` and the commands in `cmd/cairn` only parse flags and call it. The
+`cairnbook backup` and `cairnbook restore` open the server's database, so the logic is in
+`internal/server` and the commands in `cmd/cairnbook` only parse flags and call it. The
 reach guard names those two command files as the only ones that may import the
 server package, beside `serve` and `key`.
 
@@ -566,7 +566,7 @@ the output directory must not be writable by other users, as `docs/DEPLOY.md`
 requires (mode 0700, owned by the service user). An existing
 `<out>` is refused, and so are `:memory:`, a `file:` name and a name with `?`. The
 database is opened without migrating, so a
-backup never changes the database it copies, and a file with no Cairn schema, or
+backup never changes the database it copies, and a file with no Cairnbook schema, or
 a schema newer than this build, is refused. `VACUUM INTO` is one read transaction.
 In WAL mode the copy holds every commit that finished before it began and no part
 of a later one, and it does not block a writer or wait for one. The online backup
@@ -596,7 +596,7 @@ nothing changed unless the step says otherwise:
    OpenBSD. Its tests run on Linux, the CI runner, and are run by the developer
    on macOS, which CI does not run; FreeBSD and OpenBSD are built and vetted,
    not run. On any other system the lock cannot be checked. The file is moved as
-   it is at step 5, and the operator confirms that `cairn serve` is stopped. A
+   it is at step 5, and the operator confirms that `cairnbook serve` is stopped. A
    readable database must not be in use. An exclusive lock is taken with
    `locking_mode=EXCLUSIVE` and a read, and an idle or busy open server holds
    the lock against it. `BEGIN EXCLUSIVE` alone does not do this in WAL mode,
@@ -630,16 +630,16 @@ not removed by the switch, so it is kept and moved with the database, as the
 report shows.
 
 **If a restore fails.** Every error after the first move names the pre-restore
-path and the step that puts the database back. That step is: stop `cairn serve`,
+path and the step that puts the database back. That step is: stop `cairnbook serve`,
 move any file now at `<db>` aside, then move each pre-restore file back to its
 name with `mv`. The files are the ones the restore printed as moved: normally
 `<db>.pre-restore-<UTC>`, and `<db>.pre-restore-<UTC>-shm` if it printed that one.
 A restore that stopped before its first move changed nothing to undo. While a
-`<db>.pre-restore-*` file sits beside an absent database path, `cairn serve` and
-`cairn key add` refuse to create a database there, and name the file, so an
+`<db>.pre-restore-*` file sits beside an absent database path, `cairnbook serve` and
+`cairnbook key add` refuse to create a database there, and name the file, so an
 interrupted restore does not become an empty server. Those refusals also give the
 start-fresh text: check the files, move each one out of the folder by hand to a
-folder of the operator's own, then start `cairn serve` again. Nothing is deleted.
+folder of the operator's own, then start `cairnbook serve` again. Nothing is deleted.
 The stray refusal before step 2 gives the same instruction for a `-wal` or `-shm`
 with no database beside it. The same steps are in the README under "If a restore fails".
 
@@ -649,7 +649,7 @@ The verbs that take `--json` (`task`, `step`, `event`, `learning`, `directive`,
 `recall`, `search` and `prime`) exit with the code of the error kind of a failed
 call, so a script or an agent with only a shell can tell a refusal from a missing
 row without reading the message. The codes are the table in
-`internal/cli/exit.go`, and `cairn --help` prints the same table.
+`internal/cli/exit.go`, and `cairnbook --help` prints the same table.
 
 | Exit | Meaning |
 |---|---|
@@ -674,21 +674,21 @@ The other commands (`status`,
 
 ### 5.3 The server
 
-Clients open no database. `cairn mcp` and the CLI send each call to
-`cairn serve` over HTTP with the API key (D11). `cairn mcp` refuses to start
-without a `server` (M1). The store stays inside `cairn serve`, and the web UI
+Clients open no database. `cairnbook mcp` and the CLI send each call to
+`cairnbook serve` over HTTP with the API key (D11). `cairnbook mcp` refuses to start
+without a `server` (M1). The store stays inside `cairnbook serve`, and the web UI
 is served by the same process. In M1 the shipped binary had no network
 listener, and M1's flow ran against an in-process server bound to loopback
-(D19). M2 adds `cairn serve`, the binary's only listener, as set out below.
+(D19). M2 adds `cairnbook serve`, the binary's only listener, as set out below.
 
-D2 designed a local backend, in which `cairn mcp` would open a SQLite file on
+D2 designed a local backend, in which `cairnbook mcp` would open a SQLite file on
 the machine. D11 cut it before it was built, so there is no choice of backend
-and no switch in `.cairn.toml`.
+and no switch in `.cairnbook.toml`.
 
-A project's data does not move automatically. `cairn serve` can be pointed at
+A project's data does not move automatically. `cairnbook serve` can be pointed at
 an existing SQLite file to make it the server's own database.
 
-**`cairn serve` (M2, D20).** Its flags:
+**`cairnbook serve` (M2, D20).** Its flags:
 
 - `--addr` is the address to listen on. It defaults to `127.0.0.1:8788`, which
   is the port of the server example in §2.1.
@@ -743,7 +743,7 @@ both setups, TLS by files and TLS behind a proxy.
 `Service` that calls it. Defined in M1 (2026-10-30), and tightened in M2
 (2026-10-31) before any listener existed: the request rules and the versioning
 rule below are the M2 text. M2 serves this form on
-`cairn serve`, and from then on it is public API. It is written here rather
+`cairnbook serve`, and from then on it is public API. It is written here rather
 than in CONTRACT.md because CONTRACT says what each call does for an MCP
 client and the CLI. This section is how the adapter reaches the server.
 
@@ -766,11 +766,11 @@ client and the CLI. This section is how the adapter reaches the server.
   value of the wrong type, a second JSON value, and a body over 1 MiB are
   refused too: `400`, or `413` for the size. The server refuses unknown fields,
   so a misspelt field is not dropped.
-- **Caller.** The headers `X-Cairn-Project`, `X-Cairn-Agent`,
-  `X-Cairn-Session` and `X-Cairn-Client` carry the caller (CONTRACT §1.1). The
+- **Caller.** The headers `X-Cairnbook-Project`, `X-Cairnbook-Agent`,
+  `X-Cairnbook-Session` and `X-Cairnbook-Client` carry the caller (CONTRACT §1.1). The
   role comes from the API key in `Authorization: Bearer <key>`, and only from
   it: the key's scope is the role (`agent`, `operator` or `viewer`).
-  `X-Cairn-Role` is not read, so a client never sets its own role. A call with
+  `X-Cairnbook-Role` is not read, so a client never sets its own role. A call with
   no project is `invalid`. A key that is missing, malformed, unknown or revoked
   is `unauthenticated`, answered `401` before the body is read. A `viewer` key
   is refused on every write route with `read_only` (`403`), and core is not
@@ -849,7 +849,7 @@ client and the CLI. This section is how the adapter reaches the server.
   The request rules above (exact keys, no repeated keys, `application/json`, and
   `no_route`) were settled on 2026-10-31, before any listener existed. No client
   was written against the form they refuse, so they are not a break of a served
-  form. They apply from the first release of `cairn serve`.
+  form. They apply from the first release of `cairnbook serve`.
 
 Tests: `internal/client` runs the whole conformance suite over an `httptest`
 server on loopback that wraps the handlers over a real `core` (D19).
@@ -861,7 +861,7 @@ fields (`wire_test.go`).
 
 ### 5.5 The web UI
 
-The web UI is served by `cairn serve`, in the same process, under `/ui/`
+The web UI is served by `cairnbook serve`, in the same process, under `/ui/`
 (M3, decisions D23 to D26). It renders HTML on the server, needs no JavaScript,
 and loads one embedded stylesheet. Sign-in and the session rules are D23; the
 viewer rule is D24; the reaffirm call is D26.
@@ -1053,13 +1053,13 @@ mistyped name from creating a row.
 - **Cleanup.** Rows past either lifetime are deleted at each sign-in, and at most
   once an hour on the first request after the hour. A deleted row is not revived.
 
-**Cookie.** Name `cairn_ui`, or `__Secure-cairn_ui` when `Secure` is set, so a
+**Cookie.** Name `cairnbook_ui`, or `__Secure-cairnbook_ui` when `Secure` is set, so a
 browser refuses the cookie unless it is marked `Secure`. Value: the token.
 `Path=/ui`, `HttpOnly`, `SameSite=Strict`. It has no `Max-Age` and no `Expires`,
 so it is a browser session cookie, and the server's lifetimes decide when a
 session ends.
 
-Cookies are not scoped by port. Two Cairn servers on one host share the name, so
+Cookies are not scoped by port. Two Cairnbook servers on one host share the name, so
 each one signs the other out. The `__Secure-` prefix does not separate them. DEPLOY.md
 says so, and it is accepted for a host that runs one server.
 
@@ -1080,7 +1080,7 @@ cookies could already read the key typed at sign-in.
 **CSRF.** Every form that writes carries the hidden field `csrf`. Its value is
 derived, not stored: HMAC-SHA256 with the key set to the session token from the
 cookie (the cookie's value, as the browser sent it) and the message set to the
-fixed label `cairn-ui-csrf`, encoded as unpadded base64url. Each form is rendered
+fixed label `cairnbook-ui-csrf`, encoded as unpadded base64url. Each form is rendered
 with the value for its own session, and no form that writes is rendered without
 it. On a POST the server takes the cookie's token, computes the same value, and
 compares it with the field in constant time (`hmac.Equal`). Nothing is stored, so
@@ -1141,7 +1141,7 @@ element; styling comes from `app.css` only.
 
 - An agent key is refused: "This is an agent key. The web UI signs in operator
   and viewer keys." Any other refusal (malformed, unknown, revoked, or not
-  starting with `cairn_`) reads "The key was not accepted." Both are answered
+  starting with `cairnbook_`) reads "The key was not accepted." Both are answered
   with the form again at status `401`. DESIGN gives no status for a refused key,
   so `401` is the choice here.
 - The key field is `type="password"`, so the key is not shown on the screen.
@@ -1352,45 +1352,45 @@ marketplace file at the repository root.
 
 ```
 plugins/claude-code/
-  .claude-plugin/plugin.json   name "cairn"; no userConfig (D36): no server and
+  .claude-plugin/plugin.json   name "cairnbook"; no userConfig (D36): no server and
                                no api_key. The key and the server come from
                                elsewhere, as below
-  .mcp.json                    server "cairn": ${CLAUDE_PLUGIN_ROOT}/bin/cairn-launch mcp
-  bin/cairn-launch             finds the cairn binary on PATH, then in ~/.local/bin
+  .mcp.json                    server "cairnbook": ${CLAUDE_PLUGIN_ROOT}/bin/cairnbook-launch mcp
+  bin/cairnbook-launch             finds the cairnbook binary on PATH, then in ~/.local/bin
                                (D37); if neither has it, exits 127 with one line
                                naming the install command
-  hooks/hooks.json             registers the same three hooks as cairn enable:
-                               SessionStart → cairn hook session-start;
-                               PreCompact and Stop → cairn hook pre-compact
+  hooks/hooks.json             registers the same three hooks as cairnbook enable:
+                               SessionStart → cairnbook hook session-start;
+                               PreCompact and Stop → cairnbook hook pre-compact
                                and stop (D15). The hooks reference says
                                PreCompact stdout becomes instructions for the
                                compaction summary. That is not confirmed in a
                                live session (issue #26), so the skill does not
-                               rely on it (§4.1). Each runs through bin/cairn-launch
-  skills/cairn/SKILL.md        how to work with Cairn: the task loop below,
+                               rely on it (§4.1). Each runs through bin/cairnbook-launch
+  skills/cairnbook/SKILL.md        how to work with Cairnbook: the task loop below,
                                what each hook puts in front of the agent, how
                                to answer a refused close, and how to insert a step
-  commands/init.md             /cairn:init → cairn init, with the flags given
-  commands/status.md           /cairn:status
+  commands/init.md             /cairnbook:init → cairnbook init, with the flags given
+  commands/status.md           /cairnbook:status
 ```
 
 The plugin does not bundle the binary. A plugin's `bin/` is on the Bash
 tool's PATH only, and shipping per-platform binaries in a plugin is not
 documented, so the binary is installed once per machine and the launcher
 finds it. The launcher searches PATH first and then `~/.local/bin`. `CAIRN_HOME/bin`
-is not searched (D37). If `cairn` is in neither place, the launcher prints one line
+is not searched (D37). If `cairnbook` is in neither place, the launcher prints one line
 naming the install command and exits 127, the status a shell gives a command it cannot
 find. Only absolute PATH directories are searched, so an empty or relative entry never
-runs a cairn from the directory a session is in. A cairn that is the launcher itself,
+runs a cairnbook binary from the directory a session is in. A cairnbook that is the launcher itself,
 through a link on PATH, is skipped, so the launcher does not run itself.
 
 **Key and server (D36).** The plugin holds neither. The API key comes from
-`CAIRN_API_KEY` or `~/.config/cairn/client.env`, as §5.2 says, and the server comes
-from each project's `.cairn.toml`. Installing the plugin asks for no key and no server.
+`CAIRNBOOK_API_KEY` or `~/.config/cairnbook/client.env`, as §5.2 says, and the server comes
+from each project's `.cairnbook.toml`. Installing the plugin asks for no key and no server.
 
-**Plugin or `cairn enable` (D34).** The plugin and `cairn enable --agent claude-code`
+**Plugin or `cairnbook enable` (D34).** The plugin and `cairnbook enable --agent claude-code`
 are alternatives, and the plugin is the recommended route for Claude Code. Enable
-checks whether the cairn plugin is enabled in Claude Code settings. If it is, enable
+checks whether the cairnbook plugin is enabled in Claude Code settings. If it is, enable
 says so and adds no hooks, because the plugin's `hooks/hooks.json` already carries
 them. Otherwise enable behaves as §5 describes. The check is built (issue #193) and not
 released yet, so a binary from before it still writes the hooks.
@@ -1414,23 +1414,23 @@ rules, written in terms of the same tools.
 Plan v1 (decision D14) gives every client other than Claude Code the CLI over
 the same HTTP API (`internal/cli`, built in M4). Bash is enough for that, so
 no per-harness plugin is needed in v1. The rows below are the per-client
-registrations. They come through `cairn enable`, built in M4 (OpenCode and Pi
+registrations. They come through `cairnbook enable`, built in M4 (OpenCode and Pi
 experimental, as PLAN.md §3 sets out). Per-harness plugins are Later.
 
 | Client | Registration | Instructions | Notes |
 |---|---|---|---|
-| OpenCode | `opencode.json` → `"mcp": {"cairn": {"type": "local", "command": ["cairn", "mcp"]}}` | The skill text via `"instructions"` | Raise the default 5 s timeout. Tools arrive as `cairn_*`. |
+| OpenCode | `opencode.json` → `"mcp": {"cairnbook": {"type": "local", "command": ["cairnbook", "mcp"]}}` | The skill text via `"instructions"` | Raise the default 5 s timeout. Tools arrive as `cairnbook_*`. |
 | pi | `.pi/mcp.json` with `"exposure": "direct"` | `AGENTS.md` | The default `codemode` exposure hides the tools from the model. |
-| Codex CLI, Gemini/Antigravity | `<client> mcp add cairn -- cairn mcp` | `AGENTS.md` | Not tested; listed for later. |
-| Any MCP client | `cairn mcp` over stdio | The skill text | The contract is the tool list in §4. |
+| Codex CLI, Gemini/Antigravity | `<client> mcp add cairnbook -- cairnbook mcp` | `AGENTS.md` | Not tested; listed for later. |
+| Any MCP client | `cairnbook mcp` over stdio | The skill text | The contract is the tool list in §4. |
 
 ### 6.3 Bishop
 
 Bishop becomes a crew pack: a Claude Code plugin in the bishop-harness
-repository that depends on the `cairn` plugin. It ships the crew, the soul,
-its skills and its lifecycle rules, written in terms of Cairn's tools, with
+repository that depends on the `cairnbook` plugin. It ships the crew, the soul,
+its skills and its lifecycle rules, written in terms of Cairnbook's tools, with
 no state files of its own. That work belongs to the bishop-harness
-repository. PLAN.md lists what Cairn must provide for it.
+repository. PLAN.md lists what Cairnbook must provide for it.
 
 ## 7. Review loop (optional, later)
 
@@ -1454,21 +1454,21 @@ status; they only recommend.
 
 - Local mode (D2) was designed and cut by D11 before it was built. Its design
   listened on nothing and kept the database file under the user's control.
-- `cairn serve` binds loopback by default and refuses to bind anything else
+- `cairnbook serve` binds loopback by default and refuses to bind anything else
   without at least one API key. TLS by certificate files or behind a proxy. The
   bind rules and the limits are in §5.3. The setup steps, the proxy rules and the
   systemd unit are in [DEPLOY.md](DEPLOY.md).
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
-  `cairn_` and 32 random bytes in unpadded base64url, shown once when it is
-  made. `cairn key add` makes one in the server's database and prints it once on
+  `cairnbook_` and 32 random bytes in unpadded base64url, shown once when it is
+  made. `cairnbook key add` makes one in the server's database and prints it once on
   stdout, with a warning on stderr. The database keeps only the hash, and nothing
-  logs the key. `cairn key list` shows each key's name, scope and times, never the
-  hash or the key. `cairn key revoke` ends a key at its next call, since the server
+  logs the key. `cairnbook key list` shows each key's name, scope and times, never the
+  hash or the key. `cairnbook key revoke` ends a key at its next call, since the server
   reads the key table on every call. A revoked key keeps its name, so a name is
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
-  and may not begin with `cairn_`. `cairn key revoke` checks the name the same
+  and may not begin with `cairnbook_`. `cairnbook key revoke` checks the name the same
   way, before it looks anything up, so a key pasted as a name is refused and is
-  not echoed. If `cairn key add` cannot write the key to stdout, the key was made
+  not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.
 
   The 256 random bits are what make a fast hash enough: a guess of the key is
@@ -1477,7 +1477,7 @@ status; they only recommend.
   (read-only: the read routes pass, and every write route answers `403`
   `read_only`). Plan v1 (decision D13) drops the `admin` scope from the design.
 - The role comes from the key's scope and from nothing else. The resolver never
-  reads `X-Cairn-Role`, so an agent key that claims the operator role is refused
+  reads `X-Cairnbook-Role`, so an agent key that claims the operator role is refused
   on an operator route with `operator_only` (issue #110).
 - In M2 a key is not bound to a project or an agent name. Any valid key may claim
   any project and any agent name in the request headers. That is intended for the

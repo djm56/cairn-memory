@@ -1,12 +1,13 @@
-# Cairn Memory
+# Cairnbook
 
 An operating record for coding agents. Agents record the task they are on, the steps
 they take, what happened and what they learned. The next agent reads that
 back before it starts. An operator turns the best lessons into rules that
 every agent follows.
 
-A cairn is a pile of stones left on a trail for whoever comes next. Each task
-in Cairn leaves the same kind of marker.
+A cairn is a pile of stones left on a trail for whoever comes next: each stone
+rests on the ones before it. Cairnbook keeps that kind of record for each task,
+so what came before supports what comes after.
 
 <!-- cairn-milestone: M5 -->
 
@@ -14,8 +15,8 @@ in Cairn leaves the same kind of marker.
 > [milestones](https://github.com/djm56/cairn-memory/milestones)
 > and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects).
 >
-> Read [docs/DESIGN.md](docs/DESIGN.md) for what Cairn is, and
-> [docs/PLAN.md](docs/PLAN.md) for the build order. Cairn replaces
+> Read [docs/DESIGN.md](docs/DESIGN.md) for what Cairnbook is, and
+> [docs/PLAN.md](docs/PLAN.md) for the build order. Cairnbook replaces
 > [bishop-memory](https://github.com/djm56/bishop-memory), which keeps
 > running until the move is done.
 
@@ -31,13 +32,13 @@ At-a-glance progress (offline): [PROGRESS.md](PROGRESS.md). Quick install and up
   The operator accepts or rejects each finding. Accepted findings become
   **directives**: rules agents read before they work, in one project or all
   of them.
-- **Recall.** Before a task starts, Cairn returns the directives, lessons and
+- **Recall.** Before a task starts, Cairnbook returns the directives, lessons and
   similar past tasks that apply.
 - **Review.** A web page to follow tasks, decide on findings and ratify
   directives.
 
 It works with any agent harness. Claude Code connects through MCP and hooks; OpenCode,
-pi and others connect through the CLI, over the same HTTP API. One binary, `cairn`, is
+pi and others connect through the CLI, over the same HTTP API. One binary, `cairnbook`, is
 the MCP server, the CLI, the hook helper and the server. The database is the source of
 truth, and the operator decides: agents only propose.
 
@@ -52,34 +53,36 @@ git clone https://github.com/djm56/cairn-memory.git
 cd cairn-memory
 make build
 mkdir -p ~/.local/bin
-install -m 0755 bin/cairn ~/.local/bin/cairn
-mkdir -p ~/cairn-data
-cairn serve --db ~/cairn-data/cairn.db                              # in a second terminal, left running
-cairn key add --db ~/cairn-data/cairn.db --name laptop --scope agent  # copy the key it prints, now
-mkdir -p -m 700 ~/.config/cairn && chmod 700 ~/.config/cairn
+install -m 0755 bin/cairnbook ~/.local/bin/cairnbook
+mkdir -p ~/cairnbook-data
+cairnbook serve --db ~/cairnbook-data/cairnbook.db                              # in a second terminal, left running
+cairnbook key add --db ~/cairnbook-data/cairnbook.db --name laptop --scope agent  # copy the key it prints, now
+mkdir -p -m 700 ~/.config/cairnbook && chmod 700 ~/.config/cairnbook
 printf 'API key: ' >&2; read -rs K; echo >&2                         # type the key you copied; it is not echoed
-(umask 077 && printf 'CAIRN_API_KEY=%s\n' "$K" > ~/.config/cairn/client.env); unset K
-cairn init --project my-project --server http://127.0.0.1:8788      # in your project folder
-cairn enable --agent claude-code
-claude mcp add cairn -- "$(command -v cairn)" mcp
-cairn doctor
+(umask 077 && printf 'CAIRNBOOK_API_KEY=%s\n' "$K" > ~/.config/cairnbook/client.env); unset K
+cairnbook init --project my-project --server http://127.0.0.1:8788      # in your project folder
+cairnbook enable --agent claude-code
+claude mcp add cairnbook -- "$(command -v cairnbook)" mcp
+cairnbook doctor
 ```
 
-The block stores the key in `~/.config/cairn/client.env` before `cairn doctor` runs, as the
-Quick-Start gives it. `cairn doctor` should show five lines, each `ok`.
+The block stores the key in `~/.config/cairnbook/client.env` before `cairnbook doctor` runs, as the
+Quick-Start gives it. `cairnbook doctor` should show five lines, each `ok`.
 
-`.cairn.toml` is committed to the project. It names the project and the server, and `server` is
+`.cairnbook.toml` is committed to the project. It names the project and the server, and `server` is
 required (D11). The API key does not go in this file, and neither does a user name or password in
 the server URL.
 
 ```toml
 project = "acme-api"
-server = "https://cairn.lan:8788"
+server = "https://cairnbook.lan:8788"
 ```
 
-For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Claude Code 2.1.275 or later (the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`) installs it from GitHub in one line: `/plugin install cairn --marketplace djm56/cairn-memory`. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has the steps, and a route from a local checkout for developing the plugin. Use the plugin or the lines above, not both.
-The repository and the Go module still carry the name `cairn-memory`. Renaming them to `cairn` is
-planned (decision D18), and the rename has not been done.
+For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Claude Code 2.1.275 or later (the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`) installs it from GitHub in one line: `/plugin install cairnbook --marketplace djm56/cairn-memory`. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has the steps, and a route from a local checkout for developing the plugin. Use the plugin or the lines above, not both.
+The tool was named Cairn until 2026-11-27, when it became Cairnbook (decision D38). The
+repository and the Go module still carry the name `cairn-memory`; they move to `cairnbook`
+when the repository is renamed. An install made under the old name keeps working: see
+[Upgrade](https://github.com/djm56/cairn-memory/wiki/Upgrade#from-cairn-to-cairnbook).
 
 ## Where to read next
 
@@ -96,32 +99,32 @@ docs are canonical for the design.
 | [Binaries](https://github.com/djm56/cairn-memory/wiki/Binaries) | Where the builds come from, and what the version strings mean |
 | [MCP-Tools](https://github.com/djm56/cairn-memory/wiki/MCP-Tools) | The 15 MCP tools: what each takes, returns and refuses |
 | [CLI-Reference](https://github.com/djm56/cairn-memory/wiki/CLI-Reference) | Every verb, its flags, its environment variables and its exit codes |
-| [Checks](https://github.com/djm56/cairn-memory/wiki/Checks) | `cairn doctor` and the operator check, `scripts/smoke-check.sh` |
+| [Checks](https://github.com/djm56/cairn-memory/wiki/Checks) | `cairnbook doctor` and the operator check, `scripts/smoke-check.sh` |
 | [Operations](https://github.com/djm56/cairn-memory/wiki/Operations) | Keys and roles, backups, logs and certificates for a running server |
 | [Troubleshooting](https://github.com/djm56/cairn-memory/wiki/Troubleshooting) | The messages you are likely to see, why, and what to do |
 
 ## Using the CLI
 
 The CLI is for an agent with only a shell, or a harness without MCP. Each verb calls
-the server over HTTP with the key from `CAIRN_API_KEY` or `~/.config/cairn/client.env`,
-and needs `server` in `.cairn.toml` or `CAIRN_SERVER`, as `cairn mcp` does. The verbs
+the server over HTTP with the key from `CAIRNBOOK_API_KEY` or `~/.config/cairnbook/client.env`,
+and needs `server` in `.cairnbook.toml` or `CAIRNBOOK_SERVER`, as `cairnbook mcp` does. The verbs
 that take `--json` write, on one line, the object the MCP tool returns. The full list of
 verbs is in [CLI-Reference](https://github.com/djm56/cairn-memory/wiki/CLI-Reference).
-`cairn export project` prints every task of the project as Markdown on stdout; redirect it to a file to keep it.
+`cairnbook export project` prints every task of the project as Markdown on stdout; redirect it to a file to keep it.
 
 `--agent` names the calling agent. The write verbs, `task current`, `recall`, `prime`,
-`status` and `hook session-start` take it from `CAIRN_AGENT` when the flag is left out.
+`status` and `hook session-start` take it from `CAIRNBOOK_AGENT` when the flag is left out.
 `status` and the session-start hook use it only to count the directives for that role.
-`directive list` does not read `CAIRN_AGENT`, so it lists every role unless `--agent` is
+`directive list` does not read `CAIRNBOOK_AGENT`, so it lists every role unless `--agent` is
 given. A write with no agent name is refused on the CLI with exit 2. A malformed
-`CAIRN_AGENT` is refused by every verb with exit 2, reads included.
+`CAIRNBOOK_AGENT` is refused by every verb with exit 2, reads included.
 
-**Hooks.** `cairn enable --agent claude-code` adds three hooks to the project's
+**Hooks.** `cairnbook enable --agent claude-code` adds three hooks to the project's
 `.claude/settings.local.json`: `session-start`, `pre-compact` and `stop`. It keeps every
-other entry, and copies the original file to `cairn/backups/<project>` in the user's
+other entry, and copies the original file to `cairnbook/backups/<project>` in the user's
 cache directory, outside the project, before it writes. `--dry-run` writes nothing.
 `enable` writes hooks only. It does not register the MCP server. That is done by the M5
-plugin, or by hand with `claude mcp add cairn -- "$(command -v cairn)" mcp`, which uses
+plugin, or by hand with `claude mcp add cairnbook -- "$(command -v cairnbook)" mcp`, which uses
 the absolute path of the binary. The Claude Code plugin is the recommended route, and it is on `main`.
 When the plugin is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That
 check is built and not released yet.
@@ -135,7 +138,7 @@ rule counts as not run. On 2026-11-17 the operator decided that the hook text st
 (D35). That change is built and not released yet (#206). The pre-compact hook is installed. The hooks reference says its stdout becomes instructions for the compaction summary; that is not confirmed in a live session (#26). [DESIGN.md §4.1](docs/DESIGN.md#41-session-start) has the
 design.
 
-**OpenCode and pi (EXPERIMENTAL).** `cairn enable --agent opencode` and `--agent pi` register
+**OpenCode and pi (EXPERIMENTAL).** `cairnbook enable --agent opencode` and `--agent pi` register
 the MCP server in the client's own config and write the task-loop instructions into the
 project. Neither client has hooks, and neither path has been confirmed by a real run of the
 client. The steps are in [Connecting-Agents](https://github.com/djm56/cairn-memory/wiki/Connecting-Agents).
@@ -146,7 +149,7 @@ kind, so a script can tell a refusal from a missing row. The table is in
 
 ## Running the server
 
-`cairn serve` is the server, and the only listener in the binary. It keeps its data in the
+`cairnbook serve` is the server, and the only listener in the binary. It keeps its data in the
 SQLite file named by `--db`, which is created if it does not exist. It listens on loopback at
 `127.0.0.1:8788` unless `--addr` says otherwise. An address other than loopback needs TLS, by
 `--tls-cert` and `--tls-key`, or `--behind-proxy` when a proxy in front of the server terminates
@@ -159,9 +162,9 @@ reach is in [Install-Server](https://github.com/djm56/cairn-memory/wiki/Install-
 ### Making keys
 
 ```bash
-cairn key add    --db ./cairn.db --name ci --scope agent
-cairn key list   --db ./cairn.db
-cairn key revoke --db ./cairn.db --name ci
+cairnbook key add    --db ./cairnbook.db --name ci --scope agent
+cairnbook key list   --db ./cairnbook.db
+cairnbook key revoke --db ./cairnbook.db --name ci
 ```
 
 `--scope` is `agent` for the MCP tools, `operator` for decisions and ratification, or `viewer`
@@ -178,14 +181,14 @@ backup first ([Upgrade](https://github.com/djm56/cairn-memory/wiki/Upgrade)).
 ### Backup and restore
 
 ```bash
-cairn backup  --db ./cairn.db ./cairn-backup.db
-cairn restore --db ./cairn.db ./cairn-backup.db
+cairnbook backup  --db ./cairnbook.db ./cairnbook-backup.db
+cairnbook restore --db ./cairnbook.db ./cairnbook-backup.db
 ```
 
 `backup` writes a consistent copy to a new file, owner-only, while the server runs. It refuses a
 file that already exists. `restore` checks the backup first (it opens, passes SQLite's integrity
 check, and is not from a newer build). For a database it can read, it refuses while the database is
-open. For a file it cannot read, no check for a running server is possible, so stop `cairn serve`
+open. For a file it cannot read, no check for a running server is possible, so stop `cairnbook serve`
 before you confirm, whichever path it takes. It then asks you to type the database path at a
 terminal, and there is no flag to skip that. A restore from a pipe or a script is refused.
 
@@ -199,7 +202,7 @@ sure.
 
 **If a restore fails.** A restore that stops after its first move says where the database before it is,
 and the steps that put it back. The files to put back are the ones the restore printed as moved. To put
-them back: stop `cairn serve`, move any file now at `<db>` aside, then run `mv <db>.pre-restore-<UTC
+them back: stop `cairnbook serve`, move any file now at `<db>` aside, then run `mv <db>.pre-restore-<UTC
 time> <db>`, and for a `-shm` the same with `-shm` added to both names. A server that finds no database at
 its path, with a `<db>.pre-restore-*` file beside it, refuses to start and says so: that is an interrupted
 restore, and it does not create an empty database over it. Put the files back as above, then start the
@@ -215,15 +218,15 @@ refer to.
 
 A client sends its key with every call. Give it in the environment, or in a file only you can read.
 [Quick-Start](https://github.com/djm56/cairn-memory/wiki/Quick-Start) step 4 and
-[Install-Local](https://github.com/djm56/cairn-memory/wiki/Install-Local) give the commands. `CAIRN_API_KEY`
+[Install-Local](https://github.com/djm56/cairn-memory/wiki/Install-Local) give the commands. `CAIRNBOOK_API_KEY`
 is read first. A `client.env` that any other user can read or write is refused, and the client says
 `chmod 600`. The client does not follow a redirect, so the key is never sent to a second address.
-`cairn doctor` reports where the key was found, and whether the server accepted it. It warns when a key
+`cairnbook doctor` reports where the key was found, and whether the server accepted it. It warns when a key
 would go over plain `http` to a host that is not loopback, and it never prints the key.
 
 ## Web UI
 
-`cairn serve` also serves a web UI at `/ui/`, from the same process and address as the API. Open it in a
+`cairnbook serve` also serves a web UI at `/ui/`, from the same process and address as the API. Open it in a
 browser and paste an operator key or a viewer key on the sign-in page. An agent key is refused there. A
 viewer key reads every page and is refused every action. Operator keys make the changes. The pages are the
 dashboard, tasks, learnings, directives and projects. The design is in
@@ -237,7 +240,7 @@ is in [docs/M3-UI-CHECK.md](docs/M3-UI-CHECK.md).
 |---|---|
 | [The wiki](https://github.com/djm56/cairn-memory/wiki) | The procedures: install, upgrade, operate, and the reference pages. Published from `wiki/` |
 | [docs/DESIGN.md](docs/DESIGN.md) | Concepts, data model, the MCP tools, architecture, clients, security |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Running `cairn serve` for other machines: TLS, a proxy, the systemd unit, keys, backup, upgrade |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Running `cairnbook serve` for other machines: TLS, a proxy, the systemd unit, keys, backup, upgrade |
 | [docs/M2-LIVE-RUN.md](docs/M2-LIVE-RUN.md) | The M2 live run on a second machine: the checklist and what to report back |
 | [docs/M4-HAND-CHECK.md](docs/M4-HAND-CHECK.md) | The M4 hand check: the `/compact` check on Claude Code, and the OpenCode and pi checks |
 | [docs/CONTRACT.md](docs/CONTRACT.md) | Every tool's inputs, outputs, errors and rules; the operator calls |

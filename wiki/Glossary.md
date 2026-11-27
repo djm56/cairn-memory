@@ -2,25 +2,25 @@
 
 _Status as of 2026-11-06: M5 (Plugin) is current. The exit checks for M1 (the MCP stdio flow test), M2 (the live run, #19) and M3 (the web UI exit-check test) have passed. M4 (hooks and CLI) passed its /compact hand check by operator ruling, recorded 2026-11-06; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) have not been run, and #206 is open. Phases 0 to 2 are done. Live progress is on the [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects)._
 
-The terms follow [DESIGN.md §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts) and the sections it links. Cairn says **task**, not mission (decision D1).
+The terms follow [DESIGN.md §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts) and the sections it links. Cairnbook says **task**, not mission (decision D1).
 
 - **Agent.** Whoever made a call. It is `main` or a sub-agent's name, chosen by the client. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)
-- **Agent note.** A learning about how an agent behaved or performed. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairn-is)
+- **Agent note.** A learning about how an agent behaved or performed. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairnbook-is)
 - **API key.** The secret a client sends with each call. Its scope is `agent`, `operator` or `viewer`, which sets its role. The server keeps only its hash. [Operations](Operations)
-- **Client.** The program that connects to Cairn, such as Claude Code or OpenCode. It is recorded, but it is not an identity. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)
+- **Client.** The program that connects to Cairnbook, such as Claude Code or OpenCode. It is recorded, but it is not an identity. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)
 - **Close policy.** What a task must have before it can close. Each project sets it, and only the operator changes it. [DESIGN §3.7](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#37-the-close-policy)
 - **Conformance suite.** The test suite that checks any `Service` against the contract. [DESIGN §5.1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#51-packages)
 - **Directive.** A rule that agents must follow. The operator ratifies it and gives it a scope. [DESIGN §3.4](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#34-learnings-and-directives)
 - **Epic.** The issue that summarises one milestone: its work, its exit check and its child issues. [How we work](How-We-Work)
 - **Event (journal).** One row in a task's journal: something that happened, who did it and when. Events are append-only. [DESIGN §3.3](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#33-events-and-reviews)
-- **Finding.** A learning that proposes a change to a file, a rule or an agent. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairn-is)
-- **Hook.** A command a client runs at a fixed point, such as the start of a session or before compaction. Cairn's hooks print the active task. [Connecting-Agents](Connecting-Agents)
+- **Finding.** A learning that proposes a change to a file, a rule or an agent. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairnbook-is)
+- **Hook.** A command a client runs at a fixed point, such as the start of a session or before compaction. Cairnbook's hooks print the active task. [Connecting-Agents](Connecting-Agents)
 - **Learning.** Something worth keeping. It has one of three kinds: finding, pattern or agent note. Agents propose learnings, and the operator decides on them. [DESIGN §3.4](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#34-learnings-and-directives)
-- **Loopback.** The local host's own addresses: 127.0.0.0/8, `::1` and the IPv4-mapped form. `cairn serve` listens there by default, and needs no TLS for it. [Install-Server](Install-Server)
+- **Loopback.** The local host's own addresses: 127.0.0.0/8, `::1` and the IPv4-mapped form. `cairnbook serve` listens there by default, and needs no TLS for it. [Install-Server](Install-Server)
 - **Milestone.** One stage of the build plan, with its work and an exit check. Plan v1 has M1 to M8 and Later. Phases 0 to 2 came before them. [PLAN §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#3-milestones)
 - **Operator.** The person who decides. Only the operator accepts or rejects learnings and ratifies directives. [DESIGN §1.1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#11-principles)
-- **Pattern.** A learning about something that worked. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairn-is)
-- **Project.** A codebase that uses Cairn. Every task, event and learning belongs to one. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)
+- **Pattern.** A learning about something that worked. [DESIGN §1](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#1-what-cairnbook-is)
+- **Project.** A codebase that uses Cairnbook. Every task, event and learning belongs to one. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)
 - **Recall.** Before a task starts, the directives, lessons and similar past tasks that apply to it. [DESIGN §4](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#4-tool-surface-mcp)
 - **Review.** A verdict on one step: approved or not, with counts of critical issues and warnings. [DESIGN §3.3](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#33-events-and-reviews)
 - **Session.** One run of a client, when the client gives it an id. It is optional. [DESIGN §2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#2-concepts)

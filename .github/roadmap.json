@@ -3,7 +3,7 @@
     {
       "key": "phase-0",
       "title": "Phase 0 — Skeleton",
-      "description": "Exit: `make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton"
+      "description": "Exit: `make test` passes in CI on an empty suite; `bin/cairnbook version` prints a version from `git describe`.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton"
     },
     {
       "key": "phase-1",
@@ -18,12 +18,12 @@
     {
       "key": "M1",
       "title": "M1 Server-mode MCP",
-      "description": "Exit: An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` on another machine is M2's exit check (#19), since M1 builds no network listener in the shipped binary and no `cairn serve` (D19).\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: An MCP stdio test drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairnbook export task` prints the result. The live run against `cairnbook serve` on another machine is M2's exit check (#19), since M1 builds no network listener in the shipped binary and no `cairnbook serve` (D19).\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M2",
       "title": "M2 Server",
-      "description": "Exit: Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
+      "description": "Exit: Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairnbook serve` on another machine (#19), and `cairnbook export task` prints it.\n\nPlan: https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table"
     },
     {
       "key": "M3",
@@ -69,7 +69,7 @@
       "title": "Phase 0 — Skeleton",
       "milestone": "Phase 0 — Skeleton",
       "labels": ["type:epic", "phase:0", "area:core"],
-      "body": "**Status.** Delivered through PR #1.\n\n**Work.** Go module `github.com/djm56/cairn-memory`, Go 1.25. `cmd/cairn` with the sub-command frame and `cairn version`. Makefile (`build`, `test`, `vet`, `fmt`, `run`). CI on pull requests: `go vet`, `go test -race`, `gofmt` check. MIT licence (as bishop-memory). `CONTRIBUTING.md` with the rules in §6. `.gitignore` for `bin/`, `dist/`, `*.db`.\n\n**Exit check.** `make test` passes in CI on an empty suite; `bin/cairn version` prints a version from `git describe`.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton)\n\n<!-- cairn-roadmap: p0-epic -->"
+      "body": "**Status.** Delivered through PR #1.\n\n**Work.** Go module `github.com/djm56/cairn-memory`, Go 1.25. `cmd/cairnbook` with the sub-command frame and `cairnbook version`. Makefile (`build`, `test`, `vet`, `fmt`, `run`). CI on pull requests: `go vet`, `go test -race`, `gofmt` check. MIT licence (as bishop-memory). `CONTRIBUTING.md` with the rules in §6. `.gitignore` for `bin/`, `dist/`, `*.db`.\n\n**Exit check.** `make test` passes in CI on an empty suite; `bin/cairnbook version` prints a version from `git describe`.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-0--skeleton)\n\n<!-- cairn-roadmap: p0-epic -->"
     },
     {
       "key": "p1-epic",
@@ -87,7 +87,7 @@
       "title": "Phase 2 — Core and local store",
       "milestone": "Phase 2 — Core and local store",
       "labels": ["type:epic", "phase:2", "area:store"],
-      "body": "**Status.** Done. The exit check passed: the conformance suite passes against the local `Service`, and two processes writing the same database at once allocate distinct task ids.\n\n**Work.** `internal/store`: schema v1 (DESIGN.md §3) as numbered migrations, WAL mode, busy timeout, FTS5 index and its triggers. Typed query functions for every table. `internal/core`: the `Service` implementation over the store, holding every rule: status transitions, the close policy, step positions, task-id allocation in one transaction, operator-only changes. `internal/identity`: project resolution from `CAIRN_PROJECT` and `.cairn.toml` (DESIGN.md §2.1).\n\n**Exit check.** The conformance suite passes against the local `Service`. Two processes writing the same database at once allocate distinct task ids (a test). `go test -race` is clean.\n\n**Guided by.** bishop-memory, for reference: `internal/store/sqlite.go` and `migrate.go`, the FTS setup from `db/schema.sql`, and the allocator's daily sequence from `internal/api/allocate.go`.\n\n## Child issues\n\n<!-- children-start -->\n- [ ] p2-store-schema\n- [ ] p2-typed-queries\n- [ ] p2-core-service\n- [ ] p2-identity\n- [ ] p2-concurrent-allocation-test\n- [ ] p2-mutation-harness\n<!-- children-end -->\n\n<!-- children: p2-store-schema,p2-typed-queries,p2-core-service,p2-identity,p2-concurrent-allocation-test,p2-mutation-harness -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-epic -->"
+      "body": "**Status.** Done. The exit check passed: the conformance suite passes against the local `Service`, and two processes writing the same database at once allocate distinct task ids.\n\n**Work.** `internal/store`: schema v1 (DESIGN.md §3) as numbered migrations, WAL mode, busy timeout, FTS5 index and its triggers. Typed query functions for every table. `internal/core`: the `Service` implementation over the store, holding every rule: status transitions, the close policy, step positions, task-id allocation in one transaction, operator-only changes. `internal/identity`: project resolution from `CAIRNBOOK_PROJECT` and `.cairnbook.toml` (DESIGN.md §2.1).\n\n**Exit check.** The conformance suite passes against the local `Service`. Two processes writing the same database at once allocate distinct task ids (a test). `go test -race` is clean.\n\n**Guided by.** bishop-memory, for reference: `internal/store/sqlite.go` and `migrate.go`, the FTS setup from `db/schema.sql`, and the allocator's daily sequence from `internal/api/allocate.go`.\n\n## Child issues\n\n<!-- children-start -->\n- [ ] p2-store-schema\n- [ ] p2-typed-queries\n- [ ] p2-core-service\n- [ ] p2-identity\n- [ ] p2-concurrent-allocation-test\n- [ ] p2-mutation-harness\n<!-- children-end -->\n\n<!-- children: p2-store-schema,p2-typed-queries,p2-core-service,p2-identity,p2-concurrent-allocation-test,p2-mutation-harness -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-epic -->"
     },
     {
       "key": "p2-store-schema",
@@ -123,7 +123,7 @@
       "title": "Phase 2: project identity resolution",
       "milestone": "Phase 2 — Core and local store",
       "labels": ["type:task", "phase:2", "area:core"],
-      "body": "**Work.** `internal/identity`: project resolution from `CAIRN_PROJECT` and `.cairn.toml` (DESIGN.md §2.1).\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-identity -->"
+      "body": "**Work.** `internal/identity`: project resolution from `CAIRNBOOK_PROJECT` and `.cairnbook.toml` (DESIGN.md §2.1).\n\n**Exit.** Part of the phase 2 exit check; see the epic.\n\nSource: [docs/PLAN.md §3, phase 2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#phase-2--core-and-local-store)\n\n<!-- cairn-roadmap: p2-identity -->"
     },
     {
       "key": "p2-concurrent-allocation-test",
@@ -151,7 +151,7 @@
       "title": "M1 Server-mode MCP",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:epic", "m1", "area:mcp"],
-      "body": "**Status.** Done. The exit check (the MCP stdio flow test) passes in CI and was recorded as passed on 2026-11-03: it drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server, and `cairn export task` prints the result.\n\n**Work.** `internal/mcp` over `internal/client`; `internal/api` handlers over `core`, with no network listener in the shipped binary (D19; tests use an `httptest` server bound to loopback for the test's lifetime); `cairn mcp` refuses to start without a server; 13 tools plus recall and search; `cairn init` writes `project` and `server`; `cairn status`, `doctor`, `export task`, and `cairn hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** An MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairn export task` prints the result. The live run against `cairn serve` is M2's exit check (#19).\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
+      "body": "**Status.** Done. The exit check (the MCP stdio flow test) passes in CI and was recorded as passed on 2026-11-03: it drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against the in-process server, and `cairnbook export task` prints the result.\n\n**Work.** `internal/mcp` over `internal/client`; `internal/api` handlers over `core`, with no network listener in the shipped binary (D19; tests use an `httptest` server bound to loopback for the test's lifetime); `cairnbook mcp` refuses to start without a server; 13 tools plus recall and search; `cairnbook init` writes `project` and `server`; `cairnbook status`, `doctor`, `export task`, and `cairnbook hook session-start`; compact, paged output; MCP stdio test. The directive cap and `review_by` land in M2.\n\n**Exit check.** An MCP stdio test drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against the in-process server; `cairnbook export task` prints the result. The live run against `cairnbook serve` is M2's exit check (#19).\n\n**Guided by.** bishop-memory, for reference: the result and error helpers in `cmd/mcpd/main.go` (HTTP-status mapping, malformed-body guard), and the tool-description style.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p3-mcp-tools,p3-mcp-local-command,p3-cli-commands,p3-mcpd-helpers-port,p3-stdio-flow-test,m1-requires-server,m1-consolidate-tools,m1-review-event,m1-init-idempotent,m1-error-text-audit,m1-serve-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-epic -->"
     },
     {
       "key": "p3-mcp-tools",
@@ -168,20 +168,20 @@
       "phase": 3,
       "mkey": "M1",
       "area": "area:mcp",
-      "title": "cairn mcp as the server-only adapter",
+      "title": "cairnbook mcp as the server-only adapter",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Work.** `cairn mcp` is the MCP stdio adapter over `internal/client`, the only client path (D11). The refusal to start without a `server`, and the removal of the local-database path, are in the separate M1 issue on that rule.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-mcp-local-command -->"
+      "body": "**Work.** `cairnbook mcp` is the MCP stdio adapter over `internal/client`, the only client path (D11). The refusal to start without a `server`, and the removal of the local-database path, are in the separate M1 issue on that rule.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-mcp-local-command -->"
     },
     {
       "key": "p3-cli-commands",
       "phase": 3,
       "mkey": "M1",
       "area": "area:core",
-      "title": "cairn init, status, doctor, export task and hook session-start",
+      "title": "cairnbook init, status, doctor, export task and hook session-start",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:core"],
-      "body": "**Work.** `cairn init` (writes `project` and `server`), `cairn status`, `cairn doctor`, `cairn export task`, and `cairn hook session-start`. `cairn export project` is in the Scope of v1 and is placed in M4 Hooks + CLI (D22).\n\n**Exit.** `cairn export task` prints the task as Markdown. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-cli-commands -->"
+      "body": "**Work.** `cairnbook init` (writes `project` and `server`), `cairnbook status`, `cairnbook doctor`, `cairnbook export task`, and `cairnbook hook session-start`. `cairnbook export project` is in the Scope of v1 and is placed in M4 Hooks + CLI (D22).\n\n**Exit.** `cairnbook export task` prints the task as Markdown. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-cli-commands -->"
     },
     {
       "key": "p3-mcpd-helpers-port",
@@ -201,27 +201,27 @@
       "title": "MCP-level test of the task flow over stdio",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Exit.** An MCP stdio test drives a small task flow through `cairn mcp`, `internal/client`, `internal/api` and `core` against the in-process server. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-stdio-flow-test -->"
+      "body": "**Exit.** An MCP stdio test drives a small task flow through `cairnbook mcp`, `internal/client`, `internal/api` and `core` against the in-process server. Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-stdio-flow-test -->"
     },
     {
       "key": "p3-live-flow-check",
       "phase": 3,
       "mkey": "M2",
       "area": "area:mcp",
-      "title": "Live Claude Code run of a small task against cairn serve",
+      "title": "Live Claude Code run of a small task against cairnbook serve",
       "milestone": "M2 Server",
       "labels": ["type:task", "m2", "area:mcp"],
-      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairn serve` on another machine, and `cairn export task` prints it. Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
+      "body": "**Exit.** A Claude Code project with a hand-written `.mcp.json` completes a small task against `cairnbook serve` on another machine, and `cairnbook export task` prints it. Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p3-live-flow-check -->"
     },
     {
       "key": "m1-requires-server",
       "mkey": "M1",
       "phase": null,
       "area": "area:mcp",
-      "title": "cairn mcp requires server; remove the local-database path from the adapter (D11)",
+      "title": "cairnbook mcp requires server; remove the local-database path from the adapter (D11)",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:mcp"],
-      "body": "**Work.** `cairn mcp` refuses to start without `server` in `.cairn.toml` or `CAIRN_SERVER`. The local-database path is removed from the adapter, so no client opens a database (D11).\n\n**Exit.** Part of M1's exit check: an MCP stdio test drives a small task flow through `cairn mcp` → `internal/client` → `internal/api` → `core` against an in-process server, and `cairn export task` prints it.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-requires-server -->"
+      "body": "**Work.** `cairnbook mcp` refuses to start without `server` in `.cairnbook.toml` or `CAIRNBOOK_SERVER`. The local-database path is removed from the adapter, so no client opens a database (D11).\n\n**Exit.** Part of M1's exit check: an MCP stdio test drives a small task flow through `cairnbook mcp` → `internal/client` → `internal/api` → `core` against an in-process server, and `cairnbook export task` prints it.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-requires-server -->"
     },
     {
       "key": "m1-consolidate-tools",
@@ -248,10 +248,10 @@
       "mkey": "M1",
       "phase": null,
       "area": "area:core",
-      "title": "`cairn init` is idempotent and never prints a destructive command in any error",
+      "title": "`cairnbook init` is idempotent and never prints a destructive command in any error",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:core"],
-      "body": "**Work.** Running `cairn init` twice changes nothing the second time. No error from `cairn init`, or from any other command, prints a destructive command.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-init-idempotent -->"
+      "body": "**Work.** Running `cairnbook init` twice changes nothing the second time. No error from `cairnbook init`, or from any other command, prints a destructive command.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-init-idempotent -->"
     },
     {
       "key": "m1-error-text-audit",
@@ -261,7 +261,7 @@
       "title": "Error-text audit: every refusal names only a safe next step (test that greps for `--force`, `rm`, `reset`)",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:core"],
-      "body": "**Work.** A test greps every error string for `--force`, `rm` and `reset`, and fails on a match. Every refusal names only a safe next step. `cairn init` is a safe next step and may be named in an error string.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-error-text-audit -->"
+      "body": "**Work.** A test greps every error string for `--force`, `rm` and `reset`, and fails on a match. Every refusal names only a safe next step. `cairnbook init` is a safe next step and may be named in an error string.\n\n**Exit.** Part of M1's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-error-text-audit -->"
     },
     {
       "key": "m1-serve-decision",
@@ -271,17 +271,17 @@
       "title": "Decide whether M1 moves internal/client and a serve skeleton in, or tests against an in-process test server",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:decision", "m1", "area:mcp"],
-      "body": "**Question.** M1's exit check runs against `cairn serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Answer (2026-10-30, option B: test against an in-process test server, D19).** M1 tests against an in-process `httptest` server. M1 adds no network listener to the shipped binary and no `cairn serve`; its tests bind an `httptest` server to loopback (D19). The live run against `cairn serve` on another machine is M2's exit check (#19).\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
+      "body": "**Question.** M1's exit check runs against `cairnbook serve`, which M2 builds. Does M1 move `internal/client` and a serve skeleton into M1, or does it test against an in-process test server?\n\n**Answer (2026-10-30, option B: test against an in-process test server, D19).** M1 tests against an in-process `httptest` server. M1 adds no network listener to the shipped binary and no `cairnbook serve`; its tests bind an `httptest` server to loopback (D19). The live run against `cairnbook serve` on another machine is M2's exit check (#19).\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m1-serve-decision -->"
     },
     {
       "key": "m1-export-project-decision",
       "mkey": "M4",
       "phase": null,
       "area": "area:core",
-      "title": "Decision: place `cairn export project` in a milestone (placed in M4, D22)",
+      "title": "Decision: place `cairnbook export project` in a milestone (placed in M4, D22)",
       "milestone": "M4 Hooks + CLI",
       "labels": ["type:decision", "m4", "area:core"],
-      "body": "**Question.** `cairn export project` is in Scope of v1 (PLAN §3) but no milestone places it. Should it go in a milestone, and if so which one?\n\n**Decision.** Operator decision, 2026-11-03 (issue #72): `cairn export project` is placed in M4 Hooks + CLI (D22).\n\n**Source.** [docs/PLAN.md §3, Scope of v1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#scope-of-v1) and [docs/DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).\n\n<!-- cairn-roadmap: m1-export-project-decision -->"
+      "body": "**Question.** `cairnbook export project` is in Scope of v1 (PLAN §3) but no milestone places it. Should it go in a milestone, and if so which one?\n\n**Decision.** Operator decision, 2026-11-03 (issue #72): `cairnbook export project` is placed in M4 Hooks + CLI (D22).\n\n**Source.** [docs/PLAN.md §3, Scope of v1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#scope-of-v1) and [docs/DESIGN.md §5.2](https://github.com/djm56/cairn-memory/blob/main/docs/DESIGN.md#52-commands).\n\n<!-- cairn-roadmap: m1-export-project-decision -->"
     },
     {
       "key": "m1-internal-api-tracking",
@@ -291,17 +291,17 @@
       "title": "Tracking: internal/api, the HTTP handlers over core",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:server"],
-      "body": "**Work.** `internal/api`: the HTTP handlers over `core`, in the form DESIGN §5.4 sets out. M1 builds them as handlers only. The shipped binary has no network listener (D19); the listener is `cairn serve`, which is M2. This issue tracks the package after M1. Its open follow-ups are:\n\n- the wire-form decisions, #109 (M2);\n- the M1 header caller and its tripwire, #110 (M2);\n- the failure hook that `cairn serve` must pass, #112 (M2).\n\n**Exit.** Closed when `cairn serve` mounts these handlers in M2 and the follow-ups above are closed.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-internal-api-tracking -->"
+      "body": "**Work.** `internal/api`: the HTTP handlers over `core`, in the form DESIGN §5.4 sets out. M1 builds them as handlers only. The shipped binary has no network listener (D19); the listener is `cairnbook serve`, which is M2. This issue tracks the package after M1. Its open follow-ups are:\n\n- the wire-form decisions, #109 (M2);\n- the M1 header caller and its tripwire, #110 (M2);\n- the failure hook that `cairnbook serve` must pass, #112 (M2).\n\n**Exit.** Closed when `cairnbook serve` mounts these handlers in M2 and the follow-ups above are closed.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-internal-api-tracking -->"
     },
     {
       "key": "m1-internal-client-tracking",
       "mkey": "M1",
       "phase": null,
       "area": "area:server",
-      "title": "Tracking: internal/client, the HTTP client that the CLI and cairn mcp reach the server through",
+      "title": "Tracking: internal/client, the HTTP client that the CLI and cairnbook mcp reach the server through",
       "milestone": "M1 Server-mode MCP",
       "labels": ["type:task", "m1", "area:server"],
-      "body": "**Work.** `internal/client`: a `Service` implemented over HTTP. It is how `cairn mcp` and the CLI commands reach the server. M1 tests it against an in-process `httptest` server bound to loopback (D19). M2 runs it against `cairn serve`, and the live Claude Code run is M2's exit check (#19). This issue tracks the package after M1. Its open follow-ups are:\n\n- the wire-form decisions that the client encodes, #109 (M2);\n- the live run against `cairn serve`, #19 (M2).\n\n**Exit.** Closed when M2 runs the client against `cairn serve` and the follow-ups above are closed.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-internal-client-tracking -->"
+      "body": "**Work.** `internal/client`: a `Service` implemented over HTTP. It is how `cairnbook mcp` and the CLI commands reach the server. M1 tests it against an in-process `httptest` server bound to loopback (D19). M2 runs it against `cairnbook serve`, and the live Claude Code run is M2's exit check (#19). This issue tracks the package after M1. Its open follow-ups are:\n\n- the wire-form decisions that the client encodes, #109 (M2);\n- the live run against `cairnbook serve`, #19 (M2).\n\n**Exit.** Closed when M2 runs the client against `cairnbook serve` and the follow-ups above are closed.\n\nSource: [docs/PLAN.md §3, M1](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m1-internal-client-tracking -->"
     },
     {
       "key": "p4-epic",
@@ -311,7 +311,7 @@
       "title": "M5 Plugin",
       "milestone": "M5 Plugin",
       "labels": ["type:epic", "m5", "area:plugin"],
-      "body": "**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/marketplace.json` at the repository root (local marketplace first). The `cairn` skill: the task loop, what each hook will remind, how to answer a close refusal, how to insert a step between two. `cairn-launch`: finds `cairn` on PATH, then in `~/.local/bin`; otherwise exits non-zero and prints the install command. `claude plugin validate` in CI. An internal install guide with confirmed tool names. Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairn_cairn__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairn mcp`, and the SessionStart output.\n\n**Exit check.** A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p4-plugin-layout,p4-cairn-skill,p4-cairn-launch,p4-plugin-validate-ci,p4-install-guide,p4-live-confirmation -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-epic -->"
+      "body": "**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/marketplace.json` at the repository root (local marketplace first). The `cairnbook` skill: the task loop, what each hook will remind, how to answer a close refusal, how to insert a step between two. `cairnbook-launch`: finds `cairnbook` on PATH, then in `~/.local/bin`; otherwise exits non-zero and prints the install command. `claude plugin validate` in CI. An internal install guide with confirmed tool names. Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairnbook_cairnbook__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairnbook mcp`, and the SessionStart output.\n\n**Exit check.** A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: p4-plugin-layout,p4-cairnbook-skill,p4-cairnbook-launch,p4-plugin-validate-ci,p4-install-guide,p4-live-confirmation -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-epic -->"
     },
     {
       "key": "p4-plugin-layout",
@@ -324,24 +324,24 @@
       "body": "**Work.** `plugins/claude-code/` as in DESIGN.md §6.1. `.claude-plugin/marketplace.json` at the repository root (local marketplace first).\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-plugin-layout -->"
     },
     {
-      "key": "p4-cairn-skill",
+      "key": "p4-cairnbook-skill",
       "phase": 4,
       "mkey": "M5",
       "area": "area:plugin",
       "title": "Skill text: task loop, what each hook will remind, how to answer a close refusal, how to insert a step between two",
       "milestone": "M5 Plugin",
       "labels": ["type:task", "m5", "area:plugin"],
-      "body": "**Work.** Skill text: the task loop, what each hook will remind, how to answer a close refusal, and how to insert a step between two.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-cairn-skill -->"
+      "body": "**Work.** Skill text: the task loop, what each hook will remind, how to answer a close refusal, and how to insert a step between two.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-cairnbook-skill -->"
     },
     {
-      "key": "p4-cairn-launch",
+      "key": "p4-cairnbook-launch",
       "phase": 4,
       "mkey": "M5",
       "area": "area:plugin",
-      "title": "cairn-launch binary finder",
+      "title": "cairnbook-launch binary finder",
       "milestone": "M5 Plugin",
       "labels": ["type:task", "m5", "area:plugin"],
-      "body": "**Work.** `cairn-launch`: finds `cairn` on PATH, then in `~/.local/bin`; otherwise exits non-zero and prints the install command.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-cairn-launch -->"
+      "body": "**Work.** `cairnbook-launch`: finds `cairnbook` on PATH, then in `~/.local/bin`; otherwise exits non-zero and prints the install command.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-cairnbook-launch -->"
     },
     {
       "key": "p4-plugin-validate-ci",
@@ -371,7 +371,7 @@
       "title": "Confirm tool names and hook behaviour in a live session",
       "milestone": "M5 Plugin",
       "labels": ["type:task", "m5", "area:plugin"],
-      "body": "**Work.** Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairn_cairn__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairn mcp`, and the SessionStart output.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-live-confirmation -->"
+      "body": "**Work.** Confirm in a live session, and record in the guide: the exact tool names (`mcp__plugin_cairnbook_cairnbook__*` is inferred from the docs, not stated), that `CLAUDE_PROJECT_DIR` reaches `cairnbook mcp`, and the SessionStart output.\n\n**Exit.** Part of M5's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M5](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p4-live-confirmation -->"
     },
     {
       "key": "p5-epic",
@@ -381,7 +381,7 @@
       "title": "M2 Server",
       "milestone": "M2 Server",
       "labels": ["type:epic", "m2", "area:server"],
-      "body": "**Status.** Done. The exit check passed on 2026-11-02: a Claude Code session on a second machine ran a small task through `cairn mcp` against `cairn serve`, behind a TLS proxy, and `cairn export task` printed it (#19). One finding from the run review is an operator credential action, handled outside this repository.\n\n**Work.** `cairn serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or behind a proxy, loopback default, body caps, `/healthz`. Keys with `agent`, `operator` and `viewer` scopes (D13). `cairn key add/list/revoke`. `cairn backup <path>` using SQLite online backup. A systemd unit in `docs/`. The directive cap (12 per call, ranked, D16) and `review_by` on directives.\n\n**Exit check.** Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairn serve` on another machine (#19), and `cairn export task` prints it.\n\n**Guided by.** bishop-memory, for reference: `internal/auth/keys.go`, `internal/middleware`, `internal/config`, the TLS and key handling in `cmd/memoryd`, and the network tests (`internal/api/network_test.go`).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m2-viewer-scope,m2-backup-restore,m2-deploy-docs,m2-directive-cap,m2-review-by,m2-tls-decision,p3-live-flow-check -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p5-epic -->"
+      "body": "**Status.** Done. The exit check passed on 2026-11-02: a Claude Code session on a second machine ran a small task through `cairnbook mcp` against `cairnbook serve`, behind a TLS proxy, and `cairnbook export task` printed it (#19). One finding from the run review is an operator credential action, handled outside this repository.\n\n**Work.** `cairnbook serve`: the network listener over the `internal/api` handlers built in M1, TLS by files or behind a proxy, loopback default, body caps, `/healthz`. Keys with `agent`, `operator` and `viewer` scopes (D13). `cairnbook key add/list/revoke`. `cairnbook backup <path>` using SQLite online backup. A systemd unit in `docs/`. The directive cap (12 per call, ranked, D16) and `review_by` on directives.\n\n**Exit check.** Conformance suite passes over HTTP; agent key refused on operator routes; viewer key refused on every write (tests); M1 flow works with `server` set; the live Claude Code run of a small task against `cairnbook serve` on another machine (#19), and `cairnbook export task` prints it.\n\n**Guided by.** bishop-memory, for reference: `internal/auth/keys.go`, `internal/middleware`, `internal/config`, the TLS and key handling in `cmd/memoryd`, and the network tests (`internal/api/network_test.go`).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m2-viewer-scope,m2-backup-restore,m2-deploy-docs,m2-directive-cap,m2-review-by,m2-tls-decision,p3-live-flow-check -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p5-epic -->"
     },
     {
       "key": "m2-viewer-scope",
@@ -398,10 +398,10 @@
       "mkey": "M2",
       "phase": null,
       "area": "area:server",
-      "title": "`cairn backup <path>` using SQLite online backup; `cairn restore` behind an interactive confirmation",
+      "title": "`cairnbook backup <path>` using SQLite online backup; `cairnbook restore` behind an interactive confirmation",
       "milestone": "M2 Server",
       "labels": ["type:task", "m2", "area:server"],
-      "body": "**Work.** `cairn backup <path>` writes a SQLite online backup to a path. `cairn restore` restores a backup, behind an interactive confirmation.\n\n**Exit.** Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m2-backup-restore -->"
+      "body": "**Work.** `cairnbook backup <path>` writes a SQLite online backup to a path. `cairnbook restore` restores a backup, behind an interactive confirmation.\n\n**Exit.** Part of M2's exit check; see the epic.\n\nSource: [docs/PLAN.md §3, M2](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m2-backup-restore -->"
     },
     {
       "key": "m2-deploy-docs",
@@ -438,10 +438,10 @@
       "mkey": "M2",
       "phase": null,
       "area": "area:server",
-      "title": "Decide whether the proxy in front of the server terminates TLS, or cairn serve carries certificates",
+      "title": "Decide whether the proxy in front of the server terminates TLS, or cairnbook serve carries certificates",
       "milestone": "M2 Server",
       "labels": ["type:decision", "needs-operator", "m2", "area:server"],
-      "body": "**Question.** Does the proxy in front of the server terminate TLS, or does `cairn serve` carry certificates?\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m2-tls-decision -->"
+      "body": "**Question.** Does the proxy in front of the server terminate TLS, or does `cairnbook serve` carry certificates?\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: m2-tls-decision -->"
     },
     {
       "key": "p6-epic",
@@ -451,7 +451,7 @@
       "title": "M3 Web UI + dashboard",
       "milestone": "M3 Web UI + dashboard",
       "labels": ["type:epic", "m3", "area:ui"],
-      "body": "**Status.** Done. The web UI exit-check test (TestM3ExitCheck) passes in CI and was recorded as passed on 2026-11-03: a lead signs in, sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Work.** Pages embedded in the binary, served by `cairn serve`: **Tasks**: a list across projects; one task's page with its brief, steps, journal, reviews and close record. **Learnings**: proposed findings with accept, reject and supersede, each with a note. **Directives**: ratify, scope, `review_by`, retire. **Projects**: settings, including the close policy and parallel tasks. **Dashboard**: running now, waiting on you, quality (30 days), improving (by month), and the active directive count and oldest age.\n\n**Exit check.** A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Guided by.** bishop-memory, for reference: the mission HUD (Tasks page) and the triage review page (Learnings page).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m3-dashboard,m3-directive-page,m3-viewer-mode,m3-viewer-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p6-epic -->"
+      "body": "**Status.** Done. The web UI exit-check test (TestM3ExitCheck) passes in CI and was recorded as passed on 2026-11-03: a lead signs in, sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Work.** Pages embedded in the binary, served by `cairnbook serve`: **Tasks**: a list across projects; one task's page with its brief, steps, journal, reviews and close record. **Learnings**: proposed findings with accept, reject and supersede, each with a note. **Directives**: ratify, scope, `review_by`, retire. **Projects**: settings, including the close policy and parallel tasks. **Dashboard**: running now, waiting on you, quality (30 days), improving (by month), and the active directive count and oldest age.\n\n**Exit check.** A lead sees a proposed finding, accepts it, ratifies a directive, and `task_current` returns it next session; a viewer key sees every page and gets 403 on every action.\n\n**Guided by.** bishop-memory, for reference: the mission HUD (Tasks page) and the triage review page (Learnings page).\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m3-dashboard,m3-directive-page,m3-viewer-mode,m3-viewer-decision -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p6-epic -->"
     },
     {
       "key": "m3-dashboard",
@@ -498,40 +498,40 @@
       "mkey": "M4",
       "phase": null,
       "area": "area:core",
-      "title": "`cairn hook pre-compact`: prints active task, current step, next action, directive count",
+      "title": "`cairnbook hook pre-compact`: prints active task, current step, next action, directive count",
       "milestone": "M4 Hooks + CLI",
       "labels": ["type:task", "m4", "area:core"],
-      "body": "**Work.** `cairn hook pre-compact` prints the active task, the current step, the next action and the directive count (D15).\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-hook-pre-compact -->"
+      "body": "**Work.** `cairnbook hook pre-compact` prints the active task, the current step, the next action and the directive count (D15).\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-hook-pre-compact -->"
     },
     {
       "key": "m4-hook-stop",
       "mkey": "M4",
       "phase": null,
       "area": "area:core",
-      "title": "`cairn hook stop`: prints a one-line warning when a step is active without a summary",
+      "title": "`cairnbook hook stop`: prints a one-line warning when a step is active without a summary",
       "milestone": "M4 Hooks + CLI",
       "labels": ["type:task", "m4", "area:core"],
-      "body": "**Work.** `cairn hook stop` prints a one-line warning when a step is active without a summary (D15).\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-hook-stop -->"
+      "body": "**Work.** `cairnbook hook stop` prints a one-line warning when a step is active without a summary (D15).\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-hook-stop -->"
     },
     {
       "key": "m4-enable",
       "mkey": "M4",
       "phase": null,
       "area": "area:plugin",
-      "title": "`cairn enable --agent claude-code` writes `hooks.json` entries; `--agent opencode` and `--agent pi` write embedded files marked experimental",
+      "title": "`cairnbook enable --agent claude-code` writes `hooks.json` entries; `--agent opencode` and `--agent pi` write embedded files marked experimental",
       "milestone": "M4 Hooks + CLI",
       "labels": ["type:task", "m4", "area:plugin"],
-      "body": "**Work.** `cairn enable --agent claude-code` writes the `hooks.json` entries. `--agent opencode` and `--agent pi` write embedded files, marked experimental.\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-enable -->"
+      "body": "**Work.** `cairnbook enable --agent claude-code` writes the `hooks.json` entries. `--agent opencode` and `--agent pi` write embedded files, marked experimental.\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-enable -->"
     },
     {
       "key": "m4-doctor-agent",
       "mkey": "M4",
       "phase": null,
       "area": "area:core",
-      "title": "`cairn doctor --agent` reports which hooks are installed and fires a dry run of each",
+      "title": "`cairnbook doctor --agent` reports which hooks are installed and fires a dry run of each",
       "milestone": "M4 Hooks + CLI",
       "labels": ["type:task", "m4", "area:core"],
-      "body": "**Work.** `cairn doctor --agent` reports which hooks are installed, and fires a dry run of each.\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-doctor-agent -->"
+      "body": "**Work.** `cairnbook doctor --agent` reports which hooks are installed, and fires a dry run of each.\n\n**Exit.** Part of M4's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M4](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m4-doctor-agent -->"
     },
     {
       "key": "m4-internal-cli",
@@ -561,7 +561,7 @@
       "title": "M6 Import",
       "milestone": "M6 Import",
       "labels": ["type:epic", "m6", "area:migration"],
-      "body": "**Work.** `cairn import bishop-memory --db <path> [--dry-run]`. Reads the bishop-memory SQLite file directly; never reads harness Markdown. The mapping is in PLAN §5.1, with the reviewer verdicts carried as `review` events. Idempotent: running it twice changes nothing the second time. Reports counts for each table, read and written, and every row it could not map.\n\n**Exit check.** A dry run against a copy of the live bishop-memory database maps every mission, step, event, finding, directive, criterion, lesson, mistake, deliverable and grade, or names each one it skipped and why. Counts are checked against the source. The operator reviews the result in the web UI.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m6-mapping,m6-counts -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p7-epic -->"
+      "body": "**Work.** `cairnbook import bishop-memory --db <path> [--dry-run]`. Reads the bishop-memory SQLite file directly; never reads harness Markdown. The mapping is in PLAN §5.1, with the reviewer verdicts carried as `review` events. Idempotent: running it twice changes nothing the second time. Reports counts for each table, read and written, and every row it could not map.\n\n**Exit check.** A dry run against a copy of the live bishop-memory database maps every mission, step, event, finding, directive, criterion, lesson, mistake, deliverable and grade, or names each one it skipped and why. Counts are checked against the source. The operator reviews the result in the web UI.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: m6-mapping,m6-counts -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p7-epic -->"
     },
     {
       "key": "m6-mapping",
@@ -624,24 +624,24 @@
       "body": "**Work.** A retrospective on the pilot: what the dashboard could not answer.\n\n**Exit.** Part of M7's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M7](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m7-retro -->"
     },
     {
-      "key": "m8-cairn-toml",
+      "key": "m8-cairnbook-toml",
       "mkey": "M8",
       "phase": null,
       "area": "area:docs",
-      "title": "`.cairn.toml` added to every active project",
+      "title": "`.cairnbook.toml` added to every active project",
       "milestone": "M8 Roll-out",
       "labels": ["type:task", "m8", "area:docs"],
-      "body": "**Work.** A `.cairn.toml` in every active project.\n\n**Exit.** Part of M8's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m8-cairn-toml -->"
+      "body": "**Work.** A `.cairnbook.toml` in every active project.\n\n**Exit.** Part of M8's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m8-cairnbook-toml -->"
     },
     {
       "key": "m8-keys",
       "mkey": "M8",
       "phase": null,
       "area": "area:server",
-      "title": "Keys issued per role; `cairn key list` reviewed monthly",
+      "title": "Keys issued per role; `cairnbook key list` reviewed monthly",
       "milestone": "M8 Roll-out",
       "labels": ["type:task", "m8", "area:server"],
-      "body": "**Work.** Operator keys to leads, viewer keys to project managers, and a monthly review of `cairn key list`.\n\n**Exit.** Part of M8's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m8-keys -->"
+      "body": "**Work.** Operator keys to the people who rule on findings, viewer keys to the people who only read, and a monthly review of `cairnbook key list`.\n\n**Exit.** Part of M8's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m8-keys -->"
     },
     {
       "key": "m8-bishop-memory",
@@ -661,7 +661,7 @@
       "title": "Later: scheduled review loop",
       "milestone": "Later",
       "labels": ["type:epic", "later", "area:review"],
-      "body": "**Work.** Build triage and grading fresh (DESIGN.md §7), guided by bishop-memory: categories, classification, groups, recommendations, directive proposals, grades, runs; the MCP review profile; the agent definitions and skills, rewritten without Bishop names; an engine-neutral runner (`cairn review run classify|process|grade`) that starts the chosen client headless. A scheduling guide for launchd and systemd.\n\n**Exit check.** A scheduled run classifies new findings and grades closed tasks, and the operator accepts the recommendations on the review page. Then the bishop-memory nightly runs are switched off (PLAN §5.3).\n\n**Guided by.** bishop-memory, for reference: the triage and grade routes in `internal/api/triage.go` and `grades.go`, `internal/store/triage_runs.go` and `mission_grades.go`, `scripts/triage-run.sh`, the three agents and two skills under `.claude/`, and their tests.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p8-epic -->"
+      "body": "**Work.** Build triage and grading fresh (DESIGN.md §7), guided by bishop-memory: categories, classification, groups, recommendations, directive proposals, grades, runs; the MCP review profile; the agent definitions and skills, rewritten without Bishop names; an engine-neutral runner (`cairnbook review run classify|process|grade`) that starts the chosen client headless. A scheduling guide for launchd and systemd.\n\n**Exit check.** A scheduled run classifies new findings and grades closed tasks, and the operator accepts the recommendations on the review page. Then the bishop-memory nightly runs are switched off (PLAN §5.3).\n\n**Guided by.** bishop-memory, for reference: the triage and grade routes in `internal/api/triage.go` and `grades.go`, `internal/store/triage_runs.go` and `mission_grades.go`, `scripts/triage-run.sh`, the three agents and two skills under `.claude/`, and their tests.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p8-epic -->"
     },
     {
       "key": "p9-epic",
@@ -681,27 +681,27 @@
       "title": "Later: public releases",
       "milestone": "Later",
       "labels": ["type:epic", "later", "area:release"],
-      "body": "**Work.** Release archives for linux and darwin, amd64 and arm64, built by CI on a tag (`CGO_ENABLED=0`, as bishop-memory's `make dist`). A Homebrew tap. A plugin release tagged `cairn--v<version>`, which is the tag form plugin dependencies resolve against. A public marketplace only after a review of the plugin's hook text *(decision D9)*.\n\n**Exit check.** A clean machine installs `cairn` from a release, installs the plugin, and completes the M5 flow.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p10-epic -->"
+      "body": "**Work.** Release archives for linux and darwin, amd64 and arm64, built by CI on a tag (`CGO_ENABLED=0`, as bishop-memory's `make dist`). A Homebrew tap. A plugin release tagged `cairnbook--v<version>`, which is the tag form plugin dependencies resolve against. A public marketplace only after a review of the plugin's hook text *(decision D9)*.\n\n**Exit check.** A clean machine installs `cairnbook` from a release, installs the plugin, and completes the M5 flow.\n\n## Child issues\n\n<!-- children-start -->\n_No child issues yet._\n<!-- children-end -->\n\n<!-- children: -->\n\n**Source.** [docs/PLAN.md §3](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: p10-epic -->"
     },
     {
       "key": "later-rename",
       "mkey": "Later",
       "phase": null,
       "area": "area:github",
-      "title": "Rename repo, module path, binary and plugin to `cairn` (D18); redirects from `cairn-memory`. Deferred: decide timing",
+      "title": "Rename the repository and module path to `cairnbook` (D38); redirects from `cairn-memory`",
       "milestone": "Later",
       "labels": ["type:decision", "needs-operator", "later", "area:github"],
-      "body": "**Deferred: decide timing.** Plan v1 has the rename at D18. Its timing is open: one pull request before M1, or after M8. Until it is decided the rename is not done, and the repository, module and plugin names stay `cairn-memory`.\n\n**Source.** [docs/PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions) and [§10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: later-rename -->"
+      "body": "**Decided 2026-11-27 (D38).** The tool is named Cairnbook. The binary, MCP server, plugin and marketplace are renamed. What is left is the repository and the Go module path, which move from `cairn-memory` to `cairnbook` when the operator renames the repository; GitHub redirects the old URLs.\n\n**Source.** [docs/PLAN.md §8](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#8-decisions) and [§10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: later-rename -->"
     },
     {
       "key": "later-name",
       "mkey": "Later",
       "phase": null,
       "area": "area:docs",
-      "title": "Decide whether the tool keeps the name Cairn internally or takes a separate internal name",
+      "title": "Decide whether the tool keeps one name or takes a second one (answered by D38: one name, Cairnbook)",
       "milestone": "Later",
       "labels": ["type:decision", "needs-operator", "later", "area:docs"],
-      "body": "**Question.** Does the tool keep the name Cairn internally, or does it take a separate internal name?\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: later-name -->"
+      "body": "**Answered 2026-11-27 (D38).** The tool has one name, Cairnbook.\n\n**Source.** [docs/PLAN.md §10](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#10-open-questions).\n\n<!-- cairn-roadmap: later-name -->"
     }
   ]
 }
