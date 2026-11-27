@@ -30,7 +30,7 @@ const (
 )
 
 // OpenExisting opens the database at path without applying migrations. The file must
-// exist and hold a Cairn schema: a file with no schema version is refused as not a Cairn
+// exist and hold a Cairnbook schema: a file with no schema version is refused as not a Cairnbook
 // database, and one whose version is newer than this build's migrations is refused as
 // the schema of a newer build. The backup and restore paths use it, so a backup is never
 // changed to a newer schema on the way out, and a backup is verified without being
@@ -62,14 +62,14 @@ func OpenExisting(path string) (*Store, error) {
 		return nil, errors.Join(fmt.Errorf("store: read %s: %w", path, err), db.Close())
 	}
 	if hasTable == 0 {
-		return nil, errors.Join(fmt.Errorf("store: %s is not a Cairn database: it has no schema version", path), db.Close())
+		return nil, errors.Join(fmt.Errorf("store: %s is not a Cairnbook database: it has no schema version", path), db.Close())
 	}
 	v, err := currentVersion(ctx, db)
 	if err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
 	if v == 0 {
-		return nil, errors.Join(fmt.Errorf("store: %s is not a Cairn database: it has no schema version", path), db.Close())
+		return nil, errors.Join(fmt.Errorf("store: %s is not a Cairnbook database: it has no schema version", path), db.Close())
 	}
 	if v > latest {
 		return nil, errors.Join(fmt.Errorf("store: %s is at schema version %d, newer than this build (%d)", path, v, latest), db.Close())

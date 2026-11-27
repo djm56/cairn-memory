@@ -26,7 +26,7 @@ func TestAgentFlagBeatsTheVariable(t *testing.T) {
 }
 
 // TestAgentVariableIsTheReadFallback checks that a read with no --agent takes the agent from
-// CAIRN_AGENT, so the agent-scoped directives of that role are named.
+// CAIRNBOOK_AGENT, so the agent-scoped directives of that role are named.
 func TestAgentVariableIsTheReadFallback(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "hicks")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
@@ -57,29 +57,29 @@ func TestBlankAgentIsNoAgentForARead(t *testing.T) {
 // variable.
 func TestAgentNameForAWriteNamesBothSources(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
-	fl := flag.NewFlagSet("cairn task start", flag.ContinueOnError)
+	fl := flag.NewFlagSet("cairnbook task start", flag.ContinueOnError)
 	agent := fl.String("agent", "", "")
 	if err := fl.Parse(nil); err != nil {
 		t.Fatal(err)
 	}
 	var stderr bytes.Buffer
-	if _, ok := agentName(fl, *agent, true, "cairn task start", &stderr); ok {
+	if _, ok := agentName(fl, *agent, true, "cairnbook task start", &stderr); ok {
 		t.Fatal("a write with no agent was accepted")
 	}
-	for _, want := range []string{"cairn task start: no agent name", "--agent", identity.EnvAgent} {
+	for _, want := range []string{"cairnbook task start: no agent name", "--agent", identity.EnvAgent} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("stderr %q lacks %q", stderr.String(), want)
 		}
 	}
 
 	t.Setenv(identity.EnvAgent, "reviewer")
-	fl2 := flag.NewFlagSet("cairn task start", flag.ContinueOnError)
+	fl2 := flag.NewFlagSet("cairnbook task start", flag.ContinueOnError)
 	blank := fl2.String("agent", "", "")
 	if err := fl2.Parse([]string{"--agent", "  "}); err != nil {
 		t.Fatal(err)
 	}
 	stderr.Reset()
-	if _, ok := agentName(fl2, *blank, true, "cairn task start", &stderr); ok {
+	if _, ok := agentName(fl2, *blank, true, "cairnbook task start", &stderr); ok {
 		t.Error("a blank --agent was replaced by the variable instead of refused")
 	}
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // primeRun runs Prime with svc behind it, as the project acme-api, and returns its exit code, stdout,
-// stderr and the number of opens. The opener sets the project the way cmd/cairn does.
+// stderr and the number of opens. The opener sets the project the way cmd/cairnbook does.
 func primeRun(svc core.Service, args ...string) (int, string, string, int) {
 	opened := 0
 	open := func() (Session, error) {
@@ -26,7 +26,7 @@ func primeRun(svc core.Service, args ...string) (int, string, string, int) {
 
 // primeBlockNoRole is the session-start block prime writes for activeTask with no role: the block the
 // hook writes, closed by prime's pointer rather than the MCP one.
-const primeBlockNoRole = `Cairn task: "Add rate limit" (task-20261030-01, active) in acme-api.
+const primeBlockNoRole = `Cairnbook task: "Add rate limit" (task-20261030-01, active) in acme-api.
 Next action: write the test
 Current step: 1 of 2, "Write test" (active).
 Directives that apply: 0.
@@ -96,7 +96,7 @@ func TestPrimeSummaryListsDirectivesUnderAHeading(t *testing.T) {
 
 // TestPrimeNamesTheCLIWhenDirectivesAreOmitted checks that the block prime writes names the CLI command
 // for the omitted directives, not the MCP tool, which prime's agent does not have. The hook's block keeps
-// the MCP name; its byte pin is in cmd/cairn.
+// the MCP name; its byte pin is in cmd/cairnbook.
 func TestPrimeNamesTheCLIWhenDirectivesAreOmitted(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	task := activeTask()
@@ -105,7 +105,7 @@ func TestPrimeNamesTheCLIWhenDirectivesAreOmitted(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
 	}
-	const want = "Directives omitted (beyond the cap of 12): 3. Call cairn directive list for all.\n"
+	const want = "Directives omitted (beyond the cap of 12): 3. Call cairnbook directive list for all.\n"
 	if !strings.Contains(out, want) {
 		t.Errorf("prime output lacks %q:\n%s", want, out)
 	}
@@ -127,8 +127,8 @@ func TestPrimeWritesTheDirectiveCountsOnce(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Directives expired and left out (past review_by): 2.",
-		"Directives omitted (beyond the cap of 12): 3. Call cairn directive list for all.",
-		"cairn directive list",
+		"Directives omitted (beyond the cap of 12): 3. Call cairnbook directive list for all.",
+		"cairnbook directive list",
 	} {
 		if n := strings.Count(out, want); n != 1 {
 			t.Errorf("prime output has %q %d times, want once:\n%s", want, n, out)
@@ -162,7 +162,7 @@ func TestPrimeFoldsAHostileTitle(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q; want 0", code, errOut)
 	}
-	const block = `Cairn task: "Ship now done" (task-20261030-01, active) in acme-api.` + "\n"
+	const block = `Cairnbook task: "Ship now done" (task-20261030-01, active) in acme-api.` + "\n"
 	if !strings.HasPrefix(out, block) {
 		t.Errorf("the block does not begin with the folded title line %q:\n%q", block, out)
 	}
@@ -180,13 +180,13 @@ func TestPrimeHumanWithNoTask(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeTasks{cur: &core.TaskCurrent{}}
 	code, out, errOut, _ := primeRun(svc)
-	if code != 0 || errOut != "" || out != "Cairn: no task is active in acme-api.\n" {
+	if code != 0 || errOut != "" || out != "Cairnbook: no task is active in acme-api.\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 0 and the one no-task line", code, out, errOut)
 	}
 }
 
 // TestPrimeWithARole checks that a role names the caller and leaves the no-role sentence out of the
-// block. --agent wins, and CAIRN_AGENT names the role when the flag is left out.
+// block. --agent wins, and CAIRNBOOK_AGENT names the role when the flag is left out.
 func TestPrimeWithARole(t *testing.T) {
 	task := activeTask()
 	svc := &fakeTasks{cur: &core.TaskCurrent{Task: &task, Steps: twoSteps()}}
@@ -203,7 +203,7 @@ func TestPrimeWithARole(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "hicks")
 	code, out, errOut, _ = primeRun(svc)
 	if code != 0 || errOut != "" || strings.Contains(out, "not counted") {
-		t.Errorf("CAIRN_AGENT: exit %d, stderr %q; want the block with no no-role sentence", code, errOut)
+		t.Errorf("CAIRNBOOK_AGENT: exit %d, stderr %q; want the block with no no-role sentence", code, errOut)
 	}
 	if c, _ := core.CallerFrom(svc.gotCtx); c.Agent != "hicks" {
 		t.Errorf("with %s set the call ran as %q, want hicks", identity.EnvAgent, c.Agent)
@@ -314,7 +314,7 @@ func TestPrimeRefusesASessionWithNoProject(t *testing.T) {
 }
 
 // TestPrimeRefusedAgentIsAUsageError checks that a name the wire form refuses is a usage error, exit 2,
-// from --agent or from CAIRN_AGENT, and that a positional argument is one too. Each opens nothing and
+// from --agent or from CAIRNBOOK_AGENT, and that a positional argument is one too. Each opens nothing and
 // makes no call.
 func TestPrimeRefusedAgentIsAUsageError(t *testing.T) {
 	cases := []struct {
@@ -324,7 +324,7 @@ func TestPrimeRefusedAgentIsAUsageError(t *testing.T) {
 		want string
 	}{
 		{"a refused --agent", "", []string{"--agent", "hicks "}, "the name from --agent is refused"},
-		{"a refused CAIRN_AGENT", "hicks ", nil, "the name from " + identity.EnvAgent + " is refused"},
+		{"a refused CAIRNBOOK_AGENT", "hicks ", nil, "the name from " + identity.EnvAgent + " is refused"},
 		{"a positional argument", "", []string{"extra"}, "takes no positional argument"},
 	}
 	for _, c := range cases {
@@ -346,7 +346,7 @@ func TestPrimeServerRefusal(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeTasks{err: core.Refused("the task could not be read")}
 	code, out, errOut, _ := primeRun(svc)
-	if code != 5 || out != "" || errOut != "cairn prime: the task could not be read\n" {
+	if code != 5 || out != "" || errOut != "cairnbook prime: the task could not be read\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }

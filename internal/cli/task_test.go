@@ -46,7 +46,7 @@ func (f *fakeTasks) TaskList(_ context.Context, req core.TaskListRequest) (*core
 
 // testCaller is the caller the open of every test runs as: the project and client the CLI
 // gives the server, with the reader's role.
-var testCaller = core.Caller{Project: "acme-api", Client: "cairn-cli", Role: core.RoleAgent}
+var testCaller = core.Caller{Project: "acme-api", Client: "cairnbook-cli", Role: core.RoleAgent}
 
 // runTask runs the task command with svc behind it, and returns its exit code and what it
 // wrote to stdout and stderr.
@@ -166,7 +166,7 @@ func TestTaskCurrentError(t *testing.T) {
 	if code != 3 || out != "" {
 		t.Errorf("exit %d, stdout %q; want 3 and nothing on stdout", code, out)
 	}
-	if want := "cairn task current: the project has no row yet\n"; errOut != want {
+	if want := "cairnbook task current: the project has no row yet\n"; errOut != want {
 		t.Errorf("stderr %q, want %q", errOut, want)
 	}
 }
@@ -243,7 +243,7 @@ func TestTaskGetJSON(t *testing.T) {
 func TestTaskGetNotFound(t *testing.T) {
 	svc := &fakeTasks{err: core.NotFound("no task task-20261030-09 in this project")}
 	code, out, errOut := runTask(t, svc, "get", "task-20261030-09")
-	if code != 4 || out != "" || errOut != "cairn task get: no task task-20261030-09 in this project\n" {
+	if code != 4 || out != "" || errOut != "cairnbook task get: no task task-20261030-09 in this project\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 4, nothing on stdout and the not-found line", code, out, errOut)
 	}
 }
@@ -323,7 +323,7 @@ func TestTaskListPassesStatusesRepeated(t *testing.T) {
 func TestTaskListError(t *testing.T) {
 	svc := &fakeTasks{err: core.Invalid("limit must be between 1 and %d", core.MaxLimit)}
 	code, out, errOut := runTask(t, svc, "list", "--limit", "500")
-	if code != 3 || out != "" || !strings.HasPrefix(errOut, "cairn task list: limit must be between 1 and") {
+	if code != 3 || out != "" || !strings.HasPrefix(errOut, "cairnbook task list: limit must be between 1 and") {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 3, nothing on stdout and the limit line", code, out, errOut)
 	}
 }
@@ -332,7 +332,7 @@ func TestTaskListError(t *testing.T) {
 // not have. Each prints to stderr and exits 2, and makes no call.
 func TestTaskVerbs(t *testing.T) {
 	svc := &fakeTasks{}
-	if code, _, errOut := runTask(t, svc); code != 2 || !strings.Contains(errOut, "cairn task current|get|list") {
+	if code, _, errOut := runTask(t, svc); code != 2 || !strings.Contains(errOut, "cairnbook task current|get|list") {
 		t.Errorf("no verb: exit %d, stderr %q", code, errOut)
 	}
 	if code, _, errOut := runTask(t, svc, "frobnicate"); code != 2 || !strings.Contains(errOut, `unknown verb "frobnicate"`) {
@@ -347,10 +347,10 @@ func TestTaskVerbs(t *testing.T) {
 // be resolved, the command says so on stderr and makes no call.
 func TestTaskOpenFailureStopsBeforeTheCall(t *testing.T) {
 	svc := &fakeTasks{}
-	open := func() (Session, error) { return Session{}, core.Invalid("no project: run cairn init") }
+	open := func() (Session, error) { return Session{}, core.Invalid("no project: run cairnbook init") }
 	var out, errOut bytes.Buffer
 	code := Task(open, []string{"list"}, strings.NewReader(""), &out, &errOut)
-	if code != 3 || errOut.String() != "cairn task list: no project: run cairn init\n" || svc.calls != 0 {
+	if code != 3 || errOut.String() != "cairnbook task list: no project: run cairnbook init\n" || svc.calls != 0 {
 		t.Errorf("exit %d, stderr %q, calls %d; want 3 (invalid), the open's text and no call", code, errOut.String(), svc.calls)
 	}
 }
@@ -360,7 +360,7 @@ func TestTaskOpenFailureStopsBeforeTheCall(t *testing.T) {
 func TestTaskFlagErrors(t *testing.T) {
 	svc := &fakeTasks{}
 	code, _, errOut := runTask(t, svc, "list", "--nope")
-	if code != 2 || !strings.Contains(errOut, "run cairn task list -h for the flags") || svc.calls != 0 {
+	if code != 2 || !strings.Contains(errOut, "run cairnbook task list -h for the flags") || svc.calls != 0 {
 		t.Errorf("exit %d, stderr %q, calls %d; want a flag usage error and no call", code, errOut, svc.calls)
 	}
 }
@@ -640,7 +640,7 @@ func TestTaskServerErrorIsCappedToOneLine(t *testing.T) {
 	if code != 3 || out != "" || !oneLine(errOut) {
 		t.Fatalf("exit %d, stdout %q, stderr %q; want 3, nothing on stdout and one line on stderr", code, out, errOut)
 	}
-	reason := strings.TrimPrefix(errOut, "cairn task list: ")
+	reason := strings.TrimPrefix(errOut, "cairnbook task list: ")
 	if n := len([]rune(strings.TrimSuffix(reason, "\n"))); n != MaxLineRunes {
 		t.Errorf("the reason is %d runes, want %d", n, MaxLineRunes)
 	}
@@ -655,7 +655,7 @@ func TestTaskLocalErrorIsNotCut(t *testing.T) {
 	long := strings.Repeat("y", 300)
 	svc := &fakeTasks{err: core.Invalid("%s", long)}
 	code, _, errOut := runTask(t, svc, "list")
-	if code != 3 || errOut != "cairn task list: "+long+"\n" {
+	if code != 3 || errOut != "cairnbook task list: "+long+"\n" {
 		t.Errorf("exit %d, stderr of %d bytes; want 3 and the whole message", code, len(errOut))
 	}
 }

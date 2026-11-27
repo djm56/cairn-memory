@@ -1,4 +1,4 @@
-// Package ui is the web UI of cairn serve: pages rendered on the server, under /ui/
+// Package ui is the web UI of cairnbook serve: pages rendered on the server, under /ui/
 // (docs/DESIGN.md §5.5, decisions D23 to D26). It needs no script and loads one
 // embedded stylesheet. Sign-in, the session rules and their lifetimes are in
 // internal/auth; this package holds the routes, the forms, the headers and the pages.

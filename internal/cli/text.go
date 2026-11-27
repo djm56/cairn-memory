@@ -1,4 +1,4 @@
-// Package cli holds the sub-commands that work with a Cairn server for a person or an
+// Package cli holds the sub-commands that work with a Cairnbook server for a person or an
 // agent with only a shell: task, step, event, learning, directive, recall, search and
 // prime (issue #87). This file holds the text rules every command and the hook print by:
 // a server-derived text is folded to printable form before it reaches a terminal or a

@@ -14,7 +14,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/client"
 )
 
-// keyEnv points the key lookup at a fresh home directory, with CAIRN_API_KEY set to env
+// keyEnv points the key lookup at a fresh home directory, with CAIRNBOOK_API_KEY set to env
 // (or unset when env is ""). It returns the home, so a test can write client.env in it.
 // Every key here comes from auth.NewKey, so no fixture holds a key-shaped literal.
 func keyEnv(t *testing.T, env string) string {
@@ -29,7 +29,7 @@ func keyEnv(t *testing.T, env string) string {
 // path. The directories are made as the lookup expects them.
 func writeKeyFile(t *testing.T, home string, mode os.FileMode, content string) string {
 	t.Helper()
-	dir := filepath.Join(home, ".config", "cairn")
+	dir := filepath.Join(home, ".config", "cairnbook")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -54,12 +54,12 @@ func newKey(t *testing.T) string {
 	return k
 }
 
-// TestEnvWinsOverTheFile checks the order of the two sources: CAIRN_API_KEY is used when it is
+// TestEnvWinsOverTheFile checks the order of the two sources: CAIRNBOOK_API_KEY is used when it is
 // set, even when client.env holds a different key. (can-fail: swapping the order fails this.)
 func TestEnvWinsOverTheFile(t *testing.T) {
 	fromEnv, fromFile := newKey(t), newKey(t)
 	home := keyEnv(t, fromEnv)
-	writeKeyFile(t, home, 0o600, "CAIRN_API_KEY="+fromFile+"\n")
+	writeKeyFile(t, home, 0o600, "CAIRNBOOK_API_KEY="+fromFile+"\n")
 
 	k, err := client.LoadKey()
 	if err != nil {
@@ -76,7 +76,7 @@ func TestTheFileIsUsedWhenTheEnvIsUnsetOrBlank(t *testing.T) {
 	for _, env := range []string{"", "   "} {
 		fromFile := newKey(t)
 		home := keyEnv(t, env)
-		writeKeyFile(t, home, 0o600, "# the operator's key\nCAIRN_API_KEY=\""+fromFile+"\"\n")
+		writeKeyFile(t, home, 0o600, "# the operator's key\nCAIRNBOOK_API_KEY=\""+fromFile+"\"\n")
 
 		k, err := client.LoadKey()
 		if err != nil {
@@ -95,7 +95,7 @@ func TestAFileOpenToOthersIsRefused(t *testing.T) {
 	for _, mode := range []os.FileMode{0o644, 0o640, 0o604, 0o602} {
 		key := newKey(t)
 		home := keyEnv(t, "")
-		path := writeKeyFile(t, home, mode, "CAIRN_API_KEY="+key+"\n")
+		path := writeKeyFile(t, home, mode, "CAIRNBOOK_API_KEY="+key+"\n")
 
 		k, err := client.LoadKey()
 		if err == nil {
@@ -116,7 +116,7 @@ func TestAFileOpenToOthersIsRefused(t *testing.T) {
 func TestAFileOwnerOnlyIsUsed(t *testing.T) {
 	key := newKey(t)
 	home := keyEnv(t, "")
-	writeKeyFile(t, home, 0o600, "CAIRN_API_KEY="+key+"\n")
+	writeKeyFile(t, home, 0o600, "CAIRNBOOK_API_KEY="+key+"\n")
 	k, err := client.LoadKey()
 	if err != nil || k.Value != key || k.Source != client.SourceFile {
 		t.Errorf("LoadKey = %v from %s, %v; want the file's key", k, k.Source, err)
@@ -137,13 +137,13 @@ func TestNoKeyInEitherSourceIsMissing(t *testing.T) {
 	}
 }
 
-// TestClientEnvFileIsParsed checks the file format: the last CAIRN_API_KEY line wins, other names
+// TestClientEnvFileIsParsed checks the file format: the last CAIRNBOOK_API_KEY line wins, other names
 // and comments are ignored, and one pair of quotes is removed. A line with no '=' is refused by
 // its number, and the refusal does not print its text, since that text may be a key.
 func TestClientEnvFileIsParsed(t *testing.T) {
 	want := newKey(t)
 	home := keyEnv(t, "")
-	writeKeyFile(t, home, 0o600, "# comment\n\nOTHER=1\nCAIRN_API_KEY=old\nCAIRN_API_KEY='"+want+"'\n")
+	writeKeyFile(t, home, 0o600, "# comment\n\nOTHER=1\nCAIRNBOOK_API_KEY=old\nCAIRNBOOK_API_KEY='"+want+"'\n")
 	k, err := client.LoadKey()
 	if err != nil || k.Value != want {
 		t.Errorf("last line: LoadKey = %v, %v; want the last key", k, err)
@@ -229,7 +229,7 @@ func TestA401SaysTheServerRefusedTheKey(t *testing.T) {
 		t.Fatal("a 401 gave no error")
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "the server refused the API key") || !strings.Contains(msg, "CAIRN_API_KEY") {
+	if !strings.Contains(msg, "the server refused the API key") || !strings.Contains(msg, "CAIRNBOOK_API_KEY") {
 		t.Errorf("401 message %q does not say the server refused the key and where it comes from", msg)
 	}
 	if strings.Contains(msg, key) {

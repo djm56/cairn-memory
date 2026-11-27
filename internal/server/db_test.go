@@ -16,7 +16,7 @@ import (
 // SQLite gives -wal and -shm the mode of the database file it is opened beside, and the
 // umask can only remove bits from that, so the mode set at create carries to them.
 func TestNewDatabaseAndItsFilesAreOwnerOnly(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	st, err := openDatabase(path, true)
 	if err != nil {
 		t.Fatalf("openDatabase: %v", err)
@@ -37,7 +37,7 @@ func TestNewDatabaseAndItsFilesAreOwnerOnly(t *testing.T) {
 // TestOpenDatabaseLeavesAnExistingFileAlone checks that opening a database that is already
 // there does not change its mode. Only a file the server creates is made 0600.
 func TestOpenDatabaseLeavesAnExistingFileAlone(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(context.Background(), path, "ci", auth.ScopeAgent); err != nil {
 		t.Fatalf("AddKey: %v", err)
 	}
@@ -65,13 +65,13 @@ func TestCheckDBPath(t *testing.T) {
 		path string
 		ok   bool
 	}{
-		{"cairn.db", true},
-		{"/var/lib/cairn/cairn.db", true},
+		{"cairnbook.db", true},
+		{"/var/lib/cairnbook/cairnbook.db", true},
 		{"", false},
-		{"cairn.db?mode=ro", false},
+		{"cairnbook.db?mode=ro", false},
 		{":memory:", false},
 		{"file::memory:", false},
-		{"file:cairn.db", false},
+		{"file:cairnbook.db", false},
 	}
 	for _, c := range cases {
 		if err := checkDBPath(c.path); (err == nil) != c.ok {

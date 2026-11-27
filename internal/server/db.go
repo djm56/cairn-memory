@@ -54,7 +54,7 @@ func openDatabase(path string, create bool) (*store.Store, error) {
 		}
 	} else if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("no database at %s: the server creates it, and cairn key add creates it too", path)
+			return nil, fmt.Errorf("no database at %s: the server creates it, and cairnbook key add creates it too", path)
 		}
 		return nil, fmt.Errorf("the database %s: %w", path, err)
 	}
@@ -108,7 +108,7 @@ func refuseNewOverRestore(path string) error {
 		return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. None of them is a main database file, only -wal or -shm files, so there is no database here to put back; the stamps found are %s, and the files are %s. If you are not recovering from a restore, these files are history. Look for the database in a backup or in an earlier %s.pre-restore-* file elsewhere. %s (README, If a restore fails)",
 			path, strings.Join(stamps, ", "), joinNames(dir, found), base, startFresh(dir, found))
 	}
-	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairn serve, move any file now at %s aside, then run: mv -- %s %s. %s (README, If a restore fails)",
+	return fmt.Errorf("no database is at %s, but files of an earlier restore are beside it, and a restore may have been interrupted. Nothing was created. The newest is %s, moved aside at stamp %s; the stamps found are %s, and the files are %s. If you are not recovering from a restore, and the database was restored or removed on purpose long ago, these files are history, not an interrupted restore. To put the newest back, stop cairnbook serve, move any file now at %s aside, then run: mv -- %s %s. %s (README, If a restore fails)",
 		path, filepath.Join(dir, newest.name), newest.stamp, strings.Join(stamps, ", "), joinNames(dir, found), path, shellQuote(filepath.Join(dir, newest.name)), shellQuote(path), startFresh(dir, found))
 }
 
@@ -121,7 +121,7 @@ func startFresh(dir string, names []string) string {
 	for i, n := range names {
 		quoted[i] = shellQuote(filepath.Join(dir, n))
 	}
-	return fmt.Sprintf("To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own: mkdir -p -- /path/to/folder && mv -- %s /path/to/folder/ . Then start cairn serve again. Nothing is deleted.",
+	return fmt.Sprintf("To start a new, empty database instead, check these files, then move every one of them out of this folder yourself, to a folder of your own: mkdir -p -- /path/to/folder && mv -- %s /path/to/folder/ . Then start cairnbook serve again. Nothing is deleted.",
 		strings.Join(quoted, " "))
 }
 

@@ -1,4 +1,4 @@
-// Package store is Cairn's SQLite layer. It opens the local database, applies
+// Package store is Cairnbook's SQLite layer. It opens the local database, applies
 // the numbered schema migrations (docs/DESIGN.md §3), and holds the typed
 // queries for every table, the WithTx write transaction, and the scoped search
 // over search_index. It holds no rules: status transitions, the close policy
@@ -35,7 +35,7 @@ const connectRetries = 10
 //     SQLITE_BUSY in WAL mode, ignoring the busy timeout, so it is avoided.
 const dsnOptions = "_busy_timeout=5000&_foreign_keys=1&_journal_mode=WAL&_txlock=immediate"
 
-// Store is an open Cairn database, with its schema at the current version.
+// Store is an open Cairnbook database, with its schema at the current version.
 // Use it from many goroutines: the underlying pool is safe for concurrent use.
 //
 // Typical use: s, err := store.Open(path); defer s.Close().

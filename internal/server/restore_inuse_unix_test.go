@@ -26,7 +26,7 @@ const rawProbeBuilt = true
 
 // holdEnv selects how the helper process holds the database. Only startHolder sets it, and only on
 // the helper's environment. The database path is in holdEnv+"_DB".
-const holdEnv = "CAIRN_RESTORE_TEST_HOLD"
+const holdEnv = "CAIRNBOOK_RESTORE_TEST_HOLD"
 
 // TestRestoreHoldHelper is the helper process of the in-use tests, not a test of its own. With
 // holdEnv set it holds the database the way a running server would, prints "ready", and waits until
@@ -182,7 +182,7 @@ func assertRefusedInUse(t *testing.T, dir, target, backup string) {
 func TestRestoreRefusesARawDatabaseHeldByAnIdleServer(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	startHolder(t, "wal", target)
@@ -196,7 +196,7 @@ func TestRestoreRefusesARawDatabaseHeldByAnIdleServer(t *testing.T) {
 func TestRestoreRefusesARawDatabaseWithAReaderInATransaction(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	startHolder(t, "read", target)
@@ -211,7 +211,7 @@ func TestRestoreRefusesARawDatabaseWithAReaderInATransaction(t *testing.T) {
 func TestRestoreRefusesARawDatabaseHeldOnlyByItsDeadManSwitch(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	startHolder(t, "dms", target)
@@ -225,16 +225,16 @@ func TestRestoreRefusesARawDatabaseHeldOnlyByItsDeadManSwitch(t *testing.T) {
 // neither: a creating open would make the -shm it asks about.
 func TestRawInUseChangesNothing(t *testing.T) {
 	cases := map[string][]string{
-		"with its -wal and -shm": {"cairn.db", "cairn.db-wal", "cairn.db-shm"},
-		"the database alone":     {"cairn.db"},
+		"with its -wal and -shm": {"cairnbook.db", "cairnbook.db-wal", "cairnbook.db-shm"},
+		"the database alone":     {"cairnbook.db"},
 	}
 	for name, files := range cases {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			db := filepath.Join(dir, "cairn.db")
+			db := filepath.Join(dir, "cairnbook.db")
 			for _, f := range files {
 				content := "a " + f + " of nothing"
-				if f == "cairn.db" {
+				if f == "cairnbook.db" {
 					content = strings.Repeat("this is not a database\n", 200)
 				}
 				if err := os.WriteFile(filepath.Join(dir, f), []byte(content), 0o600); err != nil {
@@ -290,7 +290,7 @@ func TestRestoreSaysTheLockCouldNotBeCheckedWhenTheProbeCannotOpenIt(t *testing.
 	}
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	if err := os.WriteFile(target, []byte(strings.Repeat("this is not a database\n", 200)), 0o600); err != nil {
 		t.Fatal(err)
 	}

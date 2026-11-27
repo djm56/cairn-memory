@@ -1,0 +1,78 @@
+package identity
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestLegacyNames checks the fallbacks kept from before the rename to Cairnbook: an old
+// CAIRN_ variable is read only when the new one is unset or empty, and an old .cairn.toml
+// is read only in a directory that has no .cairnbook.toml.
+func TestLegacyNames(t *testing.T) {
+	t.Run("old project variable", func(t *testing.T) {
+		tr := newTree(t, "work", nil)
+		setEnv(t, EnvProjectDir, "", true)
+		setEnv(t, EnvProject, "", true)
+		t.Setenv("CAIRN_PROJECT", "old-name")
+		p, err := Resolve(filepath.Join(tr.root, "work"))
+		if err != nil || p.Name != "old-name" || p.Source != SourceEnv {
+			t.Fatalf("Resolve = %+v, %v; want old-name from env", p, err)
+		}
+	})
+	t.Run("new variable wins", func(t *testing.T) {
+		t.Setenv(EnvProject, "new-name")
+		t.Setenv("CAIRN_PROJECT", "old-name")
+		if v, from := Lookup(EnvProject); v != "new-name" || from != EnvProject {
+			t.Fatalf("Lookup = %q from %q, want new-name from %s", v, from, EnvProject)
+		}
+	})
+	t.Run("old variable named in a refusal", func(t *testing.T) {
+		setEnv(t, EnvProject, "", true)
+		t.Setenv("CAIRN_PROJECT", "Not Valid")
+		_, err := Resolve(t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "CAIRN_PROJECT") {
+			t.Fatalf("Resolve error = %v, want one naming CAIRN_PROJECT", err)
+		}
+	})
+	t.Run("old server variable", func(t *testing.T) {
+		setEnv(t, EnvServer, "", true)
+		t.Setenv("CAIRN_SERVER", "https://old.example")
+		if got, err := ResolveServer(t.TempDir()); err != nil || got != "https://old.example" {
+			t.Fatalf("ResolveServer = %q, %v", got, err)
+		}
+	})
+	t.Run("old project file", func(t *testing.T) {
+		tr := newTree(t, "a/b", []file{{path: LegacyFileName, body: "project = \"old-file\"\n"}})
+		setEnv(t, EnvProjectDir, "", true)
+		setEnv(t, EnvProject, "", true)
+		p, err := Resolve(filepath.Join(tr.root, "a/b"))
+		if err != nil || p.Name != "old-file" || filepath.Base(p.Path) != LegacyFileName {
+			t.Fatalf("Resolve = %+v, %v; want old-file from %s", p, err, LegacyFileName)
+		}
+	})
+	t.Run("new file wins in the same directory", func(t *testing.T) {
+		tr := newTree(t, "", []file{
+			{path: LegacyFileName, body: "project = \"old-file\"\n"},
+			{path: FileName, body: "project = \"new-file\"\n"},
+		})
+		setEnv(t, EnvProjectDir, "", true)
+		setEnv(t, EnvProject, "", true)
+		p, err := Resolve(tr.root)
+		if err != nil || p.Name != "new-file" {
+			t.Fatalf("Resolve = %+v, %v; want new-file", p, err)
+		}
+	})
+	t.Run("nearer old file wins over a farther new one", func(t *testing.T) {
+		tr := newTree(t, "sub", []file{
+			{path: FileName, body: "project = \"outer\"\n"},
+			{path: "sub/" + LegacyFileName, body: "project = \"inner\"\n"},
+		})
+		setEnv(t, EnvProjectDir, "", true)
+		setEnv(t, EnvProject, "", true)
+		p, err := Resolve(filepath.Join(tr.root, "sub"))
+		if err != nil || p.Name != "inner" {
+			t.Fatalf("Resolve = %+v, %v; want inner", p, err)
+		}
+	})
+}

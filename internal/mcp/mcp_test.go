@@ -15,7 +15,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/api"
 	"github.com/djm56/cairn-memory/internal/client"
 	"github.com/djm56/cairn-memory/internal/core"
-	cairnmcp "github.com/djm56/cairn-memory/internal/mcp"
+	cairnbookmcp "github.com/djm56/cairn-memory/internal/mcp"
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
@@ -35,7 +35,7 @@ var wantTools = []string{
 // too, so a test can read a row back through the core directly.
 func newService(t *testing.T) (core.Service, *core.Local) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -56,12 +56,12 @@ func newService(t *testing.T) (core.Service, *core.Local) {
 // connect runs an MCP server for svc in project over an in-memory transport, and
 // returns the test client's session with it. The protocol is the real one: the
 // SDK frames every message, exactly as it does on stdio.
-func connect(t *testing.T, svc core.Service, project cairnmcp.Project) *mcpsdk.ClientSession {
+func connect(t *testing.T, svc core.Service, project cairnbookmcp.Project) *mcpsdk.ClientSession {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	serverT, clientT := mcpsdk.NewInMemoryTransports()
-	srv := cairnmcp.New(svc, project, "test")
+	srv := cairnbookmcp.New(svc, project, "test")
 	go func() { _ = srv.Run(ctx, serverT) }()
 
 	mc := mcpsdk.NewClient(&mcpsdk.Implementation{Name: clientName, Version: "0"}, nil)
@@ -74,7 +74,7 @@ func connect(t *testing.T, svc core.Service, project cairnmcp.Project) *mcpsdk.C
 }
 
 // acme is the project of every test: a valid name, resolved with no error.
-var acme = cairnmcp.Project{Name: "acme-api"}
+var acme = cairnbookmcp.Project{Name: "acme-api"}
 
 // call invokes tool name with args (a JSON object, or a value that encodes to
 // one) and returns the text of its one result block, and whether it is an error.
@@ -343,17 +343,17 @@ func TestToolErrorsCarryKindMessageAndMissing(t *testing.T) {
 
 // TestProjectErrorRefusesEveryCall checks DESIGN §2.1: when the project did not
 // resolve, the server still starts, and each call is refused with that error, so
-// the model sees the fix (cairn init) and not a silent default project.
+// the model sees the fix (cairnbook init) and not a silent default project.
 func TestProjectErrorRefusesEveryCall(t *testing.T) {
 	svc, _ := newService(t)
-	noProject := cairnmcp.Project{Err: core.ErrNoProject}
+	noProject := cairnbookmcp.Project{Err: core.ErrNoProject}
 	cs := connect(t, svc, noProject)
 
 	for _, name := range []string{"task_current", "task_list", "search"} {
 		text, isErr := call(t, cs, name, map[string]any{})
 		got := errorOf(t, text, isErr)
-		if got.Kind != "invalid" || !strings.Contains(got.Message, "cairn init") {
-			t.Errorf("%s with no project: %+v, want invalid and a message that names cairn init", name, got)
+		if got.Kind != "invalid" || !strings.Contains(got.Message, "cairnbook init") {
+			t.Errorf("%s with no project: %+v, want invalid and a message that names cairnbook init", name, got)
 		}
 	}
 }

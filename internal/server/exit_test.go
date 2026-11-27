@@ -22,7 +22,7 @@ import (
 )
 
 // The M2 exit checks (docs/PLAN.md §3, M2), run against a real listener. Each test starts
-// Run on 127.0.0.1:0, as cairn serve does, and makes its keys with AddKey, as cairn key add
+// Run on 127.0.0.1:0, as cairnbook serve does, and makes its keys with AddKey, as cairnbook key add
 // does. No test here uses httptest.
 
 // listeningAddr matches the listening line Run writes once its listener is bound. The
@@ -166,7 +166,7 @@ func errorKind(body []byte) core.Kind {
 
 // routedService is a core.Service over one client per key. A call goes to the client whose key
 // carries the role of the call's caller, so an operator call arrives with the operator key and a
-// viewer call with the viewer key. The key gives the role, not the Cairn headers, so the
+// viewer call with the viewer key. The key gives the role, not the Cairnbook headers, so the
 // server's own gate decides each call.
 type routedService struct {
 	agent, operator, viewer core.Service
@@ -285,7 +285,7 @@ func (r routedService) Dashboard(ctx context.Context) (*core.Dashboard, error) {
 // agent, one operator and one viewer key, each client sending its own.
 func listenerService(t *testing.T) core.Service {
 	t.Helper()
-	db := filepath.Join(t.TempDir(), "cairn.db")
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	agent := mustAddKey(t, db, "exit-agent", auth.ScopeAgent)
 	operator := mustAddKey(t, db, "exit-operator", auth.ScopeOperator)
 	viewer := mustAddKey(t, db, "exit-viewer", auth.ScopeViewer)
@@ -310,12 +310,12 @@ func listenerClient(t *testing.T, base, key string) core.Service {
 // TestConformanceOverRealListener runs the whole suite through internal/client, against a real
 // listener that Run binds on 127.0.0.1:0, with the agent, operator and viewer keys the suite's
 // calls need. Each case gets its own database, keys and listener. The httptest runner in
-// internal/client is kept: this one proves the same suite over the server cairn serve runs.
+// internal/client is kept: this one proves the same suite over the server cairnbook serve runs.
 func TestConformanceOverRealListener(t *testing.T) {
 	conformance.Run(t, listenerService)
 }
 
-// forged returns the call headers with X-Cairn-Role set to role, as a client sends when it
+// forged returns the call headers with X-Cairnbook-Role set to role, as a client sends when it
 // claims a role its key does not hold. The server must take the role from the key,
 // so a forged header changes nothing. The header is set on a copy, so h is not changed.
 func forged(h map[string]string, role string) map[string]string {
@@ -332,7 +332,7 @@ func forged(h map[string]string, role string) map[string]string {
 // does not hold the key. An operator key is not refused on the same routes for its role, so the
 // refusal is the gate's and not a broken route.
 func TestAgentKeyIsRefusedOnEveryOperatorRoute(t *testing.T) {
-	db := filepath.Join(t.TempDir(), "cairn.db")
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	agent := mustAddKey(t, db, "exit-agent", auth.ScopeAgent)
 	operator := mustAddKey(t, db, "exit-operator", auth.ScopeOperator)
 	base := realListener(t, db)
@@ -349,7 +349,7 @@ func TestAgentKeyIsRefusedOnEveryOperatorRoute(t *testing.T) {
 		// The same agent key, claiming the operator role in a header: still refused.
 		resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, forged(callHeaders(agent), "operator"))
 		if resp.StatusCode != http.StatusForbidden || errorKind(body) != core.KindOperatorOnly {
-			t.Errorf("%s with an agent key and X-Cairn-Role: operator: status %d, body %s; want 403 operator_only", r.Route, resp.StatusCode, body)
+			t.Errorf("%s with an agent key and X-Cairnbook-Role: operator: status %d, body %s; want 403 operator_only", r.Route, resp.StatusCode, body)
 		}
 		resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, callHeaders(operator))
 		if resp.StatusCode == http.StatusForbidden && errorKind(body) == core.KindOperatorOnly {
@@ -369,7 +369,7 @@ func TestAgentKeyIsRefusedOnEveryOperatorRoute(t *testing.T) {
 // route. Both sets come from api.Routes, and each iteration checks its own answer and that the
 // answer does not hold the key.
 func TestViewerKeyIsRefusedOnEveryWriteRoute(t *testing.T) {
-	db := filepath.Join(t.TempDir(), "cairn.db")
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	viewer := mustAddKey(t, db, "exit-viewer", auth.ScopeViewer)
 	base := realListener(t, db)
 	c := client(nil)
@@ -386,7 +386,7 @@ func TestViewerKeyIsRefusedOnEveryWriteRoute(t *testing.T) {
 		for _, role := range []string{"operator", "agent"} {
 			resp, body = send(t, c, http.MethodPost, base+api.Prefix+r.Route, wrongShape, forged(callHeaders(viewer), role))
 			if resp.StatusCode != http.StatusForbidden || errorKind(body) != api.KindReadOnly {
-				t.Errorf("%s (write) with a viewer key and X-Cairn-Role: %s: status %d, body %s; want 403 read_only", r.Route, role, resp.StatusCode, body)
+				t.Errorf("%s (write) with a viewer key and X-Cairnbook-Role: %s: status %d, body %s; want 403 read_only", r.Route, role, resp.StatusCode, body)
 			}
 		}
 	}

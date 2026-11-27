@@ -118,8 +118,8 @@ var identityCases = []Case{
 		for _, c := range agentCalls {
 			err := c.do(noProject, s)
 			wantKind(t, err, core.KindInvalid, c.name+" without a project")
-			if err != nil && !strings.Contains(err.Error(), "cairn init") {
-				t.Errorf("%s without a project: error %q does not name `cairn init`", c.name, err)
+			if err != nil && !strings.Contains(err.Error(), "cairnbook init") {
+				t.Errorf("%s without a project: error %q does not name `cairnbook init`", c.name, err)
 			}
 			wantKind(t, c.do(context.Background(), s), core.KindInvalid, c.name+" without any caller")
 		}

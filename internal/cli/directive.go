@@ -8,7 +8,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// Directive is the sub-command `cairn directive`: the binding rules that apply to a project, for a
+// Directive is the sub-command `cairnbook directive`: the binding rules that apply to a project, for a
 // person or an agent with only a shell (issue #87). Its verb is list, which reads them through
 // directive_list (CONTRACT §5). It takes --json, which writes the result as one line of JSON: the
 // object the MCP tool returns, with the same field names.
@@ -21,24 +21,24 @@ import (
 // failed (ExitCodeFor), 2 for a usage error.
 func Directive(open Opener, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn directive: name what to do: cairn directive list")
+		fmt.Fprintln(stderr, "cairnbook directive: name what to do: cairnbook directive list")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
 	if verb == "list" {
 		return directiveList(open, rest, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn directive: unknown verb %q: use cairn directive list\n", verb)
+	fmt.Fprintf(stderr, "cairnbook directive: unknown verb %q: use cairnbook directive list\n", verb)
 	return 2
 }
 
-// directiveList is `cairn directive list [--agent role] [--json]`: the directives that apply to the
+// directiveList is `cairnbook directive list [--agent role] [--json]`: the directives that apply to the
 // project, ranked agent, project, then global, at most 12 (CONTRACT §5, directive_list). --agent
-// narrows the agent-scoped directives to one role. It is not read from the CAIRN_AGENT variable: an
+// narrows the agent-scoped directives to one role. It is not read from the CAIRNBOOK_AGENT variable: an
 // empty agent is the explicit listing of every role, and a variable that narrowed it would make that
 // listing impossible while the variable is set.
 func directiveList(open Opener, args []string, stdout, stderr io.Writer) int {
-	const verb = "cairn directive list"
+	const verb = "cairnbook directive list"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", "a role name, such as reviewer; narrows the agent-scoped directives to it; leave it out to list every role")
 	pos, code, done := parse(fl, args, stdout, stderr)

@@ -23,7 +23,7 @@ const copyName = "copy.db"
 func checkBackupOut(out string) error {
 	switch {
 	case out == "":
-		return errors.New("needs an output file: cairn backup --db <file> <out>")
+		return errors.New("needs an output file: cairnbook backup --db <file> <out>")
 	case strings.Contains(out, "?"):
 		return errors.New("the backup file must not contain '?': the driver reads it as the start of its options")
 	case out == ":memory:" || strings.HasPrefix(out, "file:"):
@@ -36,7 +36,7 @@ func checkBackupOut(out string) error {
 // copy's size in bytes. The server may be running. An existing name at out is refused, a symbolic
 // link included, and is never written over. The copy is owner-only (dbFileMode). The database is
 // opened without migrating it, so a backup never changes the database it copies. A database with
-// no Cairn schema, or with one newer than this build, is refused.
+// no Cairnbook schema, or with one newer than this build, is refused.
 //
 // The copy is never written at out. It is made in a directory of its own, created beside out by
 // os.MkdirTemp: that directory is 0700 and its name is unpredictable. The directory is opened once
@@ -62,7 +62,7 @@ func checkBackupOut(out string) error {
 //
 // Backup must be called one at a time, and never from serve. The copy sets the process umask
 // (copyOwnerOnly), which is process-wide, so two calls at once would interleave their set and
-// restore. The set and restore pair is not re-entrant. The cairn backup command is the only caller.
+// restore. The set and restore pair is not re-entrant. The cairnbook backup command is the only caller.
 func Backup(ctx context.Context, db, out string) (int64, error) {
 	if err := checkBackupOut(out); err != nil {
 		return 0, err
@@ -86,7 +86,7 @@ func Backup(ctx context.Context, db, out string) (int64, error) {
 	if _, err := os.Lstat(out); err == nil {
 		return 0, errExistsBackup(out)
 	}
-	stage, err := os.MkdirTemp(filepath.Dir(out), ".cairn-backup-*")
+	stage, err := os.MkdirTemp(filepath.Dir(out), ".cairnbook-backup-*")
 	if err != nil {
 		return 0, fmt.Errorf("create the staging directory for the backup beside %s: %w", out, err)
 	}

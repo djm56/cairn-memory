@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — set up GitHub project management for Cairn: labels,
+# bootstrap.sh — set up GitHub project management for Cairnbook: labels,
 # milestones, roadmap issues and the Projects v2 board.
 #
 # Usage:
@@ -49,7 +49,7 @@
 #                    project lacks it, with its options. An existing field is
 #                    never changed; missing options are reported with manual
 #                    steps.
-#   sync_project     creates the "Cairn Memory Roadmap" project when none exists
+#   sync_project     creates the "Cairnbook Memory Roadmap" project when none exists
 #                    and links it to the repository when it is not linked.
 #   sync_items       adds a roadmap issue to the board when it is not there, and
 #                    sets its Phase or Area only when that value is empty. Phase
@@ -87,7 +87,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LABELS_FILE="$ROOT/.github/labels.json"
 ROADMAP_FILE="$ROOT/.github/roadmap.json"
-PROJECT_TITLE="Cairn Memory Roadmap"
+PROJECT_TITLE="Cairnbook Memory Roadmap"
 
 APPLY=0
 REPO=""
@@ -166,7 +166,7 @@ OWNER="${REPO%%/*}"
 NAME="${REPO#*/}"
 
 # Scratch space for request bodies and intermediate JSON. Removed on exit.
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairn-bootstrap.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairnbook-bootstrap.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 if [ "$APPLY" = 1 ]; then
@@ -474,11 +474,11 @@ sync_children() {
       continue
     fi
 
-    # Test hook, inert unless CAIRN_TEST_CUT_SHIFT is set (only the tests set
+    # Test hook, inert unless CAIRNBOOK_TEST_CUT_SHIFT is set (only the tests set
     # it): moves both cut points by that many bytes so the guards can be shown
     # to refuse a wrong cut.
-    pend=$((pend + ${CAIRN_TEST_CUT_SHIFT:-0}))
-    estart=$((estart + ${CAIRN_TEST_CUT_SHIFT:-0}))
+    pend=$((pend + ${CAIRNBOOK_TEST_CUT_SHIFT:-0}))
+    estart=$((estart + ${CAIRNBOOK_TEST_CUT_SHIFT:-0}))
 
     # Range check before any head/tail uses the offsets.
     size="$(wc -c < "$cur" | tr -d ' ')"

@@ -64,7 +64,7 @@ func TestFailJSONFormIsTheAPIErrorBody(t *testing.T) {
 	}
 	for _, c := range cases {
 		var out, errOut bytes.Buffer
-		code := fail(&out, &errOut, "cairn task get", true, c.err)
+		code := fail(&out, &errOut, "cairnbook task get", true, c.err)
 		if code != c.code || errOut.Len() != 0 {
 			t.Errorf("%v: exit %d, stderr %q; want exit %d and nothing on stderr", c.err, code, errOut.String(), c.code)
 		}
@@ -89,7 +89,7 @@ func TestFailJSONFormIsTheAPIErrorBody(t *testing.T) {
 // HTTP answer: {"error": {"kind", "message"}}, with missing left out when it is empty.
 func TestFailJSONFormHasTheExactShape(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := fail(&out, &errOut, "cairn task get", true, core.NotFound("no task task-20261030-09 in this project"))
+	code := fail(&out, &errOut, "cairnbook task get", true, core.NotFound("no task task-20261030-09 in this project"))
 	const want = `{"error":{"kind":"not_found","message":"no task task-20261030-09 in this project"}}` + "\n"
 	if code != 4 || out.String() != want {
 		t.Errorf("exit %d, stdout %q; want exit 4 and %q", code, out.String(), want)
@@ -103,7 +103,7 @@ func TestFailMissingListSurvivesTheTrip(t *testing.T) {
 	refusal := core.Refused("close policy not met: summary, lessons")
 	refusal.Missing = []string{core.MissingSummary, core.MissingLessons}
 	var out, errOut bytes.Buffer
-	code := fail(&out, &errOut, "cairn task close", true, &client.ServerError{Err: refusal})
+	code := fail(&out, &errOut, "cairnbook task close", true, &client.ServerError{Err: refusal})
 	if code != 5 {
 		t.Errorf("exit %d, want 5", code)
 	}
@@ -123,8 +123,8 @@ func TestFailMissingListSurvivesTheTrip(t *testing.T) {
 // name, as before, nothing on stdout, and the kind's exit code.
 func TestFailTextFormIsOneLineOnStderr(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := fail(&out, &errOut, "cairn step add", false, core.Refused("the task is done"))
-	if code != 5 || out.Len() != 0 || errOut.String() != "cairn step add: the task is done\n" {
+	code := fail(&out, &errOut, "cairnbook step add", false, core.Refused("the task is done"))
+	if code != 5 || out.Len() != 0 || errOut.String() != "cairnbook step add: the task is done\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5, nothing on stdout and the one line", code, out.String(), errOut.String())
 	}
 }
@@ -133,7 +133,7 @@ func TestFailTextFormIsOneLineOnStderr(t *testing.T) {
 // the --json form names that kind, as CONTRACT §1.2 says any other error is an internal failure.
 func TestFailWithNoKindIsInternal(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := fail(&out, &errOut, "cairn task list", true, errors.New("the disk is full"))
+	code := fail(&out, &errOut, "cairnbook task list", true, errors.New("the disk is full"))
 	const want = `{"error":{"kind":"internal","message":"the disk is full"}}` + "\n"
 	if code != ExitFailure || out.String() != want || errOut.Len() != 0 {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 1 and the internal error object", code, out.String(), errOut.String())
@@ -153,7 +153,7 @@ func TestVerbFailureWithJSONExitsWithItsKind(t *testing.T) {
 // TestVerbCloseRefusalCarriesTheMissingList runs task close end to end: a refused close with --json exits 5
 // and its object names the missing list.
 func TestVerbCloseRefusalCarriesTheMissingList(t *testing.T) {
-	t.Setenv("CAIRN_AGENT", "")
+	t.Setenv("CAIRNBOOK_AGENT", "")
 	refusal := core.Refused("close policy not met: summary, lessons, mistakes")
 	refusal.Missing = []string{core.MissingSummary, core.MissingLessons, core.MissingMistakes}
 	svc := &fakeWrites{err: refusal}

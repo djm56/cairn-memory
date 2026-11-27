@@ -22,7 +22,7 @@ var deferred = map[string]conformance.Deferral{}
 // and the store under it, for tests that check the rows directly.
 func openLocal(t *testing.T) (*core.Local, *store.Store) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}

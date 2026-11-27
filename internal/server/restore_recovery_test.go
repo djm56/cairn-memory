@@ -36,7 +36,7 @@ func TestRecoveryStepPrintsACommandThatMovesTheFilesBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn 'one'.db")
+	target := filepath.Join(dir, "cairnbook 'one'.db")
 	seedDB(t, target, "beta")
 	leaveWAL(t, target, "gamma")
 
@@ -83,7 +83,7 @@ func TestShellQuoteIsOneWord(t *testing.T) {
 func TestSQLiteRefusalNamesTheNextStep(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 
 	prev := acquireExclusive
@@ -107,7 +107,7 @@ func TestSQLiteRefusalNamesTheNextStep(t *testing.T) {
 func TestCheckFailureNamesTheJournal(t *testing.T) {
 	dir := t.TempDir()
 	backup := makeBackup(t, dir, "alpha")
-	target := filepath.Join(dir, "cairn.db")
+	target := filepath.Join(dir, "cairnbook.db")
 	seedDB(t, target, "beta")
 	if err := os.WriteFile(target+"-journal", []byte("hot"), 0o600); err != nil {
 		t.Fatal(err)

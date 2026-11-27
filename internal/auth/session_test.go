@@ -233,7 +233,7 @@ func TestSignInRefusesUnacceptedKeysAndKeepsThePresentedSession(t *testing.T) {
 
 	for name, key := range map[string]string{
 		"malformed": "not-a-key",
-		"unknown":   "cairn_" + strings.Repeat("A", 43),
+		"unknown":   "cairnbook_" + strings.Repeat("A", 43),
 		"revoked":   revoked,
 	} {
 		_, _, err := fx.sessions.SignIn(context.Background(), key, presented)

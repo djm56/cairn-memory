@@ -31,7 +31,7 @@ jobs:
           cache: true
 
       - name: Build
-        run: make build && bin/cairn version
+        run: make build && bin/cairnbook version
 
       - name: go vet
         run: make vet

@@ -14,15 +14,20 @@ import (
 
 // EnvKey is the environment variable that holds the API key a client sends (DESIGN.md
 // §2.1). It is read before the key file.
-const EnvKey = "CAIRN_API_KEY"
+const EnvKey = "CAIRNBOOK_API_KEY"
 
-// KeySource says where a key came from. Its values are the words cairn doctor prints.
+// LegacyEnvKey is EnvKey's name before the rename to Cairnbook. It is read when EnvKey is
+// unset or blank, in the environment and in the key file, so a key set up before the
+// rename keeps working.
+const LegacyEnvKey = "CAIRN_API_KEY"
+
+// KeySource says where a key came from. Its values are the words cairnbook doctor prints.
 type KeySource string
 
 const (
-	// SourceEnv: the key came from CAIRN_API_KEY.
+	// SourceEnv: the key came from CAIRNBOOK_API_KEY.
 	SourceEnv KeySource = "env"
-	// SourceFile: the key came from the client.env file under ~/.config/cairn.
+	// SourceFile: the key came from the client.env file under ~/.config/cairnbook.
 	SourceFile KeySource = "client.env"
 )
 
@@ -40,11 +45,21 @@ func (k Key) String() string { return fmt.Sprintf("API key from %s", k.Source) }
 // GoString is String for %#v, so a debug print shows no value either.
 func (k Key) GoString() string { return fmt.Sprintf("client.Key{Source: %q}", k.Source) }
 
-// ClientEnvPath returns the file a key is read from when CAIRN_API_KEY is not set:
-// ~/.config/cairn/client.env (DESIGN.md §2.1). The path is fixed. XDG_CONFIG_HOME is not
-// read, since nothing else in Cairn reads it, and a second location would be a second
+// ClientEnvPath returns the file a key is read from when CAIRNBOOK_API_KEY is not set:
+// ~/.config/cairnbook/client.env (DESIGN.md §2.1). The path is fixed. XDG_CONFIG_HOME is not
+// read, since nothing else in Cairnbook reads it, and a second location would be a second
 // place for a key to be left behind.
 func ClientEnvPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("find the home directory for the API key file: %w", err)
+	}
+	return filepath.Join(home, ".config", "cairnbook", "client.env"), nil
+}
+
+// LegacyClientEnvPath returns the key file's path before the rename to Cairnbook:
+// ~/.config/cairn/client.env. LoadKey reads it only when ClientEnvPath does not exist.
+func LegacyClientEnvPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("find the home directory for the API key file: %w", err)
@@ -52,9 +67,10 @@ func ClientEnvPath() (string, error) {
 	return filepath.Join(home, ".config", "cairn", "client.env"), nil
 }
 
-// LoadKey returns the API key this process sends, and where it came from. CAIRN_API_KEY
+// LoadKey returns the API key this process sends, and where it came from. CAIRNBOOK_API_KEY
 // is read first; a value that is empty or only white space counts as unset. Otherwise the
-// file ClientEnvPath names is read, when it exists.
+// file ClientEnvPath names is read, when it exists. The old names from before the rename,
+// LegacyEnvKey and LegacyClientEnvPath, are read only when the new ones are missing.
 //
 // A key that is in neither place is not an error: the returned Key has no source and no
 // value, and the caller says what to do with NoKeyMessage. A key file that any other user
@@ -64,9 +80,17 @@ func LoadKey() (Key, error) {
 	if v := strings.TrimSpace(os.Getenv(EnvKey)); v != "" {
 		return Key{Value: v, Source: SourceEnv}, nil
 	}
+	if v := strings.TrimSpace(os.Getenv(LegacyEnvKey)); v != "" {
+		return Key{Value: v, Source: SourceEnv}, nil
+	}
 	path, err := ClientEnvPath()
 	if err != nil {
 		return Key{}, err
+	}
+	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
+		if old, err := LegacyClientEnvPath(); err == nil {
+			path = old
+		}
 	}
 	v, err := readKeyFile(path)
 	if err != nil {
@@ -84,7 +108,7 @@ func LoadKey() (Key, error) {
 func NoKeyMessage() string {
 	path, err := ClientEnvPath()
 	if err != nil {
-		return fmt.Sprintf("set %s, or write %s=<key> to the client.env file under ~/.config/cairn", EnvKey, EnvKey)
+		return fmt.Sprintf("set %s, or write %s=<key> to the client.env file under ~/.config/cairnbook", EnvKey, EnvKey)
 	}
 	return fmt.Sprintf("set %s, or write %s=<key> to %s", EnvKey, EnvKey, path)
 }
@@ -133,13 +157,15 @@ func notRegular(path string) error {
 	return fmt.Errorf("the API key file %s is not a regular file: replace it with a file that holds the key, as the README shows", path)
 }
 
-// parseKeyFile returns the value of the last CAIRN_API_KEY line in r, or "" when there is
-// none or its value is empty. The file is read as shell-style lines: a blank line or one
+// parseKeyFile returns the value of the last CAIRNBOOK_API_KEY line in r, or "" when there is
+// none or its value is empty. A file with no CAIRNBOOK_API_KEY line gives the value of its last
+// CAIRN_API_KEY line (LegacyEnvKey), the name before the rename. The file is read as shell-style lines: a blank line or one
 // that starts with # is skipped, a line may begin with "export ", as a shell's does, a value may
 // be wrapped in one pair of quotes, and any other name is ignored. A line with no '=' is
 // refused by its number and not its text, since it may be a key pasted without its name.
 func parseKeyFile(r io.Reader) (string, error) {
-	var value string
+	var value, legacy string
+	var named bool
 	sc := bufio.NewScanner(r)
 	for n := 1; sc.Scan(); n++ {
 		line := strings.TrimSpace(sc.Text())
@@ -153,13 +179,18 @@ func parseKeyFile(r io.Reader) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("line %d has no '=': each line is %s=<key>", n, EnvKey)
 		}
-		if strings.TrimSpace(name) != EnvKey {
-			continue
+		switch strings.TrimSpace(name) {
+		case EnvKey:
+			value, named = unquote(strings.TrimSpace(v)), true
+		case LegacyEnvKey:
+			legacy = unquote(strings.TrimSpace(v))
 		}
-		value = unquote(strings.TrimSpace(v))
 	}
 	if err := sc.Err(); err != nil {
 		return "", fmt.Errorf("read: %w", err)
+	}
+	if !named {
+		value = legacy
 	}
 	return strings.TrimSpace(value), nil
 }

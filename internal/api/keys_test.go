@@ -48,7 +48,7 @@ func (r *recorder) DirectiveRetire(ctx context.Context, _ core.DirectiveRetireRe
 // openKeyStore opens a fresh database in the test's directory.
 func openKeyStore(t *testing.T) *store.Store {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -76,7 +76,7 @@ func addKey(t *testing.T, st *store.Store, name string, scope auth.Scope) string
 	return key
 }
 
-// keyedHandler serves svc behind the key resolver over st, as cairn serve will.
+// keyedHandler serves svc behind the key resolver over st, as cairnbook serve will.
 func keyedHandler(st *store.Store, svc core.Service) http.Handler {
 	return api.Handler(svc, api.KeyCaller(auth.NewResolver(api.NewStoreLookup(st), nil)), nil)
 }
@@ -91,7 +91,7 @@ func bearer(key string) map[string]string {
 }
 
 // TestKeyScopeSetsTheRole checks that the role of each call comes from the key's
-// scope, and that X-Cairn-Role is ignored: an agent key that claims the operator
+// scope, and that X-Cairnbook-Role is ignored: an agent key that claims the operator
 // role in the header is still an agent.
 func TestKeyScopeSetsTheRole(t *testing.T) {
 	st := openKeyStore(t)
@@ -173,7 +173,7 @@ func TestViewerIsRefusedOnSampledWrites(t *testing.T) {
 
 // TestAgentKeyIsRefusedOnOperatorRoute is the security property issue #110 exists
 // for. It runs over the real core, so the refusal is core's own check: an agent key
-// that sends X-Cairn-Role: operator is still refused with operator_only, and the
+// that sends X-Cairnbook-Role: operator is still refused with operator_only, and the
 // same route answers an operator key.
 func TestAgentKeyIsRefusedOnOperatorRoute(t *testing.T) {
 	st := openKeyStore(t)
@@ -186,10 +186,10 @@ func TestAgentKeyIsRefusedOnOperatorRoute(t *testing.T) {
 	forged[api.HeaderRole] = string(core.RoleOperator)
 	got := serve(h, http.MethodPost, path, `{"code":"D-0001"}`, forged)
 	if got.Code != http.StatusForbidden {
-		t.Fatalf("agent key with X-Cairn-Role: operator: status %d, want 403: %s", got.Code, got.Body.String())
+		t.Fatalf("agent key with X-Cairnbook-Role: operator: status %d, want 403: %s", got.Code, got.Body.String())
 	}
 	if e := errorBody(t, got); e.Kind != core.KindOperatorOnly {
-		t.Errorf("agent key with X-Cairn-Role: operator: kind %s, want operator_only", e.Kind)
+		t.Errorf("agent key with X-Cairnbook-Role: operator: kind %s, want operator_only", e.Kind)
 	}
 
 	got = serve(h, http.MethodPost, path, `{"code":"D-0001"}`, bearer(agent))
@@ -226,7 +226,7 @@ func TestMissingOrBadKeyIsUnauthenticated(t *testing.T) {
 		{"an empty value", "Bearer "},
 		{"the scheme alone", "Bearer"},
 		{"another scheme", "Basic " + unknown},
-		{"a malformed key", "Bearer cairn_short"},
+		{"a malformed key", "Bearer cairnbook_short"},
 		{"an unknown key", "Bearer " + unknown},
 		{"a revoked key", "Bearer " + revoked},
 	}

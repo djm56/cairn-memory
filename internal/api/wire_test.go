@@ -58,11 +58,11 @@ func TestWireHeaderNamesCarryTheCaller(t *testing.T) {
 	f := &fake{}
 	h := api.Handler(f, api.UnauthenticatedHeaderCaller, nil)
 	headers := map[string]string{
-		"X-Cairn-Project": "acme-api",
-		"X-Cairn-Agent":   "hicks",
-		"X-Cairn-Session": "s-1",
-		"X-Cairn-Client":  "claude-code",
-		"X-Cairn-Role":    "operator",
+		"X-Cairnbook-Project": "acme-api",
+		"X-Cairnbook-Agent":   "hicks",
+		"X-Cairnbook-Session": "s-1",
+		"X-Cairnbook-Client":  "claude-code",
+		"X-Cairnbook-Role":    "operator",
 	}
 	serve(h, http.MethodPost, "/v1/agent/task_current", `{}`, headers)
 	want := core.Caller{Project: "acme-api", Agent: "hicks", Session: "s-1", Client: "claude-code", Role: core.RoleOperator}

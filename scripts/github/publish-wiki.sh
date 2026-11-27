@@ -97,7 +97,7 @@ fi
 # The remote as it may be printed: credentials redacted.
 SHOWN_URL="$(printf '%s' "$URL" | sed -E "$REDACT")"
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairn-wiki.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/cairnbook-wiki.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 CLONE="$WORK/wiki"
 
@@ -122,7 +122,7 @@ if [ "$APPLY" = 1 ]; then
   fi
   MSG="Sync wiki from commit $SHA"
   if [ -z "$(git -C "$CLONE" config user.email || true)" ]; then
-    git -C "$CLONE" -c user.name="cairn wiki publisher" \
+    git -C "$CLONE" -c user.name="cairnbook wiki publisher" \
       -c user.email="wiki-publisher@users.noreply.github.com" commit -q -m "$MSG"
   else
     git -C "$CLONE" commit -q -m "$MSG"

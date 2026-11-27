@@ -13,10 +13,10 @@ import (
 // one, and the sentence says so.
 const NoRoleNote = "Agent-scoped directives were not counted: no agent role is set."
 
-// RefusedRoleNote is the sentence status prints, and the session-start block prints, when CAIRN_AGENT
+// RefusedRoleNote is the sentence status prints, and the session-start block prints, when CAIRNBOOK_AGENT
 // is set but the wire form refuses it. It names the variable and the reason, so a person does not read
 // it as the variable being unset.
-const RefusedRoleNote = "Agent-scoped directives were not counted: CAIRN_AGENT is set but refused (a control character or a space at either end)."
+const RefusedRoleNote = "Agent-scoped directives were not counted: CAIRNBOOK_AGENT is set but refused (a control character or a space at either end)."
 
 // HookPointer is the closing line of the session-start block the hook prints. It names no tool call: the
 // block already carries the active task, its current step and its next action, so the agent continues that
@@ -36,7 +36,7 @@ const PrimePointer = "The brief, steps and recent events follow."
 // PrimeOmittedCall is the call the omitted-directives line of prime's block names. Prime's agent has only
 // a shell, so the call is the CLI command. It is the one place prime names it, and only when directives
 // are omitted.
-const PrimeOmittedCall = "cairn directive list"
+const PrimeOmittedCall = "cairnbook directive list"
 
 // SessionStart writes the session-start block for cur: the active task, its next action and current
 // step, the count of directives that apply, and the closing line pointer. With no active task it is one
@@ -44,17 +44,17 @@ const PrimeOmittedCall = "cairn directive list"
 // names a call: the pointer and the call the omitted-directives line names.
 //
 // role is the agent role the counts were read for; with none, the block says agent-scoped directives
-// were not counted. refused is true when CAIRN_AGENT is set but refused: the block then names the
+// were not counted. refused is true when CAIRNBOOK_AGENT is set but refused: the block then names the
 // variable as the reason, so the agent is not told that no role is set when one was given.
 func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role string, refused bool, pointer, omittedCall string) {
 	if cur.Task == nil {
-		fmt.Fprintf(w, "Cairn: no task is active in %s.\n", project)
+		fmt.Fprintf(w, "Cairnbook: no task is active in %s.\n", project)
 		return
 	}
 	// Every server-derived text goes through Plain: the block is read by a model, so a title or next
 	// action cannot end its line or start one of its own.
 	task := cur.Task
-	fmt.Fprintf(w, "Cairn task: \"%s\" (%s, %s) in %s.\n", Plain(task.Title), Plain(task.ID), Plain(string(task.Status)), project)
+	fmt.Fprintf(w, "Cairnbook task: \"%s\" (%s, %s) in %s.\n", Plain(task.Title), Plain(task.ID), Plain(string(task.Status)), project)
 	if next := Plain(task.NextAction); next != "" {
 		fmt.Fprintf(w, "Next action: %s\n", next)
 	} else {
@@ -69,7 +69,7 @@ func SessionStart(w io.Writer, project string, cur *core.TaskCurrent, role strin
 		fmt.Fprintf(w, "Other active tasks: %d.\n", cur.OtherActive)
 	}
 	fmt.Fprintf(w, "Directives that apply: %d.\n", len(cur.Directives))
-	// The same note as cairn status: with no role, no agent-scoped directive is counted.
+	// The same note as cairnbook status: with no role, no agent-scoped directive is counted.
 	if role == "" {
 		if refused {
 			fmt.Fprintln(w, RefusedRoleNote)
@@ -125,9 +125,9 @@ func StepWarning(w io.Writer, cur *core.TaskCurrent) error {
 	// The title is server text, so it goes through Plain: it cannot end the line or start one.
 	var msg string
 	if n == 1 {
-		msg = fmt.Sprintf("Cairn warning: step %d of %d, \"%s\", is active with no summary. Record a summary with cairn step update or the step_update tool when it is done.", s.Number, len(cur.Steps), Plain(s.Title))
+		msg = fmt.Sprintf("Cairnbook warning: step %d of %d, \"%s\", is active with no summary. Record a summary with cairnbook step update or the step_update tool when it is done.", s.Number, len(cur.Steps), Plain(s.Title))
 	} else {
-		msg = fmt.Sprintf("Cairn warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with cairn step update or the step_update tool when each is done.", n, s.Number, len(cur.Steps), Plain(s.Title))
+		msg = fmt.Sprintf("Cairnbook warning: %d steps are active with no summary; the first is step %d of %d, \"%s\". Record a summary with cairnbook step update or the step_update tool when each is done.", n, s.Number, len(cur.Steps), Plain(s.Title))
 	}
 	b, err := encodeJSON(hookWarning{SystemMessage: msg})
 	if err != nil {

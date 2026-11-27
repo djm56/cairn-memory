@@ -1,14 +1,14 @@
 {
-  "name": "cairn-memory",
-  "description": "The Cairn plugin for Claude Code, from the cairn-memory repository.",
+  "name": "cairnbook",
+  "description": "The Cairnbook plugin for Claude Code, from the cairn-memory repository.",
   "owner": {
     "name": "Donovan Maidens"
   },
   "plugins": [
     {
-      "name": "cairn",
+      "name": "cairnbook",
       "source": "./plugins/claude-code",
-      "description": "Task state, learnings, directives and recall for coding agents, through the cairn MCP server and its hooks."
+      "description": "Task state, learnings, directives and recall for coding agents, through the cairnbook MCP server and its hooks."
     }
   ]
 }

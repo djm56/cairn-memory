@@ -15,14 +15,14 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// exitScript is the agent of the exit check: a bash script with nothing but cairn commands and bash
+// exitScript is the agent of the exit check: a bash script with nothing but cairnbook commands and bash
 // builtins. It starts a task, runs one step, logs an event and closes the task with its criteria
 // results. Its server, key, project and agent come from the environment, so no flag names them.
-// Each cairn call's output is read by bash's own pattern match, so no other program is needed.
+// Each cairnbook call's output is read by bash's own pattern match, so no other program is needed.
 const exitScript = `#!/usr/bin/env bash
 set -euo pipefail
 
-started=$(cairn task start --title "Exit check" --goal "Close a task through the CLI with only bash" --json-input --json <<'JSON'
+started=$(cairnbook task start --title "Exit check" --goal "Close a task through the CLI with only bash" --json-input --json <<'JSON'
 {"criteria": ["The task closes done"]}
 JSON
 )
@@ -32,11 +32,11 @@ if [[ ! $started =~ \"id\":\"(task-[0-9]+-[0-9]+)\" ]]; then
 fi
 task="${BASH_REMATCH[1]}"
 
-cairn step add "$task" --title "Run the check" --json > /dev/null
-cairn step update "$task" 1 --action start --json > /dev/null
-cairn step update "$task" 1 --action finish --summary "The check ran." --json > /dev/null
-cairn event log "$task" --kind note --text "Checked the step by hand." --json > /dev/null
-cairn task close "$task" --outcome done --summary "The check passed." --no-lessons-reason "Nothing new to record." --json-input --json > /dev/null <<'JSON'
+cairnbook step add "$task" --title "Run the check" --json > /dev/null
+cairnbook step update "$task" 1 --action start --json > /dev/null
+cairnbook step update "$task" 1 --action finish --summary "The check ran." --json > /dev/null
+cairnbook event log "$task" --kind note --text "Checked the step by hand." --json > /dev/null
+cairnbook task close "$task" --outcome done --summary "The check passed." --no-lessons-reason "Nothing new to record." --json-input --json > /dev/null <<'JSON'
 {"criteria": [{"ord": 1, "result": "met", "evidence": "the step and the close ran"}], "lessons": [], "mistakes": []}
 JSON
 printf '%s\n' "$task"
@@ -47,7 +47,7 @@ const exitProject = "exit-check"
 
 // TestExitCheckAgentWithOnlyBashCompletesAndClosesATask is M4's exit check: an agent with only bash
 // completes and closes a task through the CLI. The agent is exitScript, run by bash with a PATH that
-// holds only the cairn binary, so a bare command name it runs that is not cairn is not found and fails the run.
+// holds only the cairnbook binary, so a bare command name it runs that is not cairnbook is not found and fails the run.
 // The server is an in-process loopback server over a real core, and the task is read back through the
 // API to show it closed done: its status and outcome, its step done, the note and the close in its journal,
 // and the criterion result the agent submitted, met, with its evidence.
@@ -60,7 +60,7 @@ func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	srv := httptest.NewServer(api.Handler(local, api.UnauthenticatedHeaderCaller, nil))
 	t.Cleanup(srv.Close)
 
-	// The PATH holds one directory, with cairn in it and nothing else. PATH confines bare command names
+	// The PATH holds one directory, with cairnbook in it and nothing else. PATH confines bare command names
 	// only: a script that runs a file by its path, such as /bin/cat, is not confined by it, so the script
 	// runs none.
 	dir := t.TempDir()
@@ -68,8 +68,8 @@ func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	if err := os.Mkdir(binDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(cairnBin, filepath.Join(binDir, "cairn")); err != nil {
-		t.Skipf("the exit check needs a symbolic link to put cairn on the PATH, and this platform refused one: %v", err)
+	if err := os.Symlink(cairnbookBin, filepath.Join(binDir, "cairnbook")); err != nil {
+		t.Skipf("the exit check needs a symbolic link to put cairnbook on the PATH, and this platform refused one: %v", err)
 	}
 	script := filepath.Join(dir, "agent.sh")
 	if err := os.WriteFile(script, []byte(exitScript), 0o600); err != nil {
@@ -81,10 +81,10 @@ func TestExitCheckAgentWithOnlyBashCompletesAndClosesATask(t *testing.T) {
 	cmd.Env = []string{
 		"PATH=" + binDir,
 		"HOME=" + dir,
-		"CAIRN_SERVER=" + srv.URL,
-		"CAIRN_API_KEY=" + testKey,
-		"CAIRN_PROJECT=" + exitProject,
-		"CAIRN_AGENT=main",
+		"CAIRNBOOK_SERVER=" + srv.URL,
+		"CAIRNBOOK_API_KEY=" + testKey,
+		"CAIRNBOOK_PROJECT=" + exitProject,
+		"CAIRNBOOK_AGENT=main",
 	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

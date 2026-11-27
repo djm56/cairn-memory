@@ -77,12 +77,12 @@ func assertIntegrityOK(t *testing.T, path string) {
 	}
 }
 
-// TestBackupWhileWritesRun is the consistency proof for cairn backup (#74). Writes run in another goroutine
+// TestBackupWhileWritesRun is the consistency proof for cairnbook backup (#74). Writes run in another goroutine
 // against the same database while Backup runs. The backup must open, pass the integrity
 // check, and hold every row that was committed before Backup started.
 func TestBackupWhileWritesRun(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	st, err := store.Open(db)
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -170,7 +170,7 @@ func TestBackupWhileWritesRun(t *testing.T) {
 // an existing file is refused and left as it was.
 func TestBackupWritesANewOwnerOnlyFile(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	out := filepath.Join(dir, "backup.db")
 
@@ -205,7 +205,7 @@ func TestBackupWritesANewOwnerOnlyFile(t *testing.T) {
 // database, and a missing database, and that none of them leaves a file.
 func TestBackupRefusesWhatCannotBeAFile(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	cases := []struct {
 		name, out, want string
@@ -236,9 +236,9 @@ func TestBackupRefusesWhatCannotBeAFile(t *testing.T) {
 	}
 }
 
-// TestBackupRefusesAFileThatIsNotACairnDatabase checks that a file with no schema is refused, and
+// TestBackupRefusesAFileThatIsNotACairnbookDatabase checks that a file with no schema is refused, and
 // that the output is not left behind.
-func TestBackupRefusesAFileThatIsNotACairnDatabase(t *testing.T) {
+func TestBackupRefusesAFileThatIsNotACairnbookDatabase(t *testing.T) {
 	dir := t.TempDir()
 	db := filepath.Join(dir, "other.db")
 	if err := os.WriteFile(db, []byte("not a database at all, just text padding it out to a page of bytes\n"), 0o600); err != nil {
@@ -246,7 +246,7 @@ func TestBackupRefusesAFileThatIsNotACairnDatabase(t *testing.T) {
 	}
 	out := filepath.Join(dir, "backup.db")
 	if _, err := Backup(context.Background(), db, out); err == nil {
-		t.Fatalf("a backup of a file that is not Cairn's: want a refusal")
+		t.Fatalf("a backup of a file that is not Cairnbook's: want a refusal")
 	}
 	if _, err := os.Lstat(out); !os.IsNotExist(err) {
 		t.Errorf("a refused backup left %s behind", out)
@@ -261,7 +261,7 @@ func TestBackupRefusesAFileThatIsNotACairnDatabase(t *testing.T) {
 // must be owner-only.
 func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	out := filepath.Join(dir, "backup.db")
 	victim := filepath.Join(dir, "victim")
@@ -313,7 +313,7 @@ func TestBackupRefusesAStagingDirectorySwappedDuringTheCopy(t *testing.T) {
 // directory, not by the name, which now holds the link. The sentinel must survive.
 func TestBackupRefusesAStagingDirectorySwappedAfterTheCopy(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	out := filepath.Join(dir, "backup.db")
 	victim := filepath.Join(dir, "victim")
@@ -366,7 +366,7 @@ func TestBackupRefusesAStagingDirectorySwappedAfterTheCopy(t *testing.T) {
 // linked file must find it is not the copy made, remove the output name, and say so.
 func TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	out := filepath.Join(dir, "backup.db")
 
@@ -404,7 +404,7 @@ func TestBackupRemovesItsNameWhenTheCopyIsSwappedBeforeTheLink(t *testing.T) {
 // swapped-in directory must survive, and the directory made must be emptied through its root.
 func TestBackupRemovesItsNameWhenTheStagingDirectoryIsSwappedBeforeTheLink(t *testing.T) {
 	dir := t.TempDir()
-	db := filepath.Join(dir, "cairn.db")
+	db := filepath.Join(dir, "cairnbook.db")
 	createDB(t, db)
 	out := filepath.Join(dir, "backup.db")
 
@@ -468,7 +468,7 @@ func TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			db := filepath.Join(dir, "cairn.db")
+			db := filepath.Join(dir, "cairnbook.db")
 			createDB(t, db)
 			out := filepath.Join(dir, "backup.db")
 
@@ -496,7 +496,7 @@ func TestBackupHintsAtNoHardLinksOnlyForTheNotSupportedErrnos(t *testing.T) {
 				t.Fatal(rerr)
 			}
 			for _, e := range entries {
-				if strings.HasPrefix(e.Name(), ".cairn-backup-") {
+				if strings.HasPrefix(e.Name(), ".cairnbook-backup-") {
 					t.Errorf("a refused backup left the staging directory %s behind", e.Name())
 				}
 			}

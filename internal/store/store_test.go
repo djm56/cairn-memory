@@ -14,7 +14,7 @@ import (
 // registers its close with the test.
 func openTemp(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(filepath.Join(t.TempDir(), "cairn.db"))
+	s, err := Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestEnumCheckRefusesUnknownValue(t *testing.T) {
 // The second open must record no new migration and leave the first rows
 // untouched.
 func TestReopenAppliesNothing(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	s, err := Open(path)
 	if err != nil {
 		t.Fatalf("first Open: %v", err)
@@ -339,7 +339,7 @@ func TestFailedMigrationLeavesPreviousVersion(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairnbook.db")+"?"+dsnOptions)
 			if err != nil {
 				t.Fatalf("sql.Open: %v", err)
 			}
@@ -390,7 +390,7 @@ func TestMigrateRefusesNewerDatabase(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairn.db")+"?"+dsnOptions)
+			db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "cairnbook.db")+"?"+dsnOptions)
 			if err != nil {
 				t.Fatalf("sql.Open: %v", err)
 			}

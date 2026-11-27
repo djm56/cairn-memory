@@ -17,7 +17,7 @@ import (
 
 // helperDBEnv names the database file. Setting it turns a test binary into the
 // allocation helper that TestAllocateTaskIDAcrossProcesses starts.
-const helperDBEnv = "CAIRN_TEST_ALLOC_DB"
+const helperDBEnv = "CAIRNBOOK_TEST_ALLOC_DB"
 
 // allocPerProcess is how many task ids each process allocates.
 const allocPerProcess = 50
@@ -37,7 +37,7 @@ const allocProject = "acme-api"
 // same point when the go lines are written. Nothing enforces the overlap. The test
 // fails unless both processes succeed and all the ids are distinct.
 func TestAllocateTaskIDAcrossProcesses(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	s, err := Open(path)
 	if err != nil {
 		t.Fatalf("Open: %v", err)

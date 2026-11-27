@@ -35,7 +35,7 @@ var deferrals = []deferral{
 	},
 	{
 		name:   "identity/client_name_refused",
-		reason: "the caller's client name is not carried: the CLI names itself cairn-cli",
+		reason: "the caller's client name is not carried: the CLI names itself cairnbook-cli",
 		match:  []string{"with the client name"},
 	},
 	{
@@ -94,7 +94,7 @@ func deferredMap(list []deferral) map[string]conformance.Deferral {
 // newLocal returns a core.Local over a new database in a temporary directory.
 func newLocal(t *testing.T) core.Service {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
@@ -102,7 +102,7 @@ func newLocal(t *testing.T) core.Service {
 	return core.NewLocal(st)
 }
 
-// TestCLIConformance runs the whole suite with every agent call made by the cairn binary, and the
+// TestCLIConformance runs the whole suite with every agent call made by the cairnbook binary, and the
 // operator and web calls made over HTTP to the same server.
 func TestCLIConformance(t *testing.T) {
 	if len(deferred) != len(deferrals) {

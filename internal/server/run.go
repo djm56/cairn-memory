@@ -16,7 +16,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/store"
 )
 
-// Options is what cairn serve starts with. Addr and DB are required. TLSCert and TLSKey
+// Options is what cairnbook serve starts with. Addr and DB are required. TLSCert and TLSKey
 // are both set or both empty. BehindProxy says a proxy in front of the server terminates
 // TLS, which the bind rule accepts in place of certificate files (D20).
 type Options struct {
@@ -41,35 +41,35 @@ func Run(ctx context.Context, o Options) error {
 	}
 	host, port, err := net.SplitHostPort(o.Addr)
 	if err != nil {
-		return fmt.Errorf("cairn serve: --addr %q: %w", o.Addr, err)
+		return fmt.Errorf("cairnbook serve: --addr %q: %w", o.Addr, err)
 	}
 	ips, err := ResolveHost(ctx, host)
 	if err != nil {
-		return fmt.Errorf("cairn serve: --addr %q: %w", o.Addr, err)
+		return fmt.Errorf("cairnbook serve: --addr %q: %w", o.Addr, err)
 	}
 	loopback := Loopback(ips)
 	tlsOn := o.TLSCert != ""
 	if err := RequireTransport(loopback, tlsOn, o.BehindProxy); err != nil {
-		return fmt.Errorf("cairn serve: --addr %s: %w", o.Addr, err)
+		return fmt.Errorf("cairnbook serve: --addr %s: %w", o.Addr, err)
 	}
 	var tlsCfg *tls.Config
 	if tlsOn {
 		if tlsCfg, err = LoadTLS(o.TLSCert, o.TLSKey); err != nil {
-			return fmt.Errorf("cairn serve: %w", err)
+			return fmt.Errorf("cairnbook serve: %w", err)
 		}
 	}
 
 	st, err := openDatabase(o.DB, true)
 	if err != nil {
-		return fmt.Errorf("cairn serve: %w", err)
+		return fmt.Errorf("cairnbook serve: %w", err)
 	}
 	defer st.Close()
 	keys, err := activeKeys(ctx, st)
 	if err != nil {
-		return fmt.Errorf("cairn serve: count the API keys: %w", err)
+		return fmt.Errorf("cairnbook serve: count the API keys: %w", err)
 	}
 	if err := RequireKeys(loopback, keys); err != nil {
-		return fmt.Errorf("cairn serve: --addr %s: %w", o.Addr, err)
+		return fmt.Errorf("cairnbook serve: --addr %s: %w", o.Addr, err)
 	}
 	if loopback && keys == 0 {
 		fmt.Fprintln(o.Log, NoKeysLine)
@@ -86,7 +86,7 @@ func Run(ctx context.Context, o Options) error {
 	}
 	ln, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		return fmt.Errorf("cairn serve: listen on %s: %w", listenAddr, err)
+		return fmt.Errorf("cairnbook serve: listen on %s: %w", listenAddr, err)
 	}
 
 	logger := newLogger(o.Log)
@@ -103,7 +103,7 @@ func Run(ctx context.Context, o Options) error {
 	}()
 	transport := Transport{TLS: tlsOn, BehindProxy: o.BehindProxy, Loopback: loopback}
 	if err := Serve(ctx, ln, NewHandler(st, logger, transport), tlsCfg, logger); err != nil {
-		return fmt.Errorf("cairn serve: %w", err)
+		return fmt.Errorf("cairnbook serve: %w", err)
 	}
 	logger.Info("stopped")
 	return nil
@@ -114,13 +114,13 @@ func Run(ctx context.Context, o Options) error {
 // caller of Run cannot skip them.
 func checkOptions(o Options) error {
 	if o.Addr == "" {
-		return errors.New("cairn serve: --addr is required")
+		return errors.New("cairnbook serve: --addr is required")
 	}
 	if err := checkDBPath(o.DB); err != nil {
-		return fmt.Errorf("cairn serve: %w", err)
+		return fmt.Errorf("cairnbook serve: %w", err)
 	}
 	if (o.TLSCert == "") != (o.TLSKey == "") {
-		return errors.New("cairn serve: --tls-cert and --tls-key go together: give both, or neither")
+		return errors.New("cairnbook serve: --tls-cert and --tls-key go together: give both, or neither")
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func LoadTLS(certFile, keyFile string) (*tls.Config, error) {
 }
 
 // newLogger returns the server's logger, writing text lines to w. The time of each line is in
-// UTC, as cairn export and cairn key list print theirs, so a reader lines the log up with them
+// UTC, as cairnbook export and cairnbook key list print theirs, so a reader lines the log up with them
 // without converting (#137).
 func newLogger(w io.Writer) *slog.Logger {
 	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{ReplaceAttr: utcTime}))

@@ -1,5 +1,5 @@
 // Package hardlink says when a failed hard link means the filesystem cannot make one. It is the
-// single list of those errnos: cmd/cairn (init) and internal/server (backup) both ask it, so the
+// single list of those errnos: cmd/cairnbook (init) and internal/server (backup) both ask it, so the
 // two cannot drift apart.
 package hardlink
 

@@ -93,7 +93,7 @@ func TestEventLogByStepIDJSONAndRefusal(t *testing.T) {
 	}
 	svc.err = core.NotFound("step 412 is not in task task-20261030-01")
 	code, out, errOut = runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "note", "--text", "started", "--step-id", "412", "--agent", "hicks")
-	if code != 4 || out != "" || errOut != "cairn event log: step 412 is not in task task-20261030-01\n" {
+	if code != 4 || out != "" || errOut != "cairnbook event log: step 412 is not in task task-20261030-01\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 4 (not_found) and the one-line refusal", code, out, errOut)
 	}
 }
@@ -183,7 +183,7 @@ func TestEventLogRefusedByServer(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeWrites{err: core.Invalid("an agent may not log started: the server writes it")}
 	code, out, errOut := runWrite(t, Event, svc, "", "log", "task-20261030-01", "--kind", "started", "--text", "x", "--agent", "hicks")
-	if code != 3 || out != "" || errOut != "cairn event log: an agent may not log started: the server writes it\n" {
+	if code != 3 || out != "" || errOut != "cairnbook event log: an agent may not log started: the server writes it\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 3 (invalid) and the refusal", code, out, errOut)
 	}
 }
@@ -218,7 +218,7 @@ func TestEventLogUsageErrors(t *testing.T) {
 // have.
 func TestEventVerbs(t *testing.T) {
 	svc := &fakeWrites{}
-	if code, _, errOut := runWrite(t, Event, svc, ""); code != 2 || !strings.Contains(errOut, "cairn event log") {
+	if code, _, errOut := runWrite(t, Event, svc, ""); code != 2 || !strings.Contains(errOut, "cairnbook event log") {
 		t.Errorf("no verb: exit %d, stderr %q", code, errOut)
 	}
 	if code, _, errOut := runWrite(t, Event, svc, "", "frobnicate"); code != 2 || !strings.Contains(errOut, `unknown verb "frobnicate"`) {

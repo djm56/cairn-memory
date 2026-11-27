@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# smoke-check.sh — an operator check of a Cairn install (CONTRIBUTING.md).
+# smoke-check.sh — an operator check of a Cairnbook install (CONTRIBUTING.md).
 #
-# Local checks: the cairn binary is found and prints its version, and cairn doctor runs
+# Local checks: the cairnbook binary is found and prints its version, and cairnbook doctor runs
 # when the binary lists it. Server checks, when --server is given: GET /healthz answers;
 # an unauthenticated call to the agent API is refused; an authenticated call is accepted;
-# and cairn mcp starts and answers initialize and tools/list.
+# and cairnbook mcp starts and answers initialize and tools/list.
 #
 # What it changes: no task or project data. It writes no file and creates no project. An
 # authenticated call that the server accepts sets last_used_at on that key, at most once a
 # minute per key. That is the one write this script can cause.
 #
-# cairn doctor makes that same authenticated call as its reach check whenever it finds a
-# key, and it finds one in CAIRN_API_KEY or in ~/.config/cairn/client.env. So a run without
-# CAIRN_API_KEY set can still make the call, when client.env holds a key. The script's own
-# key and mcp checks read CAIRN_API_KEY only, so they then report SKIP.
+# cairnbook doctor makes that same authenticated call as its reach check whenever it finds a
+# key, and it finds one in CAIRNBOOK_API_KEY or in ~/.config/cairnbook/client.env. So a run without
+# CAIRNBOOK_API_KEY set can still make the call, when client.env holds a key. The script's own
+# key and mcp checks read CAIRNBOOK_API_KEY only, so they then report SKIP.
 #
-# cairn doctor needs a project directory: a .cairn.toml above the working directory, or
-# CAIRN_PROJECT set. Run outside one, its project check FAILs, so the doctor line is FAIL.
+# cairnbook doctor needs a project directory: a .cairnbook.toml above the working directory, or
+# CAIRNBOOK_PROJECT set. Run outside one, its project check FAILs, so the doctor line is FAIL.
 # --help says how to read that.
 #
-# The script sends its key only in an Authorization header, read from CAIRN_API_KEY, never
+# The script sends its key only in an Authorization header, read from CAIRNBOOK_API_KEY, never
 # a flag, so the key stays out of the shell history and the process list.
 #
 # Usage:
-#   CAIRN_API_KEY=cairn_... scripts/smoke-check.sh [--bin PATH] [--server URL]
+#   CAIRNBOOK_API_KEY=cairnbook_... scripts/smoke-check.sh [--bin PATH] [--server URL]
 #
 # Exits 0 when no check failed, 1 when one did, 2 for a usage error. Each check prints one
 # PASS, FAIL or SKIP line, and a summary line closes the run. The script runs on the bash
@@ -35,33 +35,33 @@ usage() {
   cat <<'EOF'
 Usage: scripts/smoke-check.sh [--bin PATH] [--server URL]
 
-  --bin PATH     The cairn binary to check (default: cairn, found on PATH).
+  --bin PATH     The cairnbook binary to check (default: cairnbook, found on PATH).
   --server URL   The server's base URL, http:// or https://. Enables the server checks:
                    healthz   GET /healthz answers 200 with status ok.
                    refused   POST /v1/agent/task_current with no key is refused, 401.
-                   key       POST /v1/agent/task_current with CAIRN_API_KEY is accepted: the
+                   key       POST /v1/agent/task_current with CAIRNBOOK_API_KEY is accepted: the
                              server answers 400 with kind invalid. The call names no project,
                              so the server refuses it before it reads anything. That answer
                              shows the key was accepted. A key is needed; without one the
                              check is skipped.
-                   mcp       cairn mcp starts and answers initialize and tools/list. It needs
-                             CAIRN_API_KEY, since cairn mcp will not start without a key.
+                   mcp       cairnbook mcp starts and answers initialize and tools/list. It needs
+                             CAIRNBOOK_API_KEY, since cairnbook mcp will not start without a key.
   --help         Show this help.
 
-Local checks, always run: binary (the file is found), version (it prints "cairn ..."), and
-doctor (cairn doctor, when cairn help lists it; exit 0 is PASS, and a failing line is printed).
+Local checks, always run: binary (the file is found), version (it prints "cairnbook ..."), and
+doctor (cairnbook doctor, when cairnbook help lists it; exit 0 is PASS, and a failing line is printed).
 
-doctor needs a project directory. It finds the project from CAIRN_PROJECT, or from the
-nearest .cairn.toml, searched upward from CLAUDE_PROJECT_DIR when that is set and otherwise
+doctor needs a project directory. It finds the project from CAIRNBOOK_PROJECT, or from the
+nearest .cairnbook.toml, searched upward from CLAUDE_PROJECT_DIR when that is set and otherwise
 from the working directory. Run the script from inside the project. Outside one, doctor's
 project check FAILs and doctor exits 1, so the doctor line is FAIL even when the binary,
 server and key are sound. The detail names the failing line; a project line there is about
-where the script ran, not about the install. A broken .cairn.toml fails the same way.
+where the script ran, not about the install. A broken .cairnbook.toml fails the same way.
 
 Environment:
-  CAIRN_API_KEY  The API key. The script's key and mcp checks read it from the environment
-                 only. cairn doctor and cairn mcp also read ~/.config/cairn/client.env when
-                 CAIRN_API_KEY is not set. So doctor may make its reach call, and cairn mcp
+  CAIRNBOOK_API_KEY  The API key. The script's key and mcp checks read it from the environment
+                 only. cairnbook doctor and cairnbook mcp also read ~/.config/cairnbook/client.env when
+                 CAIRNBOOK_API_KEY is not set. So doctor may make its reach call, and cairnbook mcp
                  may start, with a key these two checks do not see; they then report SKIP.
 
 The API key is never printed. The output is one PASS, FAIL or SKIP line per check, then a
@@ -78,7 +78,7 @@ usage_error() {
   exit 2
 }
 
-BIN="cairn"
+BIN="cairnbook"
 SERVER=""
 
 while [ "$#" -gt 0 ]; do
@@ -95,7 +95,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --key|--key=*)
       # Both forms are refused by name. The argument itself is never echoed, since it may be a key.
-      usage_error "the key is not a flag: set CAIRN_API_KEY in the environment"
+      usage_error "the key is not a flag: set CAIRNBOOK_API_KEY in the environment"
       ;;
     --help|-h)
       usage
@@ -116,11 +116,11 @@ if [ -n "$SERVER" ]; then
     http://*|https://*) ;;
     *) usage_error "--server needs an http:// or https:// URL" ;;
   esac
-  # cairn reads the server from CAIRN_SERVER, so doctor and mcp check the same one.
-  export CAIRN_SERVER="$SERVER"
+  # cairnbook reads the server from CAIRNBOOK_SERVER, so doctor and mcp check the same one.
+  export CAIRNBOOK_SERVER="$SERVER"
 fi
 
-KEY="${CAIRN_API_KEY:-}"
+KEY="${CAIRNBOOK_API_KEY:-}"
 PASSED=0
 FAILED=0
 SKIPPED=0
@@ -139,7 +139,7 @@ report() {
 
 BIN_PATH="$(command -v "$BIN" 2>/dev/null || true)"
 if [ -z "$BIN_PATH" ]; then
-  report FAIL binary "no cairn binary at '$BIN': install it, or pass --bin PATH"
+  report FAIL binary "no cairnbook binary at '$BIN': install it, or pass --bin PATH"
   report SKIP version "no binary to ask"
   report SKIP doctor "no binary to ask"
 else
@@ -147,8 +147,8 @@ else
 
   version_out="$("$BIN_PATH" version 2>&1 || true)"
   case "$version_out" in
-    cairn\ *) report PASS version "${version_out%%$'\n'*}" ;;
-    *) report FAIL version "the binary did not print 'cairn <version>': ${version_out%%$'\n'*}" ;;
+    cairnbook\ *) report PASS version "${version_out%%$'\n'*}" ;;
+    *) report FAIL version "the binary did not print 'cairnbook <version>': ${version_out%%$'\n'*}" ;;
   esac
 
   # doctor runs only when the binary lists it. help is read-only and prints to stdout.
@@ -218,11 +218,11 @@ else
     # process list. The key's shape is checked first, so a value that would break the config is
     # refused without being sent.
     if [ -z "$KEY" ]; then
-      report SKIP key "CAIRN_API_KEY is not set, so no authenticated call was made"
+      report SKIP key "CAIRNBOOK_API_KEY is not set, so no authenticated call was made"
     else
-      key_shape='^cairn_[A-Za-z0-9_-]+$'
+      key_shape='^cairnbook_[A-Za-z0-9_-]+$'
       if ! [[ "$KEY" =~ $key_shape ]]; then
-        report FAIL key "CAIRN_API_KEY is not a Cairn key: a Cairn key starts with cairn_ and holds letters, digits, _ and -"
+        report FAIL key "CAIRNBOOK_API_KEY is not a Cairnbook key: a Cairnbook key starts with cairnbook_ and holds letters, digits, _ and -"
       else
         resp="$(printf '%s\n' "header = \"Authorization: Bearer $KEY\"" \
           | curl -sS --max-time 5 -K - -X POST -w '\n%{http_code}' "$SERVER/v1/agent/task_current" 2>/dev/null || true)"
@@ -232,7 +232,7 @@ else
         if [ "$code" = "000" ]; then
           report FAIL key "no answer from the server"
         elif [ "$code" = "401" ] || [ "$code" = "403" ]; then
-          report FAIL key "the server refused the key ($code ${kind:-no kind}): check CAIRN_API_KEY, and whether the key was revoked"
+          report FAIL key "the server refused the key ($code ${kind:-no kind}): check CAIRNBOOK_API_KEY, and whether the key was revoked"
         elif [ "$code" = "400" ] && [ "$kind" = "invalid" ]; then
           report PASS key "the key was accepted: the call named no project, so the server refused it before any read (400, kind invalid)"
         else
@@ -242,12 +242,12 @@ else
     fi
   fi
 
-  # mcp: cairn mcp is started with the server set, and sent initialize and tools/list. It makes
+  # mcp: cairnbook mcp is started with the server set, and sent initialize and tools/list. It makes
   # no server call for either, so this check also writes nothing. It needs a key to start.
   if [ -z "$BIN_PATH" ]; then
     report SKIP mcp "no binary to ask"
   elif [ -z "$KEY" ]; then
-    report SKIP mcp "CAIRN_API_KEY is not set, and cairn mcp will not start without one"
+    report SKIP mcp "CAIRNBOOK_API_KEY is not set, and cairnbook mcp will not start without one"
   else
     init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke-check","version":"1"}}}'
     inited='{"jsonrpc":"2.0","method":"notifications/initialized"}'
@@ -255,10 +255,10 @@ else
     # The input is held open for a second after the requests. The MCP SDK ends the session when
     # stdin closes, and a reply still in flight is then lost, so a bare pipe gets no answer.
     mcp_out="$({ printf '%s\n' "$init" "$inited" "$list"; sleep 1; } | "$BIN_PATH" mcp 2>&1 || true)"
-    if grep -q '"serverInfo"' <<< "$mcp_out" && grep -q '"name":"cairn"' <<< "$mcp_out" && grep -q '"tools"' <<< "$mcp_out"; then
-      report PASS mcp "cairn mcp answered initialize and tools/list"
+    if grep -q '"serverInfo"' <<< "$mcp_out" && grep -q '"name":"cairnbook"' <<< "$mcp_out" && grep -q '"tools"' <<< "$mcp_out"; then
+      report PASS mcp "cairnbook mcp answered initialize and tools/list"
     else
-      report FAIL mcp "cairn mcp did not answer initialize and tools/list: ${mcp_out%%$'\n'*}"
+      report FAIL mcp "cairnbook mcp did not answer initialize and tools/list: ${mcp_out%%$'\n'*}"
     fi
   fi
 fi

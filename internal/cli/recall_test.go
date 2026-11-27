@@ -140,7 +140,7 @@ func TestRecallEmptyJSON(t *testing.T) {
 }
 
 // TestRecallRequest checks the request recall sends: the goal and the limit as given, and the role
-// named by --agent. Left out, the role is CAIRN_AGENT, and with neither there is no role.
+// named by --agent. Left out, the role is CAIRNBOOK_AGENT, and with neither there is no role.
 func TestRecallRequest(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeRecall{res: emptyRecall()}
@@ -155,7 +155,7 @@ func TestRecallRequest(t *testing.T) {
 	}
 }
 
-// TestRecallRoleFromTheVariable checks the fallback: with --agent left out, CAIRN_AGENT names the
+// TestRecallRoleFromTheVariable checks the fallback: with --agent left out, CAIRNBOOK_AGENT names the
 // caller's role, as task current reads it. A flag given wins over the variable.
 func TestRecallRoleFromTheVariable(t *testing.T) {
 	svc := &fakeRecall{res: emptyRecall()}
@@ -168,7 +168,7 @@ func TestRecallRoleFromTheVariable(t *testing.T) {
 	}
 }
 
-// TestRecallRefusedVariableIsAUsageError checks that a CAIRN_AGENT the wire form refuses is a usage
+// TestRecallRefusedVariableIsAUsageError checks that a CAIRNBOOK_AGENT the wire form refuses is a usage
 // error, named as coming from the variable, before any open or call.
 func TestRecallRefusedVariableIsAUsageError(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "hicks ")
@@ -185,7 +185,7 @@ func TestRecallRefusedThroughTheFake(t *testing.T) {
 	t.Setenv(identity.EnvAgent, "")
 	svc := &fakeRecall{err: core.Refused("the goal could not be read")}
 	code, out, errOut, _ := recallRun(svc, strings.NewReader(""), "--goal", "g")
-	if code != 5 || out != "" || errOut != "cairn recall: the goal could not be read\n" {
+	if code != 5 || out != "" || errOut != "cairnbook recall: the goal could not be read\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want exit 5 (refused) with the refusal on stderr", code, out, errOut)
 	}
 }

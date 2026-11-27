@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairn-launch hook session-start"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairnbook-launch hook session-start"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairn-launch hook pre-compact"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairnbook-launch hook pre-compact"
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairn-launch hook stop"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/cairnbook-launch hook stop"
           }
         ]
       }

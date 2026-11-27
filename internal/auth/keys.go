@@ -1,4 +1,4 @@
-// Package auth makes and checks the API keys of a Cairn server (docs/DESIGN.md
+// Package auth makes and checks the API keys of a Cairnbook server (docs/DESIGN.md
 // §8). A key is random, is shown once, and is stored only as its hash. The
 // resolver turns an Authorization header into the key's scope, and that scope,
 // not anything the client sends, decides the caller's role (CONTRACT §1.1).
@@ -18,7 +18,7 @@ import (
 
 // KeyPrefix starts every key, so a key is recognisable in a config file or a
 // log line, and a secret scanner can find it.
-const KeyPrefix = "cairn_"
+const KeyPrefix = "cairnbook_"
 
 // keyBytes is the entropy of a key: 256 bits, which makes a fast hash enough
 // (see HashKey).
@@ -62,7 +62,7 @@ func NewKey() (string, error) {
 }
 
 // HashKey returns the SHA-256 of key, in lower-case hex. A password KDF is not
-// used, on purpose: a KDF slows a guess of a low-entropy secret, and a Cairn key
+// used, on purpose: a KDF slows a guess of a low-entropy secret, and a Cairnbook key
 // has 256 random bits, which no guess reaches. A fast hash is enough here, and
 // the lookup by hash stays a plain index read.
 func HashKey(key string) string {

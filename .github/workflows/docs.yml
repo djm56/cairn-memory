@@ -41,4 +41,4 @@ jobs:
 
       # The plugin's launcher has no .sh name, so it is listed here. It is a sh script; shellcheck reads its shebang.
       - name: shellcheck plugin launcher
-        run: shellcheck --severity=warning plugins/claude-code/bin/cairn-launch
+        run: shellcheck --severity=warning plugins/claude-code/bin/cairnbook-launch

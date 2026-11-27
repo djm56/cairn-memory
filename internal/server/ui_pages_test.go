@@ -71,7 +71,7 @@ func signInCookie(t *testing.T, base, key string) *http.Cookie {
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("sign-in: status %d, want 303", resp.StatusCode)
 	}
-	c := uiCookie(resp, "cairn_ui")
+	c := uiCookie(resp, "cairnbook_ui")
 	if c == nil {
 		t.Fatal("sign-in set no session cookie")
 	}

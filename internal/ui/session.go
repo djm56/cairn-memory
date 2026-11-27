@@ -8,9 +8,9 @@ import (
 )
 
 // cookieBase is the cookie's name without its prefix. Over TLS, or behind a proxy that
-// terminates it, the name is __Secure-cairn_ui, so a browser refuses the cookie unless it
+// terminates it, the name is __Secure-cairnbook_ui, so a browser refuses the cookie unless it
 // is marked Secure (DESIGN §5.5).
-const cookieBase = "cairn_ui"
+const cookieBase = "cairnbook_ui"
 
 // signedIn is a request's live session: the session as Check reports it, and the token
 // the cookie carried. The token keys the CSRF value of the session's forms.

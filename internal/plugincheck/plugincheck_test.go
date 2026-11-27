@@ -1,5 +1,5 @@
 // Package plugincheck tests the Claude Code plugin under plugins/claude-code and the marketplace file at the repository
-// root. The launcher is run by sh against stub cairn binaries, with its PATH and HOME set by the test, so the tests need no
+// root. The launcher is run by sh against stub cairnbook binaries, with its PATH and HOME set by the test, so the tests need no
 // install. The manifest, the MCP file and the command files are read as the text they are; nothing here runs claude.
 // `claude plugin validate` is a separate check, run by hand and in CI.
 package plugincheck
@@ -24,16 +24,16 @@ import (
 // run.
 const (
 	pluginDir = "../../plugins/claude-code"
-	launcher  = pluginDir + "/bin/cairn-launch"
+	launcher  = pluginDir + "/bin/cairnbook-launch"
 	repoRoot  = "../.."
 )
 
 // installLine is the install command the launcher prints, and docs/QUICK-INSTALL.md gives in pieces.
-const installLine = "install -m 0755 bin/cairn ~/.local/bin/cairn"
+const installLine = "install -m 0755 bin/cairnbook ~/.local/bin/cairnbook"
 
-// stubCairn is a file named cairn that prints which stub ran, then each argument on its own line. It uses only shell
+// stubCairnbook is a file named cairnbook that prints which stub ran, then each argument on its own line. It uses only shell
 // builtins, so it runs with the test's PATH.
-func stubCairn(label string) string {
+func stubCairnbook(label string) string {
 	return "#!/bin/sh\necho \"stub: " + label + "\"\nfor a in \"$@\"; do echo \"arg: $a\"; done\n"
 }
 
@@ -108,14 +108,14 @@ func TestLauncherIsExecutable(t *testing.T) {
 	}
 }
 
-// TestLauncherRunsCairnFromPath checks that a cairn on PATH is run, ahead of one in ~/.local/bin, with every argument passed
+// TestLauncherRunsCairnbookFromPath checks that a cairnbook on PATH is run, ahead of one in ~/.local/bin, with every argument passed
 // through unchanged.
-func TestLauncherRunsCairnFromPath(t *testing.T) {
+func TestLauncherRunsCairnbookFromPath(t *testing.T) {
 	skipOnWindows(t)
 	bin := t.TempDir()
 	home := t.TempDir()
-	writeExecutable(t, bin, "cairn", stubCairn("path"))
-	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairn", stubCairn("home"))
+	writeExecutable(t, bin, "cairnbook", stubCairnbook("path"))
+	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairnbook", stubCairnbook("home"))
 
 	code, stdout, stderr := runLauncher(t, t.TempDir(), []string{"PATH=" + bin, "HOME=" + home},
 		"mcp", "a b", "-x", "--flag=$HOME", "")
@@ -125,11 +125,11 @@ func TestLauncherRunsCairnFromPath(t *testing.T) {
 	}
 }
 
-// TestLauncherFallsBackToHomeLocalBin checks that a cairn only in ~/.local/bin is run when PATH has none.
+// TestLauncherFallsBackToHomeLocalBin checks that a cairnbook only in ~/.local/bin is run when PATH has none.
 func TestLauncherFallsBackToHomeLocalBin(t *testing.T) {
 	skipOnWindows(t)
 	home := t.TempDir()
-	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairn", stubCairn("home"))
+	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairnbook", stubCairnbook("home"))
 
 	code, stdout, stderr := runLauncher(t, t.TempDir(), []string{"PATH=" + t.TempDir(), "HOME=" + home}, "status")
 	if code != 0 || stderr != "" || stdout != "stub: home\narg: status\n" {
@@ -137,7 +137,7 @@ func TestLauncherFallsBackToHomeLocalBin(t *testing.T) {
 	}
 }
 
-// TestLauncherNotFoundNamesTheInstall checks the case with no cairn anywhere: exit 127, nothing on stdout, and one line on
+// TestLauncherNotFoundNamesTheInstall checks the case with no cairnbook anywhere: exit 127, nothing on stdout, and one line on
 // stderr that names the install command from docs/QUICK-INSTALL.md.
 func TestLauncherNotFoundNamesTheInstall(t *testing.T) {
 	skipOnWindows(t)
@@ -151,7 +151,7 @@ func TestLauncherNotFoundNamesTheInstall(t *testing.T) {
 	if strings.Count(stderr, "\n") != 1 {
 		t.Errorf("stderr %q, want exactly one line", stderr)
 	}
-	for _, want := range []string{"cairn-launch: cairn is not on PATH or in ~/.local/bin.", "make build", installLine, "docs/QUICK-INSTALL.md"} {
+	for _, want := range []string{"cairnbook-launch: cairnbook is not on PATH or in ~/.local/bin.", "make build", installLine, "docs/QUICK-INSTALL.md"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr %q lacks %q", stderr, want)
 		}
@@ -164,7 +164,7 @@ func TestLauncherNotFoundWithNoHome(t *testing.T) {
 	skipOnWindows(t)
 	rel := t.TempDir()
 	// A decoy in the directory the relative HOME names, so a launcher that searched it would run the decoy.
-	writeExecutable(t, filepath.Join(rel, "relative-home", ".local", "bin"), "cairn", stubCairn("relative home"))
+	writeExecutable(t, filepath.Join(rel, "relative-home", ".local", "bin"), "cairnbook", stubCairnbook("relative home"))
 	for _, home := range []string{"", "relative-home"} {
 		code, stdout, _ := runLauncher(t, rel, []string{"PATH=" + t.TempDir(), "HOME=" + home}, "mcp")
 		if code != 127 || stdout != "" {
@@ -173,13 +173,13 @@ func TestLauncherNotFoundWithNoHome(t *testing.T) {
 	}
 }
 
-// TestLauncherSkipsEmptyAndRelativePathEntries checks that the launcher searches only absolute directories. A cairn in the
+// TestLauncherSkipsEmptyAndRelativePathEntries checks that the launcher searches only absolute directories. A cairnbook in the
 // directory a session runs from is never run, through an empty PATH entry or a relative one.
 func TestLauncherSkipsEmptyAndRelativePathEntries(t *testing.T) {
 	skipOnWindows(t)
 	cwd := t.TempDir()
-	writeExecutable(t, cwd, "cairn", stubCairn("cwd"))
-	writeExecutable(t, filepath.Join(cwd, "rel"), "cairn", stubCairn("relative"))
+	writeExecutable(t, cwd, "cairnbook", stubCairnbook("cwd"))
+	writeExecutable(t, filepath.Join(cwd, "rel"), "cairnbook", stubCairnbook("relative"))
 
 	for _, path := range []string{":rel", "rel:", "::rel", "."} {
 		code, stdout, _ := runLauncher(t, cwd, []string{"PATH=" + path, "HOME=" + t.TempDir()}, "mcp")
@@ -190,16 +190,16 @@ func TestLauncherSkipsEmptyAndRelativePathEntries(t *testing.T) {
 }
 
 // TestLauncherDoesNotGlobPathEntries checks that a PATH entry holding *, ? or [ is searched as the literal directory it names.
-// Each case puts a decoy directory, xy, beside the entry: the pattern matches it, and it holds a cairn. The literal entry
-// holds no cairn, so a launcher that expanded the pattern would run the decoy, and the right result is not found (127). A
-// second case holds a cairn in the literal entry, which must run.
+// Each case puts a decoy directory, xy, beside the entry: the pattern matches it, and it holds a cairnbook. The literal entry
+// holds no cairnbook, so a launcher that expanded the pattern would run the decoy, and the right result is not found (127). A
+// second case holds a cairnbook in the literal entry, which must run.
 func TestLauncherDoesNotGlobPathEntries(t *testing.T) {
 	skipOnWindows(t)
 	for _, literal := range []string{"x*", "x?", "x[y]"} {
 		t.Run(literal, func(t *testing.T) {
 			bin := t.TempDir()
 			home := t.TempDir()
-			writeExecutable(t, filepath.Join(bin, "xy"), "cairn", stubCairn("decoy"))
+			writeExecutable(t, filepath.Join(bin, "xy"), "cairnbook", stubCairnbook("decoy"))
 			entry := filepath.Join(bin, literal)
 			if err := os.MkdirAll(entry, 0o755); err != nil {
 				t.Fatal(err)
@@ -210,25 +210,25 @@ func TestLauncherDoesNotGlobPathEntries(t *testing.T) {
 				t.Errorf("PATH entry %q: exit %d, stdout %q, want 127 and the decoy not run", literal, code, stdout)
 			}
 
-			writeExecutable(t, entry, "cairn", stubCairn("literal"))
+			writeExecutable(t, entry, "cairnbook", stubCairnbook("literal"))
 			code, stdout, stderr := runLauncher(t, t.TempDir(), []string{"PATH=" + entry, "HOME=" + home}, "mcp")
 			if code != 0 || stderr != "" || stdout != "stub: literal\narg: mcp\n" {
-				t.Errorf("PATH entry %q: exit %d, stdout %q, stderr %q: want the literal directory's cairn run", literal, code, stdout, stderr)
+				t.Errorf("PATH entry %q: exit %d, stdout %q, stderr %q: want the literal directory's cairnbook run", literal, code, stdout, stderr)
 			}
 		})
 	}
 }
 
-// TestLauncherSkipsItself checks the guard: a cairn on PATH that is a link to this launcher is skipped, so the launcher does
+// TestLauncherSkipsItself checks the guard: a cairnbook on PATH that is a link to this launcher is skipped, so the launcher does
 // not run itself, and the copy in ~/.local/bin is run instead.
 func TestLauncherSkipsItself(t *testing.T) {
 	skipOnWindows(t)
 	bin := t.TempDir()
-	if err := os.Symlink(launcherPath(t), filepath.Join(bin, "cairn")); err != nil {
+	if err := os.Symlink(launcherPath(t), filepath.Join(bin, "cairnbook")); err != nil {
 		t.Skipf("this system cannot make a symbolic link: %v", err)
 	}
 	home := t.TempDir()
-	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairn", stubCairn("home"))
+	writeExecutable(t, filepath.Join(home, ".local", "bin"), "cairnbook", stubCairnbook("home"))
 
 	code, stdout, stderr := runLauncher(t, t.TempDir(), []string{"PATH=" + bin, "HOME=" + home}, "mcp")
 	if code != 0 || stderr != "" || stdout != "stub: home\narg: mcp\n" {
@@ -258,7 +258,7 @@ type mcpFile struct {
 	} `json:"mcpServers"`
 }
 
-// TestMCPConfigRunsTheLauncher checks that the plugin's MCP server is cairn, started by the launcher with the mcp argument,
+// TestMCPConfigRunsTheLauncher checks that the plugin's MCP server is cairnbook, started by the launcher with the mcp argument,
 // and that the launcher the entry names exists in the plugin.
 func TestMCPConfigRunsTheLauncher(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(pluginDir, ".mcp.json"))
@@ -269,12 +269,12 @@ func TestMCPConfigRunsTheLauncher(t *testing.T) {
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		t.Fatalf(".mcp.json is not JSON: %v", err)
 	}
-	server, ok := doc.McpServers["cairn"]
+	server, ok := doc.McpServers["cairnbook"]
 	if len(doc.McpServers) != 1 || !ok {
-		t.Fatalf(".mcp.json servers %v, want exactly one named cairn", doc.McpServers)
+		t.Fatalf(".mcp.json servers %v, want exactly one named cairnbook", doc.McpServers)
 	}
-	if server.Command != "${CLAUDE_PLUGIN_ROOT}/bin/cairn-launch" || !slices.Equal(server.Args, []string{"mcp"}) {
-		t.Errorf("cairn server is %q %v, want the launcher with the mcp argument", server.Command, server.Args)
+	if server.Command != "${CLAUDE_PLUGIN_ROOT}/bin/cairnbook-launch" || !slices.Equal(server.Args, []string{"mcp"}) {
+		t.Errorf("cairnbook server is %q %v, want the launcher with the mcp argument", server.Command, server.Args)
 	}
 	if _, err := os.Stat(launcher); err != nil {
 		t.Errorf("the launcher the entry names is missing: %v", err)
@@ -286,8 +286,8 @@ type manifest struct {
 	Name string `json:"name"`
 }
 
-// TestPluginManifestHasNoUserConfig checks that plugin.json names the plugin cairn and declares no userConfig at all: the key
-// comes from CAIRN_API_KEY or client.env, and the server from .cairn.toml (D36).
+// TestPluginManifestHasNoUserConfig checks that plugin.json names the plugin cairnbook and declares no userConfig at all: the key
+// comes from CAIRNBOOK_API_KEY or client.env, and the server from .cairnbook.toml (D36).
 func TestPluginManifestHasNoUserConfig(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(pluginDir, ".claude-plugin", "plugin.json"))
 	if err != nil {
@@ -297,8 +297,8 @@ func TestPluginManifestHasNoUserConfig(t *testing.T) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatalf("plugin.json is not JSON: %v", err)
 	}
-	if m.Name != "cairn" {
-		t.Errorf("name is %q, want cairn", m.Name)
+	if m.Name != "cairnbook" {
+		t.Errorf("name is %q, want cairnbook", m.Name)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
@@ -332,15 +332,15 @@ func TestMarketplaceListsThePlugin(t *testing.T) {
 	if err := json.Unmarshal(raw, &mp); err != nil {
 		t.Fatalf("marketplace.json is not JSON: %v", err)
 	}
-	if mp.Name != "cairn-memory" || mp.Owner.Name == "" {
+	if mp.Name != "cairnbook" || mp.Owner.Name == "" {
 		t.Errorf("marketplace is %q with owner %q, want cairn-memory with an owner", mp.Name, mp.Owner.Name)
 	}
 	if len(mp.Plugins) != 1 {
 		t.Fatalf("marketplace lists %d plugins, want one", len(mp.Plugins))
 	}
 	entry := mp.Plugins[0]
-	if entry.Name != "cairn" || entry.Source != "./plugins/claude-code" {
-		t.Errorf("plugin entry is %q from %q, want cairn from ./plugins/claude-code", entry.Name, entry.Source)
+	if entry.Name != "cairnbook" || entry.Source != "./plugins/claude-code" {
+		t.Errorf("plugin entry is %q from %q, want cairnbook from ./plugins/claude-code", entry.Name, entry.Source)
 	}
 	if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(entry.Source), ".claude-plugin", "plugin.json")); err != nil {
 		t.Errorf("the entry's source holds no plugin.json: %v", err)
@@ -351,11 +351,11 @@ func TestMarketplaceListsThePlugin(t *testing.T) {
 var bashPattern = regexp.MustCompile(`Bash\(([^)]*)\)`)
 
 // TestCommandsRunOnlyTheLauncher checks the two slash commands: each has a description, and each allows only the launcher's
-// Bash invocation, and its body runs the matching cairn verb through the launcher.
+// Bash invocation, and its body runs the matching cairnbook verb through the launcher.
 func TestCommandsRunOnlyTheLauncher(t *testing.T) {
 	cases := map[string]string{
-		"init.md":   "cairn-launch init",
-		"status.md": "cairn-launch status",
+		"init.md":   "cairnbook-launch init",
+		"status.md": "cairnbook-launch status",
 	}
 	for file, verb := range cases {
 		t.Run(file, func(t *testing.T) {
@@ -378,7 +378,7 @@ func TestCommandsRunOnlyTheLauncher(t *testing.T) {
 				t.Fatalf("%s allows no Bash invocation", file)
 			}
 			for _, rule := range rules {
-				if !strings.HasPrefix(rule, "cairn-launch ") {
+				if !strings.HasPrefix(rule, "cairnbook-launch ") {
 					t.Errorf("%s allows Bash(%s), want only the launcher", file, rule)
 				}
 			}

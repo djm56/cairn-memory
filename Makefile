@@ -1,4 +1,4 @@
-APP=cairn
+APP=cairnbook
 
 # The version stamped into the binary: the nearest tag, else the commit, with
 # -dirty for uncommitted changes. "dev" outside a git checkout.
@@ -9,7 +9,7 @@ LDFLAGS := -X main.version=$(VERSION)
 
 build:
 	mkdir -p bin
-	go build -ldflags "$(LDFLAGS)" -o bin/$(APP) ./cmd/cairn
+	go build -ldflags "$(LDFLAGS)" -o bin/$(APP) ./cmd/cairnbook
 
 # A Linux binary for a server, built on any machine. The SQLite driver is pure
 # Go, so no C toolchain is needed. LINUX_ARCH is amd64 when the server's
@@ -18,9 +18,9 @@ LINUX_ARCH ?= amd64
 
 build-linux:
 	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(LINUX_ARCH) go build -ldflags "$(LDFLAGS)" -o bin/$(APP)-linux ./cmd/cairn
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(LINUX_ARCH) go build -ldflags "$(LDFLAGS)" -o bin/$(APP)-linux ./cmd/cairnbook
 
-# Builds bin/cairn-linux, copies it to the home directory on SERVER, and runs
+# Builds bin/cairnbook-linux, copies it to the home directory on SERVER, and runs
 # its version there. It installs nothing: DEPLOY.md, Upgrade, does that.
 # make push SERVER=user@host [SSH_PORT=4422]
 SSH_PORT ?= 22
@@ -93,7 +93,7 @@ scan-local-paths:
 
 # ARGS is passed to the binary: make run ARGS=version
 run:
-	go run -ldflags "$(LDFLAGS)" ./cmd/cairn $(ARGS)
+	go run -ldflags "$(LDFLAGS)" ./cmd/cairnbook $(ARGS)
 
 # Mutation testing on core and store (issue #12), with Gremlins. It is pinned
 # here, not in go.mod, so its dependencies stay out of the module. Slow, so it

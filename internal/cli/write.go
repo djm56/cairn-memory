@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/djm56/cairn-memory/internal/core"
@@ -39,8 +38,12 @@ func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, s
 	name = flagValue
 	source := "--agent"
 	if !given(fl, "agent") {
-		name = os.Getenv(identity.EnvAgent)
+		var from string
+		name, from = identity.Lookup(identity.EnvAgent)
 		source = identity.EnvAgent
+		if from != "" {
+			source = from
+		}
 	}
 	if strings.TrimSpace(name) == "" {
 		if required {
@@ -56,18 +59,18 @@ func agentName(fl *flag.FlagSet, flagValue string, required bool, verb string, s
 	return name, true
 }
 
-// checkEnvAgent refuses CAIRN_AGENT when it is set to a name the wire form cannot carry (CONTRACT §1.1): a
+// checkEnvAgent refuses CAIRNBOOK_AGENT when it is set to a name the wire form cannot carry (CONTRACT §1.1): a
 // control character, or a space at either end. The refusal is a usage error, exit 2, written to stderr, and
 // the verb opens no project. Every verb makes this check, reads included, whether or not the verb takes the
 // variable as its name, so a malformed caller name is refused, not ignored. A variable that is unset or only
 // spaces is no name, and passes. It returns false when it refused, having written the message.
 func checkEnvAgent(verb string, stderr io.Writer) bool {
-	name := os.Getenv(identity.EnvAgent)
+	name, from := identity.Lookup(identity.EnvAgent)
 	if strings.TrimSpace(name) == "" {
 		return true
 	}
 	if err := core.CheckCaller(core.Caller{Agent: name}); err != nil {
-		fmt.Fprintf(stderr, "%s: the name from %s is refused: %s\n", verb, identity.EnvAgent, Reason(err))
+		fmt.Fprintf(stderr, "%s: the name from %s is refused: %s\n", verb, from, Reason(err))
 		return false
 	}
 	return true

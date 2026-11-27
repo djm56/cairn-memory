@@ -8,7 +8,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// Learning is the sub-command `cairn learning`: the proposals a project keeps, for a person or an
+// Learning is the sub-command `cairnbook learning`: the proposals a project keeps, for a person or an
 // agent with only a shell (issue #87). Its verbs are add, which proposes one through learning_add,
 // and list, which reads them through learning_list (CONTRACT §5). Each takes --json, which writes
 // the result as one line of JSON: the object the MCP tool of the same name returns, with the same
@@ -22,7 +22,7 @@ import (
 // failed (ExitCodeFor), 2 for a usage error.
 func Learning(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn learning: name what to do: cairn learning add|list")
+		fmt.Fprintln(stderr, "cairnbook learning: name what to do: cairnbook learning add|list")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -32,7 +32,7 @@ func Learning(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 	case "list":
 		return learningList(open, rest, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn learning: unknown verb %q: use cairn learning add|list\n", verb)
+	fmt.Fprintf(stderr, "cairnbook learning: unknown verb %q: use cairnbook learning add|list\n", verb)
 	return 2
 }
 
@@ -40,13 +40,13 @@ func Learning(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 // the project is resolved, so a kind outside them is a usage error and not a refused call.
 var learningKinds = []core.LearningKind{core.LearningFinding, core.LearningPattern, core.LearningAgentNote}
 
-// learningAdd is `cairn learning add --kind k --title t --body b [--task-id id] [--target t]
+// learningAdd is `cairnbook learning add --kind k --title t --body b [--task-id id] [--target t]
 // [--rationale r] [--example e] --agent a [--json]`: one proposal, stored as proposed (CONTRACT §5,
 // learning_add). The kind, the title and the body are required; --title, --body, --target,
 // --rationale and --example each take - to read standard input. The agent is --agent, or the
-// CAIRN_AGENT variable.
+// CAIRNBOOK_AGENT variable.
 func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn learning add"
+	const verb = "cairnbook learning add"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	kind := fl.String("kind", "", "finding, pattern or agent-note")
@@ -65,15 +65,15 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 		return 2
 	}
 	if !validLearningKind(*kind) {
-		fmt.Fprintf(stderr, "%s: --kind must be finding, pattern or agent-note: cairn learning add --kind finding --title t --body b\n", verb)
+		fmt.Fprintf(stderr, "%s: --kind must be finding, pattern or agent-note: cairnbook learning add --kind finding --title t --body b\n", verb)
 		return 2
 	}
 	if !given(fl, "title") {
-		fmt.Fprintf(stderr, "%s: --title is required: cairn learning add --kind finding --title t --body b\n", verb)
+		fmt.Fprintf(stderr, "%s: --title is required: cairnbook learning add --kind finding --title t --body b\n", verb)
 		return 2
 	}
 	if !given(fl, "body") {
-		fmt.Fprintf(stderr, "%s: --body is required: cairn learning add --kind finding --title t --body b\n", verb)
+		fmt.Fprintf(stderr, "%s: --body is required: cairnbook learning add --kind finding --title t --body b\n", verb)
 		return 2
 	}
 	name, ok := agentName(fl, *agent, true, verb, stderr)
@@ -113,7 +113,7 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 	return 0
 }
 
-// learningList is `cairn learning list [--status s]... [--kind k]... [--target t] [--limit n]
+// learningList is `cairnbook learning list [--status s]... [--kind k]... [--target t] [--limit n]
 // [--cursor c] [--json]`: the project's learnings, newest first (CONTRACT §5, learning_list). --status
 // and --kind may each be given more than once; left out, every status or kind is listed. A --kind that
 // is not one of the three learning kinds is a usage error, as it is for learning add, so it exits 2
@@ -122,7 +122,7 @@ func learningAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.
 // project at a time. It is not a role gate: an agent with a project can read every project's learnings
 // through the server.
 func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
-	const verb = "cairn learning list"
+	const verb = "cairnbook learning list"
 	fl, asJSON := newFlags(verb)
 	statuses := listFlag[core.LearningStatus]{name: "status"}
 	fl.Var(&statuses, "status", "a status to list: proposed, accepted, rejected, applied, retired or superseded; repeat for more; leave it out to list all")
@@ -144,7 +144,7 @@ func learningList(open Opener, args []string, stdout, stderr io.Writer) int {
 	}
 	for _, k := range kinds.vals {
 		if !validLearningKind(string(k)) {
-			fmt.Fprintf(stderr, "%s: --kind must be finding, pattern or agent-note, not %q: cairn learning list --kind finding\n", verb, k)
+			fmt.Fprintf(stderr, "%s: --kind must be finding, pattern or agent-note, not %q: cairnbook learning list --kind finding\n", verb, k)
 			return 2
 		}
 	}

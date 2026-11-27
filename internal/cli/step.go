@@ -9,7 +9,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// Step is the sub-command `cairn step`: the steps of a task, for a person or an agent with only a
+// Step is the sub-command `cairnbook step`: the steps of a task, for a person or an agent with only a
 // shell (issue #87). Its verbs are add, update and plan. A step is named by its number,
 // as the steps list shows it (CONTRACT §1.4). Each verb takes --json, which writes the result as one
 // line of JSON, the object the MCP tool of the same name returns (CONTRACT §3).
@@ -17,7 +17,7 @@ import (
 // Exit codes: 0 when the step was written, the code of the error kind when the open or the call failed (ExitCodeFor), 2 for a usage error.
 func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "cairn step: name what to do: cairn step add|update|plan")
+		fmt.Fprintln(stderr, "cairnbook step: name what to do: cairnbook step add|update|plan")
 		return 2
 	}
 	verb, rest := args[0], args[1:]
@@ -29,16 +29,16 @@ func Step(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer)
 	case "plan":
 		return stepPlan(open, rest, stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "cairn step: unknown verb %q: use cairn step add|update|plan\n", verb)
+	fmt.Fprintf(stderr, "cairnbook step: unknown verb %q: use cairnbook step add|update|plan\n", verb)
 	return 2
 }
 
-// stepAdd is `cairn step add <task-id> --title t [--after n | --after-id id] [--assignee a] [--agent a] [--json]`:
+// stepAdd is `cairnbook step add <task-id> --title t [--after n | --after-id id] [--assignee a] [--agent a] [--json]`:
 // one step inserted into the plan (CONTRACT §3, step_add). Left out, the position puts the step last; --after 0
 // puts it first. The step to insert after is named by its number, with --after, or by its id, with --after-id,
 // and not both (CONTRACT §1.4). --assignee is the agent the step is for, and --agent is the caller.
 func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn step add"
+	const verb = "cairnbook step add"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	title := fl.String("title", "", "what the step does; - reads standard input")
@@ -50,7 +50,7 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 		return code
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, verb+": name one task id: cairn step add <task-id> --title t")
+		fmt.Fprintln(stderr, verb+": name one task id: cairnbook step add <task-id> --title t")
 		return 2
 	}
 	if given(fl, "after") && *after < 0 {
@@ -98,12 +98,12 @@ func stepAdd(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writ
 	return 0
 }
 
-// stepUpdate is `cairn step update <task-id> <number> --action a [--summary s] [--assignee a]
+// stepUpdate is `cairnbook step update <task-id> <number> --action a [--summary s] [--assignee a]
 // [--agent a] [--json]`: one step started, finished, failed or skipped, or reassigned (CONTRACT §3,
 // step_update). finish, fail and skip need a summary. --assignee reassigns the step. The step is
 // named by its number, or by its id with --step-id in place of the number (CONTRACT §1.4).
 func stepUpdate(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn step update"
+	const verb = "cairnbook step update"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	action := fl.String("action", "", "start, finish, fail or skip")
@@ -156,11 +156,11 @@ func stepUpdateRef(fl *flag.FlagSet, pos []string, verb string, id int64, stderr
 		// No task id is one fault and a number beside the id is another. Each gets its own message,
 		// so the reader is not told to drop a form they did not give.
 		if len(pos) == 0 {
-			fmt.Fprintln(stderr, verb+": name the task id first: cairn step update <task-id> --step-id 412 --action start")
+			fmt.Fprintln(stderr, verb+": name the task id first: cairnbook step update <task-id> --step-id 412 --action start")
 			return core.StepRef{}, false
 		}
 		if len(pos) > 1 {
-			fmt.Fprintln(stderr, verb+": give the step by --step-id or by its number, not both: cairn step update <task-id> --step-id 412 --action start")
+			fmt.Fprintln(stderr, verb+": give the step by --step-id or by its number, not both: cairnbook step update <task-id> --step-id 412 --action start")
 			return core.StepRef{}, false
 		}
 		if id < 1 {
@@ -170,7 +170,7 @@ func stepUpdateRef(fl *flag.FlagSet, pos []string, verb string, id int64, stderr
 		return core.IDRef(id), true
 	}
 	if len(pos) != 2 {
-		fmt.Fprintln(stderr, verb+": name a task id and a step number: cairn step update <task-id> <number> --action start")
+		fmt.Fprintln(stderr, verb+": name a task id and a step number: cairnbook step update <task-id> <number> --action start")
 		return core.StepRef{}, false
 	}
 	number, err := strconv.Atoi(pos[1])
@@ -188,12 +188,12 @@ type planInput struct {
 	Steps []core.StepInput `json:"steps"`
 }
 
-// stepPlan is `cairn step plan <task-id> --json-input [--agent a] [--json]`: the task's pending steps
+// stepPlan is `cairnbook step plan <task-id> --json-input [--agent a] [--json]`: the task's pending steps
 // replaced with the list on standard input (CONTRACT §3, step_plan). A step that an event refers to
 // cannot be removed, and the refusal names it. The list is only ever read from standard input, so
 // --json-input is required.
 func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn step plan"
+	const verb = "cairnbook step plan"
 	fl, asJSON := newFlags(verb)
 	agent := fl.String("agent", "", agentHelp)
 	jsonInput := fl.Bool("json-input", false, "required: read the new steps from standard input as one JSON object, {\"steps\": [{\"title\": ..., \"agent\": ...}]}")
@@ -202,7 +202,7 @@ func stepPlan(open Opener, args []string, stdin io.Reader, stdout, stderr io.Wri
 		return code
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(stderr, verb+": name one task id: cairn step plan <task-id> --json-input")
+		fmt.Fprintln(stderr, verb+": name one task id: cairnbook step plan <task-id> --json-input")
 		return 2
 	}
 	if !*jsonInput {

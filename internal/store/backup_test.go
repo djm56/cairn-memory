@@ -14,7 +14,7 @@ import (
 // lock is taken.
 func TestAcquireExclusiveRefusesAnIdleOpenDatabase(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	st, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -39,9 +39,9 @@ func TestAcquireExclusiveRefusesAnIdleOpenDatabase(t *testing.T) {
 	again.Close()
 }
 
-// TestOpenExistingRefusesWhatIsNotACairnDatabase checks that a file with no schema, and one whose
+// TestOpenExistingRefusesWhatIsNotACairnbookDatabase checks that a file with no schema, and one whose
 // schema is newer than this build, are refused, and that neither is migrated.
-func TestOpenExistingRefusesWhatIsNotACairnDatabase(t *testing.T) {
+func TestOpenExistingRefusesWhatIsNotACairnbookDatabase(t *testing.T) {
 	dir := t.TempDir()
 	plain := filepath.Join(dir, "plain.db")
 	raw, err := sql.Open("sqlite", plain)
@@ -52,8 +52,8 @@ func TestOpenExistingRefusesWhatIsNotACairnDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw.Close()
-	if _, err := OpenExisting(plain); err == nil || !strings.Contains(err.Error(), "not a Cairn database") {
-		t.Errorf("OpenExisting of a file with no schema: err = %v, want not a Cairn database", err)
+	if _, err := OpenExisting(plain); err == nil || !strings.Contains(err.Error(), "not a Cairnbook database") {
+		t.Errorf("OpenExisting of a file with no schema: err = %v, want not a Cairnbook database", err)
 	}
 
 	newer := filepath.Join(dir, "newer.db")
@@ -99,7 +99,7 @@ func TestOpenExistingDoesNotMigrate(t *testing.T) {
 
 // TestIntegrityCheckPassesAFreshDatabase checks the integrity check on a database the store made.
 func TestIntegrityCheckPassesAFreshDatabase(t *testing.T) {
-	st, err := Open(filepath.Join(t.TempDir(), "cairn.db"))
+	st, err := Open(filepath.Join(t.TempDir(), "cairnbook.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

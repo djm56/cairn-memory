@@ -10,14 +10,14 @@ import (
 	"github.com/djm56/cairn-memory/internal/core"
 )
 
-// file is a .cairn.toml (or any file) to write, at a path relative to the test root.
+// file is a .cairnbook.toml (or any file) to write, at a path relative to the test root.
 type file struct {
 	path string
 	body string
 }
 
 // tree builds a fixture: root is a fresh temporary directory, and the files
-// are written under it. Every test sets CAIRN_PROJECT and CLAUDE_PROJECT_DIR
+// are written under it. Every test sets CAIRNBOOK_PROJECT and CLAUDE_PROJECT_DIR
 // itself, so the real environment is never read for a result.
 type tree struct {
 	root string
@@ -60,7 +60,7 @@ func setEnv(t *testing.T, key, value string, unset bool) {
 // no file ignores the working directory" and "neither env nor file") expect
 // no file to be found, so the walk climbs from t.TempDir() to the filesystem
 // root. That is a trade-off, recorded here: the walk only reads, but a stray
-// .cairn.toml in an ancestor of the temp directory (/tmp, /var/folders, or
+// .cairnbook.toml in an ancestor of the temp directory (/tmp, /var/folders, or
 // $HOME on a developer machine or CI runner) would change those two results.
 // Making the walk hermetic would need a seam used only by tests; none is added
 // without a clearer need.
@@ -68,7 +68,7 @@ func TestResolve(t *testing.T) {
 	const good = "project = \"acme-api\"\n"
 	cases := []struct {
 		name string
-		// env is CAIRN_PROJECT. Empty means unset, unless envEmpty is set.
+		// env is CAIRNBOOK_PROJECT. Empty means unset, unless envEmpty is set.
 		env      string
 		envEmpty bool
 		// claudeDir is CLAUDE_PROJECT_DIR, relative to the tree root. Empty means unset.
@@ -79,7 +79,7 @@ func TestResolve(t *testing.T) {
 
 		wantName   string
 		wantSource Source
-		// wantPath is the .cairn.toml path, relative to the tree root. Empty for SourceEnv.
+		// wantPath is the .cairnbook.toml path, relative to the tree root. Empty for SourceEnv.
 		wantPath string
 		// wantErr is "" for success, "none" for core.ErrNoProject, or a
 		// core.Kind for any other error.
@@ -98,7 +98,7 @@ func TestResolve(t *testing.T) {
 			name:       "env set beats the file in the working directory",
 			env:        "from-env",
 			work:       "app",
-			files:      []file{{"app/.cairn.toml", good}},
+			files:      []file{{"app/.cairnbook.toml", good}},
 			wantName:   "from-env",
 			wantSource: SourceEnv,
 		},
@@ -106,49 +106,49 @@ func TestResolve(t *testing.T) {
 			name:       "env empty is treated as unset, file used",
 			envEmpty:   true,
 			work:       "app",
-			files:      []file{{"app/.cairn.toml", good}},
+			files:      []file{{"app/.cairnbook.toml", good}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
-			wantPath:   "app/.cairn.toml",
+			wantPath:   "app/.cairnbook.toml",
 		},
 		{
 			name:       "env unset, file in working directory",
 			work:       "app",
-			files:      []file{{"app/.cairn.toml", good}},
+			files:      []file{{"app/.cairnbook.toml", good}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
-			wantPath:   "app/.cairn.toml",
+			wantPath:   "app/.cairnbook.toml",
 		},
 		{
 			name:       "env unset, file in a parent directory",
 			work:       "app/src/pkg",
-			files:      []file{{".cairn.toml", good}},
+			files:      []file{{".cairnbook.toml", good}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
-			wantPath:   ".cairn.toml",
+			wantPath:   ".cairnbook.toml",
 		},
 		{
 			name:       "nearest file wins over a parent file",
 			work:       "app/src",
-			files:      []file{{".cairn.toml", "project = \"outer\"\n"}, {"app/.cairn.toml", "project = \"inner\"\n"}},
+			files:      []file{{".cairnbook.toml", "project = \"outer\"\n"}, {"app/.cairnbook.toml", "project = \"inner\"\n"}},
 			wantName:   "inner",
 			wantSource: SourceFile,
-			wantPath:   "app/.cairn.toml",
+			wantPath:   "app/.cairnbook.toml",
 		},
 		{
 			name:       "CLAUDE_PROJECT_DIR is searched instead of the working directory",
 			claudeDir:  "project",
 			work:       "elsewhere",
-			files:      []file{{"project/.cairn.toml", good}},
+			files:      []file{{"project/.cairnbook.toml", good}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
-			wantPath:   "project/.cairn.toml",
+			wantPath:   "project/.cairnbook.toml",
 		},
 		{
 			name:      "CLAUDE_PROJECT_DIR with no file ignores the working directory",
 			claudeDir: "project",
 			work:      "elsewhere",
-			files:     []file{{"elsewhere/.cairn.toml", good}},
+			files:     []file{{"elsewhere/.cairnbook.toml", good}},
 			wantErr:   "none",
 		},
 		{
@@ -159,58 +159,58 @@ func TestResolve(t *testing.T) {
 		{
 			name:     "malformed TOML",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", "project = acme-api\n"}},
+			files:    []file{{"app/.cairnbook.toml", "project = acme-api\n"}},
 			wantErr:  string(core.KindInvalid),
-			wantText: "app/.cairn.toml is not valid TOML",
+			wantText: "app/.cairnbook.toml is not valid TOML",
 		},
 		{
 			name:     "file without a project key",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", "server = \"https://cairn.lan:8788\"\n"}},
+			files:    []file{{"app/.cairnbook.toml", "server = \"https://cairnbook.lan:8788\"\n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "has no project key",
 		},
 		{
 			name:     "file with an empty project key",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", "project = \"\"\n"}},
+			files:    []file{{"app/.cairnbook.toml", "project = \"\"\n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "has no project key",
 		},
 		{
 			name:     "nearest file without a project key stops the walk",
 			work:     "app",
-			files:    []file{{".cairn.toml", good}, {"app/.cairn.toml", "server = \"x\"\n"}},
+			files:    []file{{".cairnbook.toml", good}, {"app/.cairnbook.toml", "server = \"x\"\n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "has no project key",
 		},
 		{
 			name:     "nearest file malformed stops the walk",
 			work:     "app",
-			files:    []file{{".cairn.toml", good}, {"app/.cairn.toml", "project = \n"}},
+			files:    []file{{".cairnbook.toml", good}, {"app/.cairnbook.toml", "project = \n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "not valid TOML",
 		},
 		{
 			name:       "file with extra keys reads the project",
 			work:       "app",
-			files:      []file{{"app/.cairn.toml", "project = \"acme-api\"\n# server = \"https://cairn.lan:8788\"\nserver = \"https://cairn.lan:8788\"\n"}},
+			files:      []file{{"app/.cairnbook.toml", "project = \"acme-api\"\n# server = \"https://cairnbook.lan:8788\"\nserver = \"https://cairnbook.lan:8788\"\n"}},
 			wantName:   "acme-api",
 			wantSource: SourceFile,
-			wantPath:   "app/.cairn.toml",
+			wantPath:   "app/.cairnbook.toml",
 		},
 		{
 			name:     "env set but invalid does not fall through to the file",
 			env:      "Acme",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", good}},
+			files:    []file{{"app/.cairnbook.toml", good}},
 			wantErr:  string(core.KindInvalid),
-			wantText: "CAIRN_PROJECT",
+			wantText: "CAIRNBOOK_PROJECT",
 		},
 		{
 			name:     "file project invalid",
 			work:     "app",
-			files:    []file{{"app/.cairn.toml", "project = \"acme_api\"\n"}},
+			files:    []file{{"app/.cairnbook.toml", "project = \"acme_api\"\n"}},
 			wantErr:  string(core.KindInvalid),
 			wantText: "acme_api",
 		},
@@ -239,8 +239,8 @@ func TestResolve(t *testing.T) {
 					if !errors.Is(err, core.ErrNoProject) {
 						t.Fatalf("Resolve error = %v, want core.ErrNoProject", err)
 					}
-					if !strings.Contains(err.Error(), "cairn init") {
-						t.Errorf("error %q does not name `cairn init`", err)
+					if !strings.Contains(err.Error(), "cairnbook init") {
+						t.Errorf("error %q does not name `cairnbook init`", err)
 					}
 				} else if kind := core.KindOf(err); string(kind) != tc.wantErr {
 					t.Errorf("Resolve error kind = %q (%v), want %q", kind, err, tc.wantErr)
@@ -272,7 +272,7 @@ func TestResolve(t *testing.T) {
 }
 
 // TestResolveNameRule checks the name rule of core.ValidProjectName from both
-// sources. Each name must be refused as CAIRN_PROJECT and as a file's project key.
+// sources. Each name must be refused as CAIRNBOOK_PROJECT and as a file's project key.
 func TestResolveNameRule(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -302,7 +302,7 @@ func TestResolveNameRule(t *testing.T) {
 			checkNameRule(t, tc.valid, tc.name, got, err)
 		})
 		t.Run("file "+tc.name, func(t *testing.T) {
-			tr := newTree(t, "app", []file{{"app/.cairn.toml", "project = \"" + tc.name + "\"\n"}})
+			tr := newTree(t, "app", []file{{"app/.cairnbook.toml", "project = \"" + tc.name + "\"\n"}})
 			setEnv(t, EnvProject, "", true)
 			setEnv(t, EnvProjectDir, "", true)
 			got, err := Resolve(filepath.Join(tr.root, "app"))
@@ -335,7 +335,7 @@ func checkNameRule(t *testing.T, valid bool, name string, got Project, err error
 	}
 }
 
-// TestResolveDirectoryNamedFile checks that an entry named .cairn.toml which is
+// TestResolveDirectoryNamedFile checks that an entry named .cairnbook.toml which is
 // a directory is refused as a KindInvalid error that says so, and is not
 // reported as a file that fails to parse.
 func TestResolveDirectoryNamedFile(t *testing.T) {
@@ -364,26 +364,26 @@ func TestResolveDirectoryNamedFile(t *testing.T) {
 	if strings.Contains(err.Error(), "not valid TOML") {
 		t.Errorf("error %q wrongly reports a TOML fault", err)
 	}
-	// DESIGN §2.1: the directory refusal does not name `cairn init`.
-	if strings.Contains(err.Error(), "cairn init") {
-		t.Errorf("error %q wrongly names `cairn init`", err)
+	// DESIGN §2.1: the directory refusal does not name `cairnbook init`.
+	if strings.Contains(err.Error(), "cairnbook init") {
+		t.Errorf("error %q wrongly names `cairnbook init`", err)
 	}
 }
 
-// TestNoProjectKeyNamesInit checks that both refusals for a .cairn.toml with no
-// usable project key name `cairn init` as the way out. They are separate
+// TestNoProjectKeyNamesInit checks that both refusals for a .cairnbook.toml with no
+// usable project key name `cairnbook init` as the way out. They are separate
 // branches of readFile: a missing key, and an empty one.
 func TestNoProjectKeyNamesInit(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
 	}{
-		{"missing key", "server = \"https://cairn.lan:8788\"\n"},
+		{"missing key", "server = \"https://cairnbook.lan:8788\"\n"},
 		{"empty key", "project = \"\"\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tr := newTree(t, "app", []file{{"app/.cairn.toml", tc.body}})
+			tr := newTree(t, "app", []file{{"app/.cairnbook.toml", tc.body}})
 			setEnv(t, EnvProject, "", true)
 			setEnv(t, EnvProjectDir, "", true)
 
@@ -397,8 +397,8 @@ func TestNoProjectKeyNamesInit(t *testing.T) {
 			if !strings.Contains(err.Error(), "has no project key") {
 				t.Errorf("error %q does not say the project key is missing", err)
 			}
-			if !strings.Contains(err.Error(), "cairn init") {
-				t.Errorf("error %q does not name `cairn init`", err)
+			if !strings.Contains(err.Error(), "cairnbook init") {
+				t.Errorf("error %q does not name `cairnbook init`", err)
 			}
 		})
 	}
@@ -417,7 +417,7 @@ func TestResolveProjectWrongType(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tr := newTree(t, "app", []file{{"app/.cairn.toml", tc.body}})
+			tr := newTree(t, "app", []file{{"app/.cairnbook.toml", tc.body}})
 			setEnv(t, EnvProject, "", true)
 			setEnv(t, EnvProjectDir, "", true)
 
@@ -448,7 +448,7 @@ func TestResolveRelativeStart(t *testing.T) {
 	}
 
 	t.Run("relative working directory", func(t *testing.T) {
-		tr := newTree(t, "app/src", []file{{"app/.cairn.toml", good}})
+		tr := newTree(t, "app/src", []file{{"app/.cairnbook.toml", good}})
 		t.Chdir(tr.root)
 		setEnv(t, EnvProject, "", true)
 		setEnv(t, EnvProjectDir, "", true)
@@ -463,7 +463,7 @@ func TestResolveRelativeStart(t *testing.T) {
 	})
 
 	t.Run("relative CLAUDE_PROJECT_DIR", func(t *testing.T) {
-		tr := newTree(t, "elsewhere", []file{{"app/.cairn.toml", good}})
+		tr := newTree(t, "elsewhere", []file{{"app/.cairnbook.toml", good}})
 		t.Chdir(tr.root)
 		setEnv(t, EnvProject, "", true)
 		setEnv(t, EnvProjectDir, "app", false)
@@ -480,10 +480,10 @@ func TestResolveRelativeStart(t *testing.T) {
 
 // TestResolveMissingStartDirectory checks that a start directory which does not
 // exist is not an error in itself: the walk passes the missing levels and finds
-// the nearest existing .cairn.toml above them.
+// the nearest existing .cairnbook.toml above them.
 func TestResolveMissingStartDirectory(t *testing.T) {
 	const good = "project = \"acme-api\"\n"
-	tr := newTree(t, "", []file{{".cairn.toml", good}})
+	tr := newTree(t, "", []file{{".cairnbook.toml", good}})
 	setEnv(t, EnvProject, "", true)
 	setEnv(t, EnvProjectDir, "", true)
 

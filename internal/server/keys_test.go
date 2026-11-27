@@ -29,7 +29,7 @@ func dbFiles(t *testing.T, path string) []string {
 // format, and that the plaintext appears in none of the database's files, while its hash
 // does. A key a database could show again would be a key an operator could lose to a copy.
 func TestAddKeyStoresOnlyTheHash(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	key, err := AddKey(context.Background(), path, "ci", auth.ScopeAgent)
 	if err != nil {
 		t.Fatalf("AddKey: %v", err)
@@ -60,7 +60,7 @@ func TestAddKeyStoresOnlyTheHash(t *testing.T) {
 // printed back and is not stored.
 func TestAddKeyRefusesABadNameAndScope(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	pasted, err := auth.NewKey()
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestAddKeyRefusesABadNameAndScope(t *testing.T) {
 // since the store keeps the row. A new key cannot take an old name.
 func TestAddKeyRefusesANameThatIsTaken(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(ctx, path, "ci", auth.ScopeAgent); err != nil {
 		t.Fatalf("first AddKey: %v", err)
 	}
@@ -111,12 +111,12 @@ func TestAddKeyRefusesANameThatIsTaken(t *testing.T) {
 	}
 }
 
-// TestListKeysShowsEveryKeyInOrder checks the rows cairn key list prints: every key, the
+// TestListKeysShowsEveryKeyInOrder checks the rows cairnbook key list prints: every key, the
 // revoked one included, in the order they were made, with the revocation time on the one
 // revoked. KeyInfo has no hash or plaintext field, so none can be printed.
 func TestListKeysShowsEveryKeyInOrder(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(ctx, path, "ci", auth.ScopeAgent); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestListKeysShowsEveryKeyInOrder(t *testing.T) {
 // errors that say so, and that the first revocation stands.
 func TestRevokeKeyTwiceIsNotFound(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	if _, err := AddKey(ctx, path, "ci", auth.ScopeAgent); err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestKeyCommandsNeedADatabaseThatExists(t *testing.T) {
 // table on every call, so no restart is needed.
 func TestRevokedKeyStopsWorkingOnARunningServer(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "cairn.db")
+	path := filepath.Join(t.TempDir(), "cairnbook.db")
 	key, err := AddKey(ctx, path, "ci", auth.ScopeAgent)
 	if err != nil {
 		t.Fatal(err)

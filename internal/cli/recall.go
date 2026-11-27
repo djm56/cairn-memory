@@ -8,7 +8,7 @@ import (
 	"github.com/djm56/cairn-memory/internal/identity"
 )
 
-// Recall is `cairn recall`: what a caller should know before a goal, for a person or an agent with
+// Recall is `cairnbook recall`: what a caller should know before a goal, for a person or an agent with
 // only a shell (issue #87). It is the recall call of CONTRACT §6 and takes no verb. The answer has the
 // directives that apply to the project and the role, ranked and capped as directive list gives them,
 // and the lessons, mistakes and tasks that match the goal, from every project. It takes --json, which
@@ -16,9 +16,9 @@ import (
 //
 // --goal is required, and --goal - reads it from standard input. --agent names the caller's role, as
 // the MCP tool's agent argument does: it names the role's agent-scoped directives, and it is not a
-// filter on the rest. Left out, CAIRN_AGENT names the role, as task current reads it. With neither, no
+// filter on the rest. Left out, CAIRNBOOK_AGENT names the role, as task current reads it. With neither, no
 // agent-scoped directive is listed. A name the wire form refuses, from either source, is a usage error
-// here, exit 2, where status and the session-start hook only note a refused CAIRN_AGENT and go on.
+// here, exit 2, where status and the session-start hook only note a refused CAIRNBOOK_AGENT and go on.
 //
 // The text form is a summary. It prints the directives as directive list prints them, then one line for
 // each lesson, mistake and task, and the empty-list line for each part with none. --json keeps every
@@ -27,7 +27,7 @@ import (
 // Exit codes: 0 when the answer was printed, the code of the error kind when the open or the call failed
 // (ExitCodeFor), 2 for a usage error.
 func Recall(open Opener, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	const verb = "cairn recall"
+	const verb = "cairnbook recall"
 	fl, asJSON := newFlags(verb)
 	goal := fl.String("goal", "", "what the task is for, in a sentence; - reads standard input")
 	agent := fl.String("agent", "", "the calling agent's role, such as hicks or reviewer; names its agent-scoped directives; left out, "+identity.EnvAgent+" is used; a name the wire form refuses is a usage error")
@@ -44,7 +44,7 @@ func Recall(open Opener, args []string, stdin io.Reader, stdout, stderr io.Write
 		return 2
 	}
 	if !given(fl, "goal") {
-		fmt.Fprintf(stderr, "%s: --goal is required: cairn recall --goal \"what the task is for\"\n", verb)
+		fmt.Fprintf(stderr, "%s: --goal is required: cairnbook recall --goal \"what the task is for\"\n", verb)
 		return 2
 	}
 	name, ok := agentName(fl, *agent, false, verb, stderr)

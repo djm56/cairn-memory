@@ -43,7 +43,7 @@ func TestHashKeyIsSHA256Hex(t *testing.T) {
 // TestBearerKeyAcceptsOnlyTheForm checks the header grammar. Each refused header
 // is one the resolver must answer with ErrUnauthenticated, never with a key.
 func TestBearerKeyAcceptsOnlyTheForm(t *testing.T) {
-	good := "cairn_" + strings.Repeat("A", 43)
+	good := "cairnbook_" + strings.Repeat("A", 43)
 	cases := []struct {
 		what   string
 		header string
@@ -57,12 +57,12 @@ func TestBearerKeyAcceptsOnlyTheForm(t *testing.T) {
 		{"another scheme", "Basic " + good, false},
 		{"a double space", "Bearer  " + good, false},
 		{"a trailing space", "Bearer " + good + " ", false},
-		{"a short key", "Bearer cairn_abc", false},
+		{"a short key", "Bearer cairnbook_abc", false},
 		{"a long key", "Bearer " + good + "A", false},
 		{"no prefix", "Bearer " + strings.Repeat("A", 49), false},
-		{"padding", "Bearer cairn_" + strings.Repeat("A", 42) + "=", false},
-		{"the standard alphabet", "Bearer cairn_" + strings.Repeat("+", 43), false},
-		{"non-ASCII", "Bearer cairn_" + strings.Repeat("é", 21) + "A", false},
+		{"padding", "Bearer cairnbook_" + strings.Repeat("A", 42) + "=", false},
+		{"the standard alphabet", "Bearer cairnbook_" + strings.Repeat("+", 43), false},
+		{"non-ASCII", "Bearer cairnbook_" + strings.Repeat("é", 21) + "A", false},
 	}
 	for _, c := range cases {
 		_, ok := bearerKey(c.header)

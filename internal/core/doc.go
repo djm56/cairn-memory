@@ -1,4 +1,4 @@
-// Package core holds Cairn's contract and, from phase 2, its rules.
+// Package core holds Cairnbook's contract and, from phase 2, its rules.
 //
 // Service is the contract every backend satisfies: the local SQLite
 // implementation, the HTTP client, and any later one. Its Agent half is the
