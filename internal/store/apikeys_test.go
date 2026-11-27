@@ -252,3 +252,20 @@ func TestRevokeAPIKeyDatabaseErrorDoesNotEchoTheName(t *testing.T) {
 		t.Errorf("the database error repeats the name: %v", err)
 	}
 }
+
+// TestRevokeAPIKeyNotFoundDoesNotEchoTheName checks that a revoke of a name with no active key
+// returns ErrNotFound without repeating the name, since the name may be a whole key pasted into
+// the name position (#245, W3).
+func TestRevokeAPIKeyNotFoundDoesNotEchoTheName(t *testing.T) {
+	s := openTemp(t)
+	name := "cairnbook_" + strings.Repeat("Q", 43)
+	err := s.WithTx(context.Background(), func(q Querier) error {
+		return RevokeAPIKey(context.Background(), q, name, time.Now())
+	})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("RevokeAPIKey with no such key: err = %v, want ErrNotFound", err)
+	}
+	if strings.Contains(err.Error(), name) {
+		t.Errorf("the not-found error repeats the name: %v", err)
+	}
+}

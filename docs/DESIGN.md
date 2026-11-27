@@ -1470,7 +1470,8 @@ status; they only recommend.
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
   and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` refuses a name that
   fails the pattern, or a name shaped like a whole key under either prefix, before it looks
-  anything up. No revoke error repeats the name given, so a key pasted as a name, or one with a
+  anything up. No revoke error repeats the name given, and the usage errors of `key add`, `key list` and `key revoke`
+  repeat no argument or flag, so a key pasted as a name, as a positional argument or as a flag, or one with a
   character added or dropped, is not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.
 

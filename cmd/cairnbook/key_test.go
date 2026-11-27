@@ -100,6 +100,37 @@ func TestKeyCommandUsageRefusals(t *testing.T) {
 	}
 }
 
+// TestKeyRefusesAKeyPassedAsAnArgumentOrAFlag checks #245 (W2): a key given as a positional argument,
+// or as an unknown flag, is a usage error (exit 2), and neither the key nor the start of its body is
+// printed on stderr. The key is built here, so the test holds whatever the store contains.
+func TestKeyRefusesAKeyPassedAsAnArgumentOrAFlag(t *testing.T) {
+	db := filepath.Join(t.TempDir(), "cairnbook.db")
+	key, err := auth.NewKey()
+	if err != nil {
+		t.Fatalf("NewKey: %v", err)
+	}
+	probe := key[len(auth.KeyPrefix) : len(auth.KeyPrefix)+10]
+	cases := []struct {
+		what string
+		args []string
+		want string
+	}{
+		{"a pasted key as a positional argument to revoke", []string{"key", "revoke", "--db", db, key}, "takes flags only"},
+		{"a pasted key as a positional argument to add", []string{"key", "add", "--db", db, "--name", "ci", "--scope", "agent", key}, "takes flags only"},
+		{"a key-shaped token as an unknown flag to revoke", []string{"key", "revoke", "--db", db, "-" + key}, "a flag is not recognised"},
+		{"a key-shaped token as an unknown flag to list", []string{"key", "list", "--db", db, "-" + key}, "a flag is not recognised"},
+	}
+	for _, c := range cases {
+		code, _, errs := runCmd(t, c.args...)
+		if code != 2 || !strings.Contains(errs, c.want) {
+			t.Errorf("%s: exit %d, stderr %q; want 2 and %q", c.what, code, errs, c.want)
+		}
+		if strings.Contains(errs, key) || strings.Contains(errs, probe) {
+			t.Errorf("%s: stderr prints the key: %q", c.what, errs)
+		}
+	}
+}
+
 // TestKeyDBNamesTheUnitDatabase checks #136: each key action that needs --db names the systemd
 // unit's database path when --db is missing, and so does --help, so an operator who ran the
 // command against the wrong file can see which file the unit serves.

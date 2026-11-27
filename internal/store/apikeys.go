@@ -66,7 +66,8 @@ func RevokeAPIKey(ctx context.Context, q Querier, name string, at time.Time) err
 	if err != nil {
 		return fmt.Errorf("store: revoke api key: %w", err)
 	}
-	return requireOneRow(res, fmt.Sprintf("active api key %s", name))
+	// The name is left out of the not-found error: a caller may pass a whole key as the name (#245).
+	return requireOneRow(res, "active api key")
 }
 
 // FindActiveAPIKey returns the unrevoked key whose hash is hash. It returns

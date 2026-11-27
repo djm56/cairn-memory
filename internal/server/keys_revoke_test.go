@@ -242,7 +242,11 @@ func TestRevokeKeyNotFoundNeverEchoesTheName(t *testing.T) {
 		}
 		cases = append(cases, echoCase{"a " + prefix + " key one character short", prefix + body[:len(body)-1]})
 	}
-	cases = append(cases, echoCase{"a 43-character body with no prefix", body})
+	// The no-prefix case uses a fixed body, not the random one: a random body starts with - or _
+	// about 3% of the time, and keyNamePattern refuses that, so the case would not reach the
+	// lookup (#245 review, W1). The fixed body is 43 characters and starts with a letter.
+	const plainBody = "Q7xRk2mB9vLpW4tZsN1cHjF6yDgA8eUoIqK3rTbVwX5"
+	cases = append(cases, echoCase{"a 43-character body with no prefix", plainBody})
 
 	minRun := len(auth.KeyPrefix) + 1
 	for _, c := range cases {
