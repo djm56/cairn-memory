@@ -10,10 +10,10 @@
 //  2. project = "<name>" in the nearest .cairnbook.toml (or .cairn.toml), found by
 //     walking up from CLAUDE_PROJECT_DIR when Claude Code sets it, or else from the
 //     working directory.
+//  3. Otherwise core.ErrNoProject. There is no default project.
 //
 // The old names, from before the rename to Cairnbook, are read only when the new ones
 // are missing, so an install made before the rename keeps working (see Legacy below).
-//  3. Otherwise core.ErrNoProject. There is no default project.
 //
 // A project name is checked by core.ValidProjectName, the rule that lives in
 // internal/core. The name rule is applied to both sources.
@@ -206,6 +206,21 @@ func ResolveServer(workDir string) (string, error) {
 	default:
 		return "", core.Invalid("%s has the wrong type for server: the value must be a quoted string, server = \"https://...\"", path)
 	}
+}
+
+// ServerSource says where ResolveServer finds the server for a call from workDir: the name of the variable it
+// is read from (CAIRNBOOK_SERVER, or CAIRN_SERVER under its old name), or the base name of the file it is read
+// from, FileName or LegacyFileName. It follows the same order as ResolveServer, so the two cannot disagree. It
+// returns "" when neither gives a server.
+func ServerSource(workDir string) string {
+	if _, from := Lookup(EnvServer); from != "" {
+		return from
+	}
+	path, found, err := nearestFile(workDir)
+	if err != nil || !found {
+		return ""
+	}
+	return filepath.Base(path)
 }
 
 // noServerKey is the KindInvalid error for a .cairnbook.toml with no server key, or an

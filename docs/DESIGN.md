@@ -1141,7 +1141,7 @@ element; styling comes from `app.css` only.
 
 - An agent key is refused: "This is an agent key. The web UI signs in operator
   and viewer keys." Any other refusal (malformed, unknown, revoked, or not
-  starting with `cairnbook_`) reads "The key was not accepted." Both are answered
+  starting with `cairnbook_` or `cairn_`) reads "The key was not accepted." Both are answered
   with the form again at status `401`. DESIGN gives no status for a refused key,
   so `401` is the choice here.
 - The key field is `type="password"`, so the key is not shown on the screen.
@@ -1460,13 +1460,15 @@ status; they only recommend.
   systemd unit are in [DEPLOY.md](DEPLOY.md).
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
   `cairnbook_` and 32 random bytes in unpadded base64url, shown once when it is
-  made. `cairnbook key add` makes one in the server's database and prints it once on
+  made. A key issued before the rename, under the name Cairn, starts with `cairn_`
+  and is still accepted: the same 43 characters follow the prefix, and the hash is of
+  the whole key (D38, 2026-11-27). `cairnbook key add` makes one in the server's database and prints it once on
   stdout, with a warning on stderr. The database keeps only the hash, and nothing
   logs the key. `cairnbook key list` shows each key's name, scope and times, never the
   hash or the key. `cairnbook key revoke` ends a key at its next call, since the server
   reads the key table on every call. A revoked key keeps its name, so a name is
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
-  and may not begin with `cairnbook_`. `cairnbook key revoke` checks the name the same
+  and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` checks the name the same
   way, before it looks anything up, so a key pasted as a name is refused and is
   not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.

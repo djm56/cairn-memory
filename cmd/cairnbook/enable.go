@@ -71,11 +71,14 @@ var claudeHooks = []claudeHook{
 // was already there, matcher is the matcher of the entry that runs it, and differs is set when the hook names a
 // matcher and that entry has another. enable reports such an entry and leaves it as it is. A matcher that still
 // covers compact (coversCompact) is reported without the word "not", since doctor reads it as a working entry. notString
-// is set when that entry's matcher is not a string, so enable says so rather than naming the matcher as none.
+// is set when that entry's matcher is not a string, so enable says so rather than naming the matcher as none. renamed
+// is set when the old command was renamed to the new one; removed is set when the old command was dropped because the
+// new one was already there.
 type hookResult struct {
 	hook      claudeHook
 	added     bool
 	renamed   bool
+	removed   bool
 	matcher   string
 	differs   bool
 	notString bool
@@ -539,6 +542,9 @@ func hookLines(results []hookResult) string {
 			state = "added"
 		case r.renamed:
 			state = "renamed from " + legacyCmdline(r.hook.cmdline)
+		case r.removed:
+			// The new command was already there, so the old one is gone and the hook still runs once.
+			state = "old entry removed"
 		case r.notString:
 			// The matcher is not a string, so it is not a name enable can show: the entry is left as it is.
 			state = "already present, matcher is not a string"
@@ -595,11 +601,19 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 				return nil, nil, false, fmt.Errorf(`has a "hooks" entry for %s that is not a JSON array`, h.event)
 			}
 		}
-		renamed, err := renameLegacyCommands(entries, legacyCmdline(h.cmdline), h.cmdline)
+		// When the new command is already under this event, the old one is removed, not renamed: a rename would leave two
+		// identical entries, and the hook would run twice.
+		var renamed, removed bool
+		var err error
+		if len(commandEntries(entries, h.cmdline)) > 0 {
+			entries, removed, err = removeLegacyCommands(entries, legacyCmdline(h.cmdline))
+		} else {
+			renamed, err = renameLegacyCommands(entries, legacyCmdline(h.cmdline), h.cmdline)
+		}
 		if err != nil {
 			return nil, nil, false, err
 		}
-		if renamed {
+		if renamed || removed {
 			eventBytes, err := marshalRaw(entries)
 			if err != nil {
 				return nil, nil, false, err
@@ -608,7 +622,7 @@ func addClaudeHooks(raw []byte, exists bool, hooks []claudeHook) (map[string]jso
 			changed = true
 		}
 		if found := commandEntries(entries, h.cmdline); len(found) > 0 {
-			results = append(results, hookResult{hook: h, renamed: renamed, matcher: found[0].matcher, differs: h.matcher != "" && found[0].matcher != h.matcher, notString: found[0].notString})
+			results = append(results, hookResult{hook: h, renamed: renamed, removed: removed, matcher: found[0].matcher, differs: h.matcher != "" && found[0].matcher != h.matcher, notString: found[0].notString})
 			continue
 		}
 		entry, err := marshalRaw(hookEntry{Matcher: h.matcher, Hooks: []hookCommand{{Type: "command", Command: h.cmdline}}})
@@ -642,9 +656,10 @@ func legacyCmdline(cmdline string) string {
 
 // renameLegacyCommands changes, in place, each handler in entries whose command is exactly from to to, and reports whether
 // it changed any. A hook written by enable before the rename to Cairnbook runs the old binary name, which is gone, so it is
-// renamed rather than left to fail beside a new one. Only an exact match is changed; an entry or a handler that is not
-// shaped as the settings format gives it is left as it is. A changed entry keeps every key, and is written again in
-// key order.
+// renamed rather than left to fail beside a new one. It is called only when the new command is not already under the
+// event: beside one, removeLegacyCommands drops the old handler instead. Only an exact match is changed; an entry or a
+// handler that is not shaped as the settings format gives it is left as it is. A changed entry keeps every key, and is
+// written again in key order.
 func renameLegacyCommands(entries []json.RawMessage, from, to string) (bool, error) {
 	changed := false
 	for i, raw := range entries {
@@ -685,6 +700,56 @@ func renameLegacyCommands(entries []json.RawMessage, from, to string) (bool, err
 		changed = true
 	}
 	return changed, nil
+}
+
+// removeLegacyCommands drops, from entries, each handler whose command is exactly from, and an entry that is left with no
+// handler. It is called when the new command is already under the event, so the old handler is a second run of the same
+// hook and goes rather than being renamed. It returns the entries that remain, and whether it removed any handler. An entry
+// or a handler that is not shaped as the settings format gives it is kept as it is, as renameLegacyCommands leaves it.
+func removeLegacyCommands(entries []json.RawMessage, from string) ([]json.RawMessage, bool, error) {
+	kept := []json.RawMessage{}
+	removed := false
+	for _, raw := range entries {
+		var entry map[string]json.RawMessage
+		if json.Unmarshal(raw, &entry) != nil || entry == nil {
+			kept = append(kept, raw)
+			continue
+		}
+		var handlers []map[string]json.RawMessage
+		if json.Unmarshal(entry["hooks"], &handlers) != nil {
+			kept = append(kept, raw)
+			continue
+		}
+		rest := []map[string]json.RawMessage{}
+		touched := false
+		for _, h := range handlers {
+			var cmd string
+			if h != nil && json.Unmarshal(h["command"], &cmd) == nil && cmd == from {
+				touched = true
+				continue
+			}
+			rest = append(rest, h)
+		}
+		if !touched {
+			kept = append(kept, raw)
+			continue
+		}
+		removed = true
+		if len(rest) == 0 {
+			continue
+		}
+		hb, err := marshalRaw(rest)
+		if err != nil {
+			return nil, false, err
+		}
+		entry["hooks"] = hb
+		eb, err := marshalRaw(entry)
+		if err != nil {
+			return nil, false, err
+		}
+		kept = append(kept, eb)
+	}
+	return kept, removed, nil
 }
 
 // commandEntry is an entry that already runs a cairnbook command: its matcher, and notString, which is set when the entry has

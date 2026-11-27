@@ -115,10 +115,12 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, "{\"status\":\"ok\"}\n")
 }
 
-// keyPattern matches an API key in text: the key prefix and the base64url characters
-// after it. The count is not fixed at 43, so a key cut short, or one with characters
-// added, is still removed: a fragment of a key in a cause is still a key in the log.
-var keyPattern = regexp.MustCompile(regexp.QuoteMeta(auth.KeyPrefix) + `[A-Za-z0-9_-]+`)
+// keyPattern matches an API key in text: either prefix, the one issued now or the one from
+// before the rename, and the base64url characters after it. The prefix is captured, so a key
+// marked as removed keeps the form it had. The count is not fixed at 43, so a key cut short,
+// or one with characters added, is still removed: a fragment of a key in a cause is still a
+// key in the log.
+var keyPattern = regexp.MustCompile(`(` + regexp.QuoteMeta(auth.KeyPrefix) + `|` + regexp.QuoteMeta(auth.LegacyKeyPrefix) + `)[A-Za-z0-9_-]+`)
 
 // bearerPattern matches a bearer credential in text, in case one reaches a cause.
 var bearerPattern = regexp.MustCompile(`(?i)bearer\s+\S+`)
@@ -127,6 +129,6 @@ var bearerPattern = regexp.MustCompile(`(?i)bearer\s+\S+`)
 // logged. The hooks take no header, so this is a second guard: a cause whose text
 // carries a key is still written without it.
 func redact(text string) string {
-	text = keyPattern.ReplaceAllString(text, auth.KeyPrefix+"<redacted>")
+	text = keyPattern.ReplaceAllString(text, "${1}<redacted>")
 	return bearerPattern.ReplaceAllString(text, "Bearer <redacted>")
 }

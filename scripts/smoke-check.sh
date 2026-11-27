@@ -220,9 +220,10 @@ else
     if [ -z "$KEY" ]; then
       report SKIP key "CAIRNBOOK_API_KEY is not set, so no authenticated call was made"
     else
-      key_shape='^cairnbook_[A-Za-z0-9_-]+$'
+      # A key issued before the rename starts with cairn_ and is still accepted (LegacyKeyPrefix).
+      key_shape='^cairn(book)?_[A-Za-z0-9_-]+$'
       if ! [[ "$KEY" =~ $key_shape ]]; then
-        report FAIL key "CAIRNBOOK_API_KEY is not a Cairnbook key: a Cairnbook key starts with cairnbook_ and holds letters, digits, _ and -"
+        report FAIL key "CAIRNBOOK_API_KEY is not a Cairnbook key: a Cairnbook key starts with cairnbook_ (or cairn_, if it was issued before the rename) and holds letters, digits, _ and -"
       else
         resp="$(printf '%s\n' "header = \"Authorization: Bearer $KEY\"" \
           | curl -sS --max-time 5 -K - -X POST -w '\n%{http_code}' "$SERVER/v1/agent/task_current" 2>/dev/null || true)"

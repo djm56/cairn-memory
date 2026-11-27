@@ -88,3 +88,21 @@ func TestDanglingLinkAtTheDatabaseIsRefused(t *testing.T) {
 		t.Errorf("AddKey through a link to an existing file: %v", err)
 	}
 }
+
+// TestCheckKeyNameRefusesAKeyOfEitherPrefix checks that a key pasted into the name position is
+// refused whether it was issued before the rename or after, and that the refusal does not print
+// the name.
+func TestCheckKeyNameRefusesAKeyOfEitherPrefix(t *testing.T) {
+	for _, name := range []string{auth.KeyPrefix + "abc", auth.LegacyKeyPrefix + "abc"} {
+		err := checkKeyName(name)
+		if err == nil || !strings.Contains(err.Error(), "must not begin with cairnbook_") {
+			t.Errorf("checkKeyName(%q) = %v, want the name rule", name, err)
+		}
+		if err != nil && strings.Contains(err.Error(), name) {
+			t.Errorf("the refusal prints the name: %v", err)
+		}
+	}
+	if err := checkKeyName("ci-cairn"); err != nil {
+		t.Errorf("checkKeyName(ci-cairn) = %v, want no error", err)
+	}
+}

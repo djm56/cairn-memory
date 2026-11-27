@@ -287,7 +287,7 @@ Paste these, in this order, in one message:
 Do not paste the key itself, or the contents of `client.env`. The key should appear in
 none of them; if it does, say so and leave that line out. The output of `cairnbook key add`
 (1.2) prints the key, so leave it out of the paste. In everything you paste, replace any
-`cairnbook_...` value with `<redacted>`. If a key is pasted anywhere, revoke it and make a
+`cairnbook_...` or `cairn_...` value with `<redacted>`. If a key is pasted anywhere, revoke it and make a
 new one.
 
 ## Part 6: clean up

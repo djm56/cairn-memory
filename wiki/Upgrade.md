@@ -1,6 +1,6 @@
 # Upgrade
 
-_Status as of 2026-11-27: M5 (Plugin) is current; the tool is renamed to Cairnbook (D38). M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 8b651da._
+_Status as of 2026-11-27: M5 (Plugin) is current; the tool is renamed to Cairnbook (D38). M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at f43ee09, which has the rename and the old-prefix key fallback (keys that start `cairn_`)._
 
 This page upgrades a server that is already running, and a local install. The database schema is the part that needs care. A newer build changes the database when it starts, and an older build refuses to open a database that a newer one has changed. So the rollback path is the pre-upgrade backup, not the old binary alone.
 
@@ -188,15 +188,16 @@ If you also run `cairnbook serve` on this machine, stop it first, back up its da
 
 ## From Cairn to Cairnbook
 
-On 2026-11-27 the tool was renamed from Cairn to Cairnbook (decision D38). The old names are still read when the new ones are missing, so nothing stops working the moment you install the new binary. Move to the new names when you can.
+On 2026-11-27 the tool was renamed from Cairn to Cairnbook (decision D38). The old settings and files are still read when the new ones are missing, so an install made under the old name keeps working once you install the new binary. The rows marked No below need action; move to the new names when you can.
 
 | Old | New | Still read? |
 |---|---|---|
 | `cairn` (the binary) | `cairnbook` | No: install the new binary under its new name |
 | `CAIRN_SERVER`, `CAIRN_API_KEY`, `CAIRN_PROJECT`, `CAIRN_AGENT` | `CAIRNBOOK_SERVER`, `CAIRNBOOK_API_KEY`, `CAIRNBOOK_PROJECT`, `CAIRNBOOK_AGENT` | Yes, when the new one is unset or empty |
-| `.cairn.toml` | `.cairnbook.toml` | Yes, in a folder that has no `.cairnbook.toml` |
-| `~/.config/cairn/client.env`, with a `CAIRN_API_KEY=` line | `~/.config/cairnbook/client.env`, with a `CAIRNBOOK_API_KEY=` line | Yes, when the new file is missing, or has no new line |
-| `X-Cairn-*` request headers | `X-Cairnbook-*` | Yes, by the server, when no new header is sent |
+| `.cairn.toml` | `.cairnbook.toml` | Yes. In each folder the new name is read first, and the nearest folder wins: a `.cairn.toml` in a nearer folder beats a `.cairnbook.toml` further up |
+| `~/.config/cairn/client.env`, with a `CAIRN_API_KEY=` line | `~/.config/cairnbook/client.env`, with a `CAIRNBOOK_API_KEY=` line | Yes. The old path is read only when the new file does not exist. Inside a file, a `CAIRNBOOK_API_KEY` line wins over a `CAIRN_API_KEY` line |
+| An API key with the prefix `cairn_` | An API key with the prefix `cairnbook_` | Yes: a key issued under the old name keeps working, and new keys start with `cairnbook_` |
+| `X-Cairn-*` request headers | `X-Cairnbook-*` | Yes, by the server. An old header is read only when no `X-Cairnbook-*` header of that kind is present, even an empty one |
 | MCP server `cairn` (tools `mcp__cairn__*`) | `cairnbook` (tools `mcp__cairnbook__*`) | No: re-register it (below) |
 | Plugin `cairn@cairn-memory` | `cairnbook@cairnbook` | No: reinstall it (below) |
 | UI cookie `cairn_ui` | `cairnbook_ui` | No: sign in to the web UI again |
@@ -208,11 +209,17 @@ cd cairn-memory
 git pull
 make build
 install -m 0755 bin/cairnbook ~/.local/bin/cairnbook
-mkdir -p ~/.config/cairnbook
+mkdir -p -m 700 ~/.config/cairnbook
 [ -f ~/.config/cairn/client.env ] && [ ! -f ~/.config/cairnbook/client.env ] && (umask 077 && sed 's/^\(export \)\{0,1\}CAIRN_API_KEY=/CAIRNBOOK_API_KEY=/' ~/.config/cairn/client.env > ~/.config/cairnbook/client.env)
 ```
 
-Then rename any `CAIRN_*` variables in your shell profile to `CAIRNBOOK_*`. When `cairnbook doctor` passes from a project, remove the old binary (`~/.local/bin/cairn`) and the old key file.
+Then rename any `CAIRN_*` variables in your shell profile to `CAIRNBOOK_*`. When `cairnbook doctor` passes from a project, check the new key file before you remove anything:
+
+```bash
+ls -l ~/.config/cairnbook/client.env
+```
+
+**You should see** `-rw-------` on that line. If the file is missing, or the mode is anything else, keep the old key file and check the new one first. Otherwise remove the old binary (`~/.local/bin/cairn`) and the old key file.
 
 **In each project:**
 
@@ -226,8 +233,22 @@ cairnbook doctor --agent claude-code
 
 **The Claude Code plugin:** uninstall `cairn@cairn-memory`, then install `cairnbook@cairnbook` as [Install-Plugin](Install-Plugin) shows. `enable` and `doctor` warn while the old plugin is still enabled.
 
-**A server:** the server reads either header, so clients can move in any order. The systemd unit in `docs/deploy` now runs `/usr/local/bin/cairnbook` as the user `cairnbook` on `/var/lib/cairnbook/cairnbook.db`. An existing server can keep its old unit and paths: install the new binary, point the unit's `ExecStart` at it, and leave `--db` as it is. To move to the new paths, stop the server, take a backup, move the state directory and the database file to their new names, update the unit, and start it again, as in the steps above.
+**A server:** upgrade the server before its clients, as the top of this page says. A server on this build reads either header, so once it is upgraded the clients can move to the new names in any order. Until then, an older server does not read the `X-Cairnbook-*` headers that a client under the new name sends, so the server comes first.
+
+The systemd unit in `docs/deploy` now runs `/usr/local/bin/cairnbook` as the user `cairnbook` on `/var/lib/cairnbook/cairnbook.db`. An existing server can keep its old unit and paths: install the new binary, point the unit's `ExecStart` at it, and leave `--db` as it is. To move to the new paths, stop the server, take a backup, move the state directory and the database file to their new names, update the unit, and start it again, as in the steps above.
+
+A server still set up under the old names needs a backup before you swap the binary. Run these with the old names: the user `cairn`, the unit `cairn`, and the paths it was set up with. They mirror steps 2 and 4 above:
+
+```bash
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+install -d -m 0700 -o cairn -g cairn /var/backups/cairn && \
+systemctl stop cairn && \
+sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db && \
+ls -l /var/backups/cairn/pre-upgrade-$STAMP.db
+```
+
+**Stop if any line fails.** From `install` to `ls -l` the lines are joined with `&&`, so each one runs only when the one before it succeeded. Install the new binary only after `ls -l` lists the backup file. If any line prints an error, nothing after it has run; if the error came after `systemctl stop cairn`, the server is still stopped, so start the old build again with `systemctl start cairn` and fix the cause first.
 
 ## Versions of this page
 
-This page describes the code at 8b651da. The migrations, the commands and the refusals are the ones in that build. When a newer build changes them, this page changes with the code, in the same pull request.
+This page describes the code at f43ee09, which has the rename and the old-prefix key fallback (keys that start `cairn_`). The migrations, the commands and the refusals are the ones in that build. When a newer build changes them, this page changes with the code, in the same pull request.

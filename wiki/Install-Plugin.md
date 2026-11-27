@@ -88,7 +88,7 @@ The project name is lowercase letters and digits in hyphen-separated groups, at 
 
 ## 5. Install the plugin
 
-The repository is a Claude Code marketplace. Its `.claude-plugin/marketplace.json` lists one plugin, `cairnbook`, and the marketplace is named `cairn-memory`. The install id is therefore `cairnbook@cairnbook`.
+The repository is a Claude Code marketplace. Its `.claude-plugin/marketplace.json` lists one plugin, `cairnbook`, and the marketplace is named `cairnbook`. The install id is therefore `cairnbook@cairnbook`.
 
 Use 5a to install the plugin. Use 5b only to develop the plugin, from a checkout. Both routes give the same plugin. The marketplace commands in 5a are not live-checked: the live check on 2026-11-17 loaded the plugin with `--plugin-dir`, not through the marketplace.
 

@@ -632,3 +632,18 @@ func TestRunRefusesBeforeItListens(t *testing.T) {
 		}
 	}
 }
+
+// TestRedactRemovesLegacyKeys checks the second guard on the logs for a key issued before
+// the rename, which starts with the legacy prefix: it is removed like a key now, and the
+// marker keeps the prefix the key had, so the log says which form was there.
+func TestRedactRemovesLegacyKeys(t *testing.T) {
+	legacy := auth.LegacyKeyPrefix + strings.Repeat("Q", 43)
+	in := "auth: " + legacy + " and Bearer " + legacy + " end"
+	out := redact(in)
+	if strings.Contains(out, legacy) || strings.Contains(out, strings.Repeat("Q", 5)) {
+		t.Errorf("redact left a legacy key: %q", out)
+	}
+	if !strings.Contains(out, "cairn_<redacted>") || !strings.Contains(out, "Bearer <redacted>") {
+		t.Errorf("redact did not mark the legacy key: %q", out)
+	}
+}

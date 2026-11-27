@@ -18,7 +18,7 @@ Every call to the server carries a key. The key's scope decides its role. The ro
 
 Some facts about keys:
 
-- **The format** is `cairnbook_` followed by 43 characters of base64url. The server makes it from 32 random bytes.
+- **The format** is `cairnbook_` followed by 43 characters of base64url. The server makes it from 32 random bytes. A key issued before the rename starts with `cairn_` instead, and is still accepted.
 - **Only the hash is stored.** The database keeps the SHA-256 of the key. `key add` prints the key once, and it cannot be shown again. A lost key is replaced, not recovered.
 - **Names are never reused.** A revoked name stays taken.
 - **Last used** is when the key last made an accepted call. The server writes it at most once a minute for each key.

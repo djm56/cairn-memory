@@ -88,7 +88,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	if serverErr != nil {
 		checks = append(checks, check{name: "server", status: "fail", detail: reason(serverErr)})
 	} else {
-		checks = append(checks, check{name: "server", status: "ok", detail: fmt.Sprintf("%s (from %s)", client.DisplayURL(url), serverSource())})
+		checks = append(checks, check{name: "server", status: "ok", detail: fmt.Sprintf("%s (from %s)", client.DisplayURL(url), identity.ServerSource(wd))})
 	}
 	key, keyErr := client.LoadKey()
 	keyChk := keyCheck(key, keyErr)

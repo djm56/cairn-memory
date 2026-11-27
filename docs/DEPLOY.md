@@ -512,7 +512,8 @@ sudo -u cairnbook /usr/local/bin/cairnbook key add --db /var/lib/cairnbook/cairn
 sudo -u cairnbook /usr/local/bin/cairnbook key revoke --db /var/lib/cairnbook/cairnbook.db --name laptop-claude
 ```
 
-A key looks like `cairnbook_<your-key>`. Never paste a real key into a file that is
+A key looks like `cairnbook_<your-key>`. A key issued before the rename starts with
+`cairn_` instead, and works the same. Never paste a real key into a file that is
 committed, a ticket, or a chat.
 
 ## Backup

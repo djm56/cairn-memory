@@ -81,7 +81,8 @@ server = "https://cairnbook.lan:8788"
 For Claude Code, the plugin is the recommended route. It brings the MCP server and the hooks from one install, so the `enable` and `claude mcp add` lines above are not needed. Claude Code 2.1.275 or later (the version the [Claude Code plugin docs](https://code.claude.com/docs/en/discover-plugins) give for `--marketplace`) installs it from GitHub in one line: `/plugin install cairnbook --marketplace djm56/cairn-memory`. [Install-Plugin](https://github.com/djm56/cairn-memory/wiki/Install-Plugin) has the steps, and a route from a local checkout for developing the plugin. Use the plugin or the lines above, not both.
 The tool was named Cairn until 2026-11-27, when it became Cairnbook (decision D38). The
 repository and the Go module still carry the name `cairn-memory`; they move to `cairnbook`
-when the repository is renamed. An install made under the old name keeps working: see
+when the repository is renamed. An install made under the old name keeps working, and so does an API key issued under it
+(prefix `cairn_`); new keys start with `cairnbook_`. See
 [Upgrade](https://github.com/djm56/cairn-memory/wiki/Upgrade#from-cairn-to-cairnbook).
 
 ## Where to read next

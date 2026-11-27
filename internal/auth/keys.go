@@ -14,19 +14,29 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strings"
 )
 
-// KeyPrefix starts every key, so a key is recognisable in a config file or a
+// KeyPrefix starts every key issued now, so a key is recognisable in a config file or a
 // log line, and a secret scanner can find it.
 const KeyPrefix = "cairnbook_"
+
+// LegacyKeyPrefix starts a key issued before the rename to Cairnbook, when the tool was
+// called Cairn. Such a key is still well formed and resolves against its stored hash,
+// since the hash was taken of the whole plaintext, so the prefix is only a shape. No
+// key is issued with it any more.
+const LegacyKeyPrefix = "cairn_"
 
 // keyBytes is the entropy of a key: 256 bits, which makes a fast hash enough
 // (see HashKey).
 const keyBytes = 32
 
-// keyLen is the length of a well-formed key: the prefix, then the 32 bytes in
+// keyBodyLen is the length of the part of a key after its prefix: the 32 bytes in
 // unpadded base64url, which is 43 characters.
-const keyLen = len(KeyPrefix) + 43
+const keyBodyLen = 43
+
+// keyLen is the length of a well-formed key issued now: KeyPrefix and the body.
+const keyLen = len(KeyPrefix) + keyBodyLen
 
 // Scope is what a key may do. One scope per key (DESIGN §3.6).
 type Scope string
@@ -70,14 +80,16 @@ func HashKey(key string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// wellFormed reports whether key has the shape NewKey gives: the prefix, then 43
-// characters of the base64url alphabet. It is checked before any lookup, so a
-// hostile header is refused without a database read.
+// wellFormed reports whether key has the shape NewKey gives, or the shape of a key
+// issued before the rename: KeyPrefix or LegacyKeyPrefix, then 43 characters of the
+// base64url alphabet. It is checked before any lookup, so a hostile header is refused
+// without a database read.
 func wellFormed(key string) bool {
-	if len(key) != keyLen || key[:len(KeyPrefix)] != KeyPrefix {
+	prefix, ok := keyPrefixOf(key)
+	if !ok {
 		return false
 	}
-	for i := len(KeyPrefix); i < len(key); i++ {
+	for i := len(prefix); i < len(key); i++ {
 		c := key[i]
 		switch {
 		case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9', c == '-', c == '_':
@@ -86,6 +98,18 @@ func wellFormed(key string) bool {
 		}
 	}
 	return true
+}
+
+// keyPrefixOf returns the prefix key carries, KeyPrefix or LegacyKeyPrefix, when key is
+// that prefix and then exactly keyBodyLen characters. It reports false for any other
+// length, so the two prefixes need no tie-break: neither is a prefix of the other.
+func keyPrefixOf(key string) (string, bool) {
+	for _, p := range []string{KeyPrefix, LegacyKeyPrefix} {
+		if strings.HasPrefix(key, p) && len(key) == len(p)+keyBodyLen {
+			return p, true
+		}
+	}
+	return "", false
 }
 
 // bearerScheme is the auth scheme the header must carry, with its one space.
