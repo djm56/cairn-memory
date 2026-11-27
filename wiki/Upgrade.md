@@ -1,6 +1,6 @@
 # Upgrade
 
-_Status as of 2026-11-27: M5 (Plugin) is current; the tool is renamed to Cairnbook (D38). M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at a33efd5. The old-prefix key fallback (keys that start `cairn_`) is not in a33efd5; it is in the commit after it._
+_Status as of 2026-11-27: M5 (Plugin) is current; the tool is renamed to Cairnbook (D38). M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 656cd21, which has the rename and the old-prefix key fallback (keys that start `cairn_`)._
 
 This page upgrades a server that is already running, and a local install. The database schema is the part that needs care. A newer build changes the database when it starts, and an older build refuses to open a database that a newer one has changed. So the rollback path is the pre-upgrade backup, not the old binary alone.
 
@@ -241,14 +241,16 @@ A server still set up under the old names needs a backup before you swap the bin
 
 ```bash
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-install -d -m 0700 -o cairn -g cairn /var/backups/cairn
-systemctl stop cairn
-sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db
+install -d -m 0700 -o cairn -g cairn /var/backups/cairn && \
+systemctl stop cairn && \
+sudo -u cairn /usr/local/bin/cairn backup --db /var/lib/cairn/cairn.db /var/backups/cairn/pre-upgrade-$STAMP.db && \
 ls -l /var/backups/cairn/pre-upgrade-$STAMP.db
 ```
+
+**Stop if any line fails.** From `install` to `ls -l` the lines are joined with `&&`, so each one runs only when the one before it succeeded. If any line prints an error, nothing after it has run. If the error came after `systemctl stop cairn`, the server is still stopped, so start the old build again with `systemctl start cairn` and fix the cause first.
 
 **Gate.** Install the new binary only after the `ls -l` lists the backup file. If any line fails, start the old server again with `systemctl start cairn`, which runs the old build, and fix the cause first.
 
 ## Versions of this page
 
-This page describes the code at a33efd5, with the old-prefix key fallback of the commit after it. The migrations, the commands and the refusals are the ones in that build. When a newer build changes them, this page changes with the code, in the same pull request.
+This page describes the code at 656cd21, which has the rename and the old-prefix key fallback (keys that start `cairn_`). The migrations, the commands and the refusals are the ones in that build. When a newer build changes them, this page changes with the code, in the same pull request.
