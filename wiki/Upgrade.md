@@ -229,7 +229,7 @@ cairnbook enable --agent claude-code
 cairnbook doctor --agent claude-code
 ```
 
-`enable` renames the hooks an older `cairn enable` wrote (`cairn hook ...` becomes `cairnbook hook ...`) in place. For OpenCode and pi it removes the old `cairn` MCP entry only when that entry runs `cairn mcp`, leaves any other server named `cairn` as it is, and registers `cairnbook`; delete the old `.cairn/` folder, and for pi the old `<!-- cairn:begin` block in `AGENTS.md`, by hand. If you added the server with `claude mcp add`, remove the old entry with `claude mcp remove cairn` and add it again as `cairnbook`. Allow-lists that name `mcp__cairn__*` tools need the new prefix.
+`enable` renames the hooks an older `cairn enable` wrote (`cairn hook ...` becomes `cairnbook hook ...`) in place. For OpenCode and pi it removes the old `cairn` MCP entry only when that entry runs `cairn mcp`, leaves any other server named `cairn` as it is, and registers `cairnbook`. An entry is removed only when its program's base name is exactly `cairn` (a path such as `/opt/bin/cairn` counts; `cairn.exe` and other names do not, so they are left and reported); delete the old `.cairn/` folder, and for pi the old `<!-- cairn:begin` block in `AGENTS.md`, by hand. If you added the server with `claude mcp add`, remove the old entry with `claude mcp remove cairn` and add it again as `cairnbook`. Allow-lists that name `mcp__cairn__*` tools need the new prefix.
 
 **The Claude Code plugin:** uninstall `cairn@cairn-memory`, then install `cairnbook@cairnbook` as [Install-Plugin](Install-Plugin) shows. `enable` and `doctor` warn while the old plugin is still enabled.
 

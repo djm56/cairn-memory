@@ -101,8 +101,8 @@ func TestKeyCommandUsageRefusals(t *testing.T) {
 }
 
 // TestKeyRefusesAKeyPassedAsAnArgumentOrAFlag checks #245 (W2): a key given as a positional argument,
-// or as an unknown flag, is a usage error (exit 2), and neither the key nor the start of its body is
-// printed on stderr. The key is built here, so the test holds whatever the store contains.
+// as an unknown flag, or in the action position, is a usage error (exit 2), and neither the key nor
+// the start of its body is printed on stderr. The key is built here, so the test holds whatever the store contains.
 func TestKeyRefusesAKeyPassedAsAnArgumentOrAFlag(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "cairnbook.db")
 	key, err := auth.NewKey()
@@ -119,6 +119,7 @@ func TestKeyRefusesAKeyPassedAsAnArgumentOrAFlag(t *testing.T) {
 		{"a pasted key as a positional argument to add", []string{"key", "add", "--db", db, "--name", "ci", "--scope", "agent", key}, "takes flags only"},
 		{"a key-shaped token as an unknown flag to revoke", []string{"key", "revoke", "--db", db, "-" + key}, "a flag is not recognised"},
 		{"a key-shaped token as an unknown flag to list", []string{"key", "list", "--db", db, "-" + key}, "a flag is not recognised"},
+		{"a pasted key in the action position", []string{"key", key}, "unknown action"},
 	}
 	for _, c := range cases {
 		code, _, errs := runCmd(t, c.args...)

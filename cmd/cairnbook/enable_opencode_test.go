@@ -465,6 +465,29 @@ func TestOpenCodeDryRunWritesNothing(t *testing.T) {
 	})
 }
 
+// TestOpenCodeDryRunLeavesALegacyEntryAlone checks --dry-run in a config whose cairn entry does not run cairn mcp: the
+// report says the entry was left as is, and the dry run writes no file and changes no byte of the config.
+func TestOpenCodeDryRunLeavesALegacyEntryAlone(t *testing.T) {
+	dir := enableProject(t)
+	writeFile(t, dir, openCodeFile, `{"mcp": {"cairn": {"type": "local", "command": ["node", "cairn.js"]}}}`)
+	before := readBytes(t, ocConfig(dir))
+	namesBefore := listDir(t, dir)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "opencode", "--dry-run")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if !strings.Contains(stdout, "a server named cairn that does not run cairn mcp was left as is") {
+		t.Errorf("stdout does not say the cairn entry was left as is:\n%s", stdout)
+	}
+	if got := readBytes(t, ocConfig(dir)); !bytes.Equal(got, before) {
+		t.Errorf("the dry run changed the config:\n%s", got)
+	}
+	if got := listDir(t, dir); !slices.Equal(got, namesBefore) {
+		t.Errorf("the dry run changed the project: %v, want %v", got, namesBefore)
+	}
+}
+
 // TestOpenCodeRefusesWhenNoCacheDirectoryIsKnown checks that an existing config is not changed when its backup has no
 // place to go, and that the instruction file is not written either.
 func TestOpenCodeRefusesWhenNoCacheDirectoryIsKnown(t *testing.T) {

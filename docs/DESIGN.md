@@ -1471,8 +1471,9 @@ status; they only recommend.
   and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` refuses a name that
   fails the pattern, or a name shaped like a whole key under either prefix, before it looks
   anything up. No revoke error repeats the name given, and the usage errors of `key add`, `key list` and `key revoke`
-  repeat no argument or flag, so a key pasted as a name, as a positional argument or as a flag, or one with a
-  character added or dropped, is not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
+  repeat no argument or flag, and the unknown-action error of `key` repeats no action, so a key pasted as a name, as a
+  positional argument, as a flag or as the action, or one with a character added or dropped, is not echoed. The one
+  exception is the `--db` value, which database errors print (internal/server/db.go), because it is a path. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.
 
   The 256 random bits are what make a fast hash enough: a guess of the key is

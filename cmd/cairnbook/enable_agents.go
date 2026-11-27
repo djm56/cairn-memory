@@ -233,8 +233,9 @@ func dropLegacyServer(servers map[string]json.RawMessage, runsOldMCP func(json.R
 	return legacyNoteRemoved, true
 }
 
-// isCairnBinary reports whether program names the old binary: cairn itself, or a path whose base name is cairn.
-// A name such as cairn-tools does not, and neither does an empty string.
+// isCairnBinary reports whether program names the old binary. The base name of program is taken with the
+// platform's path rules, and it must equal cairn exactly, so cairn itself and a path ending in cairn both
+// match. A name such as cairn-tools or cairn.exe does not, and neither does an empty string.
 func isCairnBinary(program string) bool {
 	return filepath.Base(program) == legacyServerName
 }
