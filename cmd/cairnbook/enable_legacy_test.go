@@ -115,3 +115,42 @@ func TestPiRemovesTheOldEntryBesideANewOne(t *testing.T) {
 		t.Errorf("mcpServers is %v, want no cairn", servers)
 	}
 }
+
+// TestEnableRemovesTheOldHookBesideTheNewOne checks a settings file that already holds both the old cairn hook and the
+// new cairnbook hook for an event: enable removes the old handler and does not rename it, so the hook is not run twice.
+// The three shapes are an old entry beside a new one, an old handler in the same entry as a new one, and a bare old
+// entry, which leaves no handler once removed and so goes. Each event is reported as removed, and a second run finds
+// every hook already present.
+func TestEnableRemovesTheOldHookBesideTheNewOne(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, settingsIn(dir), `{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": "cairnbook hook session-start"}]},
+      {"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": "cairn hook session-start"}]}
+    ],
+    "PreCompact": [
+      {"hooks": [{"type": "command", "command": "cairnbook hook pre-compact"}]},
+      {"hooks": [{"type": "command", "command": "cairn hook pre-compact"}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "cairn hook stop"}, {"type": "command", "command": "cairnbook hook stop"}]}
+    ]
+  }
+}
+`)
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := decodeJSON(t, readBytes(t, settingsIn(dir))); !reflect.DeepEqual(got, map[string]any{"hooks": freshHooks()}) {
+		t.Errorf("settings file holds %v, want one new entry per event and no old command", got)
+	}
+	want := map[string]string{"SessionStart": "old entry removed", "PreCompact": "old entry removed", "Stop": "old entry removed"}
+	if got := outcomes(stdout); !reflect.DeepEqual(got, want) {
+		t.Errorf("outcomes %v, want %v", got, want)
+	}
+	if _, stdout, _ = runCmd(t, "enable", "--agent", "claude-code"); !reflect.DeepEqual(outcomes(stdout), allPresent) {
+		t.Errorf("second run outcomes %v, want every hook already present", outcomes(stdout))
+	}
+}

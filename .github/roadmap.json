@@ -608,7 +608,7 @@
       "mkey": "M7",
       "phase": null,
       "area": "area:docs",
-      "title": "Daily findings review slot in the calendar; weekly dashboard look with a PM",
+      "title": "Daily findings review slot in the calendar; weekly dashboard look with a teammate",
       "milestone": "M7 Pilot",
       "labels": ["type:task", "m7", "area:docs"],
       "body": "**Work.** A daily findings review slot in the calendar, and a weekly look at the dashboard with a teammate.\n\n**Exit.** Part of M7's exit check; see the milestone table.\n\nSource: [docs/PLAN.md §3, M7](https://github.com/djm56/cairn-memory/blob/main/docs/PLAN.md#milestone-table)\n\n<!-- cairn-roadmap: m7-review-slot -->"

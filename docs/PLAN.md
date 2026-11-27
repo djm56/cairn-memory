@@ -505,7 +505,9 @@ that is not a numbered decision here, and the table says what.
   `CAIRNBOOK_*`; the project file is `.cairnbook.toml`; the key file is
   `~/.config/cairnbook/client.env`; the caller headers are `X-Cairnbook-*`. The
   old names are still read when the new ones are missing, so an install made
-  before the rename keeps working (wiki Upgrade). The repository and the Go
+  before the rename keeps working (wiki Upgrade). API keys issued under the old
+  name (prefix `cairn_`) keep working, since the stored hash is of the whole key;
+  new keys are issued with prefix `cairnbook_`. The repository and the Go
   module keep `cairn-memory` until the operator renames the repository to
   `cairnbook`. The `cairn-roadmap` and `cairn-milestone` markers keep their
   names, since the bootstrap script finds issues and milestones by them, and so

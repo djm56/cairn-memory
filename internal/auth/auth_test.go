@@ -211,3 +211,77 @@ func TestResolveRefusesAnUnknownScope(t *testing.T) {
 		t.Fatalf("err = %v, want a failure for scope admin", err)
 	}
 }
+
+// legacyKey is a key in the form it had before the rename to Cairnbook: LegacyKeyPrefix and 43
+// characters of the base64url alphabet. The body is fixed, so the hash the store holds for it is known.
+var legacyKey = LegacyKeyPrefix + strings.Repeat("B", 43)
+
+// TestNewKeyUsesTheNewPrefix checks that a key issued now carries KeyPrefix and not the
+// legacy one, so the rename changes what is issued and nothing already issued.
+func TestNewKeyUsesTheNewPrefix(t *testing.T) {
+	k, err := NewKey()
+	if err != nil {
+		t.Fatalf("NewKey: %v", err)
+	}
+	if !strings.HasPrefix(k, "cairnbook_") || strings.HasPrefix(k, LegacyKeyPrefix) {
+		t.Errorf("NewKey gave %q, want the cairnbook_ prefix", k[:min(len(k), 10)])
+	}
+}
+
+// TestBearerKeyAcceptsTheLegacyPrefix checks the header grammar for a key in the old form:
+// the same 43 characters after the prefix, and the same refusals for any other shape.
+func TestBearerKeyAcceptsTheLegacyPrefix(t *testing.T) {
+	cases := []struct {
+		what   string
+		header string
+		ok     bool
+	}{
+		{"the legacy form", "Bearer " + legacyKey, true},
+		{"a legacy key a character short", "Bearer " + legacyKey[:len(legacyKey)-1], false},
+		{"a legacy key a character long", "Bearer " + legacyKey + "C", false},
+		{"legacy prefix, standard alphabet", "Bearer " + LegacyKeyPrefix + strings.Repeat("+", 43), false},
+		{"legacy prefix, padding", "Bearer " + LegacyKeyPrefix + strings.Repeat("B", 42) + "=", false},
+		{"legacy prefix alone", "Bearer " + LegacyKeyPrefix, false},
+	}
+	for _, c := range cases {
+		_, ok := bearerKey(c.header)
+		if ok != c.ok {
+			t.Errorf("%s: bearerKey ok = %v, want %v", c.what, ok, c.ok)
+		}
+	}
+}
+
+// TestResolveAcceptsKeysByTheirPrefix checks that a key issued under the old name resolves
+// against its stored hash, as a key issued now does, and that a legacy-shaped key which is
+// not well formed is refused before any lookup.
+func TestResolveAcceptsKeysByTheirPrefix(t *testing.T) {
+	fresh, err := NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeLookup{keys: map[string]Key{
+		HashKey(legacyKey): {ID: 3, Name: "old-ci", Scope: ScopeAgent},
+		HashKey(fresh):     {ID: 4, Name: "new-ci", Scope: ScopeOperator},
+	}}
+	clock := time.Now()
+	r := newTestResolver(f, &clock, nil)
+
+	k, err := r.Resolve(context.Background(), "Bearer "+legacyKey)
+	if err != nil || k.Name != "old-ci" || k.Scope != ScopeAgent || k.ID != 3 {
+		t.Fatalf("legacy key: Resolve = %+v, %v; want old-ci, agent, id 3", k, err)
+	}
+	k, err = r.Resolve(context.Background(), "Bearer "+fresh)
+	if err != nil || k.Name != "new-ci" {
+		t.Fatalf("new key: Resolve = %+v, %v; want new-ci", k, err)
+	}
+
+	f.touches = 0
+	for _, bad := range []string{LegacyKeyPrefix + strings.Repeat("B", 42), LegacyKeyPrefix + strings.Repeat("B", 42) + "="} {
+		if _, err := r.Resolve(context.Background(), "Bearer "+bad); !errors.Is(err, ErrUnauthenticated) {
+			t.Errorf("malformed legacy key %q: err = %v, want ErrUnauthenticated", bad, err)
+		}
+	}
+	if f.touches != 0 {
+		t.Errorf("a malformed legacy key was stamped %d times", f.touches)
+	}
+}

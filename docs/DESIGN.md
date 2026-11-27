@@ -1460,7 +1460,9 @@ status; they only recommend.
   systemd unit are in [DEPLOY.md](DEPLOY.md).
 - API keys are stored hashed, with SHA-256 and no password KDF. A key is
   `cairnbook_` and 32 random bytes in unpadded base64url, shown once when it is
-  made. `cairnbook key add` makes one in the server's database and prints it once on
+  made. A key issued before the rename, under the name Cairn, starts with `cairn_`
+  and is still accepted: the same 43 characters follow the prefix, and the hash is of
+  the whole key (D38, 2026-11-27). `cairnbook key add` makes one in the server's database and prints it once on
   stdout, with a warning on stderr. The database keeps only the hash, and nothing
   logs the key. `cairnbook key list` shows each key's name, scope and times, never the
   hash or the key. `cairnbook key revoke` ends a key at its next call, since the server

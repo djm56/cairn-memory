@@ -34,7 +34,10 @@ const refusedRoleNote = cli.RefusedRoleNote
 type target struct {
 	project identity.Project
 	url     string
-	svc     core.Service
+	// serverFrom says where url came from: the server variable's name, or the project file's: what status prints
+	// after "from". It is set by dial, from the same lookup that gave url.
+	serverFrom string
+	svc        core.Service
 	// ctx carries the caller: the project and the client name. A read names its agent role on
 	// the call, from role (currentFor), not here.
 	ctx context.Context
@@ -106,7 +109,7 @@ func dial(wd string, timeout time.Duration) (*target, error) {
 		Role:    core.RoleAgent,
 	})
 	role, refused := roleFromEnv()
-	return &target{project: project, url: url, svc: svc, ctx: ctx, role: role, roleRefused: refused}, nil
+	return &target{project: project, url: url, serverFrom: identity.ServerSource(wd), svc: svc, ctx: ctx, role: role, roleRefused: refused}, nil
 }
 
 // loadKey returns the API key the calls send (DESIGN.md §2.1). A key that is in neither
@@ -128,13 +131,4 @@ func loadKey() (client.Key, error) {
 // to one line, and a local one is printed whole.
 func reason(err error) string {
 	return cli.Reason(err)
-}
-
-// serverSource says where the server URL came from, for a person reading status or
-// doctor. CAIRNBOOK_SERVER is read first, so it is named when it is set.
-func serverSource() string {
-	if _, from := identity.Lookup(identity.EnvServer); from != "" {
-		return from
-	}
-	return identity.FileName
 }

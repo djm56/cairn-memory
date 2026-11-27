@@ -306,10 +306,10 @@ If a key is pasted anywhere, revoke it and make a new one.
 
 ## Recorded result
 
-Section 3 was run on 2026-11-06 with `cairnbook eb34088` against the operator's server, which
+Section 3 was run on 2026-11-06 with `cairn eb34088` against the operator's server, which
 was upgraded to the same build first. Sections 4 and 5 were not run.
 
-- **Hooks.** `cairnbook doctor --agent claude-code` reported `SessionStart`, `PreCompact` and
+- **Hooks.** `cairn doctor --agent claude-code` reported `SessionStart`, `PreCompact` and
   `Stop` as `ok`, with the matcher `startup|resume|clear|compact`.
 - **Order.** The Claude Code session was started first, while no task was active, so the
   startup hook reported no task. The task, its two steps and the marker were then set

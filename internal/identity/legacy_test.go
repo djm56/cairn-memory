@@ -76,3 +76,35 @@ func TestLegacyNames(t *testing.T) {
 		}
 	})
 }
+
+// TestServerSourceNamesTheFileRead checks that ServerSource names the file ResolveServer reads: the old
+// .cairn.toml when it is the nearest file, the new name when the directory has it, and the variable when the
+// environment gives the server. It is what status and doctor print after "from".
+func TestServerSourceNamesTheFileRead(t *testing.T) {
+	t.Run("old file is the one read", func(t *testing.T) {
+		tr := newTree(t, "", []file{{path: LegacyFileName, body: "server = \"https://old.example\"\n"}})
+		setEnv(t, EnvServer, "", true)
+		setEnv(t, EnvProjectDir, "", true)
+		if got := ServerSource(tr.root); got != LegacyFileName {
+			t.Errorf("ServerSource = %q, want %q", got, LegacyFileName)
+		}
+	})
+	t.Run("new file wins in the same directory", func(t *testing.T) {
+		tr := newTree(t, "", []file{
+			{path: LegacyFileName, body: "server = \"https://old.example\"\n"},
+			{path: FileName, body: "server = \"https://new.example\"\n"},
+		})
+		setEnv(t, EnvServer, "", true)
+		setEnv(t, EnvProjectDir, "", true)
+		if got := ServerSource(tr.root); got != FileName {
+			t.Errorf("ServerSource = %q, want %q", got, FileName)
+		}
+	})
+	t.Run("environment names itself", func(t *testing.T) {
+		setEnv(t, EnvServer, "", true)
+		t.Setenv("CAIRN_SERVER", "https://old.example")
+		if got := ServerSource(t.TempDir()); got != "CAIRN_SERVER" {
+			t.Errorf("ServerSource = %q, want CAIRN_SERVER", got)
+		}
+	})
+}

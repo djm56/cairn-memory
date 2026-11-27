@@ -46,7 +46,7 @@ func writeStatus(w io.Writer, t *target, cur *core.TaskCurrent) {
 	fmt.Fprintf(w, "project     %s (from %s)\n", t.project.Name, projectSource(t.project))
 	// The URL goes without its credentials, and each server-derived text is one
 	// printable line, as the hook prints it.
-	fmt.Fprintf(w, "server      %s (from %s)\n", client.DisplayURL(t.url), serverSource())
+	fmt.Fprintf(w, "server      %s (from %s)\n", client.DisplayURL(t.url), t.serverFrom)
 	if cur.Task == nil {
 		fmt.Fprintln(w, "task        none active")
 		return

@@ -11,8 +11,8 @@ an hour. The operator runs it and pastes the results back.
 
 Two machines are involved:
 
-- **Server:** Ubuntu 24.04. `cairnbook serve` runs as the systemd unit `cairnbook` on
-  `127.0.0.1:8788`, with the database at `/var/lib/cairnbook/cairnbook.db`. Apache sits in
+- **Server:** Ubuntu 24.04. `cairn serve` runs as the systemd unit `cairn` on
+  `127.0.0.1:8788`, with the database at `/var/lib/cairn/cairn.db`. Apache sits in
   front, as in [DEPLOY.md](DEPLOY.md), with TLS from certbot. The guide assumes the
   server runs with `--behind-proxy`. The shipped unit does not pass that flag, so step
   3.3 checks for it and adds it when it is missing.

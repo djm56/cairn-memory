@@ -73,13 +73,14 @@ func AddKey(ctx context.Context, db, name string, scope auth.Scope) (string, err
 }
 
 // checkKeyName refuses a name that is not a key name: one of the shape keyNamePattern gives,
-// or one that begins with the key prefix, which is a key pasted into the name position. The
+// or one that begins with either key prefix, the one issued now or the one from before the
+// rename, which is a key pasted into the name position. The
 // message gives the rule and never the name, so a key given as a name is not printed back.
 // AddKey and RevokeKey both check the name here, before any database
 // lookup, so the two cannot disagree about what a name is.
 func checkKeyName(name string) error {
-	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) {
-		return errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairnbook_")
+	if !keyNamePattern.MatchString(name) || strings.HasPrefix(name, auth.KeyPrefix) || strings.HasPrefix(name, auth.LegacyKeyPrefix) {
+		return errors.New("the key name must be 1 to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit, and must not begin with cairnbook_ or cairn_")
 	}
 	return nil
 }

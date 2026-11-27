@@ -170,3 +170,21 @@ func TestDoctorHidesCredentials(t *testing.T) {
 	}
 	assertNoCredentials(t, stdout, stderr)
 }
+
+// TestStatusNamesTheLegacyServerFile checks that status names the file the server was read from when that file is
+// the old .cairn.toml, the name before the rename, and not the new one.
+func TestStatusNamesTheLegacyServerFile(t *testing.T) {
+	local, url := newServer(t, nil)
+	dir := t.TempDir()
+	useDir(t, dir)
+	writeFile(t, dir, ".cairn.toml", "project = \"acme-api\"\nserver = \""+url+"\"\n")
+	seedTask(t, local, "acme-api")
+
+	code, stdout, stderr := runCmd(t, "status")
+	if code != 0 {
+		t.Fatalf("exit %d, want 0 (stderr %q)", code, stderr)
+	}
+	if !strings.Contains(stdout, "server      "+url+" (from .cairn.toml)") {
+		t.Errorf("status output names the wrong server file:\n%s", stdout)
+	}
+}
