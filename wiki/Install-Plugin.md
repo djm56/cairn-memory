@@ -1,6 +1,6 @@
 # Install the Claude Code plugin
 
-_Status as of 2026-11-17: this guide is written for the M5 plugin. The plugin is built on the `m5-plugin` branch and is not on `main` yet, so the GitHub install in section 5a works only after M5 merges. Live check on 2026-11-17 (issue #26), Claude Code 2.1.311, with the plugin loaded from the checkout by `--plugin-dir`. Confirmed: the plugin's server name and tool names, the `/cairn:init` and `/cairn:status` commands, the session-start block with and without a task, a task recorded from inside a session through the plugin's tools, that a step must be started before it can be finished, and that a user-scope `cairn` entry adds a second server. Not confirmed: the marketplace install in section 5 (the probe did not use it), the pre-compact hook's effect, how Claude Code shows a server or hook that exits 127, and what `/mcp` prints. The guide has not been run end to end on a clean machine, and it has not been timed. This banner is removed when M5 merges._
+_Status as of 2026-11-24: M5 is merged to `main` (PR #229, merge commit d3ff98f, 2026-11-21), and the plugin is meant to install from GitHub through section 5a (not yet live-checked). Live check on 2026-11-17 (issue #26), Claude Code 2.1.311, with the plugin loaded from the checkout by `--plugin-dir`. Confirmed: the plugin's server name and tool names, the `/cairn:init` and `/cairn:status` commands, the session-start block with and without a task, a task recorded from inside a session through the plugin's tools, that a step must be started before it can be finished, and that a user-scope `cairn` entry adds a second server. Not confirmed: the marketplace install in section 5 (the probe did not use it), the pre-compact hook's effect, how Claude Code shows a server or hook that exits 127, and what `/mcp` prints. The guide has not yet been run end to end on a clean machine, and it has not been timed. That run is the pending M5 exit check, section 7a._
 
 This guide takes a developer from a clean machine to a recorded task, with no other instruction file. Run the commands in order. Replace each placeholder in angle brackets before you run its line. The first build is the slow part.
 
@@ -17,9 +17,7 @@ The plugin is the recommended route for Claude Code. It brings the MCP server an
 
 ## 2. Install `cairn`
 
-Choose the block for where M5 is. Both start with a clone. If you already have a checkout, skip the `git clone` line and run from the `cd` line onward in that checkout. The commands follow [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1.
-
-### After M5 is on `main`
+Run this block in the folder where you keep your code. The first line creates a `cairn-memory` folder there, and the `cd` line enters it. Because that `cd` is relative, it works only straight after the clone, from the folder the clone was made in. The commands follow [QUICK-INSTALL](https://github.com/djm56/cairn-memory/blob/main/docs/QUICK-INSTALL.md), section 1.
 
 ```bash
 git clone https://github.com/djm56/cairn-memory.git
@@ -30,22 +28,11 @@ mkdir -p ~/.local/bin && install -m 0755 bin/cairn ~/.local/bin/cairn
 command -v cairn
 ```
 
-### Before M5 is on `main`
-
-Before the `m5-plugin` branch is pushed, a clean machine cannot follow this block. A fresh clone has only `main`, so `git switch m5-plugin` has no branch to find. Until the branch is pushed, use a local checkout that already carries it, skip the `git clone` line, and run from the `cd` line onward in that checkout. Section 5b reads the plugin from that checkout.
-
-```bash
-git clone https://github.com/djm56/cairn-memory.git
-cd cairn-memory
-git switch m5-plugin
-make build && bin/cairn version
-mkdir -p ~/.local/bin && install -m 0755 bin/cairn ~/.local/bin/cairn
-command -v cairn
-```
+If you already have a checkout, skip the `git clone` and `cd cairn-memory` lines. Run `cd <path-to-your-checkout>` in their place, with the path to the checkout's top folder, from any directory. Then run the rest of the block.
 
 If you switch branches after building, run `make build` and the install line again. The binary is from the branch it was built on.
 
-In either block, expect `cairn` followed by a short commit hash. If the hash ends in `-dirty`, the checkout has local changes: deal with them first. Build with `make build`, not `go build`, which prints `cairn dev`.
+Expect `cairn` followed by a short commit hash. If the hash ends in `-dirty`, the checkout has local changes: deal with them first. Build with `make build`, not `go build`, which prints `cairn dev`.
 
 `command -v cairn` prints a path. If it prints nothing, add `~/.local/bin` to your PATH and open a new terminal. The plugin's launcher also looks in `~/.local/bin`, so the plugin finds `cairn` either way. Your shell needs the PATH for the `cairn` commands in this guide. The launcher runs the first `cairn` on PATH, so section 8 covers what to do when you update the checkout.
 
@@ -103,9 +90,9 @@ The project name is lowercase letters and digits in hyphen-separated groups, at 
 
 The repository is a Claude Code marketplace. Its `.claude-plugin/marketplace.json` lists one plugin, `cairn`, and the marketplace is named `cairn-memory`. The install id is therefore `cairn@cairn-memory`.
 
-Until M5 is on `main`, use 5b. After M5 is on `main`, use 5a. Both routes give the same plugin. The live check loaded the plugin with `--plugin-dir`, not through the marketplace, so the marketplace commands in both routes are not live-checked.
+Use 5a to install the plugin. Use 5b only to develop the plugin, from a checkout. Both routes give the same plugin. The marketplace commands in 5a are not live-checked: the live check on 2026-11-17 loaded the plugin with `--plugin-dir`, not through the marketplace.
 
-### 5a. From GitHub, once M5 is on `main`
+### 5a. From GitHub
 
 Start Claude Code in the project folder with `claude`, then type these two lines in the session:
 
@@ -129,11 +116,9 @@ claude plugin marketplace add djm56/cairn-memory
 claude plugin install cairn@cairn-memory
 ```
 
-Until M5 is on `main`, this route finds no `cairn` plugin. Use 5b.
-
 ### 5b. From a local checkout
 
-Use this route for development, and before M5 is on `main`. Give the path to your checkout. It can be absolute, or relative and starting with `./` or `../`:
+Use this route to develop the plugin. It loads the plugin from your checkout, so your edits to the plugin take effect. Give the path to your checkout. It can be absolute, or relative and starting with `./` or `../`:
 
 ```text
 /plugin marketplace add /absolute/path/to/cairn-memory
@@ -161,7 +146,7 @@ The live check's log records the block as the output of the SessionStart hook, w
 
 ### The tool names
 
-The plugin's skill teaches Claude this loop, with the tools under their short names: `recall`, `task_start`, `step_add`, `step_update`, `event_log`, `learning_add`, `task_close`, and `task_current` when the session-start block is missing. [MCP-Tools](MCP-Tools) lists all 15. In the live check's session each one was named `mcp__plugin_cairn_cairn__<short name>`, so `task_start` appeared as `mcp__plugin_cairn_cairn__task_start`. The skill and this guide use the short names.
+The plugin's skill teaches Claude the Cairn task loop with these tools, under their short names: `recall`, `task_start`, `step_add`, `step_update`, `event_log`, `learning_add`, `task_close`, and `task_current` when the session-start block is missing. [MCP-Tools](MCP-Tools) lists all 15. In the live check's session each one was named `mcp__plugin_cairn_cairn__<short name>`, so `task_start` appeared as `mcp__plugin_cairn_cairn__task_start`. The skill and this guide use the short names.
 
 ### 7a. Record a task in a session (the check that counts)
 
@@ -170,8 +155,7 @@ This check runs the plugin from inside Claude Code and reads the result from a t
 Before the session, run two checks in the project folder. They make sure the session uses the plugin's server and no other.
 
 1. Run `cairn status`. It should print `task        none active`, with eight spaces between `task` and `none`. If it names an active task, close that task first. Section 9 covers a refused `task start`, and the close it describes applies here.
-2. Run `claude mcp get cairn`. If a manual server named exactly `cairn` is there, note its scope, then remove it with `claude mcp remove cairn -s <scope>`, as section 8 describes. Leave the plugin's own server, `plugin:cairn:cairn`, alone: it is not the entry named `cairn`. If there is no manual `cairn` entry, there is nothing to remove.
-
+2. Run `claude mcp get cairn`. If a manual server named exactly `cairn` is there, remove it with `claude mcp remove cairn -s <scope>` at each scope it shows, as section 8 describes. If `claude mcp get cairn` shows no scope, use the fallback in section 8 instead. Leave the plugin's own server, `plugin:cairn:cairn`, alone: it is not the entry named `cairn`. If there is no manual `cairn` entry, there is nothing to remove.
 3. Start Claude Code in the project folder with `claude`.
 4. Ask Claude, in your own words, to record one small piece of work as a Cairn task. Give your agent name, so Claude passes it on every write, and tell Claude to use the Cairn MCP tools, not the `cairn` command in the shell. For example:
 
@@ -181,7 +165,7 @@ Before the session, run two checks in the project folder. They make sure the ses
 
    Claude uses the plugin's tools for this: `task_start`, `step_add`, `step_update` to start and finish the step, and `task_close`. A step must be started before it can be finished, and Claude does that. Claude Code may ask permission the first time each Cairn tool is used. Allow them.
 
-5. Watch the tool calls Claude makes. Claude Code shows each call's name. The check counts only when these four calls are named as shown:
+5. Watch the tool calls Claude makes. A loop action is one of the four calls that record the task: `task_start`, `step_add`, `step_update` and `task_close`. Claude Code shows each call's name. The check counts only when these four calls are named as shown:
 
    - `mcp__plugin_cairn_cairn__task_start`
    - `mcp__plugin_cairn_cairn__step_add`
@@ -248,7 +232,7 @@ The plugin and `cairn enable --agent claude-code` are alternatives (D34). The pl
 
 - **Duplicate hooks.** `cairn doctor --agent claude-code` warns when the plugin is enabled and cairn hooks are also in a settings file. Its `plugin` line names each file that holds one: the project's `.claude/settings.local.json` or `.claude/settings.json`, or the user's `~/.claude/settings.json`. Without the warning, each hook runs twice.
 - **Removing enable's hooks.** `cairn enable` has no flag to remove them. Edit the files that `doctor` names by hand. Under `hooks`, delete the entries whose command is `cairn hook session-start`, `cairn hook pre-compact` or `cairn hook stop`, and keep every other entry. Before `enable` changed a file, it copied the original to the cache folder it names when it ran. Keep that copy if you want the file back.
-- **A manual MCP entry.** If you also added cairn with `claude mcp add`, the session shows two servers: the plugin's `plugin:cairn:cairn` and your `cairn`. In the live check both were connected, each with 15 tools: the plugin's as `mcp__plugin_cairn_cairn__<tool>`, the manual one as `mcp__cairn__<tool>`. The two do not merge. Once the plugin is installed, remove the manual entry with `claude mcp remove cairn -s user`, or with the scope you used. The plugin brings its own MCP server.
+- **A manual MCP entry.** If you also added cairn with `claude mcp add`, the session shows two servers: the plugin's `plugin:cairn:cairn` and your `cairn`. In the live check both were connected, each with 15 tools: the plugin's as `mcp__plugin_cairn_cairn__<tool>`, the manual one as `mcp__cairn__<tool>`. The two do not merge. Once the plugin is installed, remove the manual entry. Run `claude mcp get cairn`, note the scope it shows, and remove that entry with `claude mcp remove cairn -s <scope>`, for example `claude mcp remove cairn -s user`. Then run `claude mcp get cairn` again. Repeat until it finds no `cairn` entry. If `claude mcp remove` reports an error, read the scope it names and use that. If `claude mcp get cairn` shows no scope, the fallback is `claude mcp remove cairn` with no `-s`. Not confirmed: that fallback's behaviour. It comes from the `claude mcp remove --help` text, which says that without `-s` the command removes the entry from whichever scope holds it. This guide has read that text and has not run the fallback, so it is not live-checked. Also not live-checked: how `claude mcp get` reports an entry held at more than one scope. The plugin brings its own MCP server.
 - **An old `cairn` on PATH.** The plugin's launcher runs the first `cairn` it finds on PATH, and only then the one in `~/.local/bin`. A `cairn` that comes earlier on PATH can be an older build than the checkout the plugin comes from. When you update the checkout, rebuild and reinstall the binary: `make build`, then `install -m 0755 bin/cairn ~/.local/bin/cairn`. `command -v cairn` shows the file the launcher will run first.
 
 After the edits, `cairn doctor --agent claude-code` should show no `plugin` warning.

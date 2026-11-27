@@ -1,6 +1,6 @@
 # Install locally
 
-_Status as of 2026-11-06: M5 (Plugin) is current and in progress, and the plugin is not shipped yet. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Checked against the code at 8b651da._
+_Status as of 2026-11-24: M5 (Plugin) is current and not yet passed. The plugin is merged to `main` (PR #229, merge commit d3ff98f, 2026-11-21) but not released. M4's exit check passed by operator ruling; sections 4 and 5 of the [hand-check guide](https://github.com/djm56/cairn-memory/blob/main/docs/M4-HAND-CHECK.md) are not run. Code facts on this page were checked against the code at 8b651da on 2026-11-06, except the plugin sentence at line 170, which reflects main as of 2026-11-24 (d3ff98f)._
 
 This page is the detailed version of [Quick-Start](Quick-Start), for a developer machine. It covers what you need, what each step does, the files `cairn` reads and writes, and the environment variables it reads. Use it when you want to know why a step works, or when the Quick-Start does not match what you see.
 
@@ -167,7 +167,7 @@ cairn enable --agent claude-code --dry-run
 cairn enable --agent claude-code
 ```
 
-It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin does both. It is the recommended route, and it is built on the `m5-plugin` branch, not on `main` yet. [Install-Plugin](Install-Plugin) has its steps. When it is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That check is built and not released yet.
+It does not register the MCP server. That is a separate step, shown in [Connecting-Agents](Connecting-Agents). The Claude Code plugin does both. It is the recommended route, and it is on `main`. [Install-Plugin](Install-Plugin) has its steps. When it is enabled in Claude Code settings, `enable` says so and adds no hooks (D34). That check is built and not released yet.
 
 ## Run a local server for development
 
