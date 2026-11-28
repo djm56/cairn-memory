@@ -15,7 +15,7 @@ make vet         # go vet ./...
 make fmt         # gofmt -w .
 make fmt-check   # fails if any file is not gofmt-formatted
 make cross       # compile and vet for Windows, macOS, FreeBSD and OpenBSD (compile only, nothing is run)
-make scan-invisible  # fails if a tracked file holds a bidirectional or invisible character
+make scan-invisible  # fails if a tracked file holds a bidirectional or invisible character, or a Go file holds a typographic quote
 make scan-local-paths  # fails if a tracked file names a local user or machine path, other than the placeholder "you"
 ```
 
@@ -76,6 +76,11 @@ From what went well and badly in bishop-memory (PLAN.md §6):
 - **No silent defaults for identity.** A missing project is an error that
   says how to fix it (`cairnbook init`).
 - **Docs are dated.** Status lines carry a date, and claims carry evidence.
+- **Typographic quotes in Go comments.** gofmt rewrites a doubled ASCII single
+  quote (`''`) in a Go doc comment to a typographic closing quote (U+201D), and
+  two backticks to an opening one (U+201C). `make scan-invisible` fails on
+  either, so describe such text in words in a comment. A typographic quote that
+  a string literal really needs is written as an escape, such as `\u201D`.
 
 ### Plan v1 rules
 

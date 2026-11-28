@@ -45,7 +45,9 @@ recall, behind MCP tools, in one Go binary (`cairnbook`) over SQLite.
   are the source of truth for progress.
 - [PROGRESS.md](PROGRESS.md) is the offline mirror. A pull request that closes
   an issue, passes an exit check, records a decision or opens a milestone
-  updates PROGRESS.md in the same pull request.
+  updates PROGRESS.md in the same pull request, and refreshes its "Last synced"
+  line (date and main commit), as PROGRESS.md's "Keeping this file current"
+  section asks.
 - Every milestone is written Quick read first (Goal, Status, Exit check, Next
   action), then the detail. That applies in PROGRESS.md and in the GitHub
   milestone descriptions.

@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-28, from main at ea86c13, the merge commit of PR #241 (rename-cairnbook-fixes into main, merged 2026-11-27). Since the previous sync, PR #238 (m5-guide-post-merge, merged 2026-11-27) closed #235, PR #240 (rename-cairnbook, merged 2026-11-27) landed the rename, and PR #241 added the old-key fallback and the rename doc corrections. Decisions D34 to D38 are on main. Decision comments are posted on #193, #206, #20 and #23. This file is updated on branch rename-followups for PR #246, which is open and closes #242 to #245 and #247.
+Last synced: 2026-11-28, from main at db2c096, the merge commit of PR #246 (rename-followups into main, merged 2026-11-28). Since the previous sync, PR #246 closed #242 to #245 and #247. Decisions D34 to D38 are on main. Decision comments are posted on #193, #206, #20 and #23. This file is updated on branch findings-followups for the pull request that adds the typographic-quote scan.
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
@@ -27,8 +27,8 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Now**
 
-- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27); the old-key fallback (`cairn_` keys) and the doc corrections from its review followed in PR #241; the review follow-ups #242 to #245 and #247 are closed by PR #246 on merge. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
-- Rename follow-up #247 (rename follow-up nits: enable matcher report, init rename quoting, test assertions) is closed by PR #246 on merge. It has no milestone, so it is not in the Later count.
+- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27); the old-key fallback (`cairn_` keys) and the doc corrections from its review followed in PR #241; the review follow-ups #242 to #245 and #247 were closed by PR #246 (merged 2026-11-28). The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
+- Rename follow-up #247 (rename follow-up nits: enable matcher report, init rename quoting, test assertions) was closed by PR #246. It has no milestone, so it is not in the Later count.
 - Rename follow-up #248 (rename follow-up nits: init path display, dangling `.cairnbook.toml` symlink, symlink test skips) is open with no milestone, so it is not in the Later count.
 - M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) was closed by PR #238 (`m5-guide-post-merge`, merged 2026-11-27).
 

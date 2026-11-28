@@ -49,7 +49,8 @@ jobs:
         run: make cross
 
       - name: Invisible and bidirectional characters
-        # Refuses a tracked file that holds one, including a byte-order mark (Makefile, scan-invisible).
+        # Refuses a tracked file that holds one, including a byte-order mark, and a Go file that
+        # holds a typographic quote (Makefile, scan-invisible).
         run: make scan-invisible
 
       - name: Local paths

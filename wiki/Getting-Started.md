@@ -28,7 +28,7 @@ make test                  # go test -race ./...
 make vet                   # go vet ./...
 make fmt-check             # fails if a file is not gofmt-formatted
 make fmt                   # gofmt -w . rewrites the files
-make scan-invisible        # fails on bidirectional or invisible characters
+make scan-invisible        # fails on bidirectional or invisible characters, or a typographic quote in a Go file
 make scan-local-paths      # fails on a local user or machine path
 make cross                 # compiles and vets for Windows, macOS, FreeBSD and OpenBSD
 make mutation              # Gremlins on internal/core and internal/store; slow, not in CI

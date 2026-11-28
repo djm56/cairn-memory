@@ -124,7 +124,7 @@ else
   changed="$(git -C "$ROOT" diff --name-only "$BASE...HEAD")" \
     || { echo "changelog: cannot diff against $BASE; is the history fetched?" >&2; exit 1; }
   if grep -qx 'CHANGELOG.md' <<< "$changed"; then
-    echo "changelog: CHANGELOG.md is changed"
+    echo "changelog: CHANGELOG.md is changed against the base"
   else
     echo "changelog: CHANGELOG.md is not changed. Add an entry, or set the skip-changelog label." >&2
     FAILED=1
