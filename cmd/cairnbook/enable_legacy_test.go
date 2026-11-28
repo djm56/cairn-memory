@@ -47,8 +47,8 @@ func TestEnableRenamesTheOldHookCommands(t *testing.T) {
 }
 
 // TestEnableWarnsOfThePluginUnderItsOldName checks that a plugin still enabled as cairn, its name before the rename, is
-// named in a warning that says to reinstall it, and that enable still adds the hooks, since the old plugin's hooks run a
-// binary that is gone.
+// named in a warning that says to uninstall it, then install cairnbook@cairnbook, and that enable still adds the hooks,
+// since the old plugin's hooks run a binary that is gone.
 func TestEnableWarnsOfThePluginUnderItsOldName(t *testing.T) {
 	dir := enableProject(t)
 	writeSettings(t, settingsIn(dir), `{"enabledPlugins": {"cairn@cairn-memory": true}}`)
