@@ -160,8 +160,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// shellQuote returns s as one word for a POSIX shell: wrapped in single quotes. Each single quote in s becomes
-// a close quote, an escaped quote and a reopened quote. Nothing else is special inside single quotes. It is the rule internal/server uses for the
+// shellQuote returns s as one word for a POSIX shell: wrapped in single quotes. Each
+// single quote in s becomes a close quote, an escaped quote and a reopened quote. Nothing
+// else is special inside single quotes. It is the rule internal/server uses for the
 // restore command; it is kept here so cmd does not import the server.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"

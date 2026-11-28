@@ -224,24 +224,35 @@ func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
 // TestInitRefusalQuotesThePathsInTheRenameCommand checks that the commands the refusal prints can be
 // pasted into a POSIX shell: each path is one single-quoted word, and a single quote inside a path
 // becomes a close quote, an escaped quote and a reopened quote. The plain path before "is the project file under its old name" is not quoted.
+// The expected words are written out from the folder name, not built with shellQuote, so the test
+// does not repeat the rule it checks.
 func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
 	cases := map[string]struct {
 		folder string
-		// quote is the shell form of one path, as a POSIX shell reads it back.
-		quote func(string) string
+		// quoted returns the shell words the command must hold for the old and the new path, given
+		// the temporary directory. The folder name is written literally in each.
+		quoted func(tmp string) (legacy, newPath string)
 	}{
 		"a space": {
 			folder: "my projects",
-			quote:  func(p string) string { return "'" + p + "'" },
+			quoted: func(tmp string) (string, string) {
+				return "'" + tmp + "/my projects/.cairn.toml'", "'" + tmp + "/my projects/.cairnbook.toml'"
+			},
 		},
 		"a single quote": {
 			folder: "it's here",
-			quote:  func(p string) string { return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'" },
+			quoted: func(tmp string) (string, string) {
+				return "'" + tmp + `/it'\''s here/.cairn.toml'`, "'" + tmp + `/it'\''s here/.cairnbook.toml'`
+			},
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			dir := filepath.Join(t.TempDir(), tc.folder)
+			tmp := t.TempDir()
+			if strings.Contains(tmp, "'") {
+				t.Fatalf("the temporary directory %s holds a single quote, so the literal expected words do not hold", tmp)
+			}
+			dir := filepath.Join(tmp, tc.folder)
 			if err := os.Mkdir(dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -256,8 +267,9 @@ func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
 			if !strings.Contains(stderr, legacy+" is the project file under its old name") {
 				t.Errorf("stderr %q does not name the old file by its plain path %s", stderr, legacy)
 			}
+			wantLegacy, wantNew := tc.quoted(tmp)
 			for _, cmd := range []string{"git mv ", "mv "} {
-				want := cmd + tc.quote(legacy) + " " + tc.quote(newPath)
+				want := cmd + wantLegacy + " " + wantNew
 				if !strings.Contains(stderr, want) {
 					t.Errorf("stderr %q does not hold the command %q", stderr, want)
 				}
@@ -269,6 +281,28 @@ func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
 				t.Errorf("a .cairnbook.toml was written beside the old file: %v", err)
 			}
 			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestShellQuote checks shellQuote against literal inputs and the words a POSIX shell reads back from
+// them: the string in single quotes, with each single quote written as '\”. The expected values are
+// worked out by hand, not produced by shellQuote.
+func TestShellQuote(t *testing.T) {
+	cases := map[string]struct {
+		in, want string
+	}{
+		"empty":       {in: "", want: `''`},
+		"a space":     {in: "a b", want: `'a b'`},
+		"a quote":     {in: "it's", want: `'it'\''s'`},
+		"two quotes":  {in: "''", want: `''\'''\'''`},
+		"dollar sign": {in: "$HOME", want: `'$HOME'`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := shellQuote(tc.in); got != tc.want {
+				t.Errorf("shellQuote(%q) = %q, want %q", tc.in, got, tc.want)
+			}
 		})
 	}
 }
@@ -290,7 +324,7 @@ func TestInitRefusesALegacySymlink(t *testing.T) {
 			}
 			legacy := filepath.Join(dir, ".cairn.toml")
 			if err := os.Symlink(target, legacy); err != nil {
-				t.Fatal(err)
+				t.Skipf("the filesystem cannot make the symlink: %v", err)
 			}
 
 			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
