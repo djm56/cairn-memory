@@ -61,6 +61,9 @@ cross:
 # Such characters can make source read differently from the bytes that run. git grep exits 0 on a
 # match and 1 on none, so the result is inverted here. The locale must be UTF-8, or \x{...} is read
 # as a byte and is too large; C.UTF-8 exists on the CI runner. CI runs this on every pull request.
+# The same target also fails when a tracked *.go file holds a typographic quote (U+2018, U+2019,
+# U+201C or U+201D). gofmt turns a doubled ASCII quote in a doc comment into one of these, so such
+# text is described in words. Only Go source is checked: Markdown and other docs may use them.
 scan-invisible:
 	@hits="$$(LC_ALL=C.UTF-8 git grep -I -l -P '[\x{202A}-\x{202E}\x{2060}-\x{2069}\x{200B}-\x{200F}\x{FEFF}\x{061C}\x{180E}\x{00AD}\x{E0000}-\x{E007F}]')"; \
 	status=$$?; \
@@ -68,6 +71,13 @@ scan-invisible:
 	  echo "Bidirectional or invisible characters found in these tracked files:"; echo "$$hits"; exit 1; \
 	elif [ $$status -ne 1 ]; then \
 	  echo "scan-invisible: git grep failed (exit $$status)"; exit $$status; \
+	fi; \
+	quotes="$$(LC_ALL=C.UTF-8 git grep -I -n -P '[\x{2018}\x{2019}\x{201C}\x{201D}]' -- '*.go')"; \
+	qstatus=$$?; \
+	if [ $$qstatus -eq 0 ]; then \
+	  echo "Typographic quotes found in Go source (file:line:text). gofmt turns a doubled ASCII single quote or backtick in a doc comment into U+201D or U+201C, so describe such text in words:"; printf '%s\n' "$$quotes"; exit 1; \
+	elif [ $$qstatus -ne 1 ]; then \
+	  echo "scan-invisible: git grep failed for typographic quotes in Go source (exit $$qstatus)"; exit $$qstatus; \
 	fi
 
 # Fails and lists the lines when a tracked file holds a local path that names a user or a machine
