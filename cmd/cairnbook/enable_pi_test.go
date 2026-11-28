@@ -463,6 +463,29 @@ func TestPiDryRunWritesNothing(t *testing.T) {
 	})
 }
 
+// TestPiDryRunLeavesALegacyEntryAlone checks --dry-run in a config whose cairn entry does not run cairn mcp: the report
+// says the entry was left as is, and the dry run writes no file and changes no byte of the config.
+func TestPiDryRunLeavesALegacyEntryAlone(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, piConfigFile(dir), `{"mcpServers": {"cairn": {"command": "node", "args": ["cairn.js"]}}}`)
+	before := readBytes(t, piConfigFile(dir))
+	namesBefore := listDir(t, dir)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "pi", "--dry-run")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if !strings.Contains(stdout, "a server named cairn that does not run cairn mcp was left as is") {
+		t.Errorf("stdout does not say the cairn entry was left as is:\n%s", stdout)
+	}
+	if got := readBytes(t, piConfigFile(dir)); !bytes.Equal(got, before) {
+		t.Errorf("the dry run changed the config:\n%s", got)
+	}
+	if got := listDir(t, dir); !slices.Equal(got, namesBefore) {
+		t.Errorf("the dry run changed the project: %v, want %v", got, namesBefore)
+	}
+}
+
 // TestPiRefusesWhenNoCacheDirectoryIsKnown checks that existing files are not changed when their backups have no place to
 // go, and that the other file is not written either.
 func TestPiRefusesWhenNoCacheDirectoryIsKnown(t *testing.T) {

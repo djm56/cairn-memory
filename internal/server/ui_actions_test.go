@@ -146,15 +146,15 @@ func TestM3ExitCheck(t *testing.T) {
 	id := addLearning(t, base, agent, "Exit finding")
 
 	// 2. The operator signs in and sees the proposed learning.
-	lead := signInCookie(t, base, addKey(t, st, "lead", auth.ScopeOperator))
-	resp, body := readPage(t, c, base+"/ui/learnings", lead)
+	operator := signInCookie(t, base, addKey(t, st, "operator", auth.ScopeOperator))
+	resp, body := readPage(t, c, base+"/ui/learnings", operator)
 	if resp.StatusCode != http.StatusOK || !strings.Contains(body, "Exit finding") {
 		t.Fatalf("the learnings page does not show the proposed learning: status %d", resp.StatusCode)
 	}
 
 	// 3. The operator accepts it, with a note, using the csrf value of the page.
 	csrf := csrfOf(t, body)
-	resp, _ = formAs(t, base, "/ui/learnings/"+idText(id)+"/decide", lead, url.Values{
+	resp, _ = formAs(t, base, "/ui/learnings/"+idText(id)+"/decide", operator, url.Values{
 		"csrf": {csrf}, "status": {"accepted"}, "note": {"Accepted in the exit check"},
 		"project": {""},
 	})
@@ -167,11 +167,11 @@ func TestM3ExitCheck(t *testing.T) {
 	}
 
 	// 4. The operator opens the ratify form from the learning, then posts it.
-	_, form := readPage(t, c, base+"/ui/directives/new?from_learning="+idText(id), lead)
+	_, form := readPage(t, c, base+"/ui/directives/new?from_learning="+idText(id), operator)
 	if !strings.Contains(form, `name="from_learning" value="`+idText(id)+`"`) {
 		t.Fatal("the ratify form does not carry from_learning")
 	}
-	resp, _ = formAs(t, base, "/ui/directives", lead, ratifyValues(csrfOf(t, form), url.Values{
+	resp, _ = formAs(t, base, "/ui/directives", operator, ratifyValues(csrfOf(t, form), url.Values{
 		"title": {"Exit directive"}, "rule": {"Ratified in the exit check"},
 		"from_learning": {idText(id)},
 	}))

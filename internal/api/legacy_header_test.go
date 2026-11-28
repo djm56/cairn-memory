@@ -29,3 +29,22 @@ func TestCallerHeaderReadsTheOldName(t *testing.T) {
 		t.Errorf("old role header: got role %q, want operator", c.Role)
 	}
 }
+
+// TestEmptyNewCallerHeaderWinsOverTheOldName checks that X-Cairnbook-Agent, -Session and -Client sent
+// empty win over the X-Cairn-* header of the same field beside them, as the project header does in
+// TestCallerHeaderReadsTheOldName.
+func TestEmptyNewCallerHeaderWinsOverTheOldName(t *testing.T) {
+	cases := []struct{ name, old string }{
+		{HeaderAgent, "X-Cairn-Agent"},
+		{HeaderSession, "X-Cairn-Session"},
+		{HeaderClient, "X-Cairn-Client"},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("POST", "/", nil)
+		r.Header.Set(c.old, "old-value")
+		r.Header.Set(c.name, "")
+		if got := callerHeader(r, c.name); got != "" {
+			t.Errorf("%s empty beside %s: got %q, want empty", c.name, c.old, got)
+		}
+	}
+}

@@ -75,6 +75,8 @@ func TestAddKeyRefusesABadNameAndScope(t *testing.T) {
 		{"a name that starts with a hyphen", "-ci", auth.ScopeAgent},
 		{"a name of 65 characters", strings.Repeat("a", 65), auth.ScopeAgent},
 		{"a key pasted as the name", pasted, auth.ScopeAgent},
+		{"a name that begins with cairn_", "cairn_x", auth.ScopeAgent},
+		{"a name that begins with cairnbook_", "cairnbook_x", auth.ScopeAgent},
 		{"a scope that is not one of three", "ci", auth.Scope("admin")},
 	}
 	for _, c := range cases {
@@ -157,8 +159,11 @@ func TestRevokeKeyTwiceIsNotFound(t *testing.T) {
 	}
 	for _, name := range []string{"ci", "nobody"} {
 		err := RevokeKey(ctx, path, name)
-		if err == nil || !strings.Contains(err.Error(), "no active API key named "+name) {
-			t.Errorf("revoke %s again: err = %v, want no active key named %s", name, err, name)
+		if err == nil || !strings.Contains(err.Error(), "no active API key has that name") {
+			t.Errorf("revoke %s again: err = %v, want no active key with that name", name, err)
+		}
+		if err != nil && strings.Contains(err.Error(), name) {
+			t.Errorf("revoke %s again: the not-found error repeats the name: %v", name, err)
 		}
 	}
 }

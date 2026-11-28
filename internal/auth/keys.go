@@ -100,6 +100,15 @@ func wellFormed(key string) bool {
 	return true
 }
 
+// IsKeyShaped reports whether s has the shape of a whole API key: KeyPrefix or
+// LegacyKeyPrefix, then exactly 43 characters of the base64url alphabet. It is the test a
+// bearer key must pass, exported so that the server can refuse a whole key given where a key
+// name belongs, without a second copy of the rule. It says nothing about whether the key is
+// stored or valid.
+func IsKeyShaped(s string) bool {
+	return wellFormed(s)
+}
+
 // keyPrefixOf returns the prefix key carries, KeyPrefix or LegacyKeyPrefix, when key is
 // that prefix and then exactly keyBodyLen characters. It reports false for any other
 // length, so the two prefixes need no tie-break: neither is a prefix of the other.

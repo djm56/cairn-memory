@@ -2,7 +2,7 @@
 
 Offline mirror. GitHub milestones, issues and the Cairn Memory Roadmap board are the source of truth; if this file and GitHub disagree, GitHub wins and this file is fixed.
 
-Last synced: 2026-11-24, from main at d3ff98f, the merge commit of PR #229 (m5-plugin into main, merged 2026-11-21), with the M5 counts already reflecting #235 closing when `m5-guide-post-merge` merges. On that merge PR #229 closed #21 to #26, #193 and #206. Decisions D34 to D37 are on main. Decision comments are posted on #193, #206, #20 and #23.
+Last synced: 2026-11-28, from main at ea86c13, the merge commit of PR #241 (rename-cairnbook-fixes into main, merged 2026-11-27). Since the previous sync, PR #238 (m5-guide-post-merge, merged 2026-11-27) closed #235, PR #240 (rename-cairnbook, merged 2026-11-27) landed the rename, and PR #241 added the old-key fallback and the rename doc corrections. Decisions D34 to D38 are on main. Decision comments are posted on #193, #206, #20 and #23. This file is updated on branch rename-followups for PR #246, which is open and closes #242 to #245 and #247.
 
 Live progress: [milestones](https://github.com/djm56/cairn-memory/milestones) and the [Cairn Memory Roadmap board](https://github.com/djm56/cairn-memory/projects). Issue counts come from the issue list, not the milestone API, which counts merged pull requests.
 
@@ -27,8 +27,10 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 **Now**
 
-- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27); the old-key fallback (`cairn_` keys) and the doc corrections from its review followed in PR #241. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
-- M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) is closed by the post-merge guide PR from `m5-guide-post-merge`, on merge.
+- Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27); the old-key fallback (`cairn_` keys) and the doc corrections from its review followed in PR #241; the review follow-ups #242 to #245 and #247 are closed by PR #246 on merge. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
+- Rename follow-up #247 (rename follow-up nits: enable matcher report, init rename quoting, test assertions) is closed by PR #246 on merge. It has no milestone, so it is not in the Later count.
+- Rename follow-up #248 (rename follow-up nits: init path display, dangling `.cairnbook.toml` symlink, symlink test skips) is open with no milestone, so it is not in the Later count.
+- M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) was closed by PR #238 (`m5-guide-post-merge`, merged 2026-11-27).
 
 **Next**
 
@@ -51,7 +53,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 ### M5 Plugin (current)
 
 - **Goal:** A Claude Code plugin under `plugins/claude-code` (DESIGN §6.1): manifest, `.mcp.json`, `bin/cairnbook-launch`, `hooks/hooks.json`, a skill, `/cairnbook:init` and `/cairnbook:status`, a root marketplace file, `claude plugin validate` in CI, and an install guide with confirmed tool names.
-- **Status:** Current. Not passed. 26 issues open, 13 closed (counted from the issue list, with #235 counted as closed, on merge of the post-merge guide PR from `m5-guide-post-merge`). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairnbook-launch`, `hooks/hooks.json`, `skills/cairnbook/SKILL.md`, `/cairnbook:init`, `/cairnbook:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
+- **Status:** Current. Not passed. 26 issues open, 13 closed (counted from the issue list; #235 was closed by PR #238 on 2026-11-27). The plugin tree is on main, merged from m5-plugin by PR #229 on 2026-11-21 at d3ff98f: manifest, `.mcp.json`, `bin/cairnbook-launch`, `hooks/hooks.json`, `skills/cairnbook/SKILL.md`, `/cairnbook:init`, `/cairnbook:status`, the root marketplace file, with tests. The `plugin` job in `ci.yml` runs `claude plugin validate` with Claude Code pinned at 2.1.326. Not released. PR #229 closed #21 to #26, #193 and #206. Epic #20 stays open until the exit check passes.
 - **Exit check:** "A new developer on a clean machine installs and records a task in 10 minutes from the guide, with no other instruction file." (PLAN §3)
 - **Next action:** The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine.
 

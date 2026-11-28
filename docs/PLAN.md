@@ -489,14 +489,14 @@ that is not a numbered decision here, and the table says what.
   session-start block carries the active task; call `task_current` only if the
   block is missing or you need more. The M4 hand-check rule stays as written
   (issue #206).
-- **D36. The API key lives only in `~/.config/cairnbook/client.env` or
-  `CAIRNBOOK_API_KEY`.** The plugin's `plugin.json` has no `userConfig` `api_key` and
-  no `server`. The server comes from each project's `.cairnbook.toml`. DESIGN §6.1
-  is amended to match.
-- **D37. `CAIRN_HOME/bin` is dropped.** `cairnbook-launch` looks for `cairnbook` on PATH,
+- **D36. The API key lives only in `~/.config/cairn/client.env` or
+  `CAIRN_API_KEY`.** The plugin's `plugin.json` has no `userConfig` `api_key` and
+  no `server`. The server comes from each project's `.cairn.toml`. DESIGN §6.1
+  is amended to match. Superseded in its names by D38.
+- **D37. `CAIRN_HOME/bin` is dropped.** `cairn-launch` looks for `cairn` on PATH,
   then in `~/.local/bin`. If it finds neither, it exits non-zero and prints the
   one-line install command. Epic #20 and issue #23 get decision comments when
-  the M5 pull request is opened.
+  the M5 pull request is opened. Superseded in its names by D38.
 
 **Operator decision, 2026-11-27: D38.**
 

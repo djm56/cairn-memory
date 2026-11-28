@@ -142,11 +142,12 @@ func enableOpenCode(root, name string, dryRun bool, stdout, stderr io.Writer) in
 				return nil, false, err
 			}
 			changed := false
-			if dropLegacyServer(mcp) {
+			note, removed := dropLegacyServer(mcp, isOldOpenCodeEntry)
+			legacyNote = note
+			if removed {
 				if doc["mcp"], err = marshalRaw(mcp); err != nil {
 					return nil, false, err
 				}
-				legacyNote = "; the old cairn entry was removed"
 				changed = true
 			}
 			if i := slices.Index(list, legacyOpenCodeInstructions); i >= 0 {
@@ -207,13 +208,64 @@ const legacyServerName = "cairn"
 // config's list; the file itself is left for the user to delete.
 const legacyOpenCodeInstructions = ".cairn/instructions.md"
 
-// dropLegacyServer removes the old cairn entry from servers, and reports whether there was one.
-func dropLegacyServer(servers map[string]json.RawMessage) bool {
-	if _, ok := servers[legacyServerName]; !ok {
-		return false
+// legacyNoteRemoved and legacyNoteLeft are the report notes for the entry named cairn. An entry named cairn is
+// removed only when it runs the old binary's MCP server; any other entry under that name belongs to the person,
+// and enable leaves it as it is and says so.
+const (
+	legacyNoteRemoved = "; the old cairn entry was removed"
+	legacyNoteLeft    = "; a server named cairn that does not run cairn mcp was left as is"
+)
+
+// dropLegacyServer removes the entry named cairn from servers when runsOldMCP says it runs the old cairn mcp
+// server, and returns the report note for it and whether it removed it. It returns "" as the note when there
+// is no entry named cairn. An entry under that name that runs something else is left in servers, with
+// legacyNoteLeft as the note. runsOldMCP is the agent's test of the entry's shape, since OpenCode and pi
+// write their commands differently; see isOldOpenCodeEntry and isOldPiEntry.
+func dropLegacyServer(servers map[string]json.RawMessage, runsOldMCP func(json.RawMessage) bool) (note string, removed bool) {
+	entry, ok := servers[legacyServerName]
+	if !ok {
+		return "", false
+	}
+	if !runsOldMCP(entry) {
+		return legacyNoteLeft, false
 	}
 	delete(servers, legacyServerName)
-	return true
+	return legacyNoteRemoved, true
+}
+
+// isCairnBinary reports whether program names the old binary. The base name of program is taken with the
+// platform's path rules, and it must equal cairn exactly, so cairn itself and a path ending in cairn both
+// match. A name such as cairn-tools or cairn.exe does not, and neither does an empty string.
+func isCairnBinary(program string) bool {
+	return filepath.Base(program) == legacyServerName
+}
+
+// isOldOpenCodeEntry reports whether an OpenCode mcp entry runs the old cairn mcp server: its command is a list
+// whose first element is the old binary (see isCairnBinary) and whose only other element is "mcp". Other keys of
+// the entry, such as type, timeout and env, do not matter. A command that is not a list of strings is not the
+// old entry.
+func isOldOpenCodeEntry(raw json.RawMessage) bool {
+	var entry struct {
+		Command []string `json:"command"`
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return false
+	}
+	return len(entry.Command) == 2 && isCairnBinary(entry.Command[0]) && entry.Command[1] == "mcp"
+}
+
+// isOldPiEntry reports whether a pi mcpServers entry runs the old cairn mcp server: its command is a string naming
+// the old binary (see isCairnBinary) and its args are exactly ["mcp"]. Other keys, such as exposure, do not
+// matter. A command or args of another shape is not the old entry.
+func isOldPiEntry(raw json.RawMessage) bool {
+	var entry struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return false
+	}
+	return isCairnBinary(entry.Command) && len(entry.Args) == 1 && entry.Args[0] == "mcp"
 }
 
 // The names enable writes for pi. pi reads .pi/mcp.json only after the project is trusted, and reads AGENTS.md without trust.
@@ -315,10 +367,8 @@ func enablePi(root, name string, dryRun bool, stdout, stderr io.Writer) int {
 			if err != nil {
 				return nil, false, err
 			}
-			dropped := dropLegacyServer(servers)
-			if dropped {
-				legacyNote = "; the old cairn entry was removed"
-			}
+			note, dropped := dropLegacyServer(servers, isOldPiEntry)
+			legacyNote = note
 			if have, ok := servers["cairnbook"]; ok {
 				serverState = "differs, left as is"
 				if jsonEqual(have, piEntry()) {

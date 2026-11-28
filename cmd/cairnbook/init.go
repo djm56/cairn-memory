@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -56,6 +57,10 @@ var writeContent = func(w io.Writer, content []byte) error {
 //
 // Exit codes: 0 for a written or unchanged file, 1 for a refusal of the file, 2 for
 // a usage error. `--help` prints to stdout and exits 0.
+//
+// A .cairn.toml in the directory, with no .cairnbook.toml beside it, is refused with the
+// rename to make (#244), whatever it holds, and nothing is written. Once both names are there,
+// the new file is compared as usual and the old one is left alone.
 func runInit(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("cairnbook init", flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
@@ -114,6 +119,27 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	// The old name with no new one beside it. A new file here would win over the old one, and
+	// any settings it holds that differ would be silently overridden (#244), so init refuses and
+	// writes nothing. The rename is the person's to make, since it moves a committed file. os.Lstat is used, not
+	// os.Stat, so any entry at the old name counts as present: a dangling symlink too, which Stat would report as absent.
+	legacy := filepath.Join(dir, identity.LegacyFileName)
+	legacyInfo, err := os.Lstat(legacy)
+	switch {
+	case err == nil && legacyInfo.IsDir():
+		fmt.Fprintf(stderr, "cairnbook init: %s is a directory, not a project file: move it aside by hand, then run cairnbook init\n", legacy)
+		return 1
+	case err == nil:
+		// The paths are the full ones: init may run from a subfolder with CLAUDE_PROJECT_DIR set, so a relative
+		// command would name a file that is not there. Each path is quoted in the command, so a folder name with a
+		// space or a quote still gives a command the shell reads back as the same two paths.
+		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv %s %s` (or mv %s %s), then run cairnbook init again\n", legacy, shellQuote(legacy), shellQuote(path), shellQuote(legacy), shellQuote(path))
+		return 1
+	case !errors.Is(err, fs.ErrNotExist):
+		fmt.Fprintf(stderr, "cairnbook init: look for %s: %v\n", legacy, err)
+		return 1
+	}
+
 	// A file above this directory belongs to the project above. A second one here would
 	// shadow it for everything below, unless it says the same, in which case there is
 	// nothing to write.
@@ -134,12 +160,21 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// shellQuote returns s as one word for a POSIX shell: wrapped in single quotes. Each
+// single quote in s becomes a close quote, an escaped quote and a reopened quote. Nothing
+// else is special inside single quotes. It is the rule internal/server uses for the
+// restore command; it is kept here so cmd does not import the server.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // writeInitHelp prints the usage of cairnbook init, and its flags, to w.
 func writeInitHelp(w io.Writer, fl *flag.FlagSet) {
 	fmt.Fprintln(w, "Usage: cairnbook init --project <name> --server <url>")
 	fmt.Fprintln(w, "Writes .cairnbook.toml in the project directory: CLAUDE_PROJECT_DIR when it is set, else the working directory.")
 	fmt.Fprintln(w, "It changes nothing that is already there.")
 	fmt.Fprintln(w, "It refuses to run from a working directory outside CLAUDE_PROJECT_DIR, when that is set.")
+	fmt.Fprintln(w, "It refuses when the folder holds .cairn.toml, the old name, and no .cairnbook.toml, and says how to rename it.")
 	fmt.Fprintln(w, "It writes the file whole or not at all where the filesystem has hard links. On one without them it writes the file directly, and a crash can leave it partly written.")
 	fl.SetOutput(w)
 	fl.PrintDefaults()

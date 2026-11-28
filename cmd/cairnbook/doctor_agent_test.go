@@ -888,3 +888,18 @@ func TestDoctorAgentPluginInAProjectFile(t *testing.T) {
 		t.Errorf("PreCompact is %v, want ok with the D15 note %q", c, wantPreCompact)
 	}
 }
+
+// TestDoctorAgentWarnsOfThePluginUnderItsOldName checks that a user settings file which enables the plugin as cairn,
+// its name before the rename, is a plugin warning that names that file and says to uninstall the plugin, then install
+// cairnbook@cairnbook. The expected text is written out here, not read from legacyPluginNote, so a wrong note fails.
+func TestDoctorAgentWarnsOfThePluginUnderItsOldName(t *testing.T) {
+	dir := agentProject(t)
+	user := userSettings(t)
+	writeSettings(t, user, `{"enabledPlugins": {"cairn@cairn-memory": true}}`)
+
+	want := "the plugin is enabled under its old name cairn in " + user + "; its hooks run the old binary name: uninstall it, then install cairnbook@cairnbook (see the wiki's Upgrade page)"
+	c := checkNamed(claudeCodeChecks(dir), "plugin")
+	if c == nil || c.status != "warn" || c.detail != want {
+		t.Errorf("plugin check is %+v, want warn %q", c, want)
+	}
+}

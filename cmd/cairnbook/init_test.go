@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -182,6 +184,291 @@ func TestInitRefusesABelowAFileAbove(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
 		t.Errorf("a file was written below the project file: %v", err)
 	}
+}
+
+// TestInitRefusesALegacyFileWithNoNewOne checks #244: a folder that holds only the old .cairn.toml
+// is refused whatever values the old file holds. The message names the rename, and nothing is
+// written or changed, so the new file cannot win over the old one with other settings.
+func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
+	cases := map[string]string{
+		"same values":  "project = \"acme-api\"\nserver = \"" + initServer + "\"\n",
+		"other values": "project = \"old-api\"\nserver = \"https://old.example:8788\"\n",
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			legacy := writeFile(t, dir, ".cairn.toml", content)
+
+			newPath := filepath.Join(dir, ".cairnbook.toml")
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			// The temporary folder has no space or quote, so the quoted command is the path in single quotes.
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") ||
+				!strings.Contains(stderr, "git mv '"+legacy+"' '"+newPath+"'") || !strings.Contains(stderr, legacy) {
+				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal naming %s and %s", code, stderr, legacy, newPath)
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the old file: %v", err)
+			}
+			if string(readBytes(t, legacy)) != content {
+				t.Errorf("the old file changed: %q", readBytes(t, legacy))
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestInitRefusalQuotesThePathsInTheRenameCommand checks that the commands the refusal prints can be
+// pasted into a POSIX shell: each path is one single-quoted word, and a single quote inside a path
+// becomes a close quote, an escaped quote and a reopened quote. The plain path before "is the project file under its old name" is not quoted.
+// The expected words are written out from the folder name, not built with shellQuote, so the test
+// does not repeat the rule it checks.
+func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
+	cases := map[string]struct {
+		folder string
+		// quoted returns the shell words the command must hold for the old and the new path, given
+		// the temporary directory. The folder name is written literally in each.
+		quoted func(tmp string) (legacy, newPath string)
+	}{
+		"a space": {
+			folder: "my projects",
+			quoted: func(tmp string) (string, string) {
+				return "'" + tmp + "/my projects/.cairn.toml'", "'" + tmp + "/my projects/.cairnbook.toml'"
+			},
+		},
+		"a single quote": {
+			folder: "it's here",
+			quoted: func(tmp string) (string, string) {
+				return "'" + tmp + `/it'\''s here/.cairn.toml'`, "'" + tmp + `/it'\''s here/.cairnbook.toml'`
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp := t.TempDir()
+			if strings.Contains(tmp, "'") {
+				t.Fatalf("the temporary directory %s holds a single quote, so the literal expected words do not hold", tmp)
+			}
+			dir := filepath.Join(tmp, tc.folder)
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			useDir(t, dir)
+			legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+			newPath := filepath.Join(dir, ".cairnbook.toml")
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") {
+				t.Fatalf("exit %d, stderr %q: want 1 and the rename refusal", code, stderr)
+			}
+			if !strings.Contains(stderr, legacy+" is the project file under its old name") {
+				t.Errorf("stderr %q does not name the old file by its plain path %s", stderr, legacy)
+			}
+			wantLegacy, wantNew := tc.quoted(tmp)
+			for _, cmd := range []string{"git mv ", "mv "} {
+				want := cmd + wantLegacy + " " + wantNew
+				if !strings.Contains(stderr, want) {
+					t.Errorf("stderr %q does not hold the command %q", stderr, want)
+				}
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the old file: %v", err)
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestShellQuote checks shellQuote against literal inputs and the words a POSIX shell reads back from
+// them: the string in single quotes. Each single quote becomes a close quote, an escaped quote, and a
+// reopened quote. The expected values are worked out by hand, not produced by shellQuote.
+func TestShellQuote(t *testing.T) {
+	cases := map[string]struct {
+		in, want string
+	}{
+		"empty":       {in: "", want: `''`},
+		"a space":     {in: "a b", want: `'a b'`},
+		"a quote":     {in: "it's", want: `'it'\''s'`},
+		"two quotes":  {in: "''", want: `''\'''\'''`},
+		"dollar sign": {in: "$HOME", want: `'$HOME'`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := shellQuote(tc.in); got != tc.want {
+				t.Errorf("shellQuote(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestInitRefusesALegacySymlink checks that any entry at the old name counts as present, a symlink included. A
+// dangling symlink reads as absent to os.Stat, so init used to write .cairnbook.toml beside it. Init refuses with
+// the rename refusal, writes nothing, and leaves the symlink as it was.
+func TestInitRefusesALegacySymlink(t *testing.T) {
+	cases := map[string]string{
+		"dangling": "missing.toml",
+		"live":     "target.toml",
+	}
+	for name, target := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			if target == "target.toml" {
+				writeFile(t, dir, target, "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+			}
+			legacy := filepath.Join(dir, ".cairn.toml")
+			if err := os.Symlink(target, legacy); err != nil {
+				t.Skipf("the filesystem cannot make the symlink: %v", err)
+			}
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") {
+				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal", code, stderr)
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Lstat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the symlink: %v", err)
+			}
+			if got, err := os.Readlink(legacy); err != nil || got != target {
+				t.Errorf("the symlink changed: points to %q, %v; want %q", got, err, target)
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestInitRefusesALegacyDirectoryInTheWay checks #244: a .cairn.toml directory is refused as a
+// .cairnbook.toml directory is, and nothing is written beside it.
+func TestInitRefusesALegacyDirectoryInTheWay(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	if err := os.Mkdir(filepath.Join(dir, ".cairn.toml"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "is a directory, not a project file") {
+		t.Errorf("exit %d, stderr %q: want 1 and the directory refusal", code, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+		t.Errorf("a .cairnbook.toml was written beside the directory: %v", err)
+	}
+	assertNoDestructive(t, stderr)
+}
+
+// TestInitDirectoryAtTheNewNameBesideALegacyFileRefusesFirst checks #244: a .cairnbook.toml directory
+// beside a legacy .cairn.toml file is refused as a directory, since the new-name check runs first. The
+// directory and the legacy file are both left as they were, and nothing is written.
+func TestInitDirectoryAtTheNewNameBesideALegacyFileRefusesFirst(t *testing.T) {
+	dir := t.TempDir()
+	useDir(t, dir)
+	newPath := filepath.Join(dir, ".cairnbook.toml")
+	if err := os.Mkdir(newPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+	legacyBefore := readBytes(t, legacy)
+
+	code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+	if code != 1 || !strings.Contains(stderr, "is a directory, not a project file") || !strings.Contains(stderr, newPath) {
+		t.Errorf("exit %d, stderr %q: want 1 and the directory refusal naming %s", code, stderr, newPath)
+	}
+	if stdout != "" {
+		t.Errorf("stdout %q, want nothing", stdout)
+	}
+	if info, err := os.Stat(newPath); err != nil || !info.IsDir() {
+		t.Errorf("%s is no longer a directory: %v", newPath, err)
+	}
+	// os.ReadDir returns names in filename order, so the names are compared in that order.
+	if got, want := dirNames(t, dir), []string{".cairn.toml", ".cairnbook.toml"}; !slices.Equal(got, want) {
+		t.Errorf("folder holds %v, want %v: the directory and the legacy file only", got, want)
+	}
+	if !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+		t.Errorf("the legacy file changed: %q", readBytes(t, legacy))
+	}
+	assertNoDestructive(t, stderr)
+}
+
+// TestInitWithBothFilesKeepsTheExistingBehaviour checks #244: when the folder holds the old file and
+// .cairnbook.toml, init compares the new file as it does on its own, and leaves the old file as it is.
+func TestInitWithBothFilesKeepsTheExistingBehaviour(t *testing.T) {
+	t.Run("same values", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		newFile := writeFile(t, dir, ".cairnbook.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\n")
+		newBefore, legacyBefore := readBytes(t, newFile), readBytes(t, legacy)
+
+		code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+		if code != 0 || !strings.Contains(stdout, "nothing changed") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 0 and nothing changed", code, stdout, stderr)
+		}
+		if !bytes.Equal(readBytes(t, newFile), newBefore) || !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+			t.Errorf("a file changed")
+		}
+	})
+	t.Run("other values", func(t *testing.T) {
+		dir := t.TempDir()
+		useDir(t, dir)
+		newFile := writeFile(t, dir, ".cairnbook.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\n")
+		newBefore, legacyBefore := readBytes(t, newFile), readBytes(t, legacy)
+
+		code, _, stderr := runCmd(t, initArgs("other", initServer)...)
+		if code != 1 || !strings.Contains(stderr, "already sets project") {
+			t.Errorf("exit %d, stderr %q: want 1 and the refusal of other values", code, stderr)
+		}
+		if !bytes.Equal(readBytes(t, newFile), newBefore) || !bytes.Equal(readBytes(t, legacy), legacyBefore) {
+			t.Errorf("a file changed")
+		}
+	})
+}
+
+// TestInitBelowALegacyFileAboveKeepsTheExistingBehaviour checks #244: a folder below a project file
+// under the old name is compared with it as fileAbove has always done. The same values change
+// nothing, and other values are refused as shadowing the project.
+func TestInitBelowALegacyFileAboveKeepsTheExistingBehaviour(t *testing.T) {
+	t.Run("same values", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		sub := filepath.Join(root, "service")
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		useDir(t, sub)
+
+		code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+		if code != 0 || !strings.Contains(stdout, "nothing changed") {
+			t.Errorf("exit %d, stdout %q, stderr %q: want 0 and nothing changed", code, stdout, stderr)
+		}
+		if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
+			t.Errorf("a file was written below the old project file: %v", err)
+		}
+	})
+	t.Run("other values", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, ".cairn.toml", "project = \"acme-api\"\nserver = \""+initServer+"\"\n")
+		sub := filepath.Join(root, "service")
+		if err := os.Mkdir(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		useDir(t, sub)
+
+		code, _, stderr := runCmd(t, initArgs("other", initServer)...)
+		if code != 1 || !strings.Contains(stderr, "would shadow it") {
+			t.Errorf("exit %d, stderr %q: want 1 and the shadowing refusal", code, stderr)
+		}
+		if _, err := os.Stat(filepath.Join(sub, ".cairnbook.toml")); !os.IsNotExist(err) {
+			t.Errorf("a file was written below the old project file: %v", err)
+		}
+	})
 }
 
 // TestInitRejectsBadArguments checks the usage errors, which exit 2 and write
@@ -363,6 +650,9 @@ func TestInitHelpGoesToStdout(t *testing.T) {
 		}
 		if !strings.Contains(stdout, "Usage: cairnbook init") || !strings.Contains(stdout, "-project") {
 			t.Errorf("%v: stdout %q does not carry the usage and the flags", args, stdout)
+		}
+		if !strings.Contains(stdout, "holds .cairn.toml") || !strings.Contains(stdout, "says how to rename it") {
+			t.Errorf("%v: stdout %q does not say init refuses the old file and how to rename it", args, stdout)
 		}
 	}
 }

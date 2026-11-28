@@ -56,16 +56,18 @@ func ListAPIKeys(ctx context.Context, q Querier) ([]APIKeyInfo, error) {
 // RevokeAPIKey sets revoked_at on the active key named name. A key with no such
 // name, or one already revoked, returns ErrNotFound (wrapped): the first
 // revocation stands, and a second one changes nothing. The row is kept, so the
-// name stays taken.
+// name stays taken. A database error is returned without the name, since a caller
+// may pass a whole key as the name and the error may reach an operator's terminal.
 //
 // Write function: call it through WithTx.
 func RevokeAPIKey(ctx context.Context, q Querier, name string, at time.Time) error {
 	res, err := q.ExecContext(ctx, `UPDATE api_keys SET revoked_at = ?
 		WHERE name = ? AND revoked_at IS NULL`, formatTime(at), name)
 	if err != nil {
-		return fmt.Errorf("store: revoke api key %s: %w", name, err)
+		return fmt.Errorf("store: revoke api key: %w", err)
 	}
-	return requireOneRow(res, fmt.Sprintf("active api key %s", name))
+	// The name is left out of the not-found error: a caller may pass a whole key as the name (#245).
+	return requireOneRow(res, "active api key")
 }
 
 // FindActiveAPIKey returns the unrevoked key whose hash is hash. It returns

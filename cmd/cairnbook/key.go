@@ -55,7 +55,8 @@ func runKey(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stdout, keyUsage)
 		return 0
 	}
-	fmt.Fprintf(stderr, "cairnbook key: unknown action %q: use add, list or revoke; run cairnbook key --help\n", args[0])
+	// The message names no action: a key pasted in this position is the token that must not be echoed (#245).
+	fmt.Fprintln(stderr, "cairnbook key: unknown action: use add, list or revoke; run cairnbook key --help")
 	return 2
 }
 
@@ -70,6 +71,11 @@ type keyFlag struct {
 // is given. It returns the exit code to stop with, or -1 to go on. A help request prints the
 // usage to stdout. The flags are checked in the order given, so the message is the same on
 // every run.
+//
+// The usage messages name no argument and no flag the person typed, and runKey's unknown-action
+// message names no action either. The flag package builds its parse error from the token it did
+// not recognise, and a key pasted in the wrong place is such a token, so that error is replaced
+// rather than printed (#245).
 func keyFlags(action string, args []string, stdout, stderr io.Writer, flags []keyFlag) int {
 	fl := flag.NewFlagSet("cairnbook key "+action, flag.ContinueOnError)
 	fl.SetOutput(io.Discard)
@@ -81,11 +87,11 @@ func keyFlags(action string, args []string, stdout, stderr io.Writer, flags []ke
 			fmt.Fprint(stdout, keyUsage)
 			return 0
 		}
-		fmt.Fprintf(stderr, "cairnbook key %s: %v; run cairnbook key --help for the flags\n", action, err)
+		fmt.Fprintf(stderr, "cairnbook key %s: a flag is not recognised, or has no value; run cairnbook key --help for the flags\n", action)
 		return 2
 	}
 	if fl.NArg() > 0 {
-		fmt.Fprintf(stderr, "cairnbook key %s: takes flags only, got %q\n", action, fl.Args())
+		fmt.Fprintf(stderr, "cairnbook key %s: takes flags only; a positional argument is not allowed; run cairnbook key --help for the flags\n", action)
 		return 2
 	}
 	for _, f := range flags {

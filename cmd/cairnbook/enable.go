@@ -73,7 +73,9 @@ var claudeHooks = []claudeHook{
 // covers compact (coversCompact) is reported without the word "not", since doctor reads it as a working entry. notString
 // is set when that entry's matcher is not a string, so enable says so rather than naming the matcher as none. renamed
 // is set when the old command was renamed to the new one; removed is set when the old command was dropped because the
-// new one was already there.
+// new one was already there. matcher, differs and notString describe the entry that runs the hook after the change, and
+// are reported on a renamed or removed result too, after the rename or removal (hookLines); the rename or removal is
+// named first and never hides the matcher.
 type hookResult struct {
 	hook      claudeHook
 	added     bool
@@ -536,27 +538,49 @@ func reportLine(what, state, detail string) string {
 func hookLines(results []hookResult) string {
 	var b strings.Builder
 	for _, r := range results {
-		state := "already present"
+		var state string
 		switch {
 		case r.added:
 			state = "added"
 		case r.renamed:
-			state = "renamed from " + legacyCmdline(r.hook.cmdline)
+			// The rename is named first; the matcher, when it differs, follows on the same line.
+			state = joinState("renamed from "+legacyCmdline(r.hook.cmdline), "; ", matcherClause(r))
 		case r.removed:
-			// The new command was already there, so the old one is gone and the hook still runs once.
-			state = "old entry removed"
-		case r.notString:
-			// The matcher is not a string, so it is not a name enable can show: the entry is left as it is.
-			state = "already present, matcher is not a string"
-		case r.differs && coversCompact(r.matcher):
-			// The entry still does what the hook is for, so it is named, and not called a fault.
-			state = fmt.Sprintf("already present, matcher is %s", shownMatcher(r.matcher))
-		case r.differs:
-			state = fmt.Sprintf("already present, matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
+			// The new command was already there, so the old one is gone and the hook still runs once. The entry that
+			// runs it is the new one, so its matcher is named after the removal, as on a rename.
+			state = joinState("old entry removed", "; ", matcherClause(r))
+		default:
+			state = joinState("already present", ", ", matcherClause(r))
 		}
 		b.WriteString(reportLine(r.hook.event, state, r.hook.cmdline))
 	}
 	return b.String()
+}
+
+// matcherClause is the part of a hook's report that names its matcher, or "" when the matcher needs no mention. It
+// covers the three cases of the already-present report: a matcher that is not a string, a matcher that still covers
+// compact (named, without the word "not", since doctor reads it as a working entry), and a matcher that differs from
+// the hook's own.
+func matcherClause(r hookResult) string {
+	switch {
+	case r.notString:
+		// The matcher is not a string, so it is not a name enable can show: the entry is left as it is.
+		return "matcher is not a string"
+	case r.differs && coversCompact(r.matcher):
+		// The entry still does what the hook is for, so it is named, and not called a fault.
+		return fmt.Sprintf("matcher is %s", shownMatcher(r.matcher))
+	case r.differs:
+		return fmt.Sprintf("matcher is %s, not %s", shownMatcher(r.matcher), r.hook.matcher)
+	}
+	return ""
+}
+
+// joinState appends clause to state with sep between them, and returns state alone when clause is "".
+func joinState(state, sep, clause string) string {
+	if clause == "" {
+		return state
+	}
+	return state + sep + clause
 }
 
 // warnIfNotOnPath warns on stderr when cairnbook is not on the PATH of this shell. The hooks and the MCP registrations run the

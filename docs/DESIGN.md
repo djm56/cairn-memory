@@ -523,7 +523,7 @@ any other backend. A behaviour exists when the conformance suite says so.
 
 | Command | Does |
 |---|---|
-| `cairnbook init` | Writes `.cairnbook.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. `--help` prints to stdout. |
+| `cairnbook init` | Writes `.cairnbook.toml` with `--project` and `--server`, in the project directory: `CLAUDE_PROJECT_DIR` when it is set, else the working directory, the directory §2.1 starts its walk from. Built in M1. It writes the file whole or not at all. It does not contact the server: the project is registered by its first call (CONTRACT §1.1). It is idempotent, never changes a value the file has, and below a project file with the same values it changes nothing. It refuses a server URL with a user name or password. In a folder that holds the old `.cairn.toml` and no `.cairnbook.toml`, it refuses with the rename to make, and writes nothing (#244). `--help` prints to stdout. |
 | `cairnbook mcp` | The MCP stdio server. Requires `server` or `CAIRNBOOK_SERVER` and refuses to start without one (M1, D11). Built in M1: server only, through `internal/client`; it never opens a database and listens on nothing. |
 | `cairnbook serve` | HTTP API and web UI. Flags for address, TLS and the database path. Built in M2 (D20), and it is the binary's only listener; its handlers landed in M1 (D19). The web UI is built in M3. |
 | `cairnbook hook <event>` | Output for client hooks. `session-start` is built in M1; `pre-compact` and `stop` are built in M4 (#83, #84). What Claude Code does with each is in §4.1. |
@@ -1468,9 +1468,12 @@ status; they only recommend.
   hash or the key. `cairnbook key revoke` ends a key at its next call, since the server
   reads the key table on every call. A revoked key keeps its name, so a name is
   never reused. Names are 1 to 64 letters, digits, dots, hyphens or underscores,
-  and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` checks the name the same
-  way, before it looks anything up, so a key pasted as a name is refused and is
-  not echoed. If `cairnbook key add` cannot write the key to stdout, the key was made
+  and may not begin with `cairnbook_` or `cairn_`. `cairnbook key revoke` refuses a name that
+  fails the pattern, or a name shaped like a whole key under either prefix, before it looks
+  anything up. No revoke error repeats the name given, and the usage errors of `key add`, `key list` and `key revoke`
+  repeat no argument or flag, and the unknown-action error of `key` repeats no action, so a key pasted as a name, as a
+  positional argument, as a flag or as the action, or one with a character added or dropped, is not echoed. The one
+  exception is the `--db` value, which database errors print (internal/server/db.go), because it is a path. If `cairnbook key add` cannot write the key to stdout, the key was made
   and nobody has seen it, so `add` revokes it and exits 1.
 
   The 256 random bits are what make a fast hash enough: a guess of the key is

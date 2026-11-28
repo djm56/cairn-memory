@@ -135,7 +135,7 @@ cairnbook init --project <name> --server <url>
 | `--project <name>` | yes | The project name, such as `acme-api`. Lowercase letters and digits, in hyphen-separated groups, at most 64 characters |
 | `--server <url>` | yes | The server's URL, such as `https://cairnbook.lan:8788`. It must not carry a user name or a password |
 
-Writes `.cairnbook.toml` in the project directory: `CLAUDE_PROJECT_DIR` when it is set, otherwise the working directory. It changes nothing that is already there. It refuses to run from a working directory outside `CLAUDE_PROJECT_DIR`, when that is set. It does not contact the server. Missing flags are a usage error, exit 2.
+Writes `.cairnbook.toml` in the project directory: `CLAUDE_PROJECT_DIR` when it is set, otherwise the working directory. It changes nothing that is already there. It refuses to run from a working directory outside `CLAUDE_PROJECT_DIR`, when that is set. In a folder that holds the old `.cairn.toml` and no `.cairnbook.toml`, it exits 1 without writing anything and names the rename to make first. It does not contact the server. Missing flags are a usage error, exit 2.
 
 The help says the file is written whole or not at all where the filesystem has hard links, and directly where it does not. Issue #200 is open on the wording.
 
