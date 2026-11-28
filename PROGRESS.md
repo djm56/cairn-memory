@@ -29,6 +29,7 @@ Install and update a test server: [docs/QUICK-INSTALL.md](docs/QUICK-INSTALL.md)
 
 - Rename (D38, decided 2026-11-27, issue #98): the tool is Cairnbook. Merged to `main` in PR #240 (2026-11-27); the old-key fallback (`cairn_` keys) and the doc corrections from its review followed in PR #241; the review follow-ups #242 to #245 and #247 are closed by PR #246 on merge. The repository and the Go module keep `cairn-memory` until the operator renames the repository; then #98 and #99 close.
 - Rename follow-up #247 (rename follow-up nits: enable matcher report, init rename quoting, test assertions) is closed by PR #246 on merge. It has no milestone, so it is not in the Later count.
+- Rename follow-up #248 (rename follow-up nits: init path display, dangling `.cairnbook.toml` symlink, symlink test skips) is open with no milestone, so it is not in the Later count.
 - M5 Plugin: merged to main (PR #229, 2026-11-21). The operator runs the exit check from `wiki/Install-Plugin.md` section 7a on a clean machine. Epic #20 stays open until it passes. #235 (install guide fixes) was closed by PR #238 (`m5-guide-post-merge`, merged 2026-11-27).
 
 **Next**
