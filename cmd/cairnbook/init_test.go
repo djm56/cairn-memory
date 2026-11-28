@@ -286,8 +286,8 @@ func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
 }
 
 // TestShellQuote checks shellQuote against literal inputs and the words a POSIX shell reads back from
-// them: the string in single quotes, with each single quote written as '\”. The expected values are
-// worked out by hand, not produced by shellQuote.
+// them: the string in single quotes. Each single quote becomes a close quote, an escaped quote, and a
+// reopened quote. The expected values are worked out by hand, not produced by shellQuote.
 func TestShellQuote(t *testing.T) {
 	cases := map[string]struct {
 		in, want string
