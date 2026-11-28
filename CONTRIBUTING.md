@@ -80,7 +80,7 @@ From what went well and badly in bishop-memory (PLAN.md §6):
   quote (`''`) in a Go doc comment to a typographic closing quote (U+201D), and
   two backticks to an opening one (U+201C). `make scan-invisible` fails on
   either, so describe such text in words in a comment. A typographic quote that
-  a string literal really needs is written as an escape, such as `”`.
+  a string literal really needs is written as an escape, such as `\u201D`.
 
 ### Plan v1 rules
 
