@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -313,8 +314,9 @@ func TestInitDirectoryAtTheNewNameBesideALegacyFileRefusesFirst(t *testing.T) {
 	if info, err := os.Stat(newPath); err != nil || !info.IsDir() {
 		t.Errorf("%s is no longer a directory: %v", newPath, err)
 	}
-	if got := dirNames(t, dir); len(got) != 2 {
-		t.Errorf("folder holds %v, want the directory and the legacy file only", got)
+	// os.ReadDir returns names in filename order, so the names are compared in that order.
+	if got, want := dirNames(t, dir), []string{".cairn.toml", ".cairnbook.toml"}; !slices.Equal(got, want) {
+		t.Errorf("folder holds %v, want %v: the directory and the legacy file only", got, want)
 	}
 	if !bytes.Equal(readBytes(t, legacy), legacyBefore) {
 		t.Errorf("the legacy file changed: %q", readBytes(t, legacy))
