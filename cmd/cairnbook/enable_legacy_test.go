@@ -290,8 +290,9 @@ func TestEnableDryRunReportsARenameAndWritesNothing(t *testing.T) {
 }
 
 // TestEnableRenamesAnOldHookUnderADifferentMatcher pins what enable does with an old cairn hook under a matcher
-// that does not name compact. The hook is renamed in place and keeps its matcher: the first run reports only the
-// rename, without naming the matcher, and a second run reports the matcher as one that does not cover compact.
+// that does not name compact. The hook is renamed in place and keeps its matcher. The first run reports the rename
+// and the matcher in one line, joined by "; ", so the operator sees the matcher on the run that changes the file; a
+// second run reports the matcher alone, as already present.
 func TestEnableRenamesAnOldHookUnderADifferentMatcher(t *testing.T) {
 	dir := enableProject(t)
 	path := settingsIn(dir)
@@ -301,8 +302,8 @@ func TestEnableRenamesAnOldHookUnderADifferentMatcher(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
 	}
-	if got := outcomes(stdout)["SessionStart"]; got != "renamed from cairn hook session-start" {
-		t.Errorf("SessionStart is %q, want the rename reported", got)
+	if got := outcomes(stdout)["SessionStart"]; got != "renamed from cairn hook session-start; matcher is startup, not startup|resume|clear|compact" {
+		t.Errorf("SessionStart is %q, want the rename and the matcher reported together", got)
 	}
 	got := decodeJSON(t, readBytes(t, path))["hooks"].(map[string]any)["SessionStart"]
 	if want := []any{entryJSON("startup", "cairnbook hook session-start")}; !reflect.DeepEqual(got, want) {
@@ -310,5 +311,49 @@ func TestEnableRenamesAnOldHookUnderADifferentMatcher(t *testing.T) {
 	}
 	if _, stdout, _ = runCmd(t, "enable", "--agent", "claude-code"); outcomes(stdout)["SessionStart"] != "already present, matcher is startup, not startup|resume|clear|compact" {
 		t.Errorf("second run SessionStart is %q, want the matcher named as not covering compact", outcomes(stdout)["SessionStart"])
+	}
+}
+
+// TestEnableRenamesAnOldHookUnderACompactMatcherThatDiffers pins the rename under a matcher that covers compact but
+// is not the hook's own. The rename line names the matcher, as the already-present line does, without the word "not",
+// since the entry still runs after /compact. A rename under the hook's own matcher is plain (see
+// TestEnableRenamesTheOldHookCommands).
+func TestEnableRenamesAnOldHookUnderACompactMatcherThatDiffers(t *testing.T) {
+	dir := enableProject(t)
+	path := settingsIn(dir)
+	writeSettings(t, path, `{"hooks": {"SessionStart": [{"matcher": "compact", "hooks": [{"type": "command", "command": "cairn hook session-start"}]}]}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := outcomes(stdout)["SessionStart"]; got != "renamed from cairn hook session-start; matcher is compact" {
+		t.Errorf("SessionStart is %q, want the rename and the matcher named without \"not\"", got)
+	}
+	if _, stdout, _ = runCmd(t, "enable", "--agent", "claude-code"); outcomes(stdout)["SessionStart"] != "already present, matcher is compact" {
+		t.Errorf("second run SessionStart is %q, want the matcher named as already present", outcomes(stdout)["SessionStart"])
+	}
+}
+
+// TestEnableRemovesTheOldHookBesideANewOneUnderADifferentMatcher pins the removed state under a matcher that differs.
+// The old entry is dropped, and the hook still runs once under the new entry's matcher, which is named on the same
+// line, as the rename states do. The new entry is left as it is.
+func TestEnableRemovesTheOldHookBesideANewOneUnderADifferentMatcher(t *testing.T) {
+	dir := enableProject(t)
+	writeSettings(t, settingsIn(dir), `{"hooks": {"SessionStart": [
+      {"matcher": "startup", "hooks": [{"type": "command", "command": "cairnbook hook session-start"}]},
+      {"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": "cairn hook session-start"}]}
+    ]}}`)
+
+	code, stdout, stderr := runCmd(t, "enable", "--agent", "claude-code")
+	if code != 0 || stderr != "" {
+		t.Fatalf("exit %d, stderr %q: want 0 and nothing on stderr", code, stderr)
+	}
+	if got := outcomes(stdout)["SessionStart"]; got != "old entry removed; matcher is startup, not startup|resume|clear|compact" {
+		t.Errorf("SessionStart is %q, want the removal and the surviving entry's matcher reported together", got)
+	}
+	want := []any{entryJSON("startup", "cairnbook hook session-start")}
+	if got := decodeJSON(t, readBytes(t, settingsIn(dir)))["hooks"].(map[string]any)["SessionStart"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("SessionStart is %v, want the old entry dropped and the new one kept as it is", got)
 	}
 }
