@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -129,8 +130,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return 1
 	case err == nil:
 		// The paths are the full ones: init may run from a subfolder with CLAUDE_PROJECT_DIR set, so a relative
-		// command would name a file that is not there.
-		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv %s %s` (or mv %s %s), then run cairnbook init again\n", legacy, legacy, path, legacy, path)
+		// command would name a file that is not there. Each path is quoted in the command, so a folder name with a
+		// space or a quote still gives a command the shell reads back as the same two paths.
+		fmt.Fprintf(stderr, "cairnbook init: %s is the project file under its old name: rename it with `git mv %s %s` (or mv %s %s), then run cairnbook init again\n", legacy, shellQuote(legacy), shellQuote(path), shellQuote(legacy), shellQuote(path))
 		return 1
 	case !errors.Is(err, fs.ErrNotExist):
 		fmt.Fprintf(stderr, "cairnbook init: look for %s: %v\n", legacy, err)
@@ -155,6 +157,13 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "cairnbook init: wrote %s with project %q and server %q.\n", path, *project, *server)
 	fmt.Fprintln(stdout, "The project is registered on the server by its first call. Commit the file: it holds no key.")
 	return 0
+}
+
+// shellQuote returns s as one word for a POSIX shell: wrapped in single quotes. Each single quote in s becomes
+// a close quote, an escaped quote and a reopened quote. Nothing else is special inside single quotes. It is the rule internal/server uses for the
+// restore command; it is kept here so cmd does not import the server.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // writeInitHelp prints the usage of cairnbook init, and its flags, to w.

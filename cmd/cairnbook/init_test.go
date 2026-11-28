@@ -201,8 +201,9 @@ func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
 
 			newPath := filepath.Join(dir, ".cairnbook.toml")
 			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			// The temporary folder has no space or quote, so the quoted command is the path in single quotes.
 			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") ||
-				!strings.Contains(stderr, "git mv "+legacy+" "+newPath) || !strings.Contains(stderr, legacy) {
+				!strings.Contains(stderr, "git mv '"+legacy+"' '"+newPath+"'") || !strings.Contains(stderr, legacy) {
 				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal naming %s and %s", code, stderr, legacy, newPath)
 			}
 			if stdout != "" {
@@ -213,6 +214,58 @@ func TestInitRefusesALegacyFileWithNoNewOne(t *testing.T) {
 			}
 			if string(readBytes(t, legacy)) != content {
 				t.Errorf("the old file changed: %q", readBytes(t, legacy))
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
+// TestInitRefusalQuotesThePathsInTheRenameCommand checks that the commands the refusal prints can be
+// pasted into a POSIX shell: each path is one single-quoted word, and a single quote inside a path
+// becomes a close quote, an escaped quote and a reopened quote. The plain path before "is the project file under its old name" is not quoted.
+func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
+	cases := map[string]struct {
+		folder string
+		// quote is the shell form of one path, as a POSIX shell reads it back.
+		quote func(string) string
+	}{
+		"a space": {
+			folder: "my projects",
+			quote:  func(p string) string { return "'" + p + "'" },
+		},
+		"a single quote": {
+			folder: "it's here",
+			quote:  func(p string) string { return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'" },
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), tc.folder)
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			useDir(t, dir)
+			legacy := writeFile(t, dir, ".cairn.toml", "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+			newPath := filepath.Join(dir, ".cairnbook.toml")
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") {
+				t.Fatalf("exit %d, stderr %q: want 1 and the rename refusal", code, stderr)
+			}
+			if !strings.Contains(stderr, legacy+" is the project file under its old name") {
+				t.Errorf("stderr %q does not name the old file by its plain path %s", stderr, legacy)
+			}
+			for _, cmd := range []string{"git mv ", "mv "} {
+				want := cmd + tc.quote(legacy) + " " + tc.quote(newPath)
+				if !strings.Contains(stderr, want) {
+					t.Errorf("stderr %q does not hold the command %q", stderr, want)
+				}
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Stat(newPath); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the old file: %v", err)
 			}
 			assertNoDestructive(t, stderr)
 		})
