@@ -273,6 +273,44 @@ func TestInitRefusalQuotesThePathsInTheRenameCommand(t *testing.T) {
 	}
 }
 
+// TestInitRefusesALegacySymlink checks that any entry at the old name counts as present, a symlink included. A
+// dangling symlink reads as absent to os.Stat, so init used to write .cairnbook.toml beside it. Init refuses with
+// the rename refusal, writes nothing, and leaves the symlink as it was.
+func TestInitRefusesALegacySymlink(t *testing.T) {
+	cases := map[string]string{
+		"dangling": "missing.toml",
+		"live":     "target.toml",
+	}
+	for name, target := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			useDir(t, dir)
+			if target == "target.toml" {
+				writeFile(t, dir, target, "project = \"old-api\"\nserver = \"https://old.example:8788\"\n")
+			}
+			legacy := filepath.Join(dir, ".cairn.toml")
+			if err := os.Symlink(target, legacy); err != nil {
+				t.Fatal(err)
+			}
+
+			code, stdout, stderr := runCmd(t, initArgs(initProject, initServer)...)
+			if code != 1 || !strings.Contains(stderr, "is the project file under its old name") {
+				t.Errorf("exit %d, stderr %q: want 1 and the rename refusal", code, stderr)
+			}
+			if stdout != "" {
+				t.Errorf("stdout %q, want nothing", stdout)
+			}
+			if _, err := os.Lstat(filepath.Join(dir, ".cairnbook.toml")); !os.IsNotExist(err) {
+				t.Errorf("a .cairnbook.toml was written beside the symlink: %v", err)
+			}
+			if got, err := os.Readlink(legacy); err != nil || got != target {
+				t.Errorf("the symlink changed: points to %q, %v; want %q", got, err, target)
+			}
+			assertNoDestructive(t, stderr)
+		})
+	}
+}
+
 // TestInitRefusesALegacyDirectoryInTheWay checks #244: a .cairn.toml directory is refused as a
 // .cairnbook.toml directory is, and nothing is written beside it.
 func TestInitRefusesALegacyDirectoryInTheWay(t *testing.T) {

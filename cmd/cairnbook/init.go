@@ -121,9 +121,10 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 
 	// The old name with no new one beside it. A new file here would win over the old one, and
 	// any settings it holds that differ would be silently overridden (#244), so init refuses and
-	// writes nothing. The rename is the person's to make, since it moves a committed file.
+	// writes nothing. The rename is the person's to make, since it moves a committed file. os.Lstat is used, not
+	// os.Stat, so any entry at the old name counts as present: a dangling symlink too, which Stat would report as absent.
 	legacy := filepath.Join(dir, identity.LegacyFileName)
-	legacyInfo, err := os.Stat(legacy)
+	legacyInfo, err := os.Lstat(legacy)
 	switch {
 	case err == nil && legacyInfo.IsDir():
 		fmt.Fprintf(stderr, "cairnbook init: %s is a directory, not a project file: move it aside by hand, then run cairnbook init\n", legacy)
